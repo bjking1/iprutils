@@ -5032,7 +5032,6 @@ int init_device(i_container *i_con)
 
 int confirm_init_device(i_container *i_con)
 {
-	int found;
 	char *input;
 	char *buffer[2];
 	struct devs_to_init_t *cur_dev_init;
@@ -5042,11 +5041,10 @@ int confirm_init_device(i_container *i_con)
 	int toggle = 0;
 	int k;
 	i_container *temp_i_con;
+	int found = 0;
+	int post_attention = 0;
+	struct ipr_dev *dev;
 	mvaddstr(0,0,"CONFIRM INIT DEVICE FUNCTION CALLED");
-	found = 0;
-
-	for (k=0; k<2; k++)
-		buffer[k] = body_init_status(n_confirm_init_device.header, &header_lines, k);
 
 	for (temp_i_con = i_con_head;
 	     temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
@@ -5056,17 +5054,41 @@ int confirm_init_device(i_container *i_con)
 
 		input = temp_i_con->field_data;        
 		if (strcmp(input, "1") == 0) {
-			found = 1;
+			found++;
 			cur_dev_init =(struct devs_to_init_t *)(temp_i_con->data);
 			cur_dev_init->do_init = 1;
+			dev = cur_dev_init->ipr_dev;
 
-			for (k=0; k<2; k++)
-				buffer[k] = print_device(cur_dev_init->ipr_dev,buffer[k],"1",cur_dev_init->ioa, k);
+			if (!ipr_is_af(dev) && dev->scsi_dev_data &&
+			    (dev->scsi_dev_data->type == TYPE_DISK))
+				post_attention++;
 		}
 	}
 
 	if (!found)
 		return INVALID_OPTION_STATUS;
+
+	if (post_attention) {
+		for (k=0; k<2; k++) {
+			buffer[k] = add_string_to_body(NULL, _("ATTENTION!  System crash may occur "
+							       "if selected device is in use. Data loss will "
+							       "occur on selected device.  Proceed with "
+							       "caution.\n\n"), "", NULL);
+			buffer[k] = __body_init(buffer[k],n_confirm_init_device.header, &header_lines);
+			buffer[k] = status_header(buffer[k], &header_lines, k);
+		}
+	} else {
+		for (k=0; k<2; k++)
+			buffer[k] = body_init_status(n_confirm_init_device.header, &header_lines, k);
+	}
+
+	for (cur_dev_init = dev_init_head; cur_dev_init; cur_dev_init = cur_dev_init->next) {
+		if (!cur_dev_init->do_init)
+			continue;
+
+		for (k=0; k<2; k++)
+			buffer[k] = print_device(cur_dev_init->ipr_dev,buffer[k],"1",cur_dev_init->ioa, k);
+	}
 
 	do {
 		n_confirm_init_device.body = buffer[toggle&1];
@@ -8488,7 +8510,9 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 				if ((rc == CHECK_CONDITION) &&
 				    ((sense_data.error_code & 0x7F) == 0x70) &&
-				    ((sense_data.sense_key & 0x0F) == 0x02)) {
+				    ((sense_data.sense_key & 0x0F) == 0x02) && /* NOT READY */
+				    (sense_data.add_sense_code == 0x04) &&     /* LOGICAL UNIT NOT READY */
+				    (sense_data.add_sense_code_qual == 0x04))  /* FORMAT IN PROGRESS */
 
 					percent_cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
 					format_in_progress++;

@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.36 2004/03/12 00:15:13 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.37 2004/03/12 15:40:13 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -851,7 +851,13 @@ int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
-	if (rc != 0)
+	/* post log if error unless error is device format in progress */
+	if ((rc != 0) &&
+	    (((sense_data.error_code & 0x7F) != 0x70) ||
+	    ((sense_data.sense_key & 0x0F) != 0x02) || /* NOT READY */
+	    (sense_data.add_sense_code != 0x04) ||     /* LOGICAL UNIT NOT READY */
+	    (sense_data.add_sense_code_qual != 0x04))) /* FORMAT IN PROGRESS */
+
 		scsi_cmd_err(dev, &sense_data, "Mode Sense", rc);
 
 	close(fd);
