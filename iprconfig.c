@@ -1269,7 +1269,7 @@ int disk_status(i_container *i_con)
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL) ||
-			    (scsi_dev_data->type == IPR_TYPE_ADAPTER) ||
+			    (scsi_dev_data->type != TYPE_DISK) ||
 			    (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
 			    (ipr_is_volume_set(&cur_ioa->dev[j])) ||
 			    (ipr_is_array_member(&cur_ioa->dev[j])))
