@@ -464,6 +464,29 @@ $set 402 bus_config_fail
  None of the installed adapters support the requested\
  operation."
 
+$set 403 change_bus_attr
+1 "Change SCSI Bus Configuration"
+2 "Current Bus configurations are shown.  To change\
+ setting hit 'c' for options menu. Hightlight desired\
+ option then hit Enter"
+3 "Change Setting"
+4 "BUS"
+5 "QAS Capability"
+6 "Host SCSI ID"
+7 "Wide Enabled"
+8 "Maximum Bus Throughput"
+9 "Enable"
+10 "Enabled"
+11 "Disable"
+12 "Disabled"
+13 "Yes"
+14 "No"
+
+21 "Confirm Change SCSI Bus Configuration"
+22 "Confirming this action will result in the following\
+ configuration to become active."
+23 "Confirm Change SCSI Bus Configration"
+
 $set 458 driver_config
 1 "Adapter Driver Configuration"
 2 "Select subsystem to change driver configuration"

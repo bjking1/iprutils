@@ -62,6 +62,7 @@ struct devs_to_init_t *dev_init_head = NULL;
 struct devs_to_init_t *dev_init_tail = NULL;
 struct array_cmd_data *raid_cmd_head = NULL;
 struct array_cmd_data *raid_cmd_tail = NULL;
+i_container *i_con_head = NULL;
 char                   log_root_dir[200];
 char                   editor[200];
 FILE                  *errpath;
@@ -92,14 +93,7 @@ nl_catd                catd;
 #define is_digit(ch) (((ch)>=(unsigned)'0'&&(ch)<=(unsigned)'9')?1:0)
 
 i_container *free_i_con(i_container *x_con);
-fn_out      *free_fn_out(fn_out *out);
-i_container *add_i_con(i_container *x_con,
-		       char *f,
-		       void *d,i_type t);
-fn_out      *init_output();
-fn_out      *add_fn_out(fn_out *output,int i,
-			char *text);
-i_container *copy_i_con(i_container *x_con);
+i_container *add_i_con(i_container *x_con, char *f, void *d);
 
 struct special_status {
 	int   index;
@@ -263,19 +257,6 @@ int main(int argc, char *argv[])
 
 struct screen_output *screen_driver(s_node *screen, int header_lines, i_container *i_con)
 {
-	/*     Screen Name   <- title
-
-	 0  Header    bla      bla   <- pad_top = 0
-	 1  heading  heading  heading   <- header_lines=2
-	 2  output   out      out
-	 3  output   out      out  <- body (represented by text, % signs for fields, and # signs for output)
-	 4  output   out      out
-	 5  output   out      out
-	 6  output   out      out  <- pad_b = std_scr_max_y-pad_scr_t-pad_scr_b-1 = number dislayed lines - 1 = 6
-
-	 e=exit   q=quit  f=pagedn ...  <- footer
-	 */
-
 	WINDOW *w_pad,*w_page_header;              /* windows to hold text */
 	FIELD **fields = NULL;                     /* field list for forms */
 	FORM *form = NULL;                       /* form for input fields */
@@ -284,13 +265,13 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 	char buffer[100];                       /* needed for special status strings */
 	bool invalid = false;                   /* invalid status display */
 
-	bool t_on=false,e_on=false,q_on=false,r_on=false,f_on=false,enter_on=false; /* control user input handling */
+	bool t_on=false,e_on=false,q_on=false,r_on=false,f_on=false,m_on=false,enter_on=false; /* control user input handling */
 	bool ground_cursor=false;
 
 	int stdscr_max_y,stdscr_max_x;
 	int w_pad_max_y=0,w_pad_max_x=0;       /* limits of the windows */
-	int pad_l=0,pad_r,pad_t=0,pad_b;
-	int pad_scr_t=2,pad_scr_b=2,pad_scr_l=0; /* position of the pad */
+	int pad_l=0,pad_scr_r,pad_t=0,viewable_body_lines;
+	int title_lines=2,footer_lines=2; /* position of the pad */
 	int center,len=0,ch;
 	int i=0,j,k,row=0,col=0,bt_len=0;      /* text positioning */
 	int field_width,num_fields=0;          /* form positioning */
@@ -301,12 +282,14 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 	bool form_adjust = false;               /* correct cursor position in multi-page screens */
 	bool refresh_stdscr = true;
 	bool x_offscr,y_offscr;                 /* scrolling windows */
-
+	char *input;
 	struct screen_output *s_out;
 	struct screen_opts   *temp;                 /* reference to another screen */
 
 	char *title,*body,*footer,*body_text,more_footer[100]; /* screen text */
-
+	i_container *temp_i_con;
+	int num_i_cons = 0;
+	int x, y;
 	s_out = ipr_malloc(sizeof(struct screen_output)); /* passes an i_con and an rc value back to the function */
 
 	/* create text strings */
@@ -314,12 +297,58 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 	body = screen->body;
 	footer = screen->footer;
 
+	/* calculate the footer size and turn any special characters on*/
+	i=0,j=0;
+	while(footer[i] != '\0') {
+		if (footer[i] == '%') {
+			i++;
+			switch (footer[i]) {
+			case 'n':
+				footer_lines += 3; /* add 3 lines to the footer */
+				enter_on = true;
+				break;
+			case 'e':
+				e_on = true; /* exit */
+				break;
+			case 'q':
+				q_on = true; /* cancel */
+				break;
+			case 'r':
+				r_on = true; /* refresh */
+				break;
+			case 'f':
+				f_on = true; /* page up/down */
+				break;
+			case 'm':
+				m_on = true; /* menu on */
+				break;
+			case 't':
+				t_on = true; /* toggle page data */
+				active_field = toggle_field;
+				break;
+			}
+		} else {
+			if (footer[i] == '\n')
+				footer_lines++;
+			more_footer[j++] = footer[i];
+		}
+		i++;
+	}
+
+	/* add null char to end of string */
+	more_footer[j] = '\0';
+
+	if (f_on && !enter_on)
+		footer_lines++;
+
 	bt_len = strlen(body);
 	body_text = calloc(bt_len + 1, sizeof(char));
 
 	/* determine max size needed and find where to put form fields and device input in the text and add them
 	 * '%' marks a field.  The number after '%' represents the field's width
 	 */
+	i=0;
+	temp_i_con = i_con_head;
 	while(body[i] != '\0') {
 		if (body[i] == '\n') {
 			row++;
@@ -340,7 +369,16 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 				field_opts_off(fields[num_fields],O_AUTOSKIP);
 
 			if (field_width > 9)
-				i++; /* skip second digit of field index */
+				/* skip second digit of field index */
+				i++; 
+
+			if ((temp_i_con) && (temp_i_con->field_data[0]) && m_on) {
+				set_field_buffer(fields[num_fields], 0, temp_i_con->field_data);
+				input = field_buffer(fields[num_fields],0);
+				temp_i_con = temp_i_con->next_item;
+				num_i_cons++;
+			}
+
 			set_field_userptr(fields[num_fields],NULL);
 			num_fields++;
 			col += field_width-1;
@@ -383,53 +421,6 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 	set_form_win(form,w_pad);
 	set_form_sub(form,w_pad);
 
-	/* calculate the footer size and turn any special characters on*/
-	i=0,j=0;
-	while(footer[i] != '\0') {
-		if (footer[i] == '%') {
-			i++;
-			switch (footer[i]) {
-			case 'n':
-				pad_scr_b += 3; /* add 3 lines to the footer */
-				enter_on = true;
-				break;
-			case 'e':
-				e_on = true; /* exit */
-				break;
-			case 'q':
-				q_on = true; /* cancel */
-				break;
-			case 'r':
-				r_on = true; /* refresh */
-				break;
-			case 'f':
-				f_on = true; /* page up/down */
-				break;
-			case 't':
-				t_on = true; /* toggle page data */
-				active_field = toggle_field;
-				break;
-			}
-		} else {
-			if (footer[i] == '\n')
-				pad_scr_b++;
-			more_footer[j++] = footer[i];
-		}
-		i++;
-	}
-
-	/* add null char to end of string */
-	more_footer[j] = '\0';
-
-	if (f_on && !enter_on)
-		pad_scr_b++;
-
-	/* clear all windows before writing new text to them */
-	clear();
-	wclear(w_pad);
-	if (pages)
-		wclear(w_page_header);
-
 	while(1) {
 		getmaxyx(stdscr,stdscr_max_y,stdscr_max_x);
 
@@ -447,15 +438,15 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 
 		/* set the boundaries of the pad based on the size of the screen
 		 and determine whether or not the user is able to scroll */
-		if ((stdscr_max_y - pad_scr_t - pad_scr_b + 1) > w_pad_max_y) {
-			pad_b = w_pad_max_y;
+		if ((stdscr_max_y - title_lines - footer_lines + 1) > w_pad_max_y) {
+			viewable_body_lines = w_pad_max_y;
 			pad_t = 0;
 			y_offscr = false; /*not scrollable*/
 			pages = false;
 			for (i = 0; i < num_fields; i++)
 				field_opts_on(fields[i],O_ACTIVE);
 		} else {
-			pad_b = stdscr_max_y - pad_scr_t - pad_scr_b - 1;
+			viewable_body_lines = stdscr_max_y - title_lines - footer_lines - 1;
 			y_offscr = true; /*scrollable*/
 			if (f_on) {
 				pages = true;
@@ -464,15 +455,15 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 		}
 
 		if (stdscr_max_x > w_pad_max_x) {
-			pad_r = w_pad_max_x;
+			pad_scr_r = w_pad_max_x;
 			pad_l = 0;
 			x_offscr = false;
 		} else {
-			pad_r = stdscr_max_x;
+			pad_scr_r = stdscr_max_x;
 			x_offscr = true;
 		}
 
-		move(stdscr_max_y-pad_scr_b,0);
+		move(stdscr_max_y - footer_lines,0);
 
 		if (enter_on) {
 			if (num_fields == 0) {
@@ -553,16 +544,18 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 
 			if (f_on && y_offscr) {
 				if (!is_bottom)
-					mvaddstr(stdscr_max_y-pad_scr_b,stdscr_max_x-8,"More...");
+					mvaddstr(stdscr_max_y-footer_lines,stdscr_max_x-8,"More...");
 				else
-					mvaddstr(stdscr_max_y-pad_scr_b,stdscr_max_x-8,"       ");
+					mvaddstr(stdscr_max_y-footer_lines,stdscr_max_x-8,"       ");
 
 				for (i=0;i<num_fields;i++) {
 					if (fields[i] != NULL) {
 						field_info(fields[i],&h,&w,&t,&l,&o,&b); /* height, width, top, left, offscreen rows, buffer */
 
 						/* turn all offscreen fields off */
-						if (t>=header_lines+pad_t && t<=pad_b+pad_t) {
+						if ((t >= (header_lines + pad_t)) &&
+						    (t <= (viewable_body_lines + pad_t))) {
+
 							field_opts_on(fields[i],O_ACTIVE);
 							if (form_adjust) {
 								if (!t_on || !toggle_field)
@@ -574,6 +567,14 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 					}
 				}
 			}  
+
+			if (m_on) {
+				for (i=0;i<num_fields;i++) {
+					field_opts_off(fields[i],O_VISIBLE);
+					field_opts_on(fields[i],O_VISIBLE);
+					set_field_fore(fields[i],A_BOLD);
+				}
+			}
 
 			if (t_on && toggle_field &&
 			    ((field_opts(fields[toggle_field]) & O_ACTIVE) != O_ACTIVE)) {
@@ -589,25 +590,22 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 				} else
 					touchline(stdscr,stdscr_max_y - 1,1);
 
-				if (ground_cursor)
-					move(0,0);
-
 				refresh();
 
 				if (pages) {
 					touchwin(w_page_header);
 					prefresh(w_page_header, 0, pad_l,
-						 pad_scr_t, pad_scr_l,
-						 header_lines + 1 ,pad_r - 1);
+						 title_lines, 0,
+						 title_lines + header_lines - 1, pad_scr_r - 1);
 					touchwin(w_pad);
-					prefresh(w_pad, pad_t + header_lines,
-						 pad_l, pad_scr_t + header_lines,
-						 pad_scr_l, pad_b + pad_scr_t, pad_r - 1);
+					prefresh(w_pad, pad_t + header_lines, pad_l,
+						 title_lines + header_lines, 0,
+						 title_lines + viewable_body_lines, pad_scr_r - 1);
 				} else {
 					touchwin(w_pad);
 					prefresh(w_pad, pad_t, pad_l,
-						 pad_scr_t, pad_scr_l,
-						 pad_b + pad_scr_t, pad_r - 1);
+						 title_lines, 0,
+						 title_lines + viewable_body_lines, pad_scr_r - 1);
 				}
 
 				if (ground_cursor) {
@@ -622,8 +620,6 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 				break;
 
 			if (IS_ENTER_KEY(ch)) {
-				char *input;
-
 				if (num_fields > 1)
 					active_field = field_index(current_field(form));
 
@@ -641,7 +637,7 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 							/* fields are not empty -> continue */
 							break;
 
-						if (i == num_fields - 1) {
+						if (i == (num_fields - 1)) {
 							/* all fields are empty */
 							rc = (CANCEL_FLAG | rc);
 							goto leave;
@@ -649,11 +645,8 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 					}
 				}
 
-				if (num_fields > 0) {
-
-					/* input field is always fields[0] if only 1 field */
-					input = field_buffer(fields[0],0);
-				}
+				if (num_fields > 0)
+					input = field_buffer(fields[active_field],0);
 
 				invalid = true;
 
@@ -666,14 +659,14 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 
 						invalid = false;
 
-						if (temp->key == "\n" && num_fields > 0) {
+						if ((temp->key == "\n") && (num_fields > 0)) {
 
 							/* store field data to existing i_con (which should already
 							 contain pointers) */
-							i_container *temp_i_con = i_con;
+							i_container *temp_i_con = i_con_head;
 							form_driver(form,REQ_VALIDATION);
 
-							for (i = num_fields - 1; i >= 0; i--) {
+							for (i = 0; i < num_fields; i++) {
 
 								strncpy(temp_i_con->field_data,field_buffer(fields[i],0),MAX_FIELD_SIZE);
 								temp_i_con = temp_i_con->next_item;
@@ -687,7 +680,7 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 						toggle_field = 0;
 
 						do 
-							rc = temp->screen_function(i_con);
+							rc = temp->screen_function(i_con_head);
 						while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
 
 						/* if screen flags exist on rc and they don't match
@@ -708,184 +701,100 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 					}
 				}
 
-				if (!invalid) 
-				{
+				if (!invalid) {
 					/*clear fields*/
 					form_driver(form,REQ_LAST_FIELD);
-					for (i=0;i<num_fields;i++)
-					{
+					for (i = 0; i < num_fields; i++) {
 						form_driver(form,REQ_CLR_FIELD);
 						form_driver(form,REQ_NEXT_FIELD);
 					}
 					break;
 				}
-			}
-
-			else if (IS_EXIT_KEY(ch) && e_on)
-			{
+			} else if (IS_EXIT_KEY(ch) && e_on) {
 				rc = (EXIT_FLAG | rc);
 				goto leave;
-			}
-			else if (IS_CANCEL_KEY(ch) && (q_on || screen == &n_main_menu))
-			{
+			} else if (IS_CANCEL_KEY(ch) && (q_on || screen == &n_main_menu))	{
 				rc = (CANCEL_FLAG | rc);
 				goto leave;
-			}
-			else if ((IS_REFRESH_KEY(ch) && r_on) || (ch == KEY_HOME && r_on))
-			{
+			} else if ((IS_REFRESH_KEY(ch) && r_on) || (ch == KEY_HOME && r_on)) {
 				rc = REFRESH_SCREEN;
-				if (num_fields>1)
+				if (num_fields > 1)
 					toggle_field = field_index(current_field(form)) + 1;
 				goto leave;
-			}
-			else if (IS_TOGGLE_KEY(ch) && t_on)
-			{
+			} else if (IS_TOGGLE_KEY(ch) && t_on) {
 				rc = TOGGLE_SCREEN;
-				if (num_fields>1)
+				if (num_fields > 1)
 					toggle_field = field_index(current_field(form)) + 1;
 				goto leave;
-			}
-			else if (IS_PGUP_KEY(ch) && f_on && y_offscr)
-			{
+			} else if (IS_PGUP_KEY(ch) && f_on && y_offscr)	{
 				invalid = false;
-				if (pad_t>0)
-				{
-					if (pages)
-						pad_t -= (pad_b-header_lines+1);
-					else
-						pad_t -= (pad_b+1);
+				if (pad_t > 0) {
+					pad_t -= (viewable_body_lines - header_lines + 1);
 					rc = PGUP_STATUS;
-				}
-				else if (f_on && y_offscr)
+				} else if (f_on && y_offscr)
 					rc = TOP_STATUS;
 				else
 					invalid = true;
 
-				if (!invalid)
-				{
-					if (pad_t<0)
+				if (!invalid) {
+					if (pad_t < 0)
 						pad_t = 0;
 
 					is_bottom = false;
 					form_adjust = true;
 					refresh_stdscr = true;
 				}
-
-			}
-			else if (IS_PGDN_KEY(ch) && f_on && y_offscr)
-			{
+			} else if (IS_PGDN_KEY(ch) && f_on && y_offscr)	{
 				invalid = false;
-				if ((stdscr_max_y + pad_t) < (w_pad_max_y + pad_scr_t + pad_scr_b))
-				{
-					if (pages)
-						pad_t += (pad_b - header_lines + 1);
-					else
-						pad_t += (pad_b + 1);
-
+				if ((stdscr_max_y + pad_t) < (w_pad_max_y + title_lines + footer_lines)) {
+					pad_t += (viewable_body_lines - header_lines + 1);
 					rc = PGDN_STATUS;
 
-					if (!(stdscr_max_y + pad_t < w_pad_max_y + pad_scr_t + pad_scr_b))
+					if (!(stdscr_max_y + pad_t < w_pad_max_y + title_lines + footer_lines))
 						is_bottom = true;
-				}
-				else if (is_bottom)
+				} else if (is_bottom)
 					rc = BTM_STATUS;
 				else
 					invalid = true;
 
-				if (!invalid)
-				{
+				if (!invalid) {
 					form_adjust = true;
 					refresh_stdscr = true;
 				}
-			}
-
-			else if (ch == KEY_RIGHT)
-			{
+			} else if (ch == KEY_RIGHT) {
 				if (x_offscr && stdscr_max_x+pad_l<w_pad_max_x)
 					pad_l++;
 				else 
 					form_driver(form, REQ_NEXT_CHAR);
-			}
-			else if (ch == KEY_LEFT)
-			{
+			} else if (ch == KEY_LEFT) {
 				if (pad_l>0)
 					pad_l--;
 				else
 					form_driver(form, REQ_PREV_CHAR);
-			}
-			else if (ch == KEY_UP)
-			{
-				if ((y_offscr || num_fields == 0) && !pages)
-				{
-					if (pad_t>0)
-					{
+			} else if (ch == KEY_UP) {
+				if ((y_offscr || (num_fields == 0)) && !pages) {
+					if (pad_t > 0) {
 						pad_t--;
 						form_adjust = true;
 						is_bottom = false;
 					}
-				}
-				else
+				} else
 					form_driver(form, REQ_PREV_FIELD);
-			}
-			else if (ch == KEY_DOWN)
-			{
-				if ((y_offscr || num_fields == 0) && !pages)
-				{
-					if (y_offscr && stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b)
-					{
+			} else if (ch == KEY_DOWN) {
+				if ((y_offscr || (num_fields == 0)) && !pages) {
+					if (y_offscr && ((stdscr_max_y + pad_t ) <
+					     (w_pad_max_y + title_lines + footer_lines))) {
 						pad_t++;
 						form_adjust = true;
 					}
-					if (!(stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b))
+					if (!((stdscr_max_y + pad_t) <
+					      (w_pad_max_y + title_lines + footer_lines)))
+
 						is_bottom = true;
 				}
 				else
 					form_driver(form, REQ_NEXT_FIELD);
-			}
-
-			else if (num_fields == 0)
-			{
-				char tempstr[2];
-				invalid = true;
-
-				tempstr[0] = ch;
-				tempstr[1] ='\0';
-
-				for (i = 0; i < screen->num_opts; i++)
-				{
-					temp = &(screen->options[i]);
-
-					if (temp->key)
-					{
-						if (strcasecmp(tempstr,temp->key) == 0)
-						{
-							invalid = false;
-
-							if (temp->screen_function == NULL)
-								goto leave;
-
-							do 
-								rc = temp->screen_function(i_con);
-							while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
-
-							if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
-								goto leave;
-
-							rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG);
-
-							if (screen->rc_flags & REFRESH_FLAG)
-							{
-								rc = (REFRESH_FLAG | rc);
-								goto leave;
-							}		      
-							break;
-						}
-					}
-				}
-				break;
-			}
-
-			else if ((ch == KEY_BACKSPACE) || (ch == 127))
+			} else if ((ch == KEY_BACKSPACE) || (ch == 127))
 				form_driver(form, REQ_DEL_PREV);
 			else if (ch == KEY_DC)
 				form_driver(form, REQ_DEL_CHAR);
@@ -899,20 +808,65 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 				form_driver(form, REQ_END_FIELD);
 			else if (ch == '\t')
 				form_driver(form, REQ_NEXT_FIELD);
-			else if (isascii(ch))
+			else if ((m_on) || (num_fields == 0)) {
+				invalid = true;
+
+				for (i = 0; i < screen->num_opts; i++) {
+					temp = &(screen->options[i]);
+
+					if ((temp->key) && (ch == temp->key[0])) {
+						invalid = false;
+
+						if (num_fields > 1) {
+							active_field = field_index(current_field(form));
+							input = field_buffer(fields[active_field],0);
+
+							if (active_field < num_i_cons) {
+								temp_i_con = i_con_head;
+								for (j = 0; j < active_field; j++)
+									temp_i_con = temp_i_con->next_item;
+
+								temp_i_con->field_data[0] = '\0';
+							}
+							toggle_field = field_index(current_field(form)) + 1;
+						}
+
+						getyx(w_pad,y,x);
+						temp_i_con->y = y;
+						temp_i_con->x = x;
+
+						if (temp->screen_function == NULL)
+							goto leave;
+
+						do 
+							rc = temp->screen_function(i_con_head);
+						while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
+
+						if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
+							goto leave;
+
+						rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG);
+
+						if (screen->rc_flags & REFRESH_FLAG) {
+							rc = (REFRESH_FLAG | rc);
+							goto leave;
+						}		      
+						break;
+					}
+				}
+			} else if (isascii(ch))
 				form_driver(form, ch);
 		}
 	}
 
 	leave:
-		s_out->i_con = i_con;
+		s_out->i_con = i_con_head;
 	s_out->rc = rc;
 	ipr_free(body_text);
 	unpost_form(form);
 	free_form(form);
 
-	for (i=0;i<num_fields;i++)
-	{
+	for (i=0;i < num_fields;i++) {
 		if (fields[i] != NULL)
 			free_field(fields[i]);
 	}
@@ -1299,7 +1253,7 @@ int disk_status(i_container *i_con)
 		for (k=0; k<2; k++)
 			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1", cur_ioa, k);
 
-		i_con = add_i_con(i_con,"\0",(char *)&cur_ioa->ioa,list);
+		i_con = add_i_con(i_con,"\0",&cur_ioa->ioa);
 
 		num_lines++;
 
@@ -1317,7 +1271,7 @@ int disk_status(i_container *i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-			i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[j], list);  
+			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);  
 
 			num_lines++;
 		}
@@ -1333,7 +1287,7 @@ int disk_status(i_container *i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-			i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[j], list);  
+			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);  
 
 			num_lines++;
 		}
@@ -1357,9 +1311,7 @@ int disk_status(i_container *i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-			i_con = add_i_con(i_con,"\0",
-					  (char *)&cur_ioa->dev[j],
-					  list);
+			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
 
 			dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 			array_id = dev_record->array_id;
@@ -1379,7 +1331,7 @@ int disk_status(i_container *i_con)
 				for (k=0; k<2; k++)
 					buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
 
-				i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[i], list);
+				i_con = add_i_con(i_con,"\0",&cur_ioa->dev[i]);
 				num_lines++;
 			}
 		}
@@ -1416,6 +1368,7 @@ int disk_status(i_container *i_con)
 }
 
 #define IPR_LINE_FEED 0
+#define IPR_RAW_DATA -1
 void body_details(s_node *n_screen, int code, char *field_data)
 {
 	char *string_buf;
@@ -1431,6 +1384,9 @@ void body_details(s_node *n_screen, int code, char *field_data)
 	if (code == IPR_LINE_FEED) {
 		body = ipr_realloc(body, cur_len + 2);
 		sprintf(body + cur_len, "\n");
+	} else if (code == IPR_RAW_DATA) {
+		body = ipr_realloc(body, cur_len + strlen(field_data) + 4);
+		sprintf(body + cur_len, "%s\n", field_data);
 	} else {
 		string_buf = catgets(catd,n_screen->text_set,code,"");
 		str_len = strlen(string_buf);
@@ -1472,7 +1428,7 @@ int device_details_get_device(i_container *i_con,
 	if (i_con == NULL)
 		return 1;
 
-	for (temp_i_con = i_con;
+	for (temp_i_con = i_con_head;
 	     temp_i_con != NULL && !invalid;
 	     temp_i_con = temp_i_con->next_item) {
 
@@ -1886,7 +1842,6 @@ int raid_screen(i_container *i_con)
 	int rc;
 	struct array_cmd_data *cur_raid_cmd;
 	struct screen_output *s_out;
-	fn_out *output = init_output();
 	char *string_buf;
 	int loop;
 	mvaddstr(0,0,"RAID SCREEN FUNCTION CALLED");
@@ -1920,7 +1875,6 @@ int raid_screen(i_container *i_con)
 	n_raid_screen.title = NULL;
 	rc = s_out->rc;
 	ipr_free(s_out);
-	output = free_fn_out(output);
 	return rc;
 }
 
@@ -1974,7 +1928,7 @@ int raid_status(i_container *i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-			i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[j], list);  
+			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);  
 
 			num_lines++;
 		}
@@ -2000,9 +1954,7 @@ int raid_status(i_container *i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-			i_con = add_i_con(i_con,"\0",
-					  (char *)&cur_ioa->dev[j],
-					  list);
+			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
 
 			dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 			array_id = dev_record->array_id;
@@ -2023,7 +1975,7 @@ int raid_status(i_container *i_con)
 				for (k=0; k<2; k++)
 					buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
 
-				i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[i], list);
+				i_con = add_i_con(i_con,"\0",&cur_ioa->dev[i]);
 				num_lines++;
 			}
 		}
@@ -2225,7 +2177,7 @@ int raid_stop(i_container *i_con)
 			raid_cmd_tail->ipr_ioa = cur_ioa;
 			raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
 
-			i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+			i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 
 			prot_level_str = get_prot_level_str(cur_ioa->supported_arrays,
 							    array_record->raid_level);
@@ -2301,7 +2253,7 @@ int confirm_raid_stop(i_container *i_con)
 	for (k=0; k<2; k++)
 		buffer[k] = body_init(&n_confirm_raid_stop, &header_lines, 2, 4, "q=", k);
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
@@ -2417,7 +2369,8 @@ int do_confirm_raid_stop(i_container *i_con)
 		printw("Operation in progress - please wait");
 		refresh();
 
-		rc = ipr_start_stop_stop(ipr_dev);
+		if (ipr_dev->scsi_dev_data)
+			rc = ipr_start_stop_stop(ipr_dev);
 
 		if (rc != 0)
 			return (20 | EXIT_FLAG);
@@ -2550,7 +2503,7 @@ int raid_start(i_container *i_con)
 		raid_cmd_tail->ipr_ioa = cur_ioa;
 		raid_cmd_tail->ipr_dev = &cur_ioa->ioa;
 
-		i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+		i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 
 		for (k=0; k<2; k++)
 			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1",
@@ -2611,7 +2564,7 @@ int raid_start_loop(i_container *i_con)
 	i_container *temp_i_con;
 	mvaddstr(0,0,"RAID START LOOP FUNCTION CALLED");
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
@@ -2655,6 +2608,7 @@ int configure_raid_start(i_container *i_con)
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev_record *device_record;
 	i_container *i_con2 = NULL;
+	i_container *i_con_head_saved;
 	i_container *temp_i_con = NULL;
 	struct screen_output *s_out;
 	char *string_buf;
@@ -2675,6 +2629,9 @@ int configure_raid_start(i_container *i_con)
 	for (k=0; k<2; k++)
 		buffer[k] = body_init(&n_configure_raid_start, &header_lines, 2, 3, "1=", k);
 
+	i_con_head_saved = i_con_head;
+	i_con_head = NULL;
+
 	for (j = 0; j < cur_ioa->num_devices; j++) {
 
 		scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
@@ -2691,7 +2648,7 @@ int configure_raid_start(i_container *i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"%1", cur_ioa, k);
 
-			i_con2 = add_i_con(i_con2,"\0",(char *)&cur_ioa->dev[j],list);
+			i_con2 = add_i_con(i_con2,"\0",&cur_ioa->dev[j]);
 		}
 	}
 
@@ -2715,7 +2672,7 @@ int configure_raid_start(i_container *i_con)
 
 		found = 0;
 
-		for (temp_i_con = i_con2;
+		for (temp_i_con = i_con_head;
 		     temp_i_con != NULL;
 		     temp_i_con = temp_i_con->next_item) {
 
@@ -2734,7 +2691,7 @@ int configure_raid_start(i_container *i_con)
 		if (found != 0) {
 
 			/* Go to parameters screen */
-			rc = configure_raid_parameters(i_con);
+			rc = configure_raid_parameters(i_con_head_saved);
 
 			if ((rc &  EXIT_FLAG) ||
 			    !(rc & CANCEL_FLAG))
@@ -2742,7 +2699,7 @@ int configure_raid_start(i_container *i_con)
 
 			/* User selected Cancel, clear out current selections
 			 for redisplay */
-			for (temp_i_con = i_con2;
+			for (temp_i_con = i_con_head;
 			     temp_i_con != NULL;
 			     temp_i_con = temp_i_con->next_item) {
 
@@ -2769,6 +2726,7 @@ int configure_raid_start(i_container *i_con)
 	leave:
 		i_con2 = free_i_con(i_con2);
 
+	i_con_head = i_con_head_saved;
 	for (k=0; k<2; k++) {
 		ipr_free(buffer[k]);
 		buffer[k] = NULL;
@@ -3361,7 +3319,7 @@ int raid_rebuild(i_container *i_con)
 			raid_cmd_tail->ipr_ioa = cur_ioa;
 			raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
 
-			i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+			i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[i],buffer[k],"%1",cur_ioa, k);
 
@@ -3603,7 +3561,7 @@ int raid_include(i_container *i_con)
 			raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
 			raid_cmd_tail->qac_data = NULL;
 
-			i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+			i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[i],buffer[k],"%1",cur_ioa, k);
@@ -3667,7 +3625,7 @@ int configure_raid_include(i_container *i_con)
 	int i, j, k;
 	int found = 0;
 	struct array_cmd_data *cur_raid_cmd;
-	struct ipr_array_query_data *qac_data = calloc(1,sizeof(struct ipr_array_query_data));
+	struct ipr_array_query_data *qac_data = calloc(1,sizeof(struct ipr_array_query_data));;
 	struct ipr_common_record *common_record;
 	struct ipr_dev_record *device_record;
 	struct scsi_dev_data *scsi_dev_data;
@@ -3687,7 +3645,7 @@ int configure_raid_include(i_container *i_con)
 	struct screen_output *s_out;
 	mvaddstr(0,0,"CONFIGURE RAID INCLUDE FUNCTION CALLED");
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		cur_raid_cmd = (struct array_cmd_data *)i_con->data;
@@ -3750,7 +3708,7 @@ int configure_raid_include(i_container *i_con)
 					    (device_record->include_cand)) {
 
 						cur_ioa->dev[j].qac_entry = common_record;
-						i_con = add_i_con(i_con,"\0",(char *)&cur_ioa->dev[j],list);
+						i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
 
 						for (k=0; k<2; k++)
 							buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"%1",cur_ioa, k);
@@ -3825,7 +3783,7 @@ int configure_raid_include(i_container *i_con)
 	 is satisfied */
 	found = 0;
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		input = temp_i_con->field_data;
@@ -3839,7 +3797,7 @@ int configure_raid_include(i_container *i_con)
 		return 25 | REFRESH_FLAG; 
 	}
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item)  {
 
 		ipr_dev = (struct ipr_dev *)temp_i_con->data;
@@ -4377,7 +4335,7 @@ int configure_af_device(i_container *i_con, int action_code)
 				for (k=0; k<2; k++)
 					buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"%1",cur_ioa, k);
 
-				i_con = add_i_con(i_con,"\0",(char *)dev_init_tail,list);
+				i_con = add_i_con(i_con,"\0",dev_init_tail);
 
 				num_devs++;
 			}
@@ -4527,7 +4485,7 @@ int hot_spare(i_container *i_con, int action)
 				raid_cmd_tail->ipr_ioa = cur_ioa;
 				raid_cmd_tail->ipr_dev = NULL;
 
-				i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+				i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 
 				for (k=0; k<2; k++) 
 					buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1",cur_ioa, k);
@@ -4582,7 +4540,7 @@ int hot_spare(i_container *i_con, int action)
 
 	found = 0;
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	temp_i_con = temp_i_con->next_item) {
 
 		cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
@@ -4659,6 +4617,8 @@ int select_hot_spare(i_container *i_con, int action)
 	char *string_buf;
 	int header_lines;
 	int toggle=1;
+	i_container *i_con_head_saved;
+
 	mvaddstr(0,0,"SELECT HOT SPARE FUNCTION CALLED");
 
 	if (action == IPR_ADD_HOT_SPARE) {
@@ -4684,6 +4644,8 @@ int select_hot_spare(i_container *i_con, int action)
 	cur_raid_cmd = (struct array_cmd_data *) i_con->data;
 	rc = RC_SUCCESS;
 	cur_ioa = cur_raid_cmd->ipr_ioa;
+	i_con_head_saved = i_con_head; /* FIXME */
+	i_con_head = NULL;
 
 	for (j = 0; j < cur_ioa->num_devices; j++) {
 
@@ -4700,7 +4662,7 @@ int select_hot_spare(i_container *i_con, int action)
 		    (((device_record->add_hot_spare_cand) && (action == IPR_ADD_HOT_SPARE)) ||
 		     ((device_record->rmv_hot_spare_cand) && (action == IPR_RMV_HOT_SPARE))))  {
 
-			i_con2 = add_i_con(i_con2,"\0",(char *)&cur_ioa->dev[j],list);
+			i_con2 = add_i_con(i_con2,"\0",&cur_ioa->dev[j]);
 
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"%1",cur_ioa, k);
@@ -4733,7 +4695,7 @@ int select_hot_spare(i_container *i_con, int action)
 
 		found = 0;
 
-		for (temp_i_con = i_con2; temp_i_con != NULL;
+		for (temp_i_con = i_con_head; temp_i_con != NULL;
 		temp_i_con = temp_i_con->next_item) {
 
 			ipr_dev = (struct ipr_dev *)temp_i_con->data;
@@ -4759,6 +4721,7 @@ int select_hot_spare(i_container *i_con, int action)
 
 	leave:
 		i_con2 = free_i_con(i_con2);
+	i_con_head = i_con_head_saved;
 	free(s_out);
 	return rc;
 }
@@ -4936,7 +4899,7 @@ int process_conc_maint(i_container *i_con, int action)
 	struct ipr_dev_record *dev_record;
 	
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		ipr_dev = (struct ipr_dev *)temp_i_con->data;
@@ -5177,7 +5140,7 @@ int start_conc_maint(i_container *i_con, int action)
 
 						for (k=0; k<2; k++)
 							buffer[k] = print_device(&cur_ioa->dev[l],buffer[k],"%1",cur_ioa, k);
-						i_con = add_i_con(i_con,"\0", &cur_ioa->dev[l], list);
+						i_con = add_i_con(i_con,"\0", &cur_ioa->dev[l]);
 
 						num_lines++;
 					}
@@ -5195,7 +5158,7 @@ int start_conc_maint(i_container *i_con, int action)
 
 					for (k=0; k<2; k++)
 						buffer[k] = print_device(local_dev[local_dev_count],buffer[k],"%1",cur_ioa, k);
-					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count], list);
+					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count]);
 
 					num_lines++;
 				}
@@ -5299,8 +5262,10 @@ int init_device(i_container *i_con)
 
 			/* If not a DASD, disallow format */
 			if ((scsi_dev_data == NULL) ||
-			    (scsi_dev_data->type != TYPE_DISK) ||
-			    (ipr_is_hot_spare(&cur_ioa->dev[j])))
+			    (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
+			    (ipr_is_volume_set(&cur_ioa->dev[j])) ||
+			    ((scsi_dev_data->type != TYPE_DISK) &&
+			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)))
 				continue;
 
 			/* If Advanced Function DASD */
@@ -5392,7 +5357,7 @@ int init_device(i_container *i_con)
 
 				for (k=0; k<2; k++)
 					buffer[k] = print_device(&cur_ioa->dev[j], buffer[k],"%1",cur_ioa, k);
-				i_con = add_i_con(i_con,"\0",(char *)&cur_ioa->dev[j],list);
+				i_con = add_i_con(i_con,"\0",dev_init_tail);
 
 				num_devs++;
 			}
@@ -5454,9 +5419,9 @@ int confirm_init_device(i_container *i_con)
 	sprintf(n_confirm_init_device.title, string_buf);
 
 	for (k=0; k<2; k++)
-		buffer[k] = body_init(&n_confirm_init_device, &header_lines, 2, 4,"q=",k);
+		buffer[k] = body_init(&n_confirm_init_device, &header_lines, 2, 3,"q=",k);
 
-	for (temp_i_con = copy_i_con(i_con);
+	for (temp_i_con = i_con_head;
 	     temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
 
 		if (temp_i_con->data == NULL)
@@ -5953,7 +5918,7 @@ int reclaim_cache(i_container* i_con)
 	struct ipr_reclaim_query_data *reclaim_buffer;
 	struct ipr_reclaim_query_data *cur_reclaim_buffer;
 	int found = 0;
-	char *buffer[2];
+	char *buffer[2];;
 	struct screen_output *s_out;
 	char *string_buf;
 	int header_lines;
@@ -5995,7 +5960,7 @@ int reclaim_cache(i_container* i_con)
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1",cur_ioa, k);
 
-			i_con = add_i_con(i_con, "\0",(char *)cur_ioa,list);
+			i_con = add_i_con(i_con, "\0",cur_ioa);
 			found++;
 		}
 	}
@@ -6044,7 +6009,7 @@ int confirm_reclaim(i_container *i_con)
 	int ioa_num;
 	mvaddstr(0,0,"CONFIRM RECLAIM CACHE FUNCTION CALLED");
 
-	for (temp_i_con = i_con; temp_i_con;
+	for (temp_i_con = i_con_head; temp_i_con;
 	     temp_i_con = temp_i_con->next_item) {
 
 		cur_ioa = (struct ipr_ioa *) temp_i_con->data;
@@ -6105,7 +6070,7 @@ int confirm_reclaim(i_container *i_con)
 	i_con = free_i_con(i_con);
 
 	/* Save the chosen IOA for later use */
-	add_i_con(i_con, "\0", reclaim_ioa, list);
+	add_i_con(i_con, "\0", reclaim_ioa);
 
 	do {
 		n_confirm_reclaim.body = buffer[toggle&1];
@@ -6311,7 +6276,7 @@ int battery_maint(i_container *i_con)
 		cur_ioa->reclaim_data = cur_reclaim_buffer;
 
 		if (cur_reclaim_buffer->rechargeable_battery_type) {
-			i_con = add_i_con(i_con, "\0",(char *)cur_ioa,list); 
+			i_con = add_i_con(i_con, "\0",cur_ioa); 
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1",cur_ioa, k);
 			found++;
@@ -6502,7 +6467,7 @@ int battery_fork(i_container *i_con)
 	i_container *temp_i_con;
 	mvaddstr(0,0,"CONFIRM FORCE BATTERY ERROR FUNCTION CALLED");
 
-	for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
+	for (temp_i_con = i_con_head; temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
 		cur_ioa = (struct ipr_ioa *)temp_i_con->data;
 		if (cur_ioa == NULL)
 			continue;
@@ -6608,7 +6573,7 @@ int bus_config(i_container *i_con)
 		if (modepage_28_hdr->num_dev_entries == 0)
 			continue;
 
-		i_con = add_i_con(i_con,"\0",(char *)cur_ioa,list);
+		i_con = add_i_con(i_con,"\0",(char *)cur_ioa);
 		for (k=0; k<2; k++)
 			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1",cur_ioa, k);
 		found++;
@@ -6649,54 +6614,69 @@ int bus_config(i_container *i_con)
 	return rc;
 }
 
+enum attr_type {qas_capability_type, scsi_id_type, bus_width_type, max_xfer_rate_type};
+struct bus_attr {
+	enum attr_type type;
+	u8 bus;
+	struct ipr_scsi_buses *page_28;
+	struct ipr_ioa *ioa;
+	struct bus_attr *next;
+};
+struct bus_attr *bus_attr_head = NULL;
+
+static struct bus_attr *get_bus_attr_buf(struct bus_attr *bus_attr)
+{
+	if (!bus_attr) {
+		bus_attr_head = malloc(sizeof(struct bus_attr));
+		bus_attr_head->next = NULL;
+		return bus_attr_head;
+	}
+
+	bus_attr->next = malloc(sizeof(struct bus_attr));
+	bus_attr->next->next = NULL;
+	return bus_attr->next;
+}
+
+static void free_all_bus_attr_buf(void)
+{
+	struct bus_attr *bus_attr;
+
+	while (bus_attr_head) {
+		bus_attr = bus_attr_head->next;
+		free(bus_attr_head);
+		bus_attr_head = bus_attr;
+	}
+}	
+
 int change_bus_attr(i_container *i_con)
 {
-#define DSP_FIELD_START_ROW 9
 	struct ipr_ioa *cur_ioa;
 	int rc, j, i;
-	FORM *form;
-	FORM *fields_form;
-	FIELD **input_fields, *cur_field;
-	FIELD *title_fields[3];
-	WINDOW *field_pad;
-	int cur_field_index;
-	char buffer[100];
-	int input_field_index = 0;
-	int num_lines = 0;
 	struct ipr_scsi_buses page_28_cur;
 	struct ipr_scsi_buses page_28_chg;
-	struct ipr_scsi_buses page_28_ipr;
 	struct scsi_dev_data *scsi_dev_data;
 	char scsi_id_str[5][16];
 	char max_xfer_rate_str[5][16];
-	int  ch;
-	int form_rows, form_cols;
-	int field_start_row, field_end_row, field_num_rows;
-	int pad_start_row;
-	int form_adjust = 0;
-	int confirm = 0;
-	int is_reset_req;
 	i_container *temp_i_con;
 	int found = 0;
 	char *input;
-	int max_x,max_y,start_y,start_x;
+	struct bus_attr *bus_attr = NULL;
+	char *string_buf;
+	int header_lines = 0;
+	int cur_len;
+	char *bus_str;
+	struct screen_output *s_out;
+	u8 bus_num;
 	int bus_attr_menu(struct ipr_ioa *cur_ioa,
-			  struct ipr_scsi_buses *page_28_cur,
-			  struct ipr_scsi_buses *page_28_chg,
-			  struct ipr_scsi_buses *page_28_ipr,
-			  int cur_field_index,
-			  int offset);
+			  struct bus_attr *bus_attr,
+			  int row,
+			  int header_lines);
 
 	mvaddstr(0,0,"CHANGE BUS ATTR FUNCTION CALLED");
 
-	getmaxyx(stdscr,max_y,max_x);
-	getbegyx(stdscr,start_y,start_x);
-
 	rc = RC_SUCCESS;
 
-	found = 0;
-
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		cur_ioa = (struct ipr_ioa *)temp_i_con->data;
@@ -6713,9 +6693,10 @@ int change_bus_attr(i_container *i_con)
 	if (!found)
 		return INVALID_OPTION_STATUS;
 
+	i_con = free_i_con(i_con);
+
 	/* zero out user page 28 page, this data is used to indicate
 	 which fields the user changed */
-	memset(&page_28_ipr, 0, sizeof(struct ipr_scsi_buses));
 	memset(&page_28_cur, 0, sizeof(struct ipr_scsi_buses));
 	memset(&page_28_chg, 0, sizeof(struct ipr_scsi_buses));
 
@@ -6736,66 +6717,62 @@ int change_bus_attr(i_container *i_con)
 	}
 
 	/* Title */
-	title_fields[0] =	new_field(1, max_x - start_x, 0, 0, 0, 0);
-	title_fields[1] =	new_field(1, 1, 1, 0, 0, 0);
-	title_fields[2] = NULL;
+	string_buf = catgets(catd,n_change_bus_attr.text_set,1,
+			     "Change SCSI Bus Configuration");
+	n_change_bus_attr.title = ipr_malloc(strlen(string_buf) + 4);
+	sprintf(n_change_bus_attr.title, string_buf);
 
-	set_field_just(title_fields[0], JUSTIFY_CENTER);
-	set_field_buffer(title_fields[0], 0,"Change SCSI Bus Configuration");
+	string_buf = catgets(catd,n_change_bus_attr.text_set,2,
+			     "Current Bus configurations are shown. To change "
+			     "setting hit 'c' for options menu. Hightlight "
+			     "desired option then hit Enter");
+	n_change_bus_attr.body =
+		add_line_to_body(n_change_bus_attr.body, string_buf, "", &header_lines);
 
-	field_opts_off(title_fields[0], O_ACTIVE);
-	form = new_form(title_fields);
+	string_buf = catgets(catd,n_change_bus_attr.text_set, 3,"Change Setting");
+	cur_len = strlen(n_change_bus_attr.body);
+	n_change_bus_attr.body = ipr_realloc(n_change_bus_attr.body,
+					     cur_len + strlen(string_buf) + 8);
+	cur_len += sprintf(n_change_bus_attr.body + cur_len,"  c=%s\n\n", string_buf);
+	header_lines += 2;
 
-	input_fields = malloc(sizeof(FIELD *));
+	body_details(&n_change_bus_attr, IPR_RAW_DATA, cur_ioa->ioa.gen_name);
+	header_lines++;
 
-	/* Loop for each device bus entry */
-	for (j = 0, num_lines = 0; j < page_28_cur.num_buses; j++) {
+	string_buf = catgets(catd,n_change_bus_attr.text_set,4,"BUS");
+	bus_str = malloc(strlen(string_buf) + 8);
 
-		input_fields = realloc(input_fields,
-				       sizeof(FIELD *) * (input_field_index + 1));
-		input_fields[input_field_index] =
-			new_field(1, 6, num_lines, 2, 0, 0);
+	for (j = 0; j < page_28_cur.num_buses; j++) {
+		sprintf(bus_str,"%s%d",string_buf, j);
+		body_details(&n_change_bus_attr, IPR_RAW_DATA, bus_str);
 
-		field_opts_off(input_fields[input_field_index], O_ACTIVE);
-		memset(buffer, 0, 100);
-		sprintf(buffer,"BUS %d", j);
-
-		set_field_buffer(input_fields[input_field_index++], 0, buffer);
-
-		num_lines++;
 		if (page_28_chg.bus[j].qas_capability) {
+			body_details(&n_change_bus_attr,5, "%9");
 
-			/* options are ENABLED(10)/DISABLED(01) */
-			input_fields = realloc(input_fields,
-					       sizeof(FIELD *) * (input_field_index + 2));
-			input_fields[input_field_index] =
-				new_field(1, 38, num_lines, 4, 0, 0);
+			bus_attr = get_bus_attr_buf(bus_attr);
+			bus_attr->type = qas_capability_type;
+			bus_attr->bus = j;
+			bus_attr->page_28 = &page_28_cur;
+			bus_attr->ioa = cur_ioa;
 
-			field_opts_off(input_fields[input_field_index], O_ACTIVE);
-			set_field_buffer(input_fields[input_field_index++],
-					 0, "QAS Capability . . . . . . . . . . . :");
+			if (page_28_cur.bus[j].qas_capability ==
+			    IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL)
 
-			input_fields[input_field_index++] =
-				new_field(1, 9, num_lines, 44, 0, 0);
-			num_lines++;
+				i_con = add_i_con(i_con,"Disabled",bus_attr);
+			else
+				i_con = add_i_con(i_con,"Enabled",bus_attr);
 		}
 		if (page_28_chg.bus[j].scsi_id) {
+			body_details(&n_change_bus_attr,6, "%3");
 
-			/* options are based on current scsi ids currently in use
-			 value must be 15 or less */
-			input_fields = realloc(input_fields,
-					       sizeof(FIELD *) * (input_field_index + 2));
-			input_fields[input_field_index] =
-				new_field(1, 38, num_lines, 4, 0, 0);
+			bus_attr = get_bus_attr_buf(bus_attr);
+			bus_attr->type = scsi_id_type;
+			bus_attr->bus = j;
+			bus_attr->page_28 = &page_28_cur;
+			bus_attr->ioa = cur_ioa;
 
-			field_opts_off(input_fields[input_field_index], O_ACTIVE);
-			set_field_buffer(input_fields[input_field_index++],
-					 0,
-					 "Host SCSI ID . . . . . . . . . . . . :");
-
-			input_fields[input_field_index++] =
-				new_field(1, 3, num_lines, 44, 0, 0);
-			num_lines++;
+			sprintf(scsi_id_str[j],"%d",page_28_cur.bus[j].scsi_id);
+			i_con = add_i_con(i_con,scsi_id_str[j],bus_attr);
 		}
 		if (page_28_chg.bus[j].bus_width)	{
 			/* check if 8 bit bus is allowable with current configuration before
@@ -6812,619 +6789,467 @@ int change_bus_attr(i_container *i_con)
 			}
 		}
 		if (page_28_chg.bus[j].bus_width)	{
-			/* options for "Wide Enabled" (bus width), No(8) or Yes(16) bits wide */
-			input_fields = realloc(input_fields,
-					       sizeof(FIELD *) * (input_field_index + 2));
-			input_fields[input_field_index] =
-				new_field(1, 38, num_lines, 4, 0, 0);
+			body_details(&n_change_bus_attr,7, "%4");
 
-			field_opts_off(input_fields[input_field_index], O_ACTIVE);
-			set_field_buffer(input_fields[input_field_index++],
-					 0,
-					 "Wide Enabled . . . . . . . . . . . . :");
+			bus_attr = get_bus_attr_buf(bus_attr);
+			bus_attr->type = bus_width_type;
+			bus_attr->bus = j;
+			bus_attr->page_28 = &page_28_cur;
+			bus_attr->ioa = cur_ioa;
 
-			input_fields[input_field_index++] =
-				new_field(1, 4, num_lines, 44, 0, 0);
-			num_lines++;
+			if (page_28_cur.bus[j].bus_width == 16)
+				i_con = add_i_con(i_con,"Yes",bus_attr);
+			else
+				i_con = add_i_con(i_con,"No",bus_attr);
 		}
 		if (page_28_chg.bus[j].max_xfer_rate) {
-			/* options are 5, 10, 20, 40, 80, 160, 320 */
-			input_fields = realloc(input_fields,
-					       sizeof(FIELD *) * (input_field_index + 2));
-			input_fields[input_field_index] =
-				new_field(1, 38, num_lines, 4, 0, 0);
+			body_details(&n_change_bus_attr,8, "%9");
 
-			field_opts_off(input_fields[input_field_index], O_ACTIVE);
-			set_field_buffer(input_fields[input_field_index++],
-					 0,
-					 "Maximum Bus Throughput . . . . . . . :");
+			bus_attr = get_bus_attr_buf(bus_attr);
+			bus_attr->type = max_xfer_rate_type;
+			bus_attr->bus = j;
+			bus_attr->page_28 = &page_28_cur;
+			bus_attr->ioa = cur_ioa;
 
-			input_fields[input_field_index++] =
-				new_field(1, 9, num_lines, 44, 0, 0);
-			num_lines++;
+			sprintf(max_xfer_rate_str[j],"%d MB/s",
+				(page_28_cur.bus[j].max_xfer_rate *
+				 page_28_cur.bus[j].bus_width)/(10 * 8));
+			i_con = add_i_con(i_con,max_xfer_rate_str[j],bus_attr);
 		}
 	}
 
-	input_fields[input_field_index] = NULL;
+	while (1) {
+		s_out = screen_driver(&n_change_bus_attr,header_lines,i_con);
+		rc = s_out->rc;
 
-	fields_form = new_form(input_fields);
-	scale_form(fields_form, &form_rows, &form_cols);
-	field_pad = newpad(form_rows, form_cols);
-	set_form_win(fields_form, field_pad);
-	set_form_sub(fields_form, field_pad); /*???*/
-	set_current_field(fields_form, input_fields[0]);
-	for (i = 0; i < input_field_index; i++)
-		field_opts_off(input_fields[i], O_EDIT);
+		for (temp_i_con = i_con_head; temp_i_con; temp_i_con = temp_i_con->next_item) {
+			if (!temp_i_con->field_data[0]) {
+				bus_attr = (struct bus_attr *)temp_i_con->data;
+				rc = bus_attr_menu(cur_ioa, bus_attr, temp_i_con->y, header_lines);
+				if (rc == CANCEL_FLAG)
+					rc = RC_SUCCESS;
 
-	form_opts_off(fields_form, O_BS_OVERLOAD);
+				bus_num = bus_attr->bus;
 
-	flush_stdscr();
-	clear();
+				if (bus_attr->type == qas_capability_type) {
+					if (page_28_cur.bus[bus_num].qas_capability ==
+					    IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL)
 
-	set_form_win(form,stdscr);
-	set_form_sub(form,stdscr);
-
-	post_form(form);
-	post_form(fields_form);
-
-	field_start_row = DSP_FIELD_START_ROW;
-	field_end_row = max_y - 4;
-	field_num_rows = field_end_row - field_start_row + 1;
-
-	mvaddstr(2, 0, "Current Bus configurations are shown.  To change");
-	mvaddstr(3, 0, "setting hit \"c\" for options menu.  Hightlight desired");
-	mvaddstr(4, 0, "option then hit Enter");
-	mvaddstr(6, 0, "c=Change Setting");
-	if (field_num_rows < form_rows) {
-
-		mvaddstr(field_end_row, 43, "More...");
-		mvaddstr(max_y - 2, 25, "f=PageDn");
-		field_end_row--;
-		field_num_rows--;
-	}
-	mvaddstr(max_y - 4, 0, "Press Enter to Continue");
-	mvaddstr(max_y - 2, 0, EXIT_KEY_LABEL CANCEL_KEY_LABEL);
-
-	memset(buffer, 0, 100);
-	sprintf(buffer,"%s",
-		cur_ioa->ioa.gen_name);
-	mvaddstr(8, 0, buffer);
-
-	refresh();
-	pad_start_row = 0;
-	pnoutrefresh(field_pad,
-		     pad_start_row, 0,
-		     field_start_row, 0,
-		     field_end_row,
-		     max_x);
-	doupdate();
-
-	form_driver(fields_form,
-		    REQ_FIRST_FIELD);
-
-	while(1) {
-
-		/* Loop for each device bus entry */
-		input_field_index = 0;
-		for (j = 0, num_lines = 0; j < page_28_cur.num_buses; j++) {
-
-			num_lines++;
-			input_field_index++;
-			if (page_28_chg.bus[j].qas_capability) {
-
-				input_field_index++;
-				if ((num_lines >= pad_start_row) &&
-				    (num_lines < (pad_start_row + field_num_rows)))
-					field_opts_on(input_fields[input_field_index],
-						      O_ACTIVE);
-				else
-					field_opts_off(input_fields[input_field_index],
-						       O_ACTIVE);
-
-				if (page_28_cur.bus[j].qas_capability ==
-				    IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL) {
-
-					if (page_28_ipr.bus[j].qas_capability)
-						set_field_buffer(input_fields[input_field_index++],
-								 0, "Disable");
+						sprintf(temp_i_con->field_data,"Disable");
 					else
-						set_field_buffer(input_fields[input_field_index++],
-								 0, "Disabled");
-				} else {
-					if (page_28_ipr.bus[j].qas_capability)
-						set_field_buffer(input_fields[input_field_index++],
-								 0, "Enable");
+						sprintf(temp_i_con->field_data,"Enable");
+				} else if (bus_attr->type == scsi_id_type) {
+					sprintf(temp_i_con->field_data,"%d",page_28_cur.bus[bus_num].scsi_id);
+				} else if (bus_attr->type == bus_width_type) {
+					if (page_28_cur.bus[bus_num].bus_width == 16)
+						sprintf(temp_i_con->field_data,"Yes");
 					else
-						set_field_buffer(input_fields[input_field_index++],
-								 0, "Enabled");
+						sprintf(temp_i_con->field_data,"No");
+				} else if (bus_attr->type == max_xfer_rate_type) {
+					sprintf(temp_i_con->field_data,"%d MB/s",
+						(page_28_cur.bus[bus_num].max_xfer_rate *
+						 page_28_cur.bus[bus_num].bus_width)/(10 * 8));
 				}
-				num_lines++;
-			}
-			if (page_28_chg.bus[j].scsi_id) {
-
-				input_field_index++;
-				if ((num_lines >= pad_start_row) &&
-				    (num_lines < (pad_start_row + field_num_rows)))
-					field_opts_on(input_fields[input_field_index],
-						      O_ACTIVE);
-				else
-					field_opts_off(input_fields[input_field_index],
-						       O_ACTIVE);
-
-				sprintf(scsi_id_str[j],"%d",page_28_cur.bus[j].scsi_id);
-				set_field_buffer(input_fields[input_field_index++],
-						 0, scsi_id_str[j]);
-				num_lines++;
-			}
-			if (page_28_chg.bus[j].bus_width) {
-
-				input_field_index++;
-				if ((num_lines >= pad_start_row) &&
-				    (num_lines < (pad_start_row + field_num_rows)))
-					field_opts_on(input_fields[input_field_index],
-						      O_ACTIVE);
-				else
-					field_opts_off(input_fields[input_field_index],
-						       O_ACTIVE);
-
-				if (page_28_cur.bus[j].bus_width == 16)
-					set_field_buffer(input_fields[input_field_index++],
-							 0, "Yes");
-				else
-					set_field_buffer(input_fields[input_field_index++],
-							 0, "No");
-				num_lines++;
-			}
-			if (page_28_chg.bus[j].max_xfer_rate) {
-
-				input_field_index++;
-				if ((num_lines >= pad_start_row) &&
-				    (num_lines < (pad_start_row + field_num_rows)))
-					field_opts_on(input_fields[input_field_index],
-						      O_ACTIVE);
-				else
-					field_opts_off(input_fields[input_field_index],
-						       O_ACTIVE);
-
-				sprintf(max_xfer_rate_str[j],"%d MB/s",
-					(ntohl(page_28_cur.bus[j].max_xfer_rate) *
-					 page_28_cur.bus[j].bus_width)/(10 * 8));
-				set_field_buffer(input_fields[input_field_index++],
-						 0, max_xfer_rate_str[j]);
-				num_lines++;
+				break;
 			}
 		}
 
-		if (form_adjust) {
-			form_driver(fields_form,
-				    REQ_NEXT_FIELD);
-			form_adjust = 0;
-			refresh();
-		}
-
-		prefresh(field_pad, pad_start_row, 0, field_start_row, 0,
-			 field_end_row, max_x);
-		doupdate();
-		ch = getch();
-
-		if (IS_EXIT_KEY(ch)) {
-			rc = EXIT_FLAG;
+		if (rc)
 			goto leave;
-		} else if (IS_CANCEL_KEY(ch))	{
-			rc = CANCEL_FLAG;
-			goto leave;
-		} else if (ch == 'c') {
-			if (!confirm) {
-				cur_field = current_field(fields_form);
-				cur_field_index = field_index(cur_field);
-
-				rc = bus_attr_menu(cur_ioa,
-						   &page_28_cur,
-						   &page_28_chg,
-						   &page_28_ipr,
-						   cur_field_index,
-						   pad_start_row);
-
-				if (rc == EXIT_FLAG)
-					goto leave;
-			} else {
-				clear();
-				set_field_buffer(title_fields[0], 0,
-						 "Processing Change SCSI Bus Configuration");
-				mvaddstr(max_y - 2, 1, "Please wait for next screen");
-				doupdate();
-				refresh();
-
-				/* issue mode select and reset if necessary */
-				rc = ipr_set_bus_attr(cur_ioa, &page_28_cur, 1);
-
-				if (rc != 0)
-					return 46 | EXIT_FLAG; /* "Change SCSI Bus configurations failed" */
-
-				if (is_reset_req)
-					ipr_reset_adapter(cur_ioa);
-
-				rc = 45 | EXIT_FLAG;
-				goto leave;
-			}
-
-		} else if (IS_ENTER_KEY(ch)) {
-			if (!confirm) {
-
-				confirm = 1;
-				clear();
-				for (j = 0, is_reset_req = 0;
-				     j < page_28_cur.num_buses; j++) {
-					if (page_28_ipr.bus[j].scsi_id)
-						is_reset_req = 1;
-				}
-
-				set_field_buffer(title_fields[0], 0,
-						 "Confirm Change SCSI Bus Configuration");
-				mvaddstr(2, 0, "Confirming this action will result in the following configuration to");
-				mvaddstr(3, 0, "become active.");
-				if (is_reset_req)	{
-					mvaddstr(3, 0, "ATTENTION:  This action requires a reset of the Host Adapter.  Confirming");
-					mvaddstr(4, 0, "this action may affect system performance while processing changes.");
-				}
-				mvaddstr(6, 0, "Press c=Confirm Change SCSI Bus Configration ");
-				if (field_num_rows < form_rows) {
-					mvaddstr(field_end_row + 1, 43, "More...");
-					mvaddstr(max_y - 2, 25, "f=PageDn");
-				}
-				mvaddstr(max_y - 2, 0, "c=Confirm   " EXIT_KEY_LABEL CANCEL_KEY_LABEL);
-
-				memset(buffer, 0, 100);
-				sprintf(buffer,"%s",
-					cur_ioa->ioa.gen_name);
-				mvaddstr(8, 0, buffer);
-
-				doupdate();
-				pad_start_row = 0;
-				form_adjust = 1;
-			}
-		} else if ((ch == 'f') || (ch == 'F')) {
-			if ((form_rows - field_num_rows) > pad_start_row) {
-				pad_start_row += field_num_rows;
-				if ((form_rows - field_num_rows) < pad_start_row) {
-					pad_start_row = form_rows - field_num_rows;
-					mvaddstr(field_end_row + 1, 43, "       ");
-					mvaddstr(max_y - 2, 25, "        ");
-				}
-				mvaddstr(max_y - 2, 36, "b=PageUp");
-				form_adjust = 1;
-			}
-		} else if ((ch == 'b') || (ch == 'B')) {
-			if (pad_start_row != 0) {
-				if ((form_rows - field_num_rows) <= pad_start_row)
-					mvaddstr(field_end_row + 1, 43, "More...");
-
-				pad_start_row -= field_num_rows;
-				if (pad_start_row < 0) {
-					pad_start_row = 0;
-					mvaddstr(max_y - 2, 36, "        ");
-				}
-				form_adjust = 1;
-				mvaddstr(max_y - 2, 25, "f=PageDn");
-			}
-		}
-		else if (ch == '\t')
-			form_driver(fields_form, REQ_NEXT_FIELD);
-		else if (ch == KEY_UP)
-			form_driver(fields_form, REQ_PREV_FIELD);
-		else if (ch == KEY_DOWN)
-			form_driver(fields_form, REQ_NEXT_FIELD);
 	}
 
 	leave:
 
-		free_form(form);
-	free_screen(NULL, NULL, input_fields);
-
-	flush_stdscr();
+		free_all_bus_attr_buf();
+	free(bus_str);
+	ipr_free(n_change_bus_attr.body);
+	n_change_bus_attr.body = NULL;
+	ipr_free(n_change_bus_attr.title);
+	n_change_bus_attr.title = NULL;
+	free_i_con(i_con);
+	ipr_free(s_out);
 	return rc;
 }
 
-int bus_attr_menu(struct ipr_ioa *cur_ioa,
-		  struct ipr_scsi_buses *page_28_cur,  
-		  struct ipr_scsi_buses *page_28_chg,
-		  struct ipr_scsi_buses *page_28_ipr,
-		  int cur_field_index,
-		  int offset)
+int confirm_change_bus_attr(i_container *i_con)
 {
-	int input_field_index;
-	int start_row;
-	int i, j, scsi_id, found;
+	struct ipr_ioa *cur_ioa;
+	int rc, j, i;
+	struct ipr_scsi_buses *page_28_cur;
+	struct ipr_scsi_buses page_28_chg;
+	struct scsi_dev_data *scsi_dev_data;
+	char scsi_id_str[5][16];
+	char max_xfer_rate_str[5][16];
+	char *string_buf;
+	int header_lines;
+	int cur_len;
+	char *bus_str;
+	struct screen_output *s_out;
+
+	mvaddstr(0,0,"CHANGE BUS ATTR FUNCTION CALLED");
+
+	rc = RC_SUCCESS;
+
+	page_28_cur = bus_attr_head->page_28;
+	cur_ioa = bus_attr_head->ioa;
+
+	/* determine changable and default values */
+	for (j = 0; j < page_28_cur->num_buses; j++) {
+
+		page_28_chg.bus[j].qas_capability = 0;
+		page_28_chg.bus[j].scsi_id = 0; /* FIXME!!! need to allow dart (by vend/prod & subsystem id) */
+		page_28_chg.bus[j].bus_width = 1;
+		page_28_chg.bus[j].max_xfer_rate = 1;
+	}
+
+	/* Title */
+	string_buf = catgets(catd,n_confirm_change_bus_attr.text_set,21,
+			     "Confirm Change SCSI Bus Configuration");
+	n_confirm_change_bus_attr.title = ipr_malloc(strlen(string_buf) + 4);
+	sprintf(n_confirm_change_bus_attr.title, string_buf);
+
+	string_buf = catgets(catd,n_confirm_change_bus_attr.text_set,22,
+			     "Confirming this action will result in the following"
+			     "configuration to become active.");
+	n_confirm_change_bus_attr.body =
+		add_line_to_body(n_confirm_change_bus_attr.body, string_buf, "", &header_lines);
+
+	string_buf = catgets(catd,n_confirm_change_bus_attr.text_set, 23,
+			     "Confirm Change SCSI Bus Configration");
+	cur_len = strlen(n_confirm_change_bus_attr.body);
+	n_confirm_change_bus_attr.body = ipr_realloc(n_confirm_change_bus_attr.body,
+					     cur_len + strlen(string_buf) + 8);
+	cur_len += sprintf(n_confirm_change_bus_attr.body + cur_len,"  c=%s\n\n", string_buf);
+	header_lines += 2;
+
+	body_details(&n_confirm_change_bus_attr, IPR_RAW_DATA, cur_ioa->ioa.gen_name);
+	header_lines++;
+
+	string_buf = catgets(catd,n_confirm_change_bus_attr.text_set,4,"BUS");
+	bus_str = malloc(strlen(string_buf) + 8);
+
+	for (j = 0; j < page_28_cur->num_buses; j++) {
+		sprintf(bus_str,"%s%d",string_buf, j);
+		body_details(&n_confirm_change_bus_attr, IPR_RAW_DATA, bus_str);
+
+		if (page_28_chg.bus[j].qas_capability) {
+			if (page_28_cur->bus[j].qas_capability ==
+			    IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL)
+
+				body_details(&n_confirm_change_bus_attr,5, "Disable");
+			else
+				body_details(&n_confirm_change_bus_attr,5, "Enable");
+		}
+		if (page_28_chg.bus[j].scsi_id) {
+			sprintf(scsi_id_str[j],"%d",page_28_cur->bus[j].scsi_id);
+			body_details(&n_confirm_change_bus_attr,6, scsi_id_str[j]);
+		}
+		if (page_28_chg.bus[j].bus_width)	{
+			/* check if 8 bit bus is allowable with current configuration before
+			 enabling option */
+			for (i=0; i < cur_ioa->num_devices; i++) {
+				scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+
+				if ((scsi_dev_data) && (scsi_dev_data->id & 0xF8) &&
+				    (j == scsi_dev_data->channel)) {
+
+					page_28_chg.bus[j].bus_width = 0;
+					break;
+				}
+			}
+		}
+		if (page_28_chg.bus[j].bus_width)	{
+			if (page_28_cur->bus[j].bus_width == 16)
+				body_details(&n_confirm_change_bus_attr,7, "Yes");
+			else
+				body_details(&n_confirm_change_bus_attr,7, "No");
+		}
+		if (page_28_chg.bus[j].max_xfer_rate) {
+			sprintf(max_xfer_rate_str[j],"%d MB/s",
+				(page_28_cur->bus[j].max_xfer_rate *
+				 page_28_cur->bus[j].bus_width)/(10 * 8));
+			body_details(&n_confirm_change_bus_attr,8, max_xfer_rate_str[j]);
+		}
+	}
+
+	s_out = screen_driver(&n_confirm_change_bus_attr,header_lines,NULL);
+
+	rc = s_out->rc;
+	free(s_out);
+	free(bus_str);
+
+	ipr_free(n_confirm_change_bus_attr.body);
+	n_confirm_change_bus_attr.body = NULL;
+	ipr_free(n_confirm_change_bus_attr.title);
+	n_confirm_change_bus_attr.title = NULL;
+
+	if (rc)
+		return rc;
+
+	rc = ipr_set_bus_attr(cur_ioa, page_28_cur, 1);
+	return rc;
+}
+
+
+int bus_attr_menu(struct ipr_ioa *cur_ioa, struct bus_attr *bus_attr, int start_row, int header_lines)
+{
+	int i, scsi_id, found;
 	int num_menu_items;
 	int menu_index;
 	ITEM **menu_item = NULL;
 	struct scsi_dev_data *scsi_dev_data;
+	struct ipr_scsi_buses *page_28_cur;
 	int *userptr;
 	int *retptr;
+	u8 bus_num;
 	int max_bus_width, max_xfer_rate;
 	int rc = RC_SUCCESS;
 
-	/* Loop for each device bus entry */
-	input_field_index = 1;
-	start_row = DSP_FIELD_START_ROW - offset;
-	for (j = 0; j < page_28_cur->num_buses; j++) {
+	/* start_row represents the row in which the top most
+	 menu item will be placed.  Ideally this will be on the
+	 same line as the field in which the menu is opened for*/
+	start_row += 2; /* for title */  /* FIXME */
+	page_28_cur = bus_attr->page_28;
+	bus_num = bus_attr->bus;
 
-		/* start_row represents the row in which the top most
-		 menu item will be placed.  Ideally this will be on the
-		 same line as the field in which the menu is opened for*/
-		start_row++;
-		input_field_index += 1;
-		if ((page_28_chg->bus[j].qas_capability) &&
-		    (input_field_index == cur_field_index)) {
+	if (bus_attr->type == qas_capability_type) {
 
-			num_menu_items = 2;
-			menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
-			userptr = malloc(sizeof(int) * num_menu_items);
+		num_menu_items = 2;
+		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+		userptr = malloc(sizeof(int) * num_menu_items);
 
-			menu_item[0] = new_item("Enable","");
-			userptr[0] = 2;
-			set_item_userptr(menu_item[0],
-					 (char *)&userptr[0]);
+		menu_item[0] = new_item("Enable","");
+		userptr[0] = 2;
+		set_item_userptr(menu_item[0],
+				 (char *)&userptr[0]);
 
-			menu_item[1] = new_item("Disable","");
-			userptr[1] = 1;
-			set_item_userptr(menu_item[1],
-					 (char *)&userptr[1]);
+		menu_item[1] = new_item("Disable","");
+		userptr[1] = 1;
+		set_item_userptr(menu_item[1],
+				 (char *)&userptr[1]);
 
-			menu_item[2] = (ITEM *)NULL;
+		menu_item[2] = (ITEM *)NULL;
 
-			rc = display_menu(menu_item, start_row, menu_index, &retptr);
-			if ((rc == RC_SUCCESS) &&
-			    (page_28_cur->bus[j].qas_capability != *retptr)) {
+		rc = display_menu(menu_item, start_row, menu_index, &retptr);
+		if ((rc == RC_SUCCESS) &&
+		    (page_28_cur->bus[bus_num].qas_capability != *retptr)) {
 
-				page_28_cur->bus[j].qas_capability = *retptr;
-				page_28_ipr->bus[j].qas_capability =
-					page_28_chg->bus[j].qas_capability;
-			}
-			i=0;
-			while (menu_item[i] != NULL)
-				free_item(menu_item[i++]);
-			free(menu_item);
-			free(userptr);
-			menu_item = NULL;
-			break;
-		} else if (page_28_chg->bus[j].qas_capability) {
-			input_field_index += 2;
-			start_row++;
+			page_28_cur->bus[bus_num].qas_capability = *retptr;
 		}
+		i=0;
+		while (menu_item[i] != NULL)
+			free_item(menu_item[i++]);
+		free(menu_item);
+		free(userptr);
+		menu_item = NULL;
+	} else if (bus_attr->type == scsi_id_type) {
 
-		if ((page_28_chg->bus[j].scsi_id) &&
-		    (input_field_index == cur_field_index)) {
+		num_menu_items = 16;
+		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+		userptr = malloc(sizeof(int) * num_menu_items);
 
-			num_menu_items = 16;
-			menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
-			userptr = malloc(sizeof(int) * num_menu_items);
+		menu_index = 0;
+		for (scsi_id = 0, found = 0; scsi_id < 16; scsi_id++, found = 0) {
+			for (i=0; i < cur_ioa->num_devices; i++) {
 
-			menu_index = 0;
-			for (scsi_id = 0, found = 0; scsi_id < 16; scsi_id++, found = 0) {
-				for (i=0; i < cur_ioa->num_devices; i++) {
+				scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+				if (scsi_dev_data == NULL)
+					continue;
 
-					scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
-					if (scsi_dev_data == NULL)
-						continue;
-
-					if ((scsi_id == scsi_dev_data->id) &&
-					    (j == scsi_dev_data->channel)) {
-						found = 1;
-						break;
-					}
-				}
-
-				if (!found) {
-					switch (scsi_id) {
-					case 0:
-						menu_item[menu_index] = new_item("0","");
-						userptr[menu_index] = 0;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 1:
-						menu_item[menu_index] = new_item("1","");
-						userptr[menu_index] = 1;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 2:
-						menu_item[menu_index] = new_item("2","");
-						userptr[menu_index] = 2;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 3:
-						menu_item[menu_index] = new_item("3","");
-						userptr[menu_index] = 3;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 4:
-						menu_item[menu_index] = new_item("4","");
-						userptr[menu_index] = 4;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 5:
-						menu_item[menu_index] = new_item("5","");
-						userptr[menu_index] = 5;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 6:
-						menu_item[menu_index] = new_item("6","");
-						userptr[menu_index] = 6;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					case 7:
-						menu_item[menu_index] = new_item("7","");
-						userptr[menu_index] = 7;
-						set_item_userptr(menu_item[menu_index],
-								 (char *)&userptr[menu_index]);
-						menu_index++;
-						break;
-					default:
-						break;
-					}
+				if ((scsi_id == scsi_dev_data->id) &&
+				    (bus_num == scsi_dev_data->channel)) {
+					found = 1;
+					break;
 				}
 			}
-			menu_item[menu_index] = (ITEM *)NULL;
-			rc = display_menu(menu_item, start_row, menu_index, &retptr);
-			if ((rc == RC_SUCCESS) &&
-			    (page_28_cur->bus[j].scsi_id != *retptr)) {
 
-				page_28_cur->bus[j].scsi_id = *retptr;
-				page_28_ipr->bus[j].scsi_id = page_28_chg->bus[j].scsi_id;
+			if (!found) {
+				switch (scsi_id) {
+				case 0:
+					menu_item[menu_index] = new_item("0","");
+					userptr[menu_index] = 0;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 1:
+					menu_item[menu_index] = new_item("1","");
+					userptr[menu_index] = 1;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 2:
+					menu_item[menu_index] = new_item("2","");
+					userptr[menu_index] = 2;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 3:
+					menu_item[menu_index] = new_item("3","");
+					userptr[menu_index] = 3;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 4:
+					menu_item[menu_index] = new_item("4","");
+					userptr[menu_index] = 4;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 5:
+					menu_item[menu_index] = new_item("5","");
+					userptr[menu_index] = 5;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 6:
+					menu_item[menu_index] = new_item("6","");
+					userptr[menu_index] = 6;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				case 7:
+					menu_item[menu_index] = new_item("7","");
+					userptr[menu_index] = 7;
+					set_item_userptr(menu_item[menu_index],
+							 (char *)&userptr[menu_index]);
+					menu_index++;
+					break;
+				default:
+					break;
+				}
 			}
-			i=0;
-			while (menu_item[i] != NULL)
-				free_item(menu_item[i++]);
-			free(menu_item);
-			free(userptr);
-			menu_item = NULL;
-			break;
-		} else if (page_28_chg->bus[j].scsi_id) {
-			input_field_index += 2;
-			start_row++;
 		}
+		menu_item[menu_index] = (ITEM *)NULL;
+		rc = display_menu(menu_item, start_row, menu_index, &retptr);
+		if ((rc == RC_SUCCESS) &&
+		    (page_28_cur->bus[bus_num].scsi_id != *retptr)) {
 
-		if ((page_28_chg->bus[j].bus_width) &&
-		    (input_field_index == cur_field_index)) {
+			page_28_cur->bus[bus_num].scsi_id = *retptr;
+		}
+		i=0;
+		while (menu_item[i] != NULL)
+			free_item(menu_item[i++]);
+		free(menu_item);
+		free(userptr);
+		menu_item = NULL;
+	} else if (bus_attr->type == bus_width_type) {
 
-			num_menu_items = 2;
-			menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
-			userptr = malloc(sizeof(int) * num_menu_items);
+		num_menu_items = 2;
+		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+		userptr = malloc(sizeof(int) * num_menu_items);
 
-			menu_index = 0;
-			menu_item[menu_index] = new_item("No","");
-			userptr[menu_index] = 8;
+		menu_index = 0;
+		menu_item[menu_index] = new_item("No","");
+		userptr[menu_index] = 8;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+
+		menu_index++;
+		max_bus_width = 16;
+		if (max_bus_width == 16) {
+			menu_item[menu_index] = new_item("Yes","");
+			userptr[menu_index] = 16;
 			set_item_userptr(menu_item[menu_index],
 					 (char *)&userptr[menu_index]);
-
 			menu_index++;
-			max_bus_width = 16;  /* FIXME */
-			if (max_bus_width == 16) {
-				menu_item[menu_index] = new_item("Yes","");
-				userptr[menu_index] = 16;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			}
-			menu_item[menu_index] = (ITEM *)NULL;
-			rc = display_menu(menu_item, start_row, menu_index, &retptr);
-			if ((rc == RC_SUCCESS) &&
-			    (page_28_cur->bus[j].bus_width != *retptr)) {
-
-				page_28_cur->bus[j].bus_width = *retptr;
-				page_28_ipr->bus[j].bus_width =
-					page_28_chg->bus[j].bus_width;
-			}
-			i=0;
-			while (menu_item[i] != NULL)
-				free_item(menu_item[i++]);
-			free(menu_item);
-			free(userptr);
-			menu_item = NULL;
-			break;
-		} else if (page_28_chg->bus[j].bus_width) {
-			input_field_index += 2;
-			start_row++;
 		}
+		menu_item[menu_index] = (ITEM *)NULL;
+		rc = display_menu(menu_item, start_row, menu_index, &retptr);
+		if ((rc == RC_SUCCESS) &&
+		    (page_28_cur->bus[bus_num].bus_width != *retptr)) {
 
-		if ((page_28_chg->bus[j].max_xfer_rate) &&
-		    (input_field_index == cur_field_index)) {
-			num_menu_items = 7;
-			menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
-			userptr = malloc(sizeof(int) * num_menu_items);
-
-			menu_index = 0;
-			max_xfer_rate = get_max_bus_speed(cur_ioa, j);
-
-			switch (max_xfer_rate) {
-			case 320:
-				menu_item[menu_index] = new_item("320 MB/s","");
-				userptr[menu_index] = 3200;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			case 160:
-				menu_item[menu_index] = new_item("160 MB/s","");
-				userptr[menu_index] = 1600;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			case 80:
-				menu_item[menu_index] = new_item(" 80 MB/s","");
-				userptr[menu_index] = 800;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			case 40:
-				menu_item[menu_index] = new_item(" 40 MB/s","");
-				userptr[menu_index] = 400;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			case 20:
-				menu_item[menu_index] = new_item(" 20 MB/s","");
-				userptr[menu_index] = 200;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			case 10:
-				menu_item[menu_index] = new_item(" 10 MB/s","");
-				userptr[menu_index] = 100;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-			case 5:
-				menu_item[menu_index] = new_item("  5 MB/s","");
-				userptr[menu_index] = 50;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-				break;
-			default:
-				menu_item[menu_index] = new_item("        ","");
-				userptr[menu_index] = 0;
-				set_item_userptr(menu_item[menu_index],
-						 (char *)&userptr[menu_index]);
-				menu_index++;
-				break;
-			}
-			menu_item[menu_index] = (ITEM *)NULL;
-			rc = display_menu(menu_item, start_row, menu_index, &retptr);
-			if ((rc == RC_SUCCESS) &&
-			    (ntohl(page_28_cur->bus[j].max_xfer_rate) !=
-			     ((*retptr) * 8)/page_28_cur->bus[j].bus_width)) {
-
-				page_28_cur->bus[j].max_xfer_rate =
-					htonl(((*retptr) * 8)/page_28_cur->bus[j].bus_width);
-				page_28_ipr->bus[j].max_xfer_rate =
-					page_28_chg->bus[j].max_xfer_rate;
-			}
-			i=0;
-			while (menu_item[i] != NULL)
-				free_item(menu_item[i++]);
-			free(menu_item);
-			free(userptr);
-			menu_item = NULL;
-			break;
-		} else if (page_28_chg->bus[j].max_xfer_rate) {
-			input_field_index += 2;
-			start_row++;
+			page_28_cur->bus[bus_num].bus_width = *retptr;
 		}
+		i=0;
+		while (menu_item[i] != NULL)
+			free_item(menu_item[i++]);
+		free(menu_item);
+		free(userptr);
+		menu_item = NULL;
+	} else if (bus_attr->type == max_xfer_rate_type) {
+		num_menu_items = 7;
+		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+		userptr = malloc(sizeof(int) * num_menu_items);
+
+		menu_index = 0;
+		max_xfer_rate = get_max_bus_speed(cur_ioa, bus_num);
+
+		switch (max_xfer_rate) {
+		case 320:
+			menu_item[menu_index] = new_item("320 MB/s","");
+			userptr[menu_index] = 3200;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+		case 160:
+			menu_item[menu_index] = new_item("160 MB/s","");
+			userptr[menu_index] = 1600;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+		case 80:
+			menu_item[menu_index] = new_item(" 80 MB/s","");
+			userptr[menu_index] = 800;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+		case 40:
+			menu_item[menu_index] = new_item(" 40 MB/s","");
+			userptr[menu_index] = 400;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+		case 20:
+			menu_item[menu_index] = new_item(" 20 MB/s","");
+			userptr[menu_index] = 200;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+		case 10:
+			menu_item[menu_index] = new_item(" 10 MB/s","");
+			userptr[menu_index] = 100;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+		case 5:
+			menu_item[menu_index] = new_item("  5 MB/s","");
+			userptr[menu_index] = 50;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+			break;
+		default:
+			menu_item[menu_index] = new_item("        ","");
+			userptr[menu_index] = 0;
+			set_item_userptr(menu_item[menu_index],
+					 (char *)&userptr[menu_index]);
+			menu_index++;
+			break;
+		}
+		menu_item[menu_index] = (ITEM *)NULL;
+		rc = display_menu(menu_item, start_row, menu_index, &retptr);
+		if ((rc == RC_SUCCESS) &&
+		    (page_28_cur->bus[bus_num].max_xfer_rate !=
+		     ((*retptr) * 8)/page_28_cur->bus[bus_num].bus_width)) {
+
+			page_28_cur->bus[bus_num].max_xfer_rate =
+				((*retptr) * 8)/page_28_cur->bus[bus_num].bus_width;
+		}
+		i=0;
+		while (menu_item[i] != NULL)
+			free_item(menu_item[i++]);
+		free(menu_item);
+		free(userptr);
+		menu_item = NULL;
 	}
+
 	return rc;
 }
 
@@ -7911,7 +7736,7 @@ int kernel_root(i_container *i_con)
 	i_con = free_i_con(i_con);
 
 	/* i_con to return field data */
-	i_con = add_i_con(i_con,"",NULL,list); 
+	i_con = add_i_con(i_con,"",NULL); 
 
 	string_buf = catgets(catd,n_kernel_root.text_set,1,
 			     "Kernel Messages Log Root Directory");
@@ -8015,7 +7840,7 @@ int set_default_editor(i_container *i_con)
 	mvaddstr(0,0,"SET DEFAULT EDITOR FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
-	i_con = add_i_con(i_con,"",NULL,list);
+	i_con = add_i_con(i_con,"",NULL);
 
 	string_buf = catgets(catd,n_set_default_editor.text_set,1,
 			     "Kernel Messages Editor");
@@ -8284,7 +8109,7 @@ int driver_config(i_container *i_con)
 		buffer[k] = body_init(&n_driver_config, &header_lines, 2, 4, "1=", k);
 
 	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-		i_con = add_i_con(i_con,"\0",(char *)cur_ioa,list);
+		i_con = add_i_con(i_con,"\0",cur_ioa);
 		for (k=0; k<2; k++)
 			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1", cur_ioa, k);
 	}
@@ -8322,7 +8147,7 @@ int change_driver_config(i_container *i_con)
 	char *input;
 	mvaddstr(0,0,"KERNEL ROOT FUNCTION CALLED");
 
-	for (temp_i_con = i_con; temp_i_con != NULL;
+	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
 		ioa = (struct ipr_ioa *)(temp_i_con->data);
@@ -8343,7 +8168,7 @@ int change_driver_config(i_container *i_con)
 	i_con = free_i_con(i_con);
 
 	/* i_con to return field data */
-	i_con = add_i_con(i_con,"",NULL,list); 
+	i_con = add_i_con(i_con,"",NULL); 
 
 	string_buf = catgets(catd,n_change_driver_config.text_set,1,
 			     "Change Driver Configuration");
@@ -8806,98 +8631,42 @@ int is_array_in_use(struct ipr_ioa *cur_ioa,
 	return 0;
 }
 
-i_container *free_i_con(i_container *x_con)
+i_container *free_i_con(i_container *i_con)
 {
 	i_container *temp_i_con;
 
-	if (x_con == NULL)
-		return x_con;
+	i_con = i_con_head;
+	if (i_con == NULL)
+		return NULL;
 
-	temp_i_con = x_con->next_item;
+	do {
+		temp_i_con = i_con->next_item;
+		free(i_con);
+		i_con = temp_i_con;
+	} while (i_con);
 
-	while (temp_i_con != NULL)
-	{
-		free(x_con);
-		x_con = temp_i_con;
-		temp_i_con = x_con->next_item;
-	}
-	free(x_con);
-	x_con = NULL;
-	return x_con;
+	i_con_head = NULL;
+	return NULL;
 }
 
-fn_out *free_fn_out(fn_out *out)
-{
-	fn_out *temp_fn_out;
-
-	if (out == NULL)
-		return out;
-
-	temp_fn_out = out->next;
-
-	while (temp_fn_out != NULL)
-	{
-		if (out->text)
-			free(out->text);
-		free(out);
-		out = temp_fn_out;
-		temp_fn_out = out->next;
-	}
-
-	if (out->text)
-		free(out->text);
-	free(out);
-	out = NULL;
-	return out;
-}
-
-i_container *add_i_con(i_container *x_con,char *f,void *d,i_type t)
+i_container *add_i_con(i_container *i_con, char *f, void *d)
 {  
 	i_container *new_i_con;
 	new_i_con = malloc(sizeof(i_container));
 
-	new_i_con->next_item = x_con;  /* a reference to the next i_con item */
-	strncpy(new_i_con->field_data,f,MAX_FIELD_SIZE+1);     /* used to hold data entered into user-entry fields */
-	new_i_con->data = d;           /* a pointer to the device information represented by the i_con */
-	new_i_con->type = t;           /* the type of container it is: list or menu */
+	new_i_con->next_item = NULL;
+
+	/* used to hold data entered into user-entry fields */
+	strncpy(new_i_con->field_data, f, MAX_FIELD_SIZE+1); 
 	new_i_con->field_data[strlen(f)+1] = '\0';
 
-	return new_i_con;
-}
+	/* a pointer to the device information represented by the i_con */
+	new_i_con->data = d;
 
-fn_out *init_output()
-{
-	fn_out *output = malloc(sizeof(fn_out));
-
-	output->next = NULL;
-	output->index = 0;
-	output->cat_offset = 0;
-	output->text = NULL;
-
-	return output;
-}
-
-fn_out *add_fn_out(fn_out *output,int i,char *text)
-{
-	fn_out *new_fn_out = malloc(sizeof(fn_out));
-	new_fn_out->next = output;
-	new_fn_out->index = i;
-	new_fn_out->text = malloc((strlen(text)+1));
-	sprintf(new_fn_out->text,"%s",text);
-
-	return new_fn_out;
-}
-
-i_container *copy_i_con(i_container *x_con)
-{
-	i_container *temp_i_con = x_con;
-	i_container *new_i_con = NULL;
-
-	while (temp_i_con != NULL)
-	{
-		new_i_con = add_i_con(new_i_con,temp_i_con->field_data,temp_i_con->data,temp_i_con->type);
-		temp_i_con = temp_i_con->next_item;
-	}
+	if (i_con)
+		i_con->next_item = new_i_con;
+	else
+		i_con_head = new_i_con;
 
 	return new_i_con;
 }

@@ -19,15 +19,14 @@
 
 #define MAX_FIELD_SIZE 39
 
-typedef enum { list, menu } i_type;
-
 typedef struct info_container i_container;
 
 struct info_container {
 	i_container *next_item;	/* reference to next info_container */
 	char field_data[MAX_FIELD_SIZE + 1];	/* stores characters entere into a user-entry field */
 	void *data;		/* stores a field pointer */
-	i_type type;		/* used to determine whether to use data for a list or menu */
+	int y;
+	int x;
 };
 
 struct screen_output {
@@ -96,6 +95,7 @@ int battery_fork(i_container * i_con);
 int force_battery_error(i_container *i_con);
 int bus_config(i_container * i_con);
 int change_bus_attr(i_container * i_con);
+int confirm_change_bus_attr(i_container *i_con);
 int driver_config(i_container * i_con);
 int change_driver_config(i_container *i_con);
 int log_menu(i_container * i_con);
@@ -720,6 +720,34 @@ s_node n_bus_config_fail = {
 	"%n%e%q"
 };
 
+struct screen_opts change_bus_attr_opt[] = {
+	{NULL, 0, "c"},
+	{confirm_change_bus_attr, 0, "\n"}
+};
+
+s_node n_change_bus_attr = {
+	403,
+	(NULL_FLAG),
+	NUM_OPTS(change_bus_attr_opt),
+	&change_bus_attr_opt[0],
+	NULL,
+	NULL,
+	"%n%t%e%q%m%f"
+};
+
+struct screen_opts confirm_change_bus_attr_opt[] = {
+	{NULL, 0, "c"}
+};
+
+s_node n_confirm_change_bus_attr = {
+	403,
+	(NULL_FLAG),
+	NUM_OPTS(confirm_change_bus_attr_opt),
+	&confirm_change_bus_attr_opt[0],
+	NULL,
+	NULL,
+	"c=Confirm   %e%q%f"
+};
 
 struct screen_opts driver_config_opt[] = {
 	{change_driver_config, 0, "\n"}
