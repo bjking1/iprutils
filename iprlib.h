@@ -1,17 +1,15 @@
 #ifndef iprlib_h
 #define iprlib_h
-/******************************************************************/
-/* Linux IBM IPR utility library                                  */
-/* Description: IBM Storage IOA Interface Specification (IPR)     */
-/*              Linux utility library                             */
-/*                                                                */
-/* (C) Copyright 2000, 2001                                       */
-/* International Business Machines Corporation and others.        */
-/* All Rights Reserved.                                           */
-/******************************************************************/
+/**
+  * IBM IPR adapter utility library
+  *
+  * (C) Copyright 2000, 2004
+  * International Business Machines Corporation and others.
+  * All Rights Reserved.
+  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.18 2004/02/18 16:28:04 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.19 2004/02/20 16:12:42 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -52,6 +50,8 @@
 #define IPR_DASD_UCODE_NO_HDR 1
 #define IPR_DASD_UCODE_HDR 2
 
+#define UCODE_BASE_DIR "/usr/lib/microcode"
+
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
 #define IPR_VENDOR_ID_LEN                    8
@@ -77,13 +77,14 @@
 #define  IPR_PERI_TYPE_SES                   0x0D
 #define IPR_ARRAY_CMD_TIMEOUT                (2 * 60)     /* 2 minutes */
 #define IPR_INTERNAL_DEV_TIMEOUT             (2 * 60)     /* 2 minutes */
-#define IPR_FORMAT_UNIT_TIMEOUT              (4 * 60 * 60) /* 4 hours */
+#define IPR_FORMAT_UNIT_TIMEOUT              (3 * 60 * 60) /* 3 hours */
 #define IPR_INTERNAL_TIMEOUT                 (30)         /* 30 seconds */
 #define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)         /* 35 seconds */
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (10 * 60)    /* 10 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
-#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    10
+#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
+#define IPR_TIMEOUT_MINUTE_RADIX		0x4000
 
 #define IPR_IOA_DEBUG                        0xDDu
 #define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
@@ -113,6 +114,7 @@
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ					0xE8
 #define SKIP_WRITE				0xEA
+#define QUERY_DASD_TIMEOUTS			0xEB
 #define SET_DASD_TIMEOUTS			0xEC
 #define IPR_QUERY_ARRAY_CONFIG            0xF0
 #define IPR_START_ARRAY_PROTECTION           0xF1
@@ -130,15 +132,13 @@
 #define  IPR_RECLAIM_FORCE_BATTERY_ERROR     0x60
 #define  IPR_RECLAIM_UNKNOWN_PERM            0x80
 #define SET_SUPPORTED_DEVICES			0xFB
-#define IPR_DISCARD_CACHE_DATA               0xF9 /* xxx remove */
-#define  IPR_PROHIBIT_CORR_INFO_UPDATE       0x80
 #define IPR_STD_INQUIRY                      0xFF
 #ifndef REPORT_LUNS
 #define REPORT_LUNS				0xA0
 #endif
 
 #define IPR_TYPE_AF_DISK             0xC
-#define IPR_TYPE_SES                 0xD
+#define IPR_TYPE_SES                 TYPE_ENCLOSURE /* xxx change to TYPE_ENCLOSURE */
 #define IPR_TYPE_ADAPTER             0x1f
 #define IPR_TYPE_EMPTY_SLOT          0xff
 
@@ -163,8 +163,6 @@ extern struct ipr_array_query_data *ipr_array_query_data;
 extern u32 num_ioas;
 extern struct ipr_ioa *ipr_ioa_head;
 extern struct ipr_ioa *ipr_ioa_tail;
-extern int driver_major;
-extern int driver_minor;
 
 struct ipr_res_addr {
 	u8 reserved;
@@ -704,24 +702,26 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 	u16 reserved4;
 };
 
+#define IPR_BUS_XFER_RATE_TO_THRUPUT(rate, width) \
+        (((rate) * ((width) / 8)) / 10)
+#define IPR_BUS_THRUPUT_TO_XFER_RATE(thruput, width) \
+        (((thruput) * 10) / ((width) / 8))
+
 #define IPR_CONFIG_DIR "/etc/ipr/"
+
+#define IPR_CATEGORY_BUS "Bus"
 #define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
 #define IPR_HOST_SCSI_ID "HOST_SCSI_ID"
 #define IPR_BUS_WIDTH "BUS_WIDTH"
 #define IPR_MAX_XFER_RATE_STR "MAX_BUS_SPEED"
 #define IPR_MIN_TIME_DELAY "MIN_TIME_DELAY"
-#define IPR_CATEGORY_BUS "Bus"
+
+#define IPR_CATEGORY_DISK "Disk"
+#define IPR_QUEUE_DEPTH "QUEUE_DEPTH"
+#define IPR_TCQ_ENABLED "TCQ_ENABLED"
+#define IPR_FORMAT_TIMEOUT "FORMAT_UNIT_TIMEOUT"
+
 #define IPR_MAX_XFER_RATE 320
-#define IPR_LIMITED_MAX_XFER_RATE 80
-/* IPR_LIMITED_CONFIG is used to compensate for
- a set of devices which will not allow firmware
- udpates when operating at high max transfer rates.
- Selecting the LIMITED_CONFIG adjusts the max
- transfer rate allowing successfull firmware update
- operations to be performed */
-#define IPR_LIMITED_CONFIG 0x7FFF
-#define IPR_SAVE_LIMITED_CONFIG 0x8000
-#define IPR_NORMAL_CONFIG 0
 
 /* Internal return codes */
 #define RC_SUCCESS          0
@@ -747,12 +747,8 @@ struct scsi_dev_data {
 	u8 vendor_id[IPR_VENDOR_ID_LEN + 1];
 	u8 product_id[IPR_PROD_ID_LEN + 1];
 	u8 sysfs_device_name[16];
-};
-
-struct sg_map_info {
 	char dev_name[64];
 	char gen_name[64];
-	struct sg_scsi_id sg_dat;
 };
 
 struct ipr_dev {
@@ -877,6 +873,22 @@ struct ipr_scsi_buses {
 	struct ipr_scsi_bus_attr bus[IPR_MAX_NUM_BUSES];
 };
 
+struct ipr_disk_attr {
+	int queue_depth;
+	int tcq_enabled;
+	int format_timeout;
+};
+
+struct ipr_vset_attr {
+	int queue_depth;
+};
+
+struct ipr_dasd_timeout_record {
+	u8 op_code;
+	u8 reserved;
+	u16 timeout;
+};
+
 struct ipr_supported_arrays {
 	struct ipr_common_record common;
 	u16 num_entries;
@@ -938,27 +950,6 @@ struct ipr_cmd_status {
 	struct ipr_cmd_status_record record[100];
 };
 
-/* xxx remove */
-struct ipr_std_inq_vpids_sn {
-	struct ipr_std_inq_vpids vpids;
-	u8 serial_num[IPR_SERIAL_NUM_LEN];
-};
-
-/* xxx remove */
-struct ipr_discard_cache_data {
-	u32 length;
-	union { 
-		struct ipr_std_inq_vpids_sn vpids_sn;
-		u32 add_cmd_parms[10];
-	};
-};
-
-/* xxx remove */
-struct ipr_software_inq_lid_info {
-	u32  load_id;
-	u32  timestamp[3];
-};
-
 struct ipr_inquiry_page0 {
 	u8 peri_qual_dev_type;
 	u8 page_code;
@@ -998,18 +989,12 @@ struct ipr_ioa_ucode_header {
     u8 reserved[LINUX_HEADER_RESERVED_BYTES];
     char eyecatcher[16];        /* IBMAS400 CCIN */
     u32 num_lids;
-    struct ipr_software_inq_lid_info lid[1];
 };
 
-/* xxx remove */
-struct ipr_inquiry_page_cx {
-	u8 peri_qual_dev_type;
-	u8 page_code;
-	u8 reserved1;
-	u8 page_length;
-	u8 ascii_length;
-	u8 reserved2[3];
-	struct ipr_software_inq_lid_info lidinfo[15];
+struct ipr_fw_images {
+	char file[100];
+	u32 version;
+	int has_header;
 };
 
 struct ipr_ioa_vpd {
@@ -1138,15 +1123,11 @@ struct ipr_encl_status_ctl_pg
 	u8 overall_status_fault_requested:1;
 	u8 overall_status_reserved6:1;
 #endif
-	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES]; //FIXME is this constant limited to 10?
+	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };
 
-int get_proc_string(char *, char *, char *);
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
-int get_major_version(char *);
-int get_minor_version(char *);
 void check_current_config(bool);
-void get_sg_ioctl_data(struct sg_map_info *, int);
 int num_device_opens(int, int, int, int);
 void tool_init();
 void exit_on_error(char *, ...);
@@ -1174,16 +1155,25 @@ int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 void ipr_reset_adapter(struct ipr_ioa *);
+int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_suspend_device_bus(struct ipr_ioa *, struct ipr_res_addr *, u8);
 int ipr_receive_diagnostics(struct ipr_dev *, u8, void *, int);
 int ipr_send_diagnostics(struct ipr_dev *, void *, int);
 int ipr_get_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
 void ipr_modify_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
-int ipr_set_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
-int find_dasd_firmware_image(struct ipr_dev *, char *, char *, char *);
+int ipr_set_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *, int);
+int get_lastest_dasd_fw_image(struct ipr_dev *, char *, char *);
 int ipr_write_buffer(struct ipr_dev *, void *, int);
-int find_ioa_firmware_image(struct ipr_ioa *, char *);
+int get_latest_ioa_fw_image(struct ipr_ioa *, char *);
+int enable_af(struct ipr_dev *);
+int get_max_bus_speed(struct ipr_ioa *, int);
+int ipr_get_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
+int ipr_modify_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
+int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
+int ipr_set_dasd_timeouts(struct ipr_dev *);
+int ipr_setup_page0x20(struct ipr_dev *);
+int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1263,19 +1253,24 @@ static inline void ipr_strncpy_0(char *dest, char *source, int length)
 #define syslog_dbg(...)
 #endif
 
-#define dev_log(level, dev, fmt, ...) \
+#define scsi_log(level, dev, fmt, ...) \
       syslog(level, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
              dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
              dev->scsi_dev_data->lun, ##__VA_ARGS__)
 
-#define dev_info(dev, fmt, ...) \
-      dev_log(LOG_NOTICE, dev, fmt, ##__VA_ARGS__)
+#define scsi_dbg(dev, fmt, ...) \
+      syslog_dbg(LOG_DEBUG, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
+             dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
+             dev->scsi_dev_data->lun, ##__VA_ARGS__)
 
-#define dev_err(dev, fmt, ...) \
-      dev_log(LOG_ERR, dev, fmt, ##__VA_ARGS__)
+#define scsi_info(dev, fmt, ...) \
+      scsi_log(LOG_NOTICE, dev, fmt, ##__VA_ARGS__)
 
-#define dev_cmd_err(dev, sense, cmd, rc) \
-      dev_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
+#define scsi_err(dev, fmt, ...) \
+      scsi_log(LOG_ERR, dev, fmt, ##__VA_ARGS__)
+
+#define scsi_cmd_err(dev, sense, cmd, rc) \
+      scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
               cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
               (sense)->add_sense_code_qual)
 

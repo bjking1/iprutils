@@ -3667,7 +3667,7 @@ int configure_raid_include(i_container *i_con)
 	int i, j, k;
 	int found = 0;
 	struct array_cmd_data *cur_raid_cmd;
-	struct ipr_array_query_data *qac_data = calloc(1,sizeof(struct ipr_array_query_data));;
+	struct ipr_array_query_data *qac_data = calloc(1,sizeof(struct ipr_array_query_data));
 	struct ipr_common_record *common_record;
 	struct ipr_dev_record *device_record;
 	struct scsi_dev_data *scsi_dev_data;
@@ -5953,7 +5953,7 @@ int reclaim_cache(i_container* i_con)
 	struct ipr_reclaim_query_data *reclaim_buffer;
 	struct ipr_reclaim_query_data *cur_reclaim_buffer;
 	int found = 0;
-	char *buffer[2];;
+	char *buffer[2];
 	struct screen_output *s_out;
 	char *string_buf;
 	int header_lines;

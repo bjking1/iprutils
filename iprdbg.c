@@ -1,15 +1,13 @@
-/******************************************************************/
-/* Linux IBM IPR IOA debug utility                                */
-/* Description: IBM Storage IOA Interface Specification (IPR)     */
-/*              Linux debug utility                               */
-/*                                                                */
-/* (C) Copyright 2003                                             */
-/* International Business Machines Corporation and others.        */
-/* All Rights Reserved.                                           */
-/******************************************************************/
+/**
+  * IBM IPR adapter debug utility
+  *
+  * (C) Copyright 2003
+  * International Business Machines Corporation and others.
+  * All Rights Reserved.
+  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.5 2004/02/03 14:23:07 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.6 2004/02/20 16:12:41 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -103,34 +101,44 @@ int main(int argc, char *argv[])
 			      sending to system logger */
 		LOG_USER);
 
-	if (argc != 2) {
-		syslog(LOG_ERR, "Usage: iprdbg /dev/ipr0\n");
-		return -EINVAL;
-	}
-
 	outfile = fopen(".iprdbglog", "a");
 	tool_init("iprdbg");
 	check_current_config(false);
 
-	for (ioa = ipr_ioa_head; ioa_num < num_ioas; ioa = ioa->next, ioa_num++)
-		if (!strcmp(ioa->ioa.gen_name, argv[1]))
-			break;
+	if (num_ioas == 0)
+		return -ENXIO;
 
-	if (!ioa) {
-		syslog(LOG_ERR, "Invalid device name %s\n", argv[1]);
-		return -EINVAL;
-	}
+	if (num_ioas > 1) {
+		printf("\nSelect adapter to debug:\n");
+		i = 1;
+		for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
+			printf("%d. IBM %X: Location: %s\n",
+			       i++, ioa->ccin, ioa->pci_address);
 
-	fd = open(argv[1], O_RDWR);
+		printf("%d to quit\n", i);
+		printf("\nSelection: ");
+		fgets(cmd_line, 999, stdin);
+		num_args = sscanf(cmd_line, "%d\n", &ioa_num);
+
+		if (ioa_num == i)
+			return 0;
+		if (num_args != 0 || ioa_num > num_ioas)
+			return -EINVAL;
+
+		for (ioa = ipr_ioa_head, i = 0; i < ioa_num; ioa = ioa->next, i++) {}
+	} else
+		ioa = ipr_ioa_head;
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
 
 	if (fd < 0) {
-		syslog(LOG_ERR, "Error opening %s. %m\n", argv[1]);
+		syslog(LOG_ERR, "Error opening %s. %m\n", ioa->ioa.gen_name);
 		return -1;
 	}
 
 	closelog();
 	openlog("iprdbg", LOG_PID, LOG_USER);
-	iprloginfo("iprdbg on %s started\n", argv[1]);
+	iprloginfo("iprdbg on %s started\n", ioa->pci_address);
 	closelog();
 	openlog("iprdbg", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
@@ -312,7 +320,7 @@ int main(int argc, char *argv[])
 			   !strcmp(cmd, "q") || !strcmp(cmd, "x")) {
 			closelog();
 			openlog("iprdbg", LOG_PID, LOG_USER);
-			iprloginfo("iprdbg on %s exited\n", argv[1]);
+			iprloginfo("iprdbg on %s exited\n", ioa->pci_address);
 			closelog();
 			return 0;
 		} else {

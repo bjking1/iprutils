@@ -53,7 +53,7 @@ utils: ./*.c ./*.h
 	tar -zcpf iprutils-$(UTILS_VER)-src.tgz --directory ../ --exclude CVS iprutils
 
 clean:
-	rm -f iprupdate iprconfig iprdump iprtrace iprdbg iprupdate.ps iprupdate.pdf iprlib.o
+	rm -f iprupdate iprconfig iprdump iprinit iprdbg iprupdate.ps iprupdate.pdf iprlib.o
 	rm -f iprconfig.ps iprconfig.pdf iprdump.pdf iprdump.ps *.tgz *.rpm
 	rm -rf docs
 	rm -f text.cat

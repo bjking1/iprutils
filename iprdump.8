@@ -1,17 +1,16 @@
-.TH IPRDUMP 8 "July 2002"
+.TH IPRDUMP 8 "February 2004"
 .SH NAME
-iprdump - IBM storage adapter dump utility
+iprdump - IBM Power RAID adapter dump utility
 .SH SYNOPIPR
 .B iprdump
 .SH DESCRIPTION
 .B iprdump
 is used to gather information in the event of an adapter failure.
 The dump data will by default be saved in the /var/log/ directory with the
-prefix ipr_D# where # will be the dump ID of the file.  Information
-will be posted in /var/log/messages in the event of a dump condition
-indicating the dump ID for cross reference.  The iprdump utility can be
-instantiated any time after the ipr driver is loaded and the file system
-to where the dump data is targetted to be stored has also been loaded.
+prefix iprdump.# where # will be the dump ID of the file. The ipr driver
+will make a log in the system error log when a dump is taken. The iprdump
+utility can be started at any time and will properly handle adapters being
+dynamically added and removed from the system.
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -21,4 +20,5 @@ Print the version number of
 .B \-d <directory>
 Assign directory where dump data is to be stored.  Default is /var/log/.
 .SH AUTHOR
-Michael Anderson (mjanders@us.ibm.com)
+Originally written by Michael Anderson <mjanders@us.ibm.com>. Rewritten
+for the 2.6 kernel by Brian King <brking@us.ibm.com>.
