@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.8 2004/02/24 23:20:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.9 2004/02/25 17:09:38 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -179,12 +179,6 @@ static int page0x20_setup(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages;
 	struct ipr_ioa_mode_page *page;
-	struct ipr_disk_attr attr;
-
-	if (ipr_get_dev_attr(dev, &attr))
-		return 0;
-	if (ipr_modify_dev_attr(dev, &attr))
-		return 0;
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
 
@@ -195,7 +189,7 @@ static int page0x20_setup(struct ipr_dev *dev)
 					     mode_pages.hdr.block_desc_len +
 					     sizeof(mode_pages.hdr));
 
-	return (page->max_tcq_depth == attr.queue_depth);
+	return (page->max_tcq_depth == AF_DISK_TCQ_DEPTH);
 }
 
 static int ipr_setup_page0x20(struct ipr_dev *dev)
@@ -297,7 +291,7 @@ static void init_af_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
 
-	if (runtime && page0x20_setup(dev))
+	if (runtime && page0x20_setup(dev) && page0x0a_setup(dev))
 		return;
 	if (ipr_set_dasd_timeouts(dev))
 		return;
