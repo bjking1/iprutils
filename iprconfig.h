@@ -1,3 +1,13 @@
+#ifndef iprconfig_h
+#define iprconfig_h
+/**
+  * IBM IPR adapter configuration utility
+  *
+  * (C) Copyright 2000, 2004
+  * International Business Machines Corporation and others.
+  * All Rights Reserved.
+  */
+
 #define EXIT_FLAG 0x8000	/* stops at given screen on exit call */
 #define CANCEL_FLAG 0x4000	/* stops at given screen on quit call */
 #define REFRESH_FLAG 0x2000	/* refreshes screen on quit or exit */
@@ -853,3 +863,4 @@ s_node n_confirm_set_default_editor = {
 	NULL,
 	"c=Confirm   %q"
 };
+#endif

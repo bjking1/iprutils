@@ -1,3 +1,11 @@
+/**
+  * IBM IPR adapter configuration utility
+  *
+  * (C) Copyright 2000, 2004
+  * International Business Machines Corporation and others.
+  * All Rights Reserved.
+  */
+
 #ifndef iprlib_h
 #include "iprlib.h"
 #endif

@@ -1,7 +1,7 @@
-#! /bin/sh
+#!/bin/sh
 # Copyright (C) 2004 IBM Corporation
 #
-# Author: Brian King <brking@us.ibm.com> 2004
+# Author: Brian King <brking@us.ibm.com>
 #
 # iprinit
 #
