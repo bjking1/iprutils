@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.62 2005/02/23 20:57:11 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.63 2005/02/25 20:39:31 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1917,7 +1917,7 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
-	if (rc != 0)
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
 		scsi_cmd_err(dev, &sense_data, "Inquiry", rc);
 
 	close(fd);

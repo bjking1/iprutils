@@ -45,8 +45,15 @@ start() {
 
 stop() {
     echo -n "Shutting down ipr update daemon"
-    log_success_msg " "
-    return 0
+    killproc $IPRUPDATE
+    
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
+    return $RETVAL
 }
 
 restart() {
@@ -62,18 +69,17 @@ reload() {
 }
 
 status() {
-	echo -n "Checking ipr microcode levels"
-	$IPRUPDATE --check_only
+    echo -n "Checking for ipr update daemon: "
 
-	RETVAL=$?
-	if [ $RETVAL -eq 0 ]; then
-	    log_success_msg " "
-	else
-	    echo " "
-	    echo -n "ipr microcode updates required"
-	    log_success_msg " "
-	fi
-        return $RETVAL
+    pidofproc $IPRUPDATE >& /dev/null
+
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg "running"
+    else
+	log_failure_msg "unused"
+    fi
+    return $RETVAL
 }
 
 case "$1" in
