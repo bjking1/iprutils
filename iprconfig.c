@@ -948,19 +948,106 @@ char *ipr_end_list(char *body)
 	return body;
 }
 
-int main_menu(i_container *i_con)
+void verify_device(struct ipr_dev *dev)
 {
 	int rc;
 	struct ipr_cmd_status cmd_status;
-	int j;
-	struct ipr_ioa *cur_ioa;
 	u8 ioctl_buffer[IPR_MODE_SENSE_LENGTH];
 	struct sense_data_t sense_data;
-	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
 	struct ipr_block_desc *block_desc;
-	int loop, retries;
+	int retries;
+
+	if (ipr_is_af(dev)) {
+
+		/* Send Test Unit Ready to start device if its a volume set */
+		if (ipr_is_volume_set(dev)) {
+			ipr_test_unit_ready(dev, &sense_data);
+			return;
+		}
+
+		/* Do a query command status */
+		rc = ipr_query_command_status(dev, &cmd_status);
+
+		if (rc != 0)
+			return;
+
+		if ((cmd_status.num_records != 0) &&
+		    (cmd_status.record->status == IPR_CMD_STATUS_SUCCESSFUL)) {
+
+			/* Check if evaluate device capabilities is necessary */
+			/* Issue mode sense */
+			rc = ipr_mode_sense(dev, 0, ioctl_buffer);
+
+			if (rc == 0) {
+				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+
+				if (mode_parm_hdr->block_desc_len > 0) {
+
+					block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
+
+					if((block_desc->block_length[1] == 0x02) && 
+					   (block_desc->block_length[2] == 0x00))   {
+
+						/* Send evaluate device capabilities */
+						evaluate_device(dev, dev->ioa, IPR_512_BLOCK);
+					}
+				}
+			}
+		}
+	} else if (dev->scsi_dev_data->type == TYPE_DISK) {
+		/* JBOD */
+		retries = 0;
+
+		redo_tur:
+
+			/* Send Test Unit Ready to find percent complete in sense data. */
+			rc = ipr_test_unit_ready(dev, &sense_data);
+
+		if ((rc == CHECK_CONDITION) &&
+		    ((sense_data.error_code & 0x7F) == 0x70) &&
+		    ((sense_data.sense_key & 0x0F) == 0x02) &&  /* NOT READY */
+		    (sense_data.add_sense_code == 0x04) &&      /* LOGICAL UNIT NOT READY */
+		    (sense_data.add_sense_code_qual == 0x02))   /* INIT CMD REQ */
+		{
+			rc = ipr_start_stop_start(dev);
+
+			if (retries == 0) {
+				retries++;
+				goto redo_tur;
+			}
+		} else if (rc != CHECK_CONDITION) {
+			/* Check if evaluate device capabilities needs to be issued */
+			/* Issue mode sense to get the block size */
+			rc = ipr_mode_sense(dev, 0x0a, &ioctl_buffer);
+
+			if (rc == 0) {
+				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+
+				if (mode_parm_hdr->block_desc_len > 0) {
+					block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
+
+					if ((!(block_desc->block_length[1] == 0x02) ||
+					     !(block_desc->block_length[2] == 0x00)) &&
+					    (dev->ioa->qac_data->num_records != 0)) {
+
+						/* send evaluate device */
+						evaluate_device(dev, dev->ioa, IPR_522_BLOCK);
+					}
+				}
+			}
+		}
+	}
+}
+
+int main_menu(i_container *i_con)
+{
+	int rc;
+	int j;
+	struct ipr_ioa *cur_ioa;
+	int loop;
 	struct screen_output *s_out;
+	struct scsi_dev_data *scsi_dev_data;
 	mvaddstr(0,0,"MAIN MENU FUNCTION CALLED");
 
 	check_current_config(false);
@@ -977,86 +1064,8 @@ int main_menu(i_container *i_con)
 			    (scsi_dev_data->type == IPR_TYPE_ADAPTER))
 				continue;
 
-			if (ipr_is_af(&cur_ioa->dev[j])) {
-
-				/* Send Test Unit Ready to start device if its a volume set */
-				if (ipr_is_volume_set(&cur_ioa->dev[j])) {
-					ipr_test_unit_ready(&cur_ioa->dev[j], &sense_data);
-					continue;
-				}
-
-				/* Do a query command status */
-				rc = ipr_query_command_status(&cur_ioa->dev[j], &cmd_status);
-
-				if (rc != 0)
-					continue;
-
-				if ((cmd_status.num_records != 0) &&
-				    (cmd_status.record->status == IPR_CMD_STATUS_SUCCESSFUL)) {
-
-					/* Check if evaluate device capabilities is necessary */
-					/* Issue mode sense */
-					rc = ipr_mode_sense(&cur_ioa->dev[j], 0, ioctl_buffer);
-
-					if (rc == 0) {
-						mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-						if (mode_parm_hdr->block_desc_len > 0) {
-
-							block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
-
-							if((block_desc->block_length[1] == 0x02) && 
-							   (block_desc->block_length[2] == 0x00))   {
-
-								/* Send evaluate device capabilities */
-								evaluate_device(&cur_ioa->dev[j], cur_ioa, IPR_512_BLOCK);
-							}
-						}
-					}
-				}
-			} else if (cur_ioa->dev[j].scsi_dev_data->type == TYPE_DISK) {
-				/* JBOD */
-				retries = 0;
-
-				redo_tur:
-
-					/* Send Test Unit Ready to find percent complete in sense data. */
-					rc = ipr_test_unit_ready(&cur_ioa->dev[j], &sense_data);
-
-				if ((rc == CHECK_CONDITION) &&
-				    ((sense_data.error_code & 0x7F) == 0x70) &&
-				    ((sense_data.sense_key & 0x0F) == 0x02) &&  /* NOT READY */
-				    (sense_data.add_sense_code == 0x04) &&      /* LOGICAL UNIT NOT READY */
-				    (sense_data.add_sense_code_qual == 0x02))   /* INIT CMD REQ */
-				{
-					rc = ipr_start_stop_start(&cur_ioa->dev[j]);
-
-					if (retries == 0) {
-						retries++;
-						goto redo_tur;
-					}
-				} else if (rc != CHECK_CONDITION) {
-					/* Check if evaluate device capabilities needs to be issued */
-					/* Issue mode sense to get the block size */
-					rc = ipr_mode_sense(&cur_ioa->dev[j], 0x0a, &ioctl_buffer);
-
-					if (rc == 0) {
-						mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-						if (mode_parm_hdr->block_desc_len > 0) {
-							block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
-
-							if ((!(block_desc->block_length[1] == 0x02) ||
-							     !(block_desc->block_length[2] == 0x00)) &&
-							    (cur_ioa->qac_data->num_records != 0)) {
-
-								/* send evaluate device */
-								evaluate_device(&cur_ioa->dev[j], cur_ioa, IPR_522_BLOCK);
-							}
-						}
-					}
-				}
-			}
+			/* check if evaluate_device is needed for this device */
+			verify_device(&cur_ioa->dev[j]);
 		}
 	}
 
@@ -1336,6 +1345,9 @@ int disk_status(i_container *i_con)
 			    (ipr_is_array_member(&cur_ioa->dev[j])))
 
 				continue;
+
+			/* check if evaluate_device is needed for this device */
+			verify_device(&cur_ioa->dev[j]);
 
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, 2+k);
@@ -3705,7 +3717,7 @@ int format_include_cand()
 	int num_devs = 0;
 	int rc = 0;
 	struct ipr_dev_record *device_record;
-	int i, opens;
+	int i, opens = 0;
 
 	cur_raid_cmd = raid_cmd_head;
 	while (cur_raid_cmd) {
@@ -3720,10 +3732,12 @@ int format_include_cand()
 				if ((device_record != NULL) && (device_record->issue_cmd)) {
 
 					/* get current "opens" data for this device to determine conditions to continue */
-					opens = num_device_opens(scsi_dev_data->host,
-								 scsi_dev_data->channel,
-								 scsi_dev_data->id,
-								 scsi_dev_data->lun);
+					scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+					if (scsi_dev_data)
+						opens = num_device_opens(scsi_dev_data->host,
+									 scsi_dev_data->channel,
+									 scsi_dev_data->id,
+									 scsi_dev_data->lun);
 
 					if (opens != 0)  {
 						syslog(LOG_ERR,_("Include Device not allowed, device in use - %s\n"),
@@ -3745,7 +3759,7 @@ int format_include_cand()
 					dev_init_tail->do_init = 1;
 
 					/* Issue the format. Failure will be detected by query command status */
-					rc = ipr_format_unit(dev_init_tail->ipr_dev);  /* FIXME  Mandatory lock? */
+					rc = ipr_format_unit(dev_init_tail->ipr_dev);
 
 					num_devs++;
 				}
@@ -7600,7 +7614,7 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 		rc = get_dasd_firmware_image_list(ipr_dev, &list);
 
 	if (rc < 0)
-		return 67;
+		return 67 | EXIT_FLAG;
 	else
 		list_count = rc;
 
@@ -8324,7 +8338,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		len = strlen(body);
 	body = ipr_realloc(body, len + 256);
 
-	if (((type & 3) == 3) && (strlen(gen_name) > 5))
+	if (((type & 3) == 2) && (strlen(gen_name) > 5))
 		ipr_strncpy_0(node_name, &gen_name[5], 6);
 	else if (strlen(dev_name) > 5)
 		ipr_strncpy_0(node_name, &dev_name[5], 6);
