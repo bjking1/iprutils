@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.1 2003/10/22 22:21:02 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.1.1.1 2003/10/22 22:21:02 manderso Exp $
  */
 
 #ifndef iprlib_h

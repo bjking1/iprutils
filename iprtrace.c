@@ -12,7 +12,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/Attic/iprtrace.c,v 1.1 2003/10/22 22:21:02 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/Attic/iprtrace.c,v 1.1.1.1 2003/10/22 22:21:02 manderso Exp $
  */
 
 #include <stdio.h>
