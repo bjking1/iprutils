@@ -4,10 +4,24 @@
   * (C) Copyright 2004
   * International Business Machines Corporation and others.
   * All Rights Reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.9 2004/02/25 17:09:38 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.10 2004/02/27 20:21:38 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -363,6 +377,7 @@ int main(int argc, char *argv[])
 {
 	struct ipr_ioa *ioa;
 	int daemonize = 0;
+	int daemonized = 0;
 
 	openlog("iprinit", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
@@ -385,8 +400,14 @@ int main(int argc, char *argv[])
 		for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
 			init_ioa(ioa);
 		runtime = 1;
-		if (daemonize)
+		if (daemonize) {
+			if (!daemonized) {
+				daemonized = 1;
+				if (fork())
+					return 0;
+			}
 			sleep(60);
+		}
 	} while(daemonize);
 
 	return 0;
