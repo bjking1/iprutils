@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.50 2004/04/28 22:53:21 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.51 2004/04/29 16:49:25 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -470,10 +470,8 @@ void tool_init(char *name)
 	num_ioas = 0;
 
 	rc = sysfs_find_driver_bus("ipr", bus, 100);
-	if (rc) {
-		syslog(LOG_ERR, "Failed to open ipr driver bus. %m\n");
+	if (rc)
 		return;
-	}
 
 	/* Find all the IPR IOAs attached and save away vital info about them */
 	sysfs_ipr_driver = sysfs_open_driver(bus, "ipr");

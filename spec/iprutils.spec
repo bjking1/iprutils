@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.8
+Version: 2.0.9
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -26,10 +26,12 @@ install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
 install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
 install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
 
+%ifarch ppc ppc64
 %post
 /usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
 /usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
 /usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
+%endif
 
 %preun
 /usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
@@ -47,6 +49,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Apr 29 2004 Brian King <brking@us.ibm.com> 2.0.9
+- Fix dependencies in init.d scripts
+- Only enable init.d scripts on ppc
+- Don't log an error if ipr is not loaded
 * Mon Apr 28 2004 Brian King <brking@us.ibm.com> 2.0.8
 - Fix to properly enable init.d scripts when the rpm is installed
 - Fix memory leak in code download path
