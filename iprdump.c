@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.9 2004/03/24 20:02:34 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.10 2004/04/06 21:10:25 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -277,8 +277,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (fork())
-		return 0;
+	ipr_daemonize();
 
 	signal(SIGINT, handle_signal);
 	signal(SIGQUIT, handle_signal);

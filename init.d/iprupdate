@@ -41,19 +41,36 @@ start() {
 }
 
 stop() {
-    exit 3
+    echo -n "Shutting down ipr update daemon"
+    log_success_msg " "
+    return 0
 }
 
 restart() {
-    exit 3
+    $0 stop
+    $0 start
+    return $RETVAL
 }
 
 reload() {
-    exit 3
+    $0 stop
+    $0 start
+    return $RETVAL
 }
 
 status() {
-    exit 3
+	echo -n "Checking ipr microcode levels"
+	$IPRUPDATE --check_only
+
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+	    log_success_msg " "
+	else
+	    echo " "
+	    echo -n "ipr microcode updates required"
+	    log_success_msg " "
+	fi
+        return $RETVAL
 }
 
 case "$1" in

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.11 2004/03/24 20:02:33 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.12 2004/04/06 21:10:25 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -121,50 +121,51 @@ static int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
 
 static int format_flit(struct ipr_flit *flit)
 {
-    int num_entries = ntohl(flit->num_entries) - 1;
-    struct ipr_flit_entry *flit_entry;
+	int num_entries = ntohl(flit->num_entries) - 1;
+	struct ipr_flit_entry *flit_entry;
 
-    signed int len;
-    u8 filename[IPR_FLIT_FILENAME_LEN+1];
-    u8 time[IPR_FLIT_TIMESTAMP_LEN+1];
-    u8 buf1[IPR_FLIT_FILENAME_LEN+1];
-    u8 buf2[IPR_FLIT_FILENAME_LEN+1];
-    u8 lid_name[IPR_FLIT_FILENAME_LEN+1];
-    u8 path[IPR_FLIT_FILENAME_LEN+1];
-    int num_args, i;
+	signed int len;
+	u8 filename[IPR_FLIT_FILENAME_LEN+1];
+	u8 time[IPR_FLIT_TIMESTAMP_LEN+1];
+	u8 buf1[IPR_FLIT_FILENAME_LEN+1];
+	u8 buf2[IPR_FLIT_FILENAME_LEN+1];
+	u8 lid_name[IPR_FLIT_FILENAME_LEN+1];
+	u8 path[IPR_FLIT_FILENAME_LEN+1];
+	int num_args, i;
 
-    for (i = 0, flit_entry = flit->flit_entry;
-         (i < num_entries) && (*flit_entry->timestamp);
-         flit_entry++, i++) {
-        snprintf(time, IPR_FLIT_TIMESTAMP_LEN, flit_entry->timestamp);
-        time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
+	for (i = 0, flit_entry = flit->flit_entry;
+	     (i < num_entries) && (*flit_entry->timestamp);
+	     flit_entry++, i++) {
+		snprintf(time, IPR_FLIT_TIMESTAMP_LEN, flit_entry->timestamp);
+		time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
 
-        snprintf(filename, IPR_FLIT_FILENAME_LEN, flit_entry->filename);
-        filename[IPR_FLIT_FILENAME_LEN] = '\0';
+		snprintf(filename, IPR_FLIT_FILENAME_LEN, flit_entry->filename);
+		filename[IPR_FLIT_FILENAME_LEN] = '\0';
 
-        num_args = sscanf(filename, "%184s " "%184s " "%184s "
-                          "%184s ", buf1, buf2, lid_name, path);
+		num_args = sscanf(filename, "%184s " "%184s " "%184s "
+				  "%184s ", buf1, buf2, lid_name, path);
 
-        if (num_args != 4) {
-            syslog(LOG_ERR, "Cannot parse flit\n");
-            return 1;
-        }
+		if (num_args != 4) {
+			syslog(LOG_ERR, "Cannot parse flit\n");
+			return 1;
+		}
 
-        len = strlen(path);
+		len = strlen(path);
 
-        iprprint("LID Name:   %s  (%8X)\n", lid_name, ntohl(flit_entry->load_name));
-        iprprint("Time Stamp: %s\n", time);
-        iprprint("LID Path:   %s\n", lid_name);
-        iprprint("Text Segment:  Address %08X,  Length %8X\n",
-               ntohl(flit_entry->text_ptr), ntohl(flit_entry->text_len));
-        iprprint("Data Segment:  Address %08X,  Length %8X\n",
-               ntohl(flit_entry->data_ptr), ntohl(flit_entry->data_len));
-        iprprint("BSS Segment:   Address %08X,  Length %8X\n",
-               ntohl(flit_entry->bss_ptr), ntohl(flit_entry->bss_len));
-        iprprint("\n");
-    }
+		iprprint("LID Name:   %s  (%8X)\n", lid_name, ntohl(flit_entry->load_name));
+		iprprint("LID Path:   %s\n", path);
+		iprprint("Time Stamp: %s\n", time);
+		iprprint("LID Path:   %s\n", lid_name);
+		iprprint("Text Segment:  Address %08X,  Length %8X\n",
+			 ntohl(flit_entry->text_ptr), ntohl(flit_entry->text_len));
+		iprprint("Data Segment:  Address %08X,  Length %8X\n",
+			 ntohl(flit_entry->data_ptr), ntohl(flit_entry->data_len));
+		iprprint("BSS Segment:   Address %08X,  Length %8X\n",
+			 ntohl(flit_entry->bss_ptr), ntohl(flit_entry->bss_len));
+		iprprint("\n");
+	}
 
-    return 0;
+	return 0;
 } 
 
 int main(int argc, char *argv[])

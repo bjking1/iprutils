@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.47 2004/03/29 23:23:29 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.48 2004/04/06 21:10:25 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2437,7 +2437,7 @@ void ipr_modify_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 	}
 }
 
-static struct unsupported_af_dasd *
+struct unsupported_af_dasd *
 get_unsupp_af(struct ipr_std_inq_data *inq,
 	      struct ipr_dasd_inquiry_page3 *page3)
 {
@@ -2476,8 +2476,8 @@ get_unsupp_af(struct ipr_std_inq_data *inq,
 	return NULL;
 }
 
-static bool disk_needs_msl(struct unsupported_af_dasd *unsupp_af,
-			   struct ipr_std_inq_data *inq)
+bool disk_needs_msl(struct unsupported_af_dasd *unsupp_af,
+		    struct ipr_std_inq_data *inq)
 {
 	u32 ros_rcv_ram_rsvd, min_ucode_level;
 	int j;
@@ -2714,8 +2714,8 @@ int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 		rc = scandir(HOTPLUG_BASE_DIR, &dirent, NULL, alphasort);
 
 		for (i = 0; i < rc && rc > 0; i++) {
-			/* xxx fix this to look for IBM-eServer-xxx */
-			if (strstr(dirent[i]->d_name, parms->fw_name)) {
+			if (strstr(dirent[i]->d_name, "IBM-eServer-") &&
+			    strstr(dirent[i]->d_name, parms->fw_name)) {
 				ret = realloc(ret, sizeof(*ret) * (j + 1));
 				sprintf(ret[j].file, HOTPLUG_BASE_DIR"/%s",
 					dirent[i]->d_name);
@@ -2852,8 +2852,8 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 		rc--;
 
 		for (i = rc ; i >= 0; i--) {
-			/* xxx fix this to look for IBM-eServer-xxx */
-			if (strstr(dirent[i]->d_name, prefix)) {
+			if (strstr(dirent[i]->d_name, "IBM-eServer-") &&
+			    strstr(dirent[i]->d_name, prefix)) {
 				ret = realloc(ret, sizeof(*ret) * (j + 1));
 				sprintf(ret[j].file, HOTPLUG_BASE_DIR"/%s",
 					dirent[i]->d_name);
@@ -3408,18 +3408,16 @@ struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 	struct scsi_dev_data *scsi_dev_data;
 
 	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-
 		for (j = 0; j < cur_ioa->num_devices; j++) {
-
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
 			if (scsi_dev_data == NULL)
 				continue;
 
-			if ((scsi_dev_data->host == res_addr->host) &&
-			    (scsi_dev_data->channel == res_addr->bus) &&
-			    (scsi_dev_data->id == res_addr->target) &&
-			    (scsi_dev_data->lun == res_addr->lun))
+			if (scsi_dev_data->host == res_addr->host &&
+			    scsi_dev_data->channel == res_addr->bus &&
+			    scsi_dev_data->id == res_addr->target &&
+			    scsi_dev_data->lun == res_addr->lun)
 				return &cur_ioa->dev[j];
 		}
 	}
@@ -3435,25 +3433,43 @@ struct ipr_dev *get_dev_from_handle(u32 res_handle)
 	struct ipr_array_record *array_record;
 
 	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-
 		for (j = 0; j < cur_ioa->num_devices; j++) {
-
 			device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 			array_record = (struct ipr_array_record *)cur_ioa->dev[j].qac_entry;
 
 			if (device_record == NULL)
 				continue;
 
-			if ((device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-			    (device_record->resource_handle == res_handle))
+			if (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+			    device_record->resource_handle == res_handle)
 				return &cur_ioa->dev[j];
 
-			if ((array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD) &&
-			    (array_record->resource_handle == res_handle))
+			if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD &&
+			    array_record->resource_handle == res_handle)
 				return &cur_ioa->dev[j];
 
 		}
 	}
 
 	return NULL;
+}
+
+void ipr_daemonize()
+{
+	int rc = fork();
+
+	if (rc < 0) {
+		syslog(LOG_ERR, "Failed to daemonize\n");
+		exit(1);
+	} else if (rc) {
+		exit(0);
+	}
+
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+	open("/dev/null",O_RDONLY);
+	open("/dev/null",O_WRONLY);
+	open("/dev/null",O_WRONLY);
+	setsid();
 }

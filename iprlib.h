@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.40 2004/03/29 23:23:30 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.41 2004/04/06 21:10:25 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -1200,6 +1200,11 @@ void ipr_init_ioa(struct ipr_ioa *);
 int device_supported(struct ipr_dev *);
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr);
 struct ipr_dev *get_dev_from_handle(u32 res_handle);
+void ipr_daemonize();
+struct unsupported_af_dasd *get_unsupp_af(struct ipr_std_inq_data *,
+					  struct ipr_dasd_inquiry_page3 *);
+bool disk_needs_msl(struct unsupported_af_dasd *,
+		    struct ipr_std_inq_data *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

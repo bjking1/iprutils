@@ -1513,9 +1513,8 @@ int device_details(i_container *i_con)
 	char *buffer;
 	char *body = NULL;
 	struct ipr_dev *device;
-	int rc;
+	int rc, i;
 	struct scsi_dev_data *scsi_dev_data;
-	int i;
 	u8 product_id[IPR_PROD_ID_LEN+1];
 	u8 vendor_id[IPR_VENDOR_ID_LEN+1];
 	u8 plant_code[IPR_VPD_PLANT_CODE_LEN+1];
@@ -1529,9 +1528,7 @@ int device_details(i_container *i_con)
 	long double device_capacity; 
 	unsigned long long max_user_lba_int;
 	double lba_divisor;
-	int scsi_channel;
-	int scsi_id;
-	int scsi_lun;
+	int scsi_channel, scsi_id, scsi_lun;
 	struct ipr_ioa_vpd ioa_vpd;
 	struct ipr_cfc_vpd cfc_vpd;
 	struct ipr_dram_vpd dram_vpd;
@@ -1554,8 +1551,9 @@ int device_details(i_container *i_con)
 		return rc;
 
 	scsi_dev_data = device->scsi_dev_data;
-	array_record =
-		(struct ipr_array_record *)device->qac_entry;
+	common_record = device->qac_entry;
+	array_record = (struct ipr_array_record *)common_record;
+	device_record = (struct ipr_dev_record *)common_record;
 	rc = 0;
 
 	memset(&ioa_vpd, 0, sizeof(ioa_vpd));
@@ -1568,9 +1566,7 @@ int device_details(i_container *i_con)
 		scsi_id = scsi_dev_data->id;
 		scsi_lun = scsi_dev_data->lun;
 	} else if (device->qac_entry) {
-		common_record = device->qac_entry;
 		if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
-			device_record = (struct ipr_dev_record *)common_record;
 			scsi_channel = device_record->last_resource_addr.bus;
 			scsi_id = device_record->last_resource_addr.target;
 			scsi_lun = device_record->last_resource_addr.lun;
@@ -5349,6 +5345,59 @@ int confirm_init_device(i_container *i_con)
 	return rc;
 }
 
+static int disable_qerr(struct ipr_dev *dev)
+{
+	u8 ioctl_buffer[IOCTL_BUFFER_SIZE];
+	u8 ioctl_buffer2[IOCTL_BUFFER_SIZE];
+	struct ipr_control_mode_page *control_mode_page;
+	struct ipr_control_mode_page *control_mode_page_changeable;
+	struct ipr_mode_parm_hdr *mode_parm_hdr;
+	int status;
+	u8 length;
+
+	/* Issue mode sense to get the control mode page */
+	status = ipr_mode_sense(dev, 0x0a, &ioctl_buffer);
+
+	if (status)
+		return -EIO;
+
+	/* Issue mode sense to get the control mode page */
+	status = ipr_mode_sense(dev, 0x4a, &ioctl_buffer2);
+
+	if (status)
+		return -EIO;
+
+	mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
+
+	control_mode_page_changeable = (struct ipr_control_mode_page *)
+		(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
+
+	mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+
+	control_mode_page = (struct ipr_control_mode_page *)
+		(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
+
+	/* Turn off QERR since some drives do not like QERR
+	 and IMMED bit at the same time. */
+	IPR_SET_MODE(control_mode_page_changeable->qerr,
+		     control_mode_page->qerr, 0);
+
+	/* Issue mode select to set page x0A */
+	length = mode_parm_hdr->length + 1;
+
+	mode_parm_hdr->length = 0;
+	control_mode_page->hdr.parms_saveable = 0;
+	mode_parm_hdr->medium_type = 0;
+	mode_parm_hdr->device_spec_parms = 0;
+
+	status = ipr_mode_select(dev, &ioctl_buffer, length);
+
+	if (status)
+		return -EIO;
+
+	return 0;
+}
+
 int send_dev_inits(i_container *i_con)
 {
 	u8 num_devs = 0;
@@ -5545,63 +5594,7 @@ int send_dev_inits(i_container *i_con)
 				continue;
 			}
 
-			/* Issue mode sense to get the control mode page */
-			status = ipr_mode_sense(cur_dev_init->ipr_dev,
-						0x0a, &ioctl_buffer);
-
-			if (status)
-			{
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
-			}
-
-			/* Issue mode sense to get the control mode page */
-			status = ipr_mode_sense(cur_dev_init->ipr_dev,
-						0x4a, &ioctl_buffer2);
-
-			if (status)
-			{
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
-			}
-
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
-
-			control_mode_page_changeable = (struct ipr_control_mode_page *)
-				(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-			control_mode_page = (struct ipr_control_mode_page *)
-				(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-			/* Turn off QERR since some drives do not like QERR
-			 and IMMED bit at the same time. */
-			IPR_SET_MODE(control_mode_page_changeable->qerr,
-				     control_mode_page->qerr, 0);
-
-			/* Issue mode select to set page x0A */
-			length = mode_parm_hdr->length + 1;
-
-			mode_parm_hdr->length = 0;
-			control_mode_page->hdr.parms_saveable = 0;
-			mode_parm_hdr->medium_type = 0;
-			mode_parm_hdr->device_spec_parms = 0;
-
-			status = ipr_mode_select(cur_dev_init->ipr_dev,
-						 &ioctl_buffer, length);
-
-			if (status)
-			{
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
-			}
+			disable_qerr(cur_dev_init->ipr_dev);
 
 			/* Issue mode select to setup block size */
 			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
@@ -5679,18 +5672,14 @@ int dev_init_complete(u8 num_devs)
 		percent_cmplt = 100;
 		done_bad = 0;
 
-		for (cur_dev_init = dev_init_head;  cur_dev_init != NULL;
-		cur_dev_init = cur_dev_init->next) {
-
-			if ((cur_dev_init->do_init) &&
-			    (cur_dev_init->dev_type == IPR_AF_DASD_DEVICE)) {
-
+		for (cur_dev_init = dev_init_head; cur_dev_init; cur_dev_init = cur_dev_init->next) {
+			if (cur_dev_init->do_init &&
+			    cur_dev_init->dev_type == IPR_AF_DASD_DEVICE) {
 				rc = ipr_query_command_status(cur_dev_init->ipr_dev,
 							      &cmd_status);
 
-				if ((rc) || (cmd_status.num_records == 0)) {
+				if (rc || cmd_status.num_records == 0)
 					continue;
-				}
 
 				status_record = cmd_status.record;
 				if (status_record->status == IPR_CMD_STATUS_FAILED) {
@@ -5700,10 +5689,8 @@ int dev_init_complete(u8 num_devs)
 						percent_cmplt = status_record->percent_complete;
 					not_done = 1;
 				}
-			}
-			else if ((cur_dev_init->do_init) &&
-				 (cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE))
-			{
+			} else if (cur_dev_init->do_init &&
+				   cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE) {
 				/* Send Test Unit Ready to find percent complete in sense data. */
 				rc = ipr_test_unit_ready(cur_dev_init->ipr_dev,
 							 &sense_data);
@@ -5711,10 +5698,9 @@ int dev_init_complete(u8 num_devs)
 				if (rc < 0)
 					continue;
 
-				if ((rc == CHECK_CONDITION) &&
-				    ((sense_data.error_code & 0x7F) == 0x70) &&
-				    ((sense_data.sense_key & 0x0F) == 0x02)) {
-
+				if (rc == CHECK_CONDITION &&
+				    (sense_data.error_code & 0x7F) == 0x70 &&
+				    (sense_data.sense_key & 0x0F) == 0x02) {
 					cur_dev_init->cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
 					if (cur_dev_init->cmplt < percent_cmplt)
 						percent_cmplt = cur_dev_init->cmplt;
@@ -5724,10 +5710,8 @@ int dev_init_complete(u8 num_devs)
 		}
 
 		if (!not_done) {
-
 			for (cur_dev_init = dev_init_head; cur_dev_init;
 			     cur_dev_init = cur_dev_init->next) {
-
 				if (!cur_dev_init->do_init)
 					continue;
 

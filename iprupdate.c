@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.11 2004/03/24 20:02:34 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.12 2004/04/06 21:10:25 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -23,6 +23,48 @@
 #endif
 
 #include <sys/mman.h>
+
+static int ioa_needs_update(struct ipr_ioa *ioa)
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	u32 fw_version;
+
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, "fw_version");
+	sscanf(attr->value, "%8X", &fw_version);
+	sysfs_close_class_device(class_device);
+
+	if (fw_version >= ioa->msl)
+		return 0;
+
+	ioa_info(ioa, "Adapter needs microcode update\n");
+	return 1;
+}
+
+static int dev_needs_update(struct ipr_dev *dev)
+{
+	struct ipr_std_inq_data std_inq_data;
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	struct unsupported_af_dasd *unsupp_af;
+
+	memset(&std_inq_data, 0, sizeof(std_inq_data));
+	if (ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq_data, sizeof(std_inq_data)))
+		return 0;
+
+	if (ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq)))
+		return 0;
+
+	unsupp_af = get_unsupp_af(&std_inq_data, &page3_inq);
+	if (!unsupp_af)
+		return 0;
+
+	if (!disk_needs_msl(unsupp_af, &std_inq_data))
+		return 0;
+
+	scsi_info(dev, "Device needs microcode update\n");
+	return 1;
+}
 
 static void update_ioa_fw(struct ipr_ioa *ioa, int force)
 {
@@ -60,6 +102,7 @@ int main(int argc, char *argv[])
 	int rc = 0;
 	int i;
 	int force_devs, force_ioas;
+	int check_levels = 0;
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
 
@@ -77,6 +120,8 @@ int main(int argc, char *argv[])
 			force_devs = 1;
 		} else if (strcmp(argv[1], "--force-ioas") == 0) {
 			force_ioas = 1;
+		} else if (strcmp(argv[1], "--check_only") == 0) {
+			check_levels = 1;
 		} else {
 			printf("Usage: iprdate [options]\n");
 			printf("  Options: --version    Print iprupdate version\n");
@@ -89,7 +134,10 @@ int main(int argc, char *argv[])
 	check_current_config(false);
 
 	for (ioa = ipr_ioa_head; ioa; ioa = ioa->next) {
-		update_ioa_fw(ioa, force_ioas);
+		if (check_levels)
+			rc |= ioa_needs_update(ioa);
+		else
+			update_ioa_fw(ioa, force_ioas);
 
 		for (i = 0; i < ioa->num_devices; i++) {
 			dev = &ioa->dev[i];
@@ -101,7 +149,10 @@ int main(int argc, char *argv[])
 			     dev->scsi_dev_data->type != IPR_TYPE_AF_DISK))
 				continue;
 
-			update_disk_fw(dev, force_devs);
+			if (check_levels)
+				rc |= dev_needs_update(dev);
+			else
+				update_disk_fw(dev, force_devs);
 		}
 	}
 
