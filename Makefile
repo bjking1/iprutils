@@ -65,8 +65,6 @@ install: all
 	install docs/iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz
 	install docs/iprupdate.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprupdate.8.gz
 	install docs/iprdump.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprdump.8.gz
-	install -d $(INSTALL_MOD_PATH)/usr/share/iprutils-$(UTILS_VER)
-	install LICENSE $(INSTALL_MOD_PATH)/usr/share/iprutils-$(UTILS_VER)/LICENSE
 
 rpm: *.c *.h *.8
 	-make clean

@@ -43,6 +43,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %doc iprutils/README
+%doc iprutils/LICENSE
 /sbin/iprconfig
 /sbin/iprupdate
 /sbin/iprdump
@@ -54,5 +55,3 @@ rm -rf $RPM_BUILD_ROOT
 /etc/init.d/iprdump
 /etc/init.d/iprinit
 /etc/init.d/iprupdate
-/usr/share/ipr/ipr.cat
-/usr/share/doc/iprutils-%version/LICENSE
