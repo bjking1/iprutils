@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.13 2004/05/23 05:45:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.14 2004/09/09 17:52:35 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
 	if (num_ioas > 1) {
 		printf("\nSelect adapter to debug:\n");
 		i = 1;
-		for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
+		for_each_ioa(ioa)
 			printf("%d. IBM %X: Location: %s\n",
 			       i++, ioa->ccin, ioa->pci_address);
 

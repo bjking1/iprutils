@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.15 2004/08/11 22:17:26 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.16 2004/09/09 17:52:36 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -78,11 +78,7 @@ static void update_ioa_fw(struct ipr_ioa *ioa, int force)
 	rc = get_ioa_firmware_image_list(ioa, &list);
 
 	if (rc < 1) {
-		syslog(LOG_ERR, "Could not find microcode file for IBM %04X. "
-		       "Please download the latest microcode from "
-		       "http://techsupport.services.ibm.com/server/mdownload/download.html. "
-		       "SCSI speeds will be limited to %d MB/s until updated microcode is downloaded.\n",
-		       ioa->ccin, IPR_SAFE_XFER_RATE);
+		ipr_log_ucode_error(ioa);
 		return;
 	}
 

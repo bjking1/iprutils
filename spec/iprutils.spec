@@ -51,10 +51,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Fri Jun 17 2004 Brian King <brking@us.ibm.com> 2.0.13
+* Wed Sep 1 2004 Brian King <brking@us.ibm.com> 2.0.13
 - Fix handling of dead adapters in all of iprutils.
 - Improve iprupdate error logs to indicate where to download microcode from.
 - Set default tcq queue depth for AS400 disks to 16.
+- Add ability to query multi-adapter status for dual initiator RAID configs
+- Add "known to be zeroed" tracking to iprconfig to drastically reduce the
+  time required to create a RAID array when starting with 512 formatted disks
 * Fri Jun 11 2004 Brian King <brking@us.ibm.com> 2.0.12
 - Fix bug preventing ucode download to iSeries disks from working
 * Thu Jun 10 2004 Brian King <brking@us.ibm.com> 2.0.11

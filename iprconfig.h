@@ -117,24 +117,25 @@ int confirm_change_bus_attr(i_container *i_con);
 int driver_config(i_container * i_con);
 int change_driver_config(i_container *i_con);
 int disk_config(i_container * i_con);
-int change_disk_config(i_container * i_con);
-int download_ucode(i_container * i_con);
-int choose_ucode(i_container * i_con);
-int log_menu(i_container * i_con);
-int ibm_storage_log_tail(i_container * i_con);
-int ibm_storage_log(i_container * i_con);
-int kernel_log(i_container * i_con);
-int iprconfig_log(i_container * i_con);
-int kernel_root(i_container * i_con);
-int confirm_kernel_root(i_container * i_con);
-int confirm_kernel_root_change(i_container * i_con);
-int confirm_kernel_root_change2(i_container * i_con);
-int set_default_editor(i_container * i_con);
-int confirm_set_default_editor(i_container * i_con);
-int confirm_set_default_editor_change(i_container * i_con);
-int confirm_set_default_editor_change2(i_container * i_con);
-int restore_log_defaults(i_container * i_con);
-int ibm_boot_log(i_container * i_con);
+int change_disk_config(i_container *);
+int download_ucode(i_container *);
+int choose_ucode(i_container *);
+int log_menu(i_container *);
+int ibm_storage_log_tail(i_container *);
+int ibm_storage_log(i_container *);
+int kernel_log(i_container *);
+int iprconfig_log(i_container *);
+int kernel_root(i_container *);
+int confirm_kernel_root(i_container *);
+int confirm_kernel_root_change(i_container *);
+int confirm_kernel_root_change2(i_container *);
+int set_default_editor(i_container *);
+int confirm_set_default_editor(i_container *);
+int confirm_set_default_editor_change(i_container *);
+int confirm_set_default_editor_change2(i_container *);
+int restore_log_defaults(i_container *);
+int ibm_boot_log(i_container *);
+int exit_confirmed(i_container *);
 
 /* constant strings */
 const char *no_dev_found = __("No devices found");
@@ -184,6 +185,22 @@ s_node n_main_menu = {
 	.options  = &main_menu_opt[0],
 	.title    =  __("IBM Power RAID Configuration Utility")
 };
+
+struct screen_opts exit_confirm_opt[] = {
+	{main_menu,        "1", __("Return to main menu")},
+	{exit_confirmed,     "2", __("Exit iprconfig")},
+};
+
+s_node n_exit_confirm = {
+	.num_opts = NUM_OPTS(exit_confirm_opt),
+	.options  = &exit_confirm_opt[0],
+	.title    =  __("Confirm Exit"),
+	.header   = {
+		__("One or more disks is currently known to be zeroed. Exiting now "
+		   "will cause this state to be lost, resulting in longer array creation times\n\n"),
+		"" }
+};
+
 
 struct screen_opts disk_status_opt[] = {
 	{device_details, "\n"}
@@ -436,8 +453,8 @@ s_node n_confirm_raid_include = {
 	.options  = &null_opt[0],
 	.title    = __("Confirm Devices to Add to a Disk Array"),
 	.header   = {
-		__("ATTENTION: All listed disks will be formatted "
-		   "and zeroed before being added to the disk array.\n\n"),
+		__("All listed disks will be added to the disk array.\n"),
+		__("ATTENTION: Disks that have not been zeroed with be formatted first.\n"),
 		__("Press Enter to confirm your choice to have the system "
 		   "include the selected disks in the disk array\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
@@ -1135,7 +1152,22 @@ s_node n_log_menu = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG),
 	.num_opts = NUM_OPTS(log_menu_opt),
 	.options  = &log_menu_opt[0],
-	.title    = __("Kernel Messages Log")
+	.title    = __("Kernel Messages Log"),
+	.header   = {
+		__("ATTENTION: Devices listed below are currently known to be zeroed. "
+		   "By exiting now, this information will be lost, resulting in potentially "
+		   "longer array creation times.\n\n"),
+		__("  q=Cancel to return to iprconfig.\n"),
+		__("  e=Exit iprconfig\n")
+	}
+};
+
+s_node n_exit_menu = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG),
+	.num_opts = NUM_OPTS(log_menu_opt),
+	.options  = &null_opt[0],
+	.title    = __("Confirm Exit")
 };
 
 struct screen_opts kernel_root_opt[] = {

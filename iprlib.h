@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.45 2004/08/11 22:17:26 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.46 2004/09/09 17:52:35 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -44,6 +44,7 @@
 #include <linux/byteorder/swab.h>
 #include <asm/byteorder.h>
 #include <sys/mman.h>
+#include <paths.h>
 
 #define IPR_DASD_UCODE_USRLIB 0
 #define IPR_DASD_UCODE_ETC 1
@@ -53,7 +54,10 @@
 #define IPR_DASD_UCODE_HDR 2
 
 #define UCODE_BASE_DIR "/usr/lib/microcode"
-#define HOTPLUG_BASE_DIR "/usr/lib/hotplug/firmware"
+#define HOTPLUG_BASE_DIR "/lib/firmware"
+
+#define FIRMWARE_HOTPLUG_DIR_TAG "FIRMWARE_DIR"
+#define FIRMWARE_HOTPLUG_CONFIG_FILE "/etc/hotplug/firmware.agent"
 
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
@@ -105,12 +109,13 @@
 #define IPR_STD_INQ_PART_NUM_LEN     12
 #define IPR_STD_INQ_EC_LEVEL_LEN     10
 #define IPR_STD_INQ_FRU_NUM_LEN      12
-#define IPR_STD_INQ_AS400_SERV_LVL_OFF       107
 
 #define  IPR_START_STOP_STOP                 0x00
 #define  IPR_START_STOP_START                0x01
 #define  IPR_READ_CAPACITY_16                0x10
 #define IPR_SERVICE_ACTION_IN                0x9E
+#define IPR_MAINTENANCE_IN                   0xA3
+#define  IPR_QUERY_MULTI_ADAPTER_STATUS	   0x01
 #define IPR_QUERY_RESOURCE_STATE             0xC2
 #define IPR_QUERY_COMMAND_STATUS             0xCB
 #define IPR_SUSPEND_DEV_BUS                  0xC8u
@@ -171,6 +176,9 @@ extern int runtime;
 extern void (*exit_func) (void);
 extern int ipr_debug;
 extern int ipr_force;
+extern char *hotplug_dir;
+extern struct zeroed_dev *head_zdev;
+extern struct zeroed_dev *tail_zdev;
 
 struct ipr_res_addr {
 	u8 host;
@@ -210,6 +218,11 @@ struct ipr_dasd_res_state {
 	u32 failing_dev_ioasc;
 	struct ipr_res_addr failing_dev_res_addr;
 	u32 failing_dev_res_handle;
+};
+
+struct ipr_gscsi_res_state {
+	u32 data_path_width;  /* bits */
+	u32 data_xfer_rate;   /* 100 KBytes/second */
 };
 
 struct ipr_supported_device {
@@ -422,6 +435,7 @@ struct ipr_query_res_state {
 	union {
 		struct ipr_vset_res_state vset;
 		struct ipr_dasd_res_state dasd;
+		struct ipr_gscsi_res_state gscsi;
 	};
 };
 
@@ -446,6 +460,9 @@ struct ipr_array_cap_entry {
 	u16  recommended_stripe_size;
 	u8   prot_level_str[8];
 };
+
+#define for_each_cap_entry(i, cap, supp) \
+        for (i = 0, cap = supported_arrays->entry; i < ntohs(supp->num_entries); i++, cap++)
 
 struct ipr_array_record {
 	struct ipr_common_record common;
@@ -569,6 +586,10 @@ struct ipr_dev_record {
 	u32 reserved5;
 };
 
+#define for_each_qac_entry(rcd, i, qac) \
+      for (i = 0, rcd = (struct ipr_common_record *)qac->data; i < qac->num_records; \
+           i++, rcd = (struct ipr_common_record *)((unsigned long)rcd + ntohs(rcd->record_len)))
+
 struct ipr_std_inq_data {
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 peri_qual:3;
@@ -665,7 +686,7 @@ struct ipr_std_inq_data_long {
 	u8 reserved1[41];
 	u8 z2_term[IPR_STD_INQ_Z2_TERM_LEN];
 	u8 z3_term[IPR_STD_INQ_Z3_TERM_LEN];
-	u8 reserved2;
+	u8 as400_service_level;
 	u8 z4_term[IPR_STD_INQ_Z4_TERM_LEN];
 	u8 z5_term[IPR_STD_INQ_Z5_TERM_LEN];
 	u8 part_number[IPR_STD_INQ_PART_NUM_LEN];
@@ -776,7 +797,11 @@ struct ipr_dev {
 	u32 is_reclaim_cand:1;
 	u32 reserved:31;
 	struct scsi_dev_data *scsi_dev_data;
-	struct ipr_common_record *qac_entry;
+	union {
+		struct ipr_common_record *qac_entry;
+		struct ipr_dev_record *dev_rcd;
+		struct ipr_array_record *array_rcd;
+	};
 	struct ipr_ioa *ioa;
 };
 
@@ -792,6 +817,12 @@ struct ipr_ioa {
 	u8 ioa_dead:1;
 	u8 nr_ioa_microcode:1;
 	u8 scsi_id_changeable:1;
+	u8 dual_raid_support:1;
+	u8 is_secondary:1;
+	u16 subsystem_vendor;
+	u16 subsystem_device;
+	char dual_state[16];
+	char saved_dual_state[16];
 	int host_num;
 	char pci_address[16];
 	char host_name[16];
@@ -803,6 +834,8 @@ struct ipr_ioa {
 	struct ipr_ioa *next;
 	struct ipr_ioa *cmd_next;
 };
+
+#define for_each_ioa(ioa) for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
 
 struct ipr_dasd_inquiry_page3 {
 	u8 peri_qual_dev_type;
@@ -822,6 +855,41 @@ struct ipr_array_query_data {
 	u8 reserved;
 	u8 num_records;
 	u8 data[IPR_QAC_BUFFER_SIZE];
+};
+
+struct ipr_path_entry {
+	u8 state;
+#define IPR_PATH_FUNCTIONAL		0
+#define IPR_PATH_NOT_FUNCTIONAL	1
+	u8 local_bus_num;
+	u8 remote_bus_num;
+	u8 reserved;
+	u8 local_connection_id[8];
+	u8 remote_connection_id[8];
+};
+
+struct ipr_dual_ioa_entry {
+	u32 length;
+	u8 link_state;
+#define IPR_IOA_LINK_STATE_NOT_OPER	0
+#define IPR_IOA_LINK_STATE_OPER	1
+	u8 cur_state;
+	u8 saved_state;
+#define IPR_IOA_STATE_UNASSIGNED	0
+#define IPR_IOA_STATE_STANDALONE	1
+#define IPR_IOA_STATE_PRIMARY		2
+#define IPR_IOA_STATE_SECONDARY	3
+	u8 token;
+	u8 remote_vendor_id[IPR_VENDOR_ID_LEN];
+	u8 remote_prod_id[IPR_PROD_ID_LEN];
+	u8 remote_sn[IPR_SERIAL_NUM_LEN];
+	u32 num_path_entries;
+	struct ipr_path_entry path[64]; /* variable length */
+};
+
+struct ipr_multi_ioa_status {
+	u32 length;
+	struct ipr_dual_ioa_entry ioa[8]; /* variable length */
 };
 
 struct ipr_block_desc {
@@ -912,7 +980,7 @@ struct ipr_supported_arrays {
 	struct ipr_common_record common;
 	u16 num_entries;
 	u16 entry_length;
-	u8 data[0];
+	struct ipr_array_cap_entry entry[0];
 };
 
 struct ipr_read_cap {
@@ -995,6 +1063,24 @@ struct ipr_inquiry_page3 {
 	u8 minor_release[2];
 	u8 ptf_number[4];
 	u8 patch_number[4];
+};
+
+struct ipr_inquiry_ioa_cap {
+	u8 peri_qual_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length;
+	u8 ascii_len;
+	u8 reserved2[3];
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 dual_ioa_raid:1;
+	u8 reserved:7;
+	u8 reserved3[3];
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved:7;
+	u8 dual_ioa_raid:1;
+	u8 reserved3[3];
+#endif
 };
 
 struct ipr_dasd_ucode_header {
@@ -1148,6 +1234,9 @@ struct ipr_encl_status_ctl_pg
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };
 
+#define for_each_elem_status(i, ses_data) \
+        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)); i++)
+
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 void check_current_config(bool);
@@ -1208,6 +1297,16 @@ struct unsupported_af_dasd *get_unsupp_af(struct ipr_std_inq_data *,
 					  struct ipr_dasd_inquiry_page3 *);
 bool disk_needs_msl(struct unsupported_af_dasd *,
 		    struct ipr_std_inq_data *);
+void ipr_add_zeroed_dev(struct ipr_dev *);
+void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *);
+void ipr_cleanup_zeroed_devs();
+void ipr_del_zeroed_dev(struct ipr_dev *);
+int ipr_device_is_zeroed(struct ipr_dev *);
+struct ipr_array_cap_entry *get_raid_cap_entry(struct ipr_supported_arrays *, u8 );
+char *get_prot_level_str(struct ipr_supported_arrays *, int);
+u32 get_ioa_fw_version(struct ipr_ioa *);
+int ipr_disable_qerr(struct ipr_dev *);
+void ipr_log_ucode_error(struct ipr_ioa *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1240,8 +1339,8 @@ static inline int ipr_is_hidden(struct ipr_dev *device)
 	     (device->scsi_dev_data->type == 3)))  //FIXME SES type.
 			return 1;
 	else
-		return 0;
-}
+		return 0;}
+
 
 static inline int ipr_is_hot_spare(struct ipr_dev *device)
 {
