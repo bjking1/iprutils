@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2.2.1 2003/10/29 14:04:59 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -399,12 +399,12 @@ void tool_init(char *tool_name)
                     /* remove all ipr* files with old major number */
                     sprintf(temp,"rm %s",p_ipr_ioa->ioa.dev_name);
                     p_char = strstr(temp, "ipr");
-                    p_char[6] = '*';
-                    p_char[7] = '\0';
+                    p_char[3] = '*'; /* xxx - should not hard code this!!! */
+                    p_char[4] = '\0';
                     system(temp);
                 }
                 p_char = strstr(p_ipr_ioa->ioa.dev_name, "ipr");
-                p_char += 6;
+                p_char += 3; /* xxx - should not hard code this!!! */
                 minor_num = strtoul(p_char, NULL, 10);
                 major_minor = MKDEV( major_num, minor_num);
 

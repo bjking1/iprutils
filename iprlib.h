@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.4 2003/10/27 13:52:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.4.2.1 2003/10/29 14:04:59 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -48,7 +48,7 @@
 #define IPR_CCB_CDB_LEN      16
 #define IPR_EOL                              "\n"
 #define IPR_IOCTL_SEND_COMMAND          0xf1f1
-#define IPR_MAX_PSERIES_LOCATION_LEN    24
+#define IPR_MAX_PSERIES_LOCATION_LEN    48
 #define IPR_MAX_PHYSICAL_DEVS           192
 #define IPR_QAC_BUFFER_SIZE             16000
 #define IPR_VSET_MODEL_NUMBER        200
