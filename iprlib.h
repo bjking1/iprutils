@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.17 2004/02/17 23:49:25 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.18 2004/02/18 16:28:04 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -43,6 +43,14 @@
 #include <linux/byteorder/swab.h>
 #include <asm/byteorder.h>
 #include <libiberty.h>
+#include <sys/mman.h>
+
+#define IPR_DASD_UCODE_USRLIB 0
+#define IPR_DASD_UCODE_ETC 1
+
+#define IPR_DASD_UCODE_NOT_FOUND -1
+#define IPR_DASD_UCODE_NO_HDR 1
+#define IPR_DASD_UCODE_HDR 2
 
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
@@ -764,13 +772,14 @@ struct ipr_ioa {
 	u16 ccin;
 	u32 host_addr;
 	u32 num_raid_cmds;
+	u32 msl;
 	char driver_version[50];
 	u16 num_devices;
 	u8 rw_protected:1; /* FIXME */
 	u8 ioa_dead:1;
 	u8 nr_ioa_microcode:1;
+	u8 scsi_id_changeable:1;
 	int host_num;
-	int scsi_id_changeable;
 	char pci_address[16];
 	char host_name[16];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
@@ -844,16 +853,28 @@ struct ipr_mode_page_28_header {
 	u8 dev_entry_length;
 };
 
-struct ipr_page_28 {
+struct ipr_mode_page_28 {
 	struct ipr_mode_page_28_header page_hdr;
-	struct ipr_mode_page_28_scsi_dev_bus_attr attr[IPR_MAX_NUM_BUSES];
+	struct ipr_mode_page_28_scsi_dev_bus_attr attr[0];
 };
 
-/* xxx cleanup */
-struct ipr_pagewh_28 {
-	struct ipr_mode_parm_hdr parm_hdr;
-	struct ipr_mode_page_28_header page_hdr;
-	struct ipr_mode_page_28_scsi_dev_bus_attr attr[IPR_MAX_NUM_BUSES];
+#define for_each_bus_attr(ptr, page28, i) \
+      for (i = 0, ptr = page28->attr; i < page_28->page_hdr.num_dev_entries; \
+           i++, ptr = (struct ipr_mode_page_28_scsi_dev_bus_attr *) \
+               ((u8 *)ptr + page_28->page_hdr.dev_entry_length))
+
+struct ipr_scsi_bus_attr {
+	u32 max_xfer_rate;
+	u8 qas_capability;
+	u8 scsi_id;
+	u8 bus_width;
+	u8 extended_reset_delay;
+	u8 min_time_delay;
+};
+
+struct ipr_scsi_buses {
+	int num_buses;
+	struct ipr_scsi_bus_attr bus[IPR_MAX_NUM_BUSES];
 };
 
 struct ipr_supported_arrays {
@@ -967,6 +988,17 @@ struct ipr_dasd_ucode_header {
 	u8 modification_level[4];
 	u8 ptf_number[4];
 	u8 patch_number[4];
+};
+
+struct ipr_ioa_ucode_header {
+    u32 header_length;
+    u32 lid_table_offset;
+    u32 rev_level;
+#define LINUX_HEADER_RESERVED_BYTES 20
+    u8 reserved[LINUX_HEADER_RESERVED_BYTES];
+    char eyecatcher[16];        /* IBMAS400 CCIN */
+    u32 num_lids;
+    struct ipr_software_inq_lid_info lid[1];
 };
 
 /* xxx remove */
@@ -1118,42 +1150,40 @@ void get_sg_ioctl_data(struct sg_map_info *, int);
 int num_device_opens(int, int, int, int);
 void tool_init();
 void exit_on_error(char *, ...);
-int ipr_config_file_valid(struct ipr_ioa *ioa);
-int ipr_config_file_read(char *, char *, char *, char *);
-void ipr_config_file_entry(char *, char *, char *, char *, int);
-void ipr_save_page_28(struct ipr_ioa *, struct ipr_page_28 *,
-		      struct ipr_page_28 *, struct ipr_page_28 *);
-void ipr_set_page_28(struct ipr_ioa *, int, int);
-void ipr_set_page_28_init(struct ipr_ioa *, int);
-void iprlog_location(struct ipr_ioa *);
 bool is_af_blocked(struct ipr_dev *, int);
-int ipr_query_array_config(char *, bool, bool, int, void *);
-int ipr_query_command_status(char *, void *);
-int ipr_mode_sense(char *, u8, void *);
-int ipr_mode_select(char *, void *, int);
-int ipr_reset_device(char *);
-int ipr_re_read_partition(char *);
-int ipr_read_capacity(char *, void *);
-int ipr_read_capacity_16(char *, void *);
-int ipr_query_resource_state(char *, void *);
-int ipr_start_stop_start(char *);
-int ipr_start_stop_stop(char *);
-int ipr_stop_array_protection(char *, struct ipr_array_query_data *);
-int ipr_remove_hot_spare(char *, struct ipr_array_query_data *);
-int ipr_start_array_protection(char *, struct ipr_array_query_data *, int, int);
-int ipr_add_hot_spare(char *, struct ipr_array_query_data *);
-int ipr_rebuild_device_data(char *, struct ipr_array_query_data *);
-int ipr_test_unit_ready(char *, struct sense_data_t *);
-int ipr_format_unit(char *);
-int ipr_add_array_device(char *, struct ipr_array_query_data *);
+int ipr_query_array_config(struct ipr_ioa *, bool, bool, int, void *);
+int ipr_query_command_status(struct ipr_dev *, void *);
+int ipr_mode_sense(struct ipr_dev *, u8, void *);
+int ipr_mode_select(struct ipr_dev *, void *, int);
+int ipr_reset_device(struct ipr_dev *);
+int ipr_re_read_partition(struct ipr_dev *);
+int ipr_read_capacity(struct ipr_dev *, void *);
+int ipr_read_capacity_16(struct ipr_dev *, void *);
+int ipr_query_resource_state(struct ipr_dev *, void *);
+int ipr_start_stop_start(struct ipr_dev *);
+int ipr_start_stop_stop(struct ipr_dev *);
+int ipr_stop_array_protection(struct ipr_ioa *);
+int ipr_remove_hot_spare(struct ipr_ioa *);
+int ipr_start_array_protection(struct ipr_ioa *, int, int);
+int ipr_add_hot_spare(struct ipr_ioa *);
+int ipr_rebuild_device_data(struct ipr_ioa *);
+int ipr_test_unit_ready(struct ipr_dev *, struct sense_data_t *);
+int ipr_format_unit(struct ipr_dev *);
+int ipr_add_array_device(struct ipr_ioa *, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
-int ipr_evaluate_device(char *, u32);
-int ipr_inquiry(char *, u8, void *, u8);
+int ipr_evaluate_device(struct ipr_dev *, u32);
+int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 void ipr_reset_adapter(struct ipr_ioa *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
-int ipr_suspend_device_bus(char *file, struct ipr_res_addr *res_addr, u8 option);
-int ipr_receive_diagnostics(char *file, u8 page, void *buff, int length);
-int ipr_send_diagnostics(char *file, void *buff, int length);
+int ipr_suspend_device_bus(struct ipr_ioa *, struct ipr_res_addr *, u8);
+int ipr_receive_diagnostics(struct ipr_dev *, u8, void *, int);
+int ipr_send_diagnostics(struct ipr_dev *, void *, int);
+int ipr_get_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
+void ipr_modify_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
+int ipr_set_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
+int find_dasd_firmware_image(struct ipr_dev *, char *, char *, char *);
+int ipr_write_buffer(struct ipr_dev *, void *, int);
+int find_ioa_firmware_image(struct ipr_ioa *, char *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1233,4 +1263,33 @@ static inline void ipr_strncpy_0(char *dest, char *source, int length)
 #define syslog_dbg(...)
 #endif
 
+#define dev_log(level, dev, fmt, ...) \
+      syslog(level, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
+             dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
+             dev->scsi_dev_data->lun, ##__VA_ARGS__)
+
+#define dev_info(dev, fmt, ...) \
+      dev_log(LOG_NOTICE, dev, fmt, ##__VA_ARGS__)
+
+#define dev_err(dev, fmt, ...) \
+      dev_log(LOG_ERR, dev, fmt, ##__VA_ARGS__)
+
+#define dev_cmd_err(dev, sense, cmd, rc) \
+      dev_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
+              cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
+              (sense)->add_sense_code_qual)
+
+#define ioa_log(level, ioa, fmt, ...) \
+      syslog(level, "%s: " fmt, ioa->pci_address, ##__VA_ARGS__)
+
+#define ioa_info(ioa, fmt, ...) \
+      ioa_log(LOG_NOTICE, ioa, fmt, ##__VA_ARGS__)
+
+#define ioa_err(ioa, fmt, ...) \
+      ioa_log(LOG_ERR, ioa, fmt, ##__VA_ARGS__)
+
+#define ioa_cmd_err(ioa, sense, cmd, rc) \
+      ioa_err(ioa, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
+              cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
+              (sense)->add_sense_code_qual)
 #endif

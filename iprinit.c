@@ -8,7 +8,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.4 2004/02/17 16:15:56 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.5 2004/02/18 16:28:03 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -146,8 +146,7 @@ static int enable_af(struct ipr_dev *dev)
 {
 	struct ipr_std_inq_data std_inq;
 
-	if (ipr_inquiry(dev->gen_name, IPR_STD_INQUIRY,
-			&std_inq, sizeof(std_inq)))
+	if (ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq)))
 		return -EIO;
 
 	if (set_supported_devs(dev, &std_inq))
@@ -155,16 +154,16 @@ static int enable_af(struct ipr_dev *dev)
 	return 0;
 }
 
-static int mode_select(char *file, void *buff, int length)
+static int mode_select(struct ipr_dev *dev, void *buff, int length)
 {
 	int fd;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
 
-	fd = open(file, O_RDWR);
+	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		syslog(LOG_ERR, "Could not open %s. %m\n",file);
+		syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
 
@@ -178,7 +177,9 @@ static int mode_select(char *file, void *buff, int length)
 		      length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_INTERNAL_TIMEOUT);
 
-	/* xxx additional parm to enable dumping sense data? */
+	if (rc)
+		dev_cmd_err(dev, &sense_data, "Mode Select", rc);
+
 	close(fd);
 	return rc;
 }
@@ -191,7 +192,7 @@ static int setup_page0x01(struct ipr_dev *dev)
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
 
-	if (ipr_mode_sense(dev->gen_name, 0x01, &mode_pages))
+	if (ipr_mode_sense(dev, 0x01, &mode_pages))
 		return -EIO;
 
 	page = (struct ipr_rw_err_mode_page *)(((u8 *)&mode_pages) +
@@ -207,7 +208,7 @@ static int setup_page0x01(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (mode_select(dev->gen_name, &mode_pages, len)) {
+	if (mode_select(dev, &mode_pages, len)) {
 		syslog(LOG_ERR, "Failed to setup mode page 0x01 for %s.\n",
 		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
@@ -223,7 +224,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
 
-	if (ipr_mode_sense(dev->gen_name, 0x0A, &mode_pages))
+	if (ipr_mode_sense(dev, 0x0A, &mode_pages))
 		return -EIO;
 
 	page = (struct ipr_control_mode_page *)(((u8 *)&mode_pages) +
@@ -240,7 +241,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (mode_select(dev->gen_name, &mode_pages, len)) {
+	if (mode_select(dev, &mode_pages, len)) {
 		syslog(LOG_ERR, "Failed to setup mode page 0x0A for %s.\n",
 		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
@@ -256,7 +257,7 @@ static int setup_page0x20(struct ipr_dev *dev)
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
 
-	if (ipr_mode_sense(dev->gen_name, 0x20, &mode_pages))
+	if (ipr_mode_sense(dev, 0x20, &mode_pages))
 		return -EIO;
 
 	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
@@ -271,7 +272,7 @@ static int setup_page0x20(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (mode_select(dev->gen_name, &mode_pages, len)) {
+	if (mode_select(dev, &mode_pages, len)) {
 		syslog(LOG_ERR, "Failed to setup mode page 0x20 for %s.\n",
 		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
@@ -291,7 +292,7 @@ static void init_vset_dev(struct ipr_dev *dev)
 
 	memset(&res_state, 0, sizeof(res_state));
 
-	if (!ipr_query_resource_state(dev->gen_name, &res_state)) {
+	if (!ipr_query_resource_state(dev, &res_state)) {
 		snprintf(q_depth, sizeof(q_depth), "%d",
 			 (res_state.vset.num_devices_in_vset * 4));
 		q_depth[sizeof(q_depth)-1] = '\0';
@@ -347,15 +348,13 @@ static void init_af_dev(struct ipr_dev *dev)
  */
 static void init_ioa_dev(struct ipr_dev *dev)
 {
-	char fname[64];
+	struct ipr_scsi_buses buses;
 
-	sprintf(fname,"%x_%s", dev->ioa->ccin, dev->ioa->pci_address);
-	if (RC_SUCCESS == ipr_config_file_valid(fname))
-		ipr_set_page_28(dev->ioa, IPR_NORMAL_CONFIG, 0);
-	else
-		ipr_set_page_28_init(dev->ioa, IPR_NORMAL_CONFIG);
-
-
+	if (ipr_get_bus_attr(dev->ioa, &buses))
+		return;
+	ipr_modify_bus_attr(dev->ioa, &buses);
+	if (ipr_set_bus_attr(dev->ioa, &buses))
+		return;
 }
 
 static void init_dev(struct ipr_dev *dev)
@@ -397,6 +396,7 @@ static void init_ioa(struct ipr_ioa *ioa)
 int main(int argc, char *argv[])
 {
 	struct ipr_ioa *ioa;
+	int daemonize = 0;
 
 	openlog("iprinit", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
@@ -404,6 +404,8 @@ int main(int argc, char *argv[])
 		if (strcmp(argv[1], "--version") == 0) {
 			printf("iprinit: %s\n", IPR_VERSION_STR);
 			return 0;
+		} else if (strcmp(argv[1], "--daemon") == 0) {
+			daemonize = 1;
 		} else {
 			printf("Usage: iprinit [options]\n");
 			printf("  Options: --version    Print iprinit version\n");
@@ -417,6 +419,11 @@ int main(int argc, char *argv[])
 	for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
 		init_ioa(ioa);
 
-	/* xxx daemonize so that new devices get setup properly? */
+	if (!daemonize)
+		return 0;
+
+	/* xxx - sit in a loop, issuing query_dasd_timeouts and
+	 mode_sense page 0x20 */
+
 	return 0;
 }
