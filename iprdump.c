@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.12 2004/05/23 05:45:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.12.2.1 2004/10/06 14:18:11 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -64,8 +64,7 @@ static void enable_dump(struct ipr_ioa *ioa)
 
 	attr = sysfs_get_classdev_attr(class_device, "dump");
 	if (!attr) {
-		if (errno != ENOENT)
-			ioa_err(ioa, "Failed to get class attribute. %m\n");
+		ioa_dbg(ioa, "Failed to get class attribute. %m\n");
 		sysfs_close_class_device(class_device);
 		return;
 	}
@@ -104,8 +103,7 @@ static void disable_dump(struct ipr_ioa *ioa)
 
 	attr = sysfs_get_classdev_attr(class_device, "dump");
 	if (!attr) {
-		if (errno != ENOENT)
-			ioa_err(ioa, "Failed to get class attribute. %m\n");
+		ioa_dbg(ioa, "Failed to get class attribute. %m\n");
 		sysfs_close_class_device(class_device);
 		return;
 	}
@@ -142,8 +140,7 @@ static int read_dump(struct ipr_ioa *ioa)
 
 	attr = sysfs_get_classdev_attr(class_device, "dump");
 	if (!attr) {
-		if (errno != ENOENT)
-			ioa_err(ioa, "Failed to open dump attribute. %m\n");
+		ioa_dbg(ioa, "Failed to open dump attribute. %m\n");
 		sysfs_close_class_device(class_device);
 		return -EIO;
 

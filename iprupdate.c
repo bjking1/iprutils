@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.16 2004/09/09 17:52:36 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.14.2.1 2004/10/06 14:18:12 bjking1 Exp $
  */
 
 #include <unistd.h>
