@@ -65,6 +65,7 @@ struct array_cmd_data *raid_cmd_tail = NULL;
 i_container *i_con_head = NULL;
 char                   log_root_dir[200];
 char                   editor[200];
+char                   ipr_catalog[200];
 FILE                  *errpath;
 int                    toggle_field;
 nl_catd                catd;
@@ -172,10 +173,12 @@ char *strip_trailing_whitespace(char *p_str)
 
 int main(int argc, char *argv[])
 {
-	int  next_editor, next_dir, next_platform, i;
-	char parm_editor[200], parm_dir[200];
+	int  next_editor, next_dir, next_catalog, i;
+	char parm_editor[200], parm_dir[200], catalog[200];
+	char ipr_catalog[200];
 
 	ipr_ioa_head = ipr_ioa_tail = NULL;
+	catalog[0] = '\0';
 
 	/* makes program compatible with all terminals -
 	 originally did not display text correctly when user was running xterm */
@@ -196,33 +199,32 @@ int main(int argc, char *argv[])
 	{
 		next_editor = 0;
 		next_dir = 0;
-		next_platform = 0;
+		next_catalog = 0;
 		for (i = 1; i < argc; i++)
 		{
 			if (strcmp(argv[i], "-e") == 0)
 				next_editor = 1;
 			else if (strcmp(argv[i], "-k") == 0)
 				next_dir = 1;
-			else if (strcmp(argv[i], "--version") == 0)
-			{
+			else if (strcmp(argv[i], "-c") == 0)
+				next_catalog = 1;
+			else if (strcmp(argv[i], "--version") == 0) {
 				printf("iprconfig: %s\n", IPR_VERSION_STR);
 				exit(1);
-			}
-			else if (next_editor)
-			{
+			} else if (next_editor)	{
 				strcpy(parm_editor, argv[i]);
 				next_editor = 0;
-			}
-			else if (next_dir)
-			{
+			} else if (next_dir) {
 				strcpy(parm_dir, argv[i]);
 				next_dir = 0;
-			}
-			else
-			{
+			} else if (next_catalog) {
+				strcpy(catalog, argv[i]);
+				next_catalog = 0;
+			} else {
 				printf("Usage: iprconfig [options]\n");
 				printf("  Options: -e name    Default editor for viewing error logs\n");
 				printf("           -k dir     Kernel messages root directory\n");
+				printf("           -c catalog Catalog file to use\n");
 				printf("           --version  Print iprconfig version\n");
 				printf("  Use quotes around parameters with spaces\n");
 				exit(1);
@@ -232,6 +234,7 @@ int main(int argc, char *argv[])
 
 	strcpy(log_root_dir, parm_dir);
 	strcpy(editor, parm_editor);
+	strcpy(ipr_catalog, catalog);
 
 	tool_init("iprconfig");
 
@@ -244,7 +247,12 @@ int main(int argc, char *argv[])
 	s_status.index = 0;
 
 	/* open the text catalog */
-	catd=catopen("./text.cat",NL_CAT_LOCALE);
+	if (strlen(ipr_catalog) != 0)
+		sprintf(ipr_catalog, "%s",ipr_catalog);
+	else
+		sprintf(ipr_catalog, "%s/ipr.cat",IPR_CATALOG_DIR);
+
+	catd=catopen(ipr_catalog,NL_CAT_LOCALE);
 
 	main_menu(NULL);
 

@@ -26,8 +26,8 @@ iprdbg:iprdbg.c iprlib.o
 iprlib.o: iprlib.c
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
 
-text:  text.msg
-	gencat text.cat text.msg
+text:  ipr.msg
+	gencat ipr.cat ipr.msg
 
 docs: iprconfig.8 iprupdate.8 iprdump.8
 	mkdir -p docs
@@ -69,6 +69,8 @@ install: all
 	install docs/iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz
 	install docs/iprupdate.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprupdate.8.gz
 	install docs/iprdump.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprdump.8.gz
+	install -d $(INSTALL_MOD_PATH)/$(IPR_CATALOG_DIR)
+	install ipr.cat $(INSTALL_MOD_PATH)/$(IPR_CATALOG_DIR)/ipr.cat
 
 rpm: *.c *.h *.8
 	-make clean
