@@ -9,7 +9,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.20 2004/02/23 19:54:30 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.21 2004/02/24 23:20:25 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -1167,7 +1167,6 @@ int ipr_get_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
 int ipr_modify_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int ipr_set_dasd_timeouts(struct ipr_dev *);
-int ipr_setup_page0x20(struct ipr_dev *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);

@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.21 2004/02/24 17:23:33 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.22 2004/02/24 23:20:25 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1508,7 +1508,7 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 
 static void get_sg_names(int num_devs)
 {
-	int i, fd;
+	int i;
 	struct sysfs_class *sysfs_device_class;
 	struct dlist *class_devices;
 	struct sysfs_class_device *class_device;
@@ -1943,7 +1943,7 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 		return -EIO;
 	attr->queue_depth = strtoul(temp, NULL, 10);
 
-	if (ipr_read_dev_attr(dev, "tcq_enabled", temp))
+	if (ipr_read_dev_attr(dev, "tcq_enable", temp))
 		return -EIO;
 	attr->tcq_enabled = strtoul(temp, NULL, 10);
 
@@ -1980,30 +1980,35 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 	if (ipr_get_dev_attr(dev, &old_attr))
 		return -EIO;
 
-	sprintf(temp, "%d", attr->queue_depth);
-	if (ipr_write_dev_attr(dev, "queue_depth", temp))
-		return -EIO;
-
-	if (save && attr->queue_depth != old_attr.queue_depth) {
-		if (ipr_setup_page0x20(dev))
-			return -EIO;
-		ipr_save_dev_attr(dev, IPR_QUEUE_DEPTH, temp, 1);
+	if (attr->queue_depth != old_attr.queue_depth) {
+		if (!ipr_is_af_dasd_device(dev)) {
+			sprintf(temp, "%d", attr->queue_depth);
+			if (ipr_write_dev_attr(dev, "queue_depth", temp))
+				return -EIO;
+			if (save)
+				ipr_save_dev_attr(dev, IPR_QUEUE_DEPTH, temp, 1);
+		}
 	}
 
-	if (ipr_write_dev_attr(dev, "tcq_enabled", temp))
-		return -EIO;
-	ipr_save_dev_attr(dev, IPR_TCQ_ENABLED, temp, 1);
+	if (attr->format_timeout != old_attr.format_timeout) {
+		if (ipr_is_af_dasd_device(dev)) {
+			sprintf(temp, "%d", attr->format_timeout);
+			if (ipr_set_dasd_timeouts(dev))
+				return -EIO;
+			if (save)
+				ipr_save_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp, 1);
+		}
+	}
 
-	if (save && attr->tcq_enabled != old_attr.tcq_enabled)
-		sprintf(temp, "%d", attr->tcq_enabled);
-
-	sprintf(temp, "%d", attr->format_timeout);
-	if (ipr_is_af_dasd_device(dev))
-		if (ipr_set_dasd_timeouts(dev))
-			return -EIO;
-
-	if (save && attr->format_timeout != old_attr.format_timeout)
-		ipr_save_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp, 1);
+	if (attr->tcq_enabled != old_attr.tcq_enabled) {
+		if (!ipr_is_af_dasd_device(dev)) {
+			sprintf(temp, "%d", attr->tcq_enabled);
+			if (ipr_write_dev_attr(dev, "tcq_enable", temp))
+				return -EIO;
+			if (save)
+				ipr_save_dev_attr(dev, IPR_TCQ_ENABLED, temp, 1);
+		}
+	}
 
 	return 0;
 }
@@ -2078,44 +2083,6 @@ int ipr_set_dasd_timeouts(struct ipr_dev *dev)
 
 	close(fd);
 	return rc;
-}
-
-int ipr_setup_page0x20(struct ipr_dev *dev)
-{
-	struct ipr_mode_pages mode_pages;
-	struct ipr_disk_attr attr;
-	struct ipr_ioa_mode_page *page;
-	int len;
-
-	if (!ipr_is_af_dasd_device(dev))
-		return 0;
-
-	memset(&mode_pages, 0, sizeof(mode_pages));
-
-	if (ipr_mode_sense(dev, 0x20, &mode_pages))
-		return -EIO;
-
-	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
-					     mode_pages.hdr.block_desc_len +
-					     sizeof(mode_pages.hdr));
-
-	if (ipr_get_dev_attr(dev, &attr))
-		return -EIO;
-	if (ipr_modify_dev_attr(dev, &attr))
-		return -EIO;
-
-	page->max_tcq_depth = attr.queue_depth;
-
-	len = mode_pages.hdr.length + 1;
-	mode_pages.hdr.length = 0;
-	mode_pages.hdr.medium_type = 0;
-	mode_pages.hdr.device_spec_parms = 0;
-	page->hdr.parms_saveable = 0;
-
-	if (ipr_mode_select(dev, &mode_pages, len))
-		return -EIO;
-
-	return 0;
 }
 
 int ipr_get_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)

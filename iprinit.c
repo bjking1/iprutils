@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.7 2004/02/23 19:54:29 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.8 2004/02/24 23:20:25 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -198,6 +198,38 @@ static int page0x20_setup(struct ipr_dev *dev)
 	return (page->max_tcq_depth == attr.queue_depth);
 }
 
+static int ipr_setup_page0x20(struct ipr_dev *dev)
+{
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
+	int len;
+
+	if (!ipr_is_af_dasd_device(dev))
+		return 0;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	if (ipr_mode_sense(dev, 0x20, &mode_pages))
+		return -EIO;
+
+	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+					     mode_pages.hdr.block_desc_len +
+					     sizeof(mode_pages.hdr));
+
+	page->max_tcq_depth = AF_DISK_TCQ_DEPTH;
+
+	len = mode_pages.hdr.length + 1;
+	mode_pages.hdr.length = 0;
+	mode_pages.hdr.medium_type = 0;
+	mode_pages.hdr.device_spec_parms = 0;
+	page->hdr.parms_saveable = 0;
+
+	if (ipr_mode_select(dev, &mode_pages, len))
+		return -EIO;
+
+	return 0;
+}
+
 /*
  * VSETs:
  * 1. Adjust queue depth based on number of devices
@@ -267,27 +299,24 @@ static void init_af_dev(struct ipr_dev *dev)
 
 	if (runtime && page0x20_setup(dev))
 		return;
-
-	if (ipr_get_dev_attr(dev, &attr))
-		return;
 	if (ipr_set_dasd_timeouts(dev))
 		return;
 	if (setup_page0x01(dev))
 		return;
 	if (setup_page0x0a(dev))
 		return;
+	if (ipr_setup_page0x20(dev))
+		return;
+	if (enable_af(dev))
+		return;
+	if (ipr_get_dev_attr(dev, &attr))
+		return;
 
-	attr.queue_depth = AF_DISK_TCQ_DEPTH;
-	attr.tcq_enabled = 1;
 	attr.format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
 
 	if (ipr_modify_dev_attr(dev, &attr))
 		return;
 	if (ipr_set_dev_attr(dev, &attr, 0))
-		return;
-	if (ipr_setup_page0x20(dev))
-		return;
-	if (enable_af(dev))
 		return;
 }
 
