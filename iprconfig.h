@@ -93,7 +93,7 @@ int reclaim_warning(i_container * i_con);
 int reclaim_result(i_container * i_con);
 int af_include(i_container * i_con);
 int af_remove(i_container * i_con);
-int configure_af_device(i_container * i_con, int action_code);	/* called by af_include and af_remove */
+int configure_af_device(i_container * i_con, int action_code);
 int add_hot_spare(i_container * i_con);
 int remove_hot_spare(i_container * i_con);
 int hot_spare(i_container * i_con, int action);
@@ -223,8 +223,8 @@ struct screen_opts raid_screen_opt[] = {
 	{raid_include,     "4", __("Add a device to a disk array")},
 	{af_include,       "5", __("Format device for advanced function (522)")},
 	{af_remove,        "6", __("Format device for JBOD function (512)")},
-	{add_hot_spare,    "7", __("Configure a hot spare device")},
-	{remove_hot_spare, "8", __("Unconfigure a hot spare device")}
+	{add_hot_spare,    "7", __("Create a hot spare")},
+	{remove_hot_spare, "8", __("Delete a hot spare")}
 };
 
 s_node n_raid_screen = {
@@ -270,7 +270,7 @@ s_node n_raid_stop_fail = {
 	.header   = {
 		__("There are no disk units eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no device parity protected units in the system.\n"),
+		__("o There are no disk arrays in the system.\n"),
 		__("o An IOA is in a condition that makes the disk units attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
@@ -279,7 +279,7 @@ s_node n_raid_stop_fail = {
 		__("o Not all disk units attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disk unit/s are currently in use.\n"), /* xxx? */
 		"" }
 };
 
@@ -324,16 +324,15 @@ s_node n_raid_start_fail = {
 	.header   = {
 		__("There are no disk units eligible for the selected operation due "
 		   "to one or more of the following reasons:\n\n"),
-		__("o There are not enough device parity capable units in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o There are not enough advanced function disks in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have "
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disks are missing.\n"),
 		"" }
 };
 
@@ -342,7 +341,7 @@ s_node n_configure_raid_start = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Select Disk Units for Parity Protection"),
+	.title    = __("Select Disk Units for Disk Array"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -353,7 +352,7 @@ s_node n_confirm_raid_start = {
 	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Confirm Start Device Parity Protection"),
+	.title    = __("Confirm Create Disk Array"),
 	.header   = {
 		__("ATTENTION: Data will not be preserved and may be "
 		   "lost on selected disk units when parity protection is enabled.\n\n"),
@@ -363,8 +362,8 @@ s_node n_confirm_raid_start = {
 };
 
 s_node n_raid_start_complete = {
-	.title    = __("Start Device Parity Protection Status"),
-	.body     = __("You selected to start device parity protection")
+	.title    = __("Create Disk Array Status"),
+	.body     = __("You selected to create a disk array")
 };
 
 struct screen_opts raid_include_opt[] = {
@@ -376,30 +375,29 @@ s_node n_raid_include = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(raid_include_opt),
 	.options  = &raid_include_opt[0],
-	.title    = __("Add a Device to a Disk Array"),
+	.title    = __("Add Devices to a Disk Array"),
 	.header   = {
 		__("Select the subsystem that the disk unit will be included.\n\n"),
 		__("Type choice, press Enter.\n"),
-		__("  1=Select Parity Array to Include Disk Unit\n\n"),
+		__("  1=Select Disk Array to Include Disk Unit\n\n"),
 		"" }
 };
 
 s_node n_raid_include_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Include Device Parity Protection Failed"),
+	.title    = __("Add Devices to a Disk Array Failed"),
 	.header   = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no device parity protected units in the system.\n"),
+		__("o There are no disk arrays in the system.\n"),
 		__("o An IOA is in a condition that makes the disk units attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have"
+		__("o Not all disks attached to an advanced function IOA have"
 		   "reported to the system. Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disks are missing.\n"),
 		"" }
 };
 
@@ -408,9 +406,9 @@ s_node n_configure_raid_include = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options = &null_opt[0],
-	.title   = __("Include Disk Units in Device Parity Protection"),
+	.title   = __("Add Devices to a Disk Array"),
 	.header  = {
-		__("Select the units to be included in Device Parity Protection\n\n"),
+		__("Select the units to be included in the disk array\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=Add a Device to a Disk Array\n\n"),
 		   "" }
@@ -418,22 +416,17 @@ s_node n_configure_raid_include = {
 
 s_node n_configure_raid_include_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Include Disk Unit Failed"),
+	.title    = __("Add Devices to a Disk Array Failed"),
 	.header = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are not enough disk units available to be included.\n"),
-		__("o The disk unit that needs to be included is not at the right "
-		   "location. Examine the 'message log' for the exposed unit "
-		   "and make sure that the replacement unit is at the correct "
-		   "location\n"),
+		__("o There are not enough disks available to be included.\n"),
 		__("o Not all disk units attached to an IOA have reported to the "
 		   "system. Retry the operation.\n"),
-		__("o The disk unit to be included must be the same or greater "
-		   "capacity than the smallest device in the volume set and "
+		__("o The disk to be included must be the same or greater "
+		   "capacity than the smallest device in the disk array and "
 		   "be formatted correctly\n"),
-		__("o The type/model of the disk units is not supported for the "
-		   "requested operation\n"),
+		__("o The disk is not supported for the requested operation\n"),
 		"" }
 };
 
@@ -441,100 +434,99 @@ s_node n_confirm_raid_include = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Confirm Disk Units to be Included"),
+	.title    = __("Confirm Devices to Add to a Disk Array"),
 	.header   = {
-		__("ATTENTION: All listed device units will be formatted "
-		   "and zeroed before listed device is added to array.\n\n"),
+		__("ATTENTION: All listed disks will be formatted "
+		   "and zeroed before being added to the disk array.\n\n"),
 		__("Press Enter to confirm your choice to have the system "
-		   "include the selected units in device parity protection\n"),
+		   "include the selected disks in the disk array\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
 		"" }
 };
 
 s_node n_dev_include_complete = {
-	.title    = __("Include Disk Units in Device Parity Protection Status"),
+	.title    = __("Add Devices to a Disk Array Status"),
 	.header   = {
-		__("The operation to include units in the device parity protection "
-		   "will be done in two phases.  The device must first be formatted "
-		   "before device may be included into array set."),
-		__("You selected to include a device in a device parity set"),
+		__("The operation to add disks to the disk array "
+		   "will be done in two phases. The disks will first be "
+		   "formatted, then added to the disk array."),
+		__("You selected to add disks to a disk array"),
 		""
 	}
 };
 
 s_node n_af_include_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Format Device for Advanced Function Failed"),
+	.title    = __("Format Device for Advanced Function (522) Failed"),
 	.header = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no eligible device units in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o There are no eligible disks in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have "
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disks are missing.\n"),
+		__("o The disks are currently in use.\n"), /* xxx */
 		"" }
 };
 
 s_node n_af_remove_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Disable Device for Advanced Functions Failed"),
+	.title    = __("Format Device for JBOD Function (512) Failed"),
 	.header   = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no eligible device units in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o There are no eligible disks in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have "
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disks are missing.\n"),
+		__("o The disks are currently in use.\n"),
 		"" }
 };
 
 s_node n_add_hot_spare_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Enable Device as Hot Spare Failed"),
+	.title    = __("Create Hot Spare Failed"),
 	.header = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no eligible device units in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o There are no eligible disks in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have "
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disks are missing.\n"),
 		"" }
 };
 
 s_node n_remove_hot_spare_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Disable Device as Hot Spare Failed"),
+	.title    = __("Delete Hot Spare Failed"),
 	.header = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no eligible device units in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o There are no eligible disks in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have "
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system.  Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"),
+		__("o The disks are missing.\n"),
+		__("o The disks are currently in use.\n"),
 		"" }
 };
 
@@ -543,12 +535,12 @@ s_node n_add_hot_spare = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Configure a hot spare device"),
+	.title    = __("Create a Hot Spare Device"),
 	.header   = {
-		__("Select the subsystems which disk units will be "
+		__("Select the adapter on which disks will be "
 		   "configured as hot spares\n\n"),
 		__("Type choice, press Enter.\n"),
-		__("  1=Select subsystem\n\n"),
+		__("  1=Select adapter\n\n"),
 		"" },
 };
 
@@ -557,20 +549,19 @@ s_node n_remove_hot_spare = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Unconfigure a hot spare device"),
+	.title    = __("Delete a Hot Spare Device"),
 	.header   = {
-		__("Select the subsystems which disk units will be "
-		   "unconfigured as hot spares\n\n"),
+		__("Select the adapter on which hot spares will be deleted\n\n"),
 		__("Type choice, press Enter.\n"),
-		__("  1=Select subsystem\n\n"),
+		__("  1=Select adapter\n\n"),
 		"" },
-};
+};/* xxx search for subsystem and disk unit and replace all */
 
 s_node n_select_add_hot_spare = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Select Disk Units to Enable as Hot Spare"),
+	.title    = __("Select Disks to Create Hot Spares"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -581,7 +572,7 @@ s_node n_select_remove_hot_spare = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Select Disk Units to Disable as Hot Spare"),
+	.title    = __("Select Hot Spares to Delete"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -592,9 +583,9 @@ s_node n_confirm_add_hot_spare = {
 	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Confirm Enable Hot Spare"),
+	.title    = __("Confirm Create Hot Spare"),
 	.header   = {
-		__("ATTENTION: Existing data on these disk units "
+		__("ATTENTION: Existing data on these disks "
 		   "will not be preserved.\n\n"),
 		__("Press Enter to continue.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
@@ -605,10 +596,10 @@ s_node n_confirm_remove_hot_spare = {
 	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Confirm Disable Hot Spare"),
+	.title    = __("Confirm Delete Hot Spare"),
 	.header   = {
-		__("ATTENTION: Existing data on these disk units "
-		   "will not be preserved.\n\n"),
+		__("ATTENTION: Selected disks will no longer be available "
+		   "as hot spare devices.\n\n"),
 		__("Press Enter to continue.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
 		"" }
@@ -718,7 +709,7 @@ s_node n_af_init_device = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(init_device_opt),
 	.options  = &init_device_opt[0],
-	.title    = __("Select Disk Units to format for Advanced Function"),
+	.title    = __("Select Disks to format for Advanced Function (522)"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -730,7 +721,7 @@ s_node n_jbod_init_device = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(init_device_opt),
 	.options  = &init_device_opt[0],
-	.title    = __("Select Disk Units to format for JBOD Function"),
+	.title    = __("Select Disks to format for JBOD Function (512)"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -742,7 +733,7 @@ s_node n_init_device = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(init_device_opt),
 	.options  = &init_device_opt[0],
-	.title    = __("Select Disk Units for Initialize and Format"),
+	.title    = __("Select Disks for Initialize and Format"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -757,7 +748,7 @@ s_node n_confirm_init_device = {
 	.f_flags  = (CONFIRM_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(confirm_inits_opt),
 	.options  = &confirm_inits_opt[0],
-	.title    = __("Confirm Initialize and Format Disk Unit"),
+	.title    = __("Confirm Initialize and Format Disks"),
 	.header   = {
 		__("Press 'c' to confirm your choice for 1=Initialize and format.\n"),
 		__("  q=Return to change your choice.\n\n"),
@@ -783,7 +774,7 @@ s_node n_reclaim_cache = {
 		__("Select the IOA to reclaim IOA cache storage.\n"),
 		__("ATTENTION: Proceed with this function only if directed "
 		   "to from a service procedure.  Data in the IOA cache "
-		   "will be discarded. Damaged objects may result on the system.\n\n"),
+		   "will be discarded.\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=Reclaim IOA cache storage.\n\n"),
 		"" }
@@ -799,7 +790,7 @@ s_node n_confirm_reclaim = {
 	.options  = &confirm_reclaim_opt[0],
 	.title    = __("Confirm Reclaim IOA Cache Storage"),
 	.header   = {
-		__("The disk units that may be affected by the function are displayed.\n"),
+		__("The disks that may be affected by the function are displayed.\n"),
 		__("ATTENTION: Proceed with this function only if directed to from a "
 		   "service procedure. Data in the IOA cache will be discarded. "
 		   "Filesystem corruption may result on the system.\n\n"),
@@ -844,7 +835,7 @@ s_node n_raid_rebuild = {
 	.options  = &raid_rebuild_opt[0],
 	.title    = __("Rebuild Disk Unit Data"),
 	.header   = {
-		__("Select the units to be rebuilt\n\n"),
+		__("Select the disks to be rebuilt\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=Rebuild\n\n"),
 		"" }
@@ -854,20 +845,16 @@ s_node n_raid_rebuild_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
 	.title    = __("Rebuild Disk Unit Data Failed"),
 	.header   = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
-		__("o There are no disk units that need to be rebuilt.\n"),
-		__("o The disk unit that needs  to be rebuild is not at the right "
+		__("o There are no disks that need to be rebuilt.\n"),
+		__("o The disk that needs to be rebuild is not at the right "
 		   "location. Examine the 'message log' for the exposed unit "
 		   "and make sure that the replacement unit is at the correct "
 		   "location.\n"),
-		__("o Not all disk units attached to an IOA have reported to the "
+		__("o Not all disks attached to an IOA have reported to the "
 		   "system. Retry the operation.\n"),
-		__("o All the disk units in a parity set must be the same capacity "
-		   "with a minumum number of 4 disk units and a maximum of 10 units"
-		   "in the resulting parity set.\n"),
-		__("o The type/model of the disk units is not supported for the "
-		   "requested operation.\n"),
+		__("o The disk is not supported for the requested operation.\n"),
 		"" }
 };
 
@@ -878,7 +865,7 @@ s_node n_confirm_raid_rebuild = {
 	.title    = __("Confirm Rebuild Disk Unit Data"),
 	.header   = {
 		__("Rebuilding the disk unit data may take several "
-		   "minutes for each unit selected.\n\n"),
+		   "minutes for each disk selected.\n\n"),
 		__("Press Enter to confirm having the data rebuilt.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
 		"" },
@@ -942,7 +929,7 @@ s_node n_bus_config = {
 	.options  = &bus_config_opt[0],
 	.title    = __("Work with SCSI Bus Configuration"),
 	.header   = {
-		__("Select the subsystem to change scsi bus attribute.\n\n"),
+		__("Select the adapter to change scsi bus attribute.\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=change scsi bus attribute\n\n"),
 		"" }
@@ -969,7 +956,7 @@ s_node n_change_bus_attr = {
 	.options  = &change_bus_attr_opt[0],
 	.title    = __("Change SCSI Bus Configuration"),
 	.header   = {
-		__("Current Bus configurations are shown. To change "
+		__("Current bus configurations are shown. To change "
 		   "setting hit 'c' for options menu. Hightlight "
 		   "desired option then hit Enter.\n"),
 		__("  c=Change Setting\n\n"),
@@ -1210,20 +1197,20 @@ const char *screen_status[] = {
 	/* 12 */ "",
 	/* 13 */ "",
 	/* 14 */ "",
-	/* 15 */ __("The selection is not valid"),
-	/* 16 */ __("Error.  More than one unit was selected."),
+	/* 15 */ __("The selection is not valid."),
+	/* 16 */ __("Error.  More than one device was selected."),
 	/* 17 */ __("Invalid option.  No devices selected."),
-	/* 18 */ __("Start Parity Protection completed successfully"),
-	/* 19 */ __("Start Parity Protection failed."),
-	/* 20 */ __("Stop Parity Protection failed"),
-	/* 21 */ __("Stop Parity Protection completed successfully."),
+	/* 18 */ __("Disk array successfully created."),
+	/* 19 */ __("Create disk array failed."),
+	/* 20 */ __("Delete disk array failed."),
+	/* 21 */ __("Disk array successfully deleted."),
 	/* 22 */ "",
 	/* 23 */ "",
 	/* 24 */ "",
 	/* 25 */ __("Error:  number of devices selected must be a multiple of %d"),
-	/* 26 */ __("Include failed"),
-	/* 27 */ __("Include Unit completed successfully"),
-	/* 28 */ __("Rebuild started, view Parity Status Window for rebuild progress"),
+	/* 26 */ __("Add device failed"),
+	/* 27 */ __("Add device completed successfully"),
+	/* 28 */ __("Rebuild started, view Disk Array Status Window for rebuild progress"),
 	/* 29 */ __("Rebuild failed"),
 	/* 30 */ __("Device concurrent maintenance failed"),
 	/* 31 */ __("Device concurrent maintenance failed, device in use"),
@@ -1235,25 +1222,25 @@ const char *screen_status[] = {
 	/* 37 */ __("Reclaim IOA Cache Storage failed"),
 	/* 38 */ __("No Reclaim IOA Cache Storage is necessary"),
 	/* 39 */ __("No Reclaim IOA Cache Storage performed"),
-	/* 40 */ __("Rebuild started, view Parity Status Window for rebuild progress"),
+	/* 40 */ __("Rebuild started, view Disk Array Status Window for rebuild progress"),
 	/* 41 */ __("Rebuild failed"),
 	/* 42 */ __("The selected battery packs have successfully been placed into an error state."),
-	/* 43 */ __("Attempting to force the selected battery packs into an error state failed."),
+	/* 43 */ __("Failed to force the selected battery packs into an error state."),
 	/* 44 */ __("No configured resources contain a cache battery pack."),
 	/* 45 */ __("Change SCSI Bus configurations completed successfully"),
 	/* 46 */ __("Change SCSI Bus configurations failed"),
-	/* 47 */ __("Change Device Driver Configurations completed successfully"),
-	/* 48 */ __("Change Device Driver Configurations failed"),
+	/* 47 */ __("Change device driver configurations completed successfully"),
+	/* 48 */ __("Change device driver configurations failed"),
 	/* 49 */ __("No units available for initialize and format"),
 	/* 50 */ __("Initialize and format completed successfully"),
 	/* 51 */ __("Initialize and format failed"),
 	/* 52 */ __("No devices available for the selected hot spare operation"),
-	/* 53 */ __("Enable Device as Hot Spare Completed successfully"),
-	/* 54 */ __("Disable Device as Hot Spare Completed successfully"),
-	/* 55 */ __("Configure a hot spare device failed"),
-	/* 56 */ __("Unconfigure a hot spare device failed"),
-	/* 57 */ __("Change Device Driver Configurations completed successfully"),
-	/* 58 */ __("Change Device Driver Configurations failed"),
+	/* 53 */ __("Hot spare successfully created"),
+	/* 54 */ __("Failed to delete hot spare"),
+	/* 55 */ __("Failed to create hot spare"),
+	/* 56 */ __("Failed to delete hot spare"),
+	/* 57 */ __("Successfully changed device driver configuration"),
+	/* 58 */ __("Failed to change device driver configuration"),
 	/* 59 */ __("Invalid directory"),
 	/* 60 */ __("Root directory changed to %s"),
 	/* 61 */ __("Root directory unchanged"),
@@ -1261,7 +1248,7 @@ const char *screen_status[] = {
 	/* 63 */ __("Editor unchanged"),
 	/* 64 */ __("Default log values restored"),
 	/* 65 */ __("Editor returned %d. Try setting the default editor."),
-      /* 66 */ __("Change Disk Configuration failed."),
+      /* 66 */ __("Failed to change disk configuration."),
       /* 67 */ __("Microcode Download failed.")
       /* NOTE:  127 maximum limit */
 };

@@ -513,7 +513,8 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 
 				for (i=0;i<num_fields;i++) {
 					if (fields[i] != NULL) {
-						field_info(fields[i],&h,&w,&t,&l,&o,&b); /* height, width, top, left, offscreen rows, buffer */
+						/* height, width, top, left, offscreen rows, buffer */
+						field_info(fields[i],&h,&w,&t,&l,&o,&b); 
 
 						/* turn all offscreen fields off */
 						if ((t >= (header_lines + pad_t)) &&
@@ -1226,8 +1227,11 @@ char *body_init_status(char **header, int *num_lines, int type)
 char *__body_init(char *buffer, char **header, int *num_lines)
 {
 	int j, i;
-	int header_lines = *num_lines;
+	int header_lines = 0;
 	char *x_header;
+
+	if (num_lines)
+		header_lines = *num_lines;
 
 	for (j=0, x_header = _(header[j]); strlen(x_header) != 0; j++, x_header = _(header[j])) {
 		if (j==0)
@@ -1241,7 +1245,7 @@ char *__body_init(char *buffer, char **header, int *num_lines)
 		}
 	}
 
-	if (num_lines != NULL)
+	if (num_lines)
 		*num_lines = header_lines;
 	return buffer;
 }
@@ -1735,7 +1739,9 @@ int device_details(i_container *i_con)
 		rc =  ipr_inquiry(device, 0, &page0_inq, sizeof(page0_inq));
 
 		for (i = 0; (i < page0_inq.page_length) && !rc; i++) {
-			if (page0_inq.supported_page_codes[i] == 0xC7) { /* FIXME 0xC7 is SCSD, do further research to find what needs to be tested for this affirmation.*/
+			if (page0_inq.supported_page_codes[i] == 0xC7) {
+				/* FIXME 0xC7 is SCSD, do further research to find
+				 what needs to be tested for this affirmation.*/
 
 				body = add_line_to_body(body,"", NULL);
 				body = add_line_to_body(body,_("Extended Details"), NULL);
@@ -1988,9 +1994,7 @@ int raid_stop(i_container *i_con)
 		buffer[k] = body_init_status(n_raid_stop.header, &header_lines, k);
 
 	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-
 		for (i = 0; i < cur_ioa->num_devices; i++) {
-
 			common_record = cur_ioa->dev[i].qac_entry;
 
 			if ((common_record == NULL) ||
@@ -2005,13 +2009,10 @@ int raid_stop(i_container *i_con)
 			rc = is_array_in_use(cur_ioa, array_record->array_id);
 			if (rc != 0) continue;
 
-			if (raid_cmd_head)
-			{
+			if (raid_cmd_head) {
 				raid_cmd_tail->next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
 				raid_cmd_tail = raid_cmd_tail->next;
-			}
-			else
-			{
+			} else {
 				raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
 			}
 
@@ -2302,7 +2303,7 @@ int raid_start(i_container *i_con)
 	struct ipr_ioa *cur_ioa;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle = 1;
+	int toggle = 0;
 	mvaddstr(0,0,"RAID START FUNCTION CALLED");
 
 	/* empty the linked list that contains field pointers */
@@ -2437,7 +2438,7 @@ int configure_raid_start(i_container *i_con)
 	i_container *temp_i_con = NULL;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle = 1;
+	int toggle = 0;
 	mvaddstr(0,0,"CONFIGURE RAID START FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
@@ -2891,7 +2892,7 @@ int confirm_raid_start(i_container *i_con)
 	struct ipr_dev_record *device_record;
 	struct ipr_dev *ipr_dev;
 	int header_lines;
-	int toggle = 1;
+	int toggle = 0;
 	struct screen_output *s_out;
 	mvaddstr(0,0,"CONFIRM RAID START FUNCTION CALLED");
 
@@ -3268,7 +3269,7 @@ int raid_include(i_container *i_con)
 	int rc = RC_SUCCESS;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle = 1;
+	int toggle = 0;
 	mvaddstr(0,0,"RAID INCLUDE FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
@@ -3604,7 +3605,7 @@ int confirm_raid_include(i_container *i_con)
 	int format_include_cand();
 	struct devs_to_init_t *cur_dev_init;
 	int header_lines;
-	int toggle = 1;
+	int toggle = 0;
 	mvaddstr(0,0,"CONFIRM RAID INCLUDE FUNCTION CALLED");
 
 	for (k=0; k<2; k++)
@@ -3705,7 +3706,8 @@ int format_include_cand()
 						dev_init_tail->next = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
 						dev_init_tail = dev_init_tail->next;
 					} else
-						dev_init_head = dev_init_tail = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
+						dev_init_head = dev_init_tail =
+							(struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
 
 					memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
 					dev_init_tail->ioa = cur_ioa;
@@ -3909,7 +3911,7 @@ int configure_af_device(i_container *i_con, int action_code)
 	int num_devs = 0;
 	struct ipr_ioa *cur_ioa;
 	struct devs_to_init_t *cur_dev_init;
-	int toggle = 1;
+	int toggle = 0;
 	int header_lines;
 	s_node *n_screen;
 	struct screen_output *s_out;
@@ -4104,12 +4106,12 @@ int hot_spare(i_container *i_con, int action)
 	struct ipr_ioa *cur_ioa;
 	int found = 0;
 	char *input;
-	int toggle=1;
+	int toggle = 0;
 	i_container *temp_i_con;
 	struct screen_output *s_out;
 	s_node *n_screen;
 	int header_lines;
-	mvaddstr(0,0,"BUS CONFIG FUNCTION CALLED");
+	mvaddstr(0,0,"HOT SPARE FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 
@@ -4275,7 +4277,7 @@ int select_hot_spare(i_container *i_con, int action)
 	struct screen_output *s_out;
 	int header_lines;
 	s_node *n_screen;
-	int toggle=1;
+	int toggle = 0;
 	i_container *i_con_head_saved;
 
 	mvaddstr(0,0,"SELECT HOT SPARE FUNCTION CALLED");
@@ -4382,7 +4384,7 @@ int confirm_hot_spare(int action)
 	struct screen_output *s_out;
 	s_node *n_screen;
 	int header_lines;
-	int toggle=1;
+	int toggle = 0;
 	mvaddstr(0,0,"CONFIRM HOT SPARE FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
@@ -6012,7 +6014,7 @@ int bus_config(i_container *i_con)
 	struct ipr_mode_page_28_header *modepage_28_hdr;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle=1;
+	int toggle = 0;
 	mvaddstr(0,0,"BUS CONFIG FUNCTION CALLED");
 	rc = RC_SUCCESS;
 
@@ -6174,7 +6176,7 @@ int change_bus_attr(i_container *i_con)
 	}
 
 	body = body_init(n_change_bus_attr.header, &header_lines);
-	body = add_line_to_body(body, cur_ioa->ioa.gen_name, NULL);
+	body = add_line_to_body(body, cur_ioa->pci_address, NULL);
 	header_lines++;
 
 	for (j = 0; j < page_28_cur.num_buses; j++) {
@@ -6422,7 +6424,6 @@ int bus_attr_menu(struct ipr_ioa *cur_ioa, struct bus_attr *bus_attr, int start_
 	bus_num = bus_attr->bus;
 
 	if (bus_attr->type == qas_capability_type) {
-
 		num_menu_items = 2;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
@@ -6452,7 +6453,6 @@ int bus_attr_menu(struct ipr_ioa *cur_ioa, struct bus_attr *bus_attr, int start_
 		free(userptr);
 		menu_item = NULL;
 	} else if (bus_attr->type == scsi_id_type) {
-
 		num_menu_items = 16;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
@@ -6549,7 +6549,6 @@ int bus_attr_menu(struct ipr_ioa *cur_ioa, struct bus_attr *bus_attr, int start_
 		free(userptr);
 		menu_item = NULL;
 	} else if (bus_attr->type == bus_width_type) {
-
 		num_menu_items = 2;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
@@ -6686,11 +6685,9 @@ int display_menu(ITEM **menu_item,
 
 	/* check if fits in current screen, + 1 is added for
 	 bottom border, +1 is added for buffer */
-	if ((menu_start_row + menu_rows + 1 + 1) > max_y)
-	{
+	if ((menu_start_row + menu_rows + 1 + 1) > max_y) {
 		menu_start_row = max_y - (menu_rows + 1 + 1);
-		if (menu_start_row < (8 + 1))
-		{
+		if (menu_start_row < (8 + 1)) {
 			/* size is adjusted by 2 to allow for top
 			 and bottom border, add +1 for buffer */
 			menu_rows_disp = max_y - (8 + 2 + 1);
@@ -6698,8 +6695,7 @@ int display_menu(ITEM **menu_item,
 		}
 	}
 
-	if (menu_rows > menu_rows_disp)
-	{
+	if (menu_rows > menu_rows_disp) {
 		set_menu_format(menu, menu_rows_disp, 1);
 		use_box2 = 1;
 	}
@@ -6711,110 +6707,67 @@ int display_menu(ITEM **menu_item,
 	set_menu_win(menu, field_win);
 	post_menu(menu);
 	box(box1_win,ACS_VLINE,ACS_HLINE);
-	if (use_box2)
-	{
+	if (use_box2) {
 		box2_win = newwin(menu_rows + 2, 3, menu_start_row - 1, 54 + menu_cols + 1);
 		box(box2_win,ACS_VLINE,ACS_HLINE);
 
 		/* initialize scroll bar */
-		for (i = 0;
-		     i < menu_rows_disp/2;
-		     i++)
-		{
+		for (i = 0; i < menu_rows_disp/2; i++)
 			mvwaddstr(box2_win, i + 1, 1, "#");
-		}
 
 		/* put down arrows in */
-		for (i = menu_rows_disp;
-		     i > (menu_rows_disp - menu_rows_disp/2);
-		     i--)
-		{
+		for (i = menu_rows_disp; i > (menu_rows_disp - menu_rows_disp/2); i--)
 			mvwaddstr(box2_win, i, 1, "v");
-		}
 	}
 	wnoutrefresh(box1_win);
 
 	menu_index = 0;
-	while (1)
-	{
+	while (1) {
 		if (use_box2)
 			wnoutrefresh(box2_win);
 		wnoutrefresh(field_win);
 		doupdate();
 		ch = getch();
-		if (IS_ENTER_KEY(ch))
-		{
+		if (IS_ENTER_KEY(ch)) {
 			cur_item = current_item(menu);
 			cur_item_index = item_index(cur_item);
 			*userptrptr = item_userptr(menu_item[cur_item_index]);
 			break;
-		}
-		else if ((ch == KEY_DOWN) || (ch == '\t'))
-		{
-			if (use_box2 &&
-			    (menu_index < (menu_index_max - 1)))
-			{
+		} else if ((ch == KEY_DOWN) || (ch == '\t')) {
+			if (use_box2 && (menu_index < (menu_index_max - 1))) {
 				menu_index++;
-				if (menu_index == menu_rows_disp)
-				{
+				if (menu_index == menu_rows_disp) {
 					/* put up arrows in */
-					for (i = 0;
-					     i < menu_rows_disp/2;
-					     i++)
-					{
+					for (i = 0; i < menu_rows_disp/2; i++)
 						mvwaddstr(box2_win, i + 1, 1, "^");
-					}
 				}
-				if (menu_index == (menu_index_max - 1))
-				{
+				if (menu_index == (menu_index_max - 1)) {
 					/* remove down arrows */
-					for (i = menu_rows_disp;
-					     i > (menu_rows_disp - menu_rows_disp/2);
-					     i--)
-					{
+					for (i = menu_rows_disp; i > (menu_rows_disp - menu_rows_disp/2); i--)
 						mvwaddstr(box2_win, i, 1, "#");
-					}
 				}
 			}
 
 			menu_driver(menu,REQ_DOWN_ITEM);
-		}
-		else if (ch == KEY_UP)
-		{
-			if (use_box2 &&
-			    (menu_index != 0))
-			{
+		} else if (ch == KEY_UP) {
+			if (use_box2 && menu_index != 0) {
 				menu_index--;
-				if (menu_index == (menu_index_max - menu_rows_disp - 1))
-				{
+				if (menu_index == (menu_index_max - menu_rows_disp - 1)) {
 					/* put down arrows in */
-					for (i = menu_rows_disp;
-					     i > (menu_rows_disp - menu_rows_disp/2);
-					     i--)
-					{
+					for (i = menu_rows_disp; i > (menu_rows_disp - menu_rows_disp/2); i--)
 						mvwaddstr(box2_win, i, 1, "v");
-					}
 				}
-				if (menu_index == 0)
-				{
+				if (menu_index == 0) {
 					/* remove up arrows */
-					for (i = 0;
-					     i < menu_rows_disp/2;
-					     i++)
-					{
+					for (i = 0; i < menu_rows_disp/2; i++)
 						mvwaddstr(box2_win, i + 1, 1, "#");
-					}
 				}
 			}
 			menu_driver(menu,REQ_UP_ITEM);
-		}
-		else if (IS_EXIT_KEY(ch))
-		{
+		} else if (IS_EXIT_KEY(ch)) {
 			rc = EXIT_FLAG;
 			break;
-		}
-		else if (IS_CANCEL_KEY(ch))
-		{
+		} else if (IS_CANCEL_KEY(ch)) {
 			rc = CANCEL_FLAG;
 			break;
 		}
@@ -6844,8 +6797,8 @@ int driver_config(i_container *i_con)
 	struct ipr_ioa *cur_ioa;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle = 1;
-	mvaddstr(0,0,"RAID START FUNCTION CALLED");
+	int toggle = 0;
+	mvaddstr(0,0,"DRIVER CONFIG FUNCTION CALLED");
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -6958,6 +6911,7 @@ int change_driver_config(i_container *i_con)
 	i_con = add_i_con(i_con,"",NULL); 
 
 	body = body_init(n_change_driver_config.header, NULL);
+	body = add_line_to_body(body, ioa->pci_address, NULL);
 	sprintf(buffer,"%d", get_log_level(ioa));
 	body = add_line_to_body(body,_("Current Log Level"), buffer);
 	body = add_line_to_body(body,_("New Log Level"), "%2");
@@ -8405,12 +8359,14 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			if (ipr_is_hot_spare(ipr_dev))
 				len += sprintf(body + len, "%-25s ", "Hot Spare");
 			else if (ipr_is_volume_set(ipr_dev)) {
-				if (is_start_cand)
+				if (is_start_cand) {
 					len += sprintf(body + len, "%-25s ",
 						       "SCSI RAID Adapter");
-				else 
-					len += sprintf(body + len, "RAID %-20s ",
-						       ipr_dev->prot_level_str);
+				} else {
+					sprintf(ioctl_buffer, "RAID %s Disk Array",
+						ipr_dev->prot_level_str);
+					len += sprintf(body + len, "%-25s ", ioctl_buffer);
+				}
 
 				rc = ipr_query_command_status(&cur_ioa->ioa, &cmd_status);
 
