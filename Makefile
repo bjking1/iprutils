@@ -8,7 +8,7 @@ UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
 
 all: iprconfig iprupdate iprdump iprtrace iprdbg docs text
 
-iprconfig: iprconfig.c iprlib.o
+iprconfig: iprconfig.c iprlib.o text.msg
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu -lsysfs
 
 iprupdate: iprupdate.c iprlib.o

@@ -16,12 +16,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-struct device_detail_struct {
-  struct ipr_ioa *ioa;
-  struct ipr_dev *ipr_dev;
-  int             field_index;
-};
-
 struct devs_to_init_t {
   struct ipr_dev       *ipr_dev;
   struct ipr_ioa       *ioa;
@@ -723,7 +717,8 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                             field_opts_on(fields[i],O_ACTIVE);
                             if (form_adjust)
                             {
-                                set_current_field(form,fields[i]);
+                                if (!t_on || !toggle_field)
+                                    set_current_field(form,fields[i]);
                                 form_adjust = false;
                             }
                         }
@@ -733,11 +728,12 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                 }
             }  
 
-            if (t_on && toggle_field && ((field_opts(fields[toggle_field]) & O_ACTIVE) != O_ACTIVE))
-            {
-                ch = KEY_NPAGE;
-            }
-            else {
+            if (t_on && toggle_field &&
+                ((field_opts(fields[toggle_field]) & O_ACTIVE) != O_ACTIVE)) {
+
+               ch = KEY_NPAGE;
+            } else {
+
                 toggle_field = 0;
 
                 if (refresh_stdscr)
@@ -783,77 +779,83 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
             if (ch == KEY_RESIZE)
                 break;
 
-            if (IS_ENTER_KEY(ch))
-            {
+            if (IS_ENTER_KEY(ch)) {
                 char *input;
 
-                if (num_fields>1)
+                if (num_fields > 1)
                     active_field = field_index(current_field(form));
 
-                if (enter_on && num_fields == 0)
-                {
+                if (enter_on && num_fields == 0) {
+
                     rc = (CANCEL_FLAG | rc);
                     goto leave;
-                }
-                else if (enter_on && !menus_on) /* cancel if all fields are empty */
-                {
+                } else if (enter_on && !menus_on) {
+
+                    /* cancel if all fields are empty */
                     form_driver(form,REQ_VALIDATION);
-                    for (i=0;i<num_fields;i++)
-                    {
+                    for (i = 0; i < num_fields; i++) {
+
                         if (strlen(strip_trailing_whitespace(field_buffer(fields[i],0))) != 0)
-                            break; /* fields are not empty -> continue */
-                        if (i == num_fields-1) /* all fields are empty */
-                        {
+                            /* fields are not empty -> continue */
+                            break;
+
+                        if (i == num_fields - 1) {
+                            /* all fields are empty */
                             rc = (CANCEL_FLAG | rc);
                             goto leave;
                         }
                     }
                 }
 
-                if (num_fields > 0)
-                {
+                if (num_fields > 0) {
+
                     /* input field is always fields[0] if only 1 field */
                     input = field_buffer(fields[0],0);
                 }
 
                 invalid = true;
 
-                for (i = 0; i < screen->num_opts; i++)
-                {
+                for (i = 0; i < screen->num_opts; i++) {
 
                     temp = &(screen->options[i]);
 
-                    if ((temp->key == "\n") || ((num_fields > 0)?(strcasecmp(input,temp->key) == 0):0))
-                    {
+                    if ((temp->key == "\n") ||
+                        ((num_fields > 0)?(strcasecmp(input,temp->key) == 0):0)) {
+
                         invalid = false;
 
-                        if (temp->key == "\n" && num_fields > 0) /* store field data to existing i_con (which should already
-                                                                  contain pointers) */
-                        {
+                        if (temp->key == "\n" && num_fields > 0) {
+
+                            /* store field data to existing i_con (which should already
+                             contain pointers) */
                             i_container *temp_i_con = i_con;
                             form_driver(form,REQ_VALIDATION);
 
-                            for (i=num_fields-1;i>=0;i--)
-                            {
+                            for (i = num_fields - 1; i >= 0; i--) {
+
                                 strncpy(temp_i_con->field_data,field_buffer(fields[i],0),MAX_FIELD_SIZE);
                                 temp_i_con = temp_i_con->next_item;
                             }
                         }
 
                         if (temp->screen_function == NULL)
-                            goto leave; /* continue with function */
+                            /* continue with function */
+                            goto leave; 
 
                         do 
                             rc = temp->screen_function(i_con);
                         while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
 
+                        /* if screen flags exist on rc and they don't match
+                         the screen's flags, return */
                         if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
-                            goto leave; /* if screen flags exist on rc and they don't match the screen's flags, return */
+                            goto leave; 
 
-                        rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG); /* strip screen flags from rc */
+                        /* strip screen flags from rc */
+                        rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG); 
 
-                        if (screen->rc_flags & REFRESH_FLAG)
-                        {
+                        if (screen->rc_flags & REFRESH_FLAG) {
+
                             s_status.index = rc;
                             rc = (REFRESH_FLAG | rc);
                             goto leave;
@@ -1071,8 +1073,6 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
     delwin(w_pad);
     delwin(w_page_header);
     return s_out;
-
-    mvaddstr(1,0,"inconceivable!");refresh();getch(); /* should never reach this point */
 }
   
 struct screen_output *screen_driver(s_node *screen, fn_out *output,
@@ -1426,7 +1426,7 @@ int main_menu(i_container *i_con)
     }
     n_main_menu.body = ipr_end_list(n_main_menu.body);
 
-    s_out = screen_driver(&n_main_menu,NULL,NULL);
+    s_out = screen_driver_new(&n_main_menu,NULL,0,NULL);
     ipr_free(n_main_menu.body);
     n_main_menu.body = NULL;
     ipr_free(n_main_menu.title);
@@ -1490,6 +1490,7 @@ int disk_status(i_container *i_con)
     char *buffer[2];
     int toggle = 1;
     struct ipr_dev_record *dev_record;
+    struct ipr_query_res_state res_state;
     mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
     rc = RC_SUCCESS;
@@ -1515,7 +1516,7 @@ int disk_status(i_container *i_con)
         for (k=0; k<2; k++)
             buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1", cur_ioa, k);
 
-        i_con = add_i_con(i_con,"\0",(char *) cur_ioa->ioa.scsi_dev_data,list);
+        i_con = add_i_con(i_con,"\0",(char *)&cur_ioa->ioa,list);
 
         num_lines++;
 
@@ -1534,7 +1535,7 @@ int disk_status(i_container *i_con)
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-            i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[j].scsi_dev_data, list);  
+            i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[j], list);  
 
             num_lines++;
         }
@@ -1551,7 +1552,7 @@ int disk_status(i_container *i_con)
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-            i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[j].scsi_dev_data, list);  
+            i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[j], list);  
 
             num_lines++;
         }
@@ -1563,11 +1564,17 @@ int disk_status(i_container *i_con)
             if (!ipr_is_volume_set(&cur_ioa->dev[j]))
                 continue;
 
+            /* query resource state to acquire protection level string */
+            rc = ipr_query_resource_state(cur_ioa->dev[j].gen_name,
+                                          &res_state);
+            strncpy(cur_ioa->dev[j].prot_level_str,
+                    res_state.dev.vset.prot_level_str, 8);
+
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
             i_con = add_i_con(i_con,"\0",
-                              (char *)cur_ioa->dev[j].scsi_dev_data,
+                              (char *)&cur_ioa->dev[j],
                               list);
 
             dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
@@ -1586,10 +1593,14 @@ int disk_status(i_container *i_con)
                 {
                     continue;
                 }
+
+                strncpy(cur_ioa->dev[i].prot_level_str,
+                        res_state.dev.vset.prot_level_str, 8);
+
                 for (k=0; k<2; k++)
                     buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
 
-                i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[i].scsi_dev_data, list);
+                i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[i], list);
                 num_lines++;
             }
         }
@@ -1673,93 +1684,59 @@ void device_details_body(int code, char *field_data)
     n_device_details.body = body;
 }
 
-int device_details_get_device(i_container *i_con, struct device_detail_struct *device)
+int device_details_get_device(i_container *i_con,
+                              struct ipr_dev **device)
 {
     i_container *temp_i_con;
-    int j, invalid=0;
+    int invalid=0;
     int dev_num = 0;
-    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_dev *cur_device;
     char *input;
-    int found = 0;
-    struct ipr_ioa *cur_ioa;
 
     if (i_con == NULL)
-    {
         return 1;
-    }
 
     for (temp_i_con = i_con;
          temp_i_con != NULL && !invalid;
          temp_i_con = temp_i_con->next_item) {
 
-        scsi_dev_data = (struct scsi_dev_data *)(temp_i_con->data);
-        if (scsi_dev_data != NULL)
-        {
-            input = temp_i_con->field_data;
+        cur_device =(struct ipr_dev *)(temp_i_con->data);
 
-            if (input == NULL)
-                continue;
+        if (cur_device == NULL)
+            continue;
 
-            if (strcmp(input, "5") == 0)
-            {
-                if (dev_num)
-                {
-                    dev_num++;
-                    break;
-                }
-                else
-                {
-                    found = 0;
+        input = temp_i_con->field_data;
 
-                    for (cur_ioa = ipr_ioa_head;
-                         cur_ioa != NULL;
-                         cur_ioa = cur_ioa->next)
-                    {
-                        if (cur_ioa->ioa.scsi_dev_data == scsi_dev_data)
-                        {
-                            device->ipr_dev = &cur_ioa->ioa;
-                            found = 1;
-                            break;
-                        }
-                        for (j = 0; j < cur_ioa->num_devices; j++)
-                        {
-                            if (scsi_dev_data == cur_ioa->dev[j].scsi_dev_data)
-                            {
-                                device->ipr_dev = &cur_ioa->dev[j];
-                                found = 1;
-                                break;
-                            }
-                        }
-                        if (found)
-                            break;
-                    }
+        if (input == NULL)
+            continue;
 
-                    device->ioa = cur_ioa;
-                    dev_num++;
-                }
+        if (strcmp(input, "5") == 0) {
+
+            if (dev_num) {
+                dev_num++;
+                break;
+            } else {
+                *device = cur_device;
+                dev_num++;
             }
-            else if (strcmp(input, " ") != 0 && input != NULL && strcmp(input, "") != 0)
-            {
-                invalid = 1;
-            }
+        } else if ((strcmp(input, " ") != 0) &&
+                   (input != NULL)           &&
+                   (strcmp(input, "") != 0)) {
+
+            invalid = 1;
         }
     }
 
     if (invalid)
-    {
-        return 15; /* The selection is not valid */
-    }
+        /* The selection is not valid */
+        return 15; 
 
     if (dev_num == 0)
-    {
-        return 17; /* "Invalid option.  No devices selected." */
-    }
-
-
+        /* Invalid option.  No devices selected. */
+        return 17; 
     else if (dev_num != 1) 
-    {
-        return 16; /* "Error.  More than one unit was selected." */
-    }
+        /* Error.  More than one unit was selected. */
+        return 16; 
 
     return 0;
 }
@@ -1819,13 +1796,10 @@ int device_details(i_container *i_con)
      */
 
     char *buffer;
-    struct device_detail_struct detail_device;
+    struct ipr_dev *device;
     int rc;
     struct scsi_dev_data *scsi_dev_data;
     struct ipr_array_record *ipr_array_record;
-    struct ipr_ioa *ioa;
-    struct ipr_supported_arrays *supported_arrays;
-    struct ipr_array_cap_entry *cur_array_cap_entry;
     int i;
     u8 product_id[IPR_PROD_ID_LEN+1];
     u8 vendor_id[IPR_VENDOR_ID_LEN+1];
@@ -1861,13 +1835,13 @@ int device_details(i_container *i_con)
     char *string_buf;
     mvaddstr(0,0,"DEVICE DETAILS FUNCTION CALLED");
 
-    rc = device_details_get_device(i_con, &detail_device);
+    rc = device_details_get_device(i_con, &device);
     if (rc)
         return rc;
 
-    scsi_dev_data = detail_device.ipr_dev->scsi_dev_data;
-    ipr_array_record = (struct ipr_array_record *)detail_device.ipr_dev->qac_entry;
-    ioa = detail_device.ioa;
+    scsi_dev_data = device->scsi_dev_data;
+    ipr_array_record =
+        (struct ipr_array_record *)device->qac_entry;
 
     rc = 0;
 
@@ -1875,8 +1849,8 @@ int device_details(i_container *i_con)
         scsi_channel = scsi_dev_data->channel;
         scsi_id = scsi_dev_data->id;
         scsi_lun = scsi_dev_data->lun;
-    } else if (detail_device.ipr_dev->qac_entry) {
-        common_record = detail_device.ipr_dev->qac_entry;
+    } else if (device->qac_entry) {
+        common_record = device->qac_entry;
         if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
             device_record = (struct ipr_dev_record *)common_record;
             scsi_channel = device_record->last_resource_addr.bus;
@@ -1906,44 +1880,58 @@ int device_details(i_container *i_con)
         memset(&dram_vpd, 0, sizeof(dram_vpd));
         memset(&page3_inq, 0, sizeof(page3_inq));
 
-        ipr_inquiry(ioa->ioa.gen_name, IPR_STD_INQUIRY,
+        ipr_inquiry(device->gen_name, IPR_STD_INQUIRY,
                     &ioa_vpd, sizeof(ioa_vpd));
-        ipr_inquiry(ioa->ioa.gen_name, 1,
+        ipr_inquiry(device->gen_name, 1,
                     &cfc_vpd, sizeof(cfc_vpd));
-        ipr_inquiry(ioa->ioa.gen_name, 2,
+        ipr_inquiry(device->gen_name, 2,
                     &dram_vpd, sizeof(dram_vpd));
-        ipr_inquiry(ioa->ioa.gen_name, 3,
+        ipr_inquiry(device->gen_name, 3,
                     &page3_inq, sizeof(page3_inq));
 
-        ipr_strncpy_0(vendor_id, ioa_vpd.std_inq_data.vpids.vendor_id, IPR_VENDOR_ID_LEN);
-        ipr_strncpy_0(product_id, ioa_vpd.std_inq_data.vpids.product_id, IPR_PROD_ID_LEN);
-        ipr_strncpy_0(plant_code, ioa_vpd.ascii_plant_code, IPR_VPD_PLANT_CODE_LEN);
-        ipr_strncpy_0(part_num, ioa_vpd.ascii_part_num, IPR_VPD_PART_NUM_LEN);
-        ipr_strncpy_0(buffer, cfc_vpd.cache_size, IPR_VPD_CACHE_SIZE_LEN);
-        ipr_strncpy_0(serial_num, cfc_vpd.serial_num, IPR_SERIAL_NUM_LEN);
+        ipr_strncpy_0(vendor_id,
+                      ioa_vpd.std_inq_data.vpids.vendor_id,
+                      IPR_VENDOR_ID_LEN);
+        ipr_strncpy_0(product_id,
+                      ioa_vpd.std_inq_data.vpids.product_id,
+                      IPR_PROD_ID_LEN);
+        ipr_strncpy_0(plant_code,
+                      ioa_vpd.ascii_plant_code,
+                      IPR_VPD_PLANT_CODE_LEN);
+        ipr_strncpy_0(part_num,
+                      ioa_vpd.ascii_part_num,
+                      IPR_VPD_PART_NUM_LEN);
+        ipr_strncpy_0(buffer,
+                      cfc_vpd.cache_size,
+                      IPR_VPD_CACHE_SIZE_LEN);
+        ipr_strncpy_0(serial_num,
+                      cfc_vpd.serial_num,
+                      IPR_SERIAL_NUM_LEN);
         cache_size = strtoul(buffer, NULL, 16);
         sprintf(buffer,"%d MB", cache_size);
         memcpy(dram_size, dram_vpd.dram_size, IPR_VPD_DRAM_SIZE_LEN);
         sprintf(dram_size + IPR_VPD_DRAM_SIZE_LEN, " MB");
         sprintf(firmware_version,"%02X%02X%02X%02X",
-                   page3_inq.major_release, page3_inq.card_type,
-                   page3_inq.minor_release[0], page3_inq.minor_release[1]);
+                page3_inq.major_release,
+                page3_inq.card_type,
+                page3_inq.minor_release[0],
+                page3_inq.minor_release[1]);
 
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(2, vendor_id);
         device_details_body(3, product_id);
-        device_details_body(4, ioa->driver_version);
+        device_details_body(4, device->ioa->driver_version);
         device_details_body(5, firmware_version);
         device_details_body(6, serial_num);
         device_details_body(7, part_num);
         device_details_body(8, plant_code);
         device_details_body(9, buffer);
         device_details_body(10, dram_size);
-        device_details_body(11, ioa->ioa.gen_name);
+        device_details_body(11, device->gen_name);
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(12, NULL);
-        device_details_body(13, ioa->pci_address);
-        sprintf(buffer,"%d", ioa->host_num);
+        device_details_body(13, device->ioa->pci_address);
+        sprintf(buffer,"%d", device->ioa->host_num);
         device_details_body(14, buffer);
     } else if ((ipr_array_record) &&
                (ipr_array_record->common.record_id ==
@@ -1954,55 +1942,47 @@ int device_details(i_container *i_con)
         n_device_details.title = ipr_malloc(strlen(string_buf) + 4);
         sprintf(n_device_details.title, string_buf);
 
-        ipr_strncpy_0(vendor_id, ipr_array_record->vendor_id, IPR_VENDOR_ID_LEN);
+        ipr_strncpy_0(vendor_id,
+                      ipr_array_record->vendor_id,
+                      IPR_VENDOR_ID_LEN);
 
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(2, vendor_id);
 
-        supported_arrays = ioa->supported_arrays;
-        if (supported_arrays) {
-            cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
-            for (i=0; i<iprtoh16(supported_arrays->num_entries); i++)
-            {
-                if (cur_array_cap_entry->prot_level == ipr_array_record->raid_level)
-                {
-                    sprintf(buffer,"RAID %s", cur_array_cap_entry->prot_level_str);
-                    device_details_body(102, buffer);
-                    break;
-                }
+        sprintf(buffer,"RAID %s", device->prot_level_str);
+        device_details_body(102, buffer);
 
-                cur_array_cap_entry = (struct ipr_array_cap_entry *)
-                    ((void *)cur_array_cap_entry + iprtoh16(supported_arrays->entry_length));
-            }
+        if (iprtoh16(ipr_array_record->stripe_size) > 1024)
+            sprintf(buffer,"%d M",
+                    iprtoh16(ipr_array_record->stripe_size)/1024);
+        else
+            sprintf(buffer,"%d k",
+                    iprtoh16(ipr_array_record->stripe_size));
 
-            if (iprtoh16(ipr_array_record->stripe_size) > 1024)
-                sprintf(buffer,"%d M",iprtoh16(ipr_array_record->stripe_size)/1024);
-            else
-                sprintf(buffer,"%d k",iprtoh16(ipr_array_record->stripe_size));
-
-            device_details_body(103, buffer);
-        }
-
+        device_details_body(103, buffer);
+        
         /* Do a read capacity to determine the capacity */
-        rc = ipr_read_capacity_16(detail_device.ipr_dev->gen_name, &read_cap16);
+        rc = ipr_read_capacity_16(device->gen_name,
+                                  &read_cap16);
 
         if ((rc == 0) &&
             (iprtoh32(read_cap16.max_user_lba_hi) ||
              iprtoh32(read_cap16.max_user_lba_lo)) &&
-            iprtoh32(read_cap16.block_length))
-        {
+            iprtoh32(read_cap16.block_length)) {
+
             max_user_lba_int = iprtoh32(read_cap16.max_user_lba_hi);
             max_user_lba_int <<= 32;
             max_user_lba_int |= iprtoh32(read_cap16.max_user_lba_lo);
 
             device_capacity = max_user_lba_int + 1;
 
-            lba_divisor  = (1000*1000*1000)/iprtoh32(read_cap16.block_length);
+            lba_divisor  =
+                (1000*1000*1000) / iprtoh32(read_cap16.block_length);
 
             sprintf(buffer,"%.2Lf GB",device_capacity/lba_divisor);
             device_details_body(104, buffer);
         }
-        device_details_body(11, detail_device.ipr_dev->dev_name);
+        device_details_body(11, device->dev_name);
     } else {
         string_buf = catgets(catd,n_device_details.text_set,201,"Title");
 
@@ -2010,22 +1990,28 @@ int device_details(i_container *i_con)
         sprintf(n_device_details.title, string_buf);
 
         memset(&read_cap, 0, sizeof(read_cap));
-        rc = ipr_read_capacity(detail_device.ipr_dev->gen_name, &read_cap);
+        rc = ipr_read_capacity(device->gen_name, &read_cap);
 
-        rc = ipr_inquiry(detail_device.ipr_dev->gen_name,
+        rc = ipr_inquiry(device->gen_name,
                          0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
-        rc = ipr_inquiry(detail_device.ipr_dev->gen_name,
+        rc = ipr_inquiry(device->gen_name,
                          IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
 
-        ipr_strncpy_0(vendor_id, std_inq.std_inq_data.vpids.vendor_id, IPR_VENDOR_ID_LEN);
-        ipr_strncpy_0(product_id, std_inq.std_inq_data.vpids.product_id, IPR_PROD_ID_LEN);
+        ipr_strncpy_0(vendor_id,
+                      std_inq.std_inq_data.vpids.vendor_id,
+                      IPR_VENDOR_ID_LEN);
+        ipr_strncpy_0(product_id,
+                      std_inq.std_inq_data.vpids.product_id,
+                      IPR_PROD_ID_LEN);
 
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(2, vendor_id);
         device_details_body(202, product_id);
 
-        len = sprintf(buffer, "%X%X%X%X", dasd_page3_inq.release_level[0],
-                      dasd_page3_inq.release_level[1], dasd_page3_inq.release_level[2],
+        len = sprintf(buffer, "%X%X%X%X",
+                      dasd_page3_inq.release_level[0],
+                      dasd_page3_inq.release_level[1],
+                      dasd_page3_inq.release_level[2],
                       dasd_page3_inq.release_level[3]);
 
         if (isalnum(dasd_page3_inq.release_level[0]) &&
@@ -2050,27 +2036,34 @@ int device_details(i_container *i_con)
             device_details_body(207, buffer);
         }
 
-        ipr_strncpy_0(serial_num, std_inq.std_inq_data.serial_num, IPR_SERIAL_NUM_LEN);
+        ipr_strncpy_0(serial_num,
+                      std_inq.std_inq_data.serial_num,
+                      IPR_SERIAL_NUM_LEN);
         device_details_body(6, serial_num);
 
-        if (iprtoh32(read_cap.block_length) && iprtoh32(read_cap.max_user_lba))
-        {
-            lba_divisor = (1000*1000*1000)/iprtoh32(read_cap.block_length);
+        if (iprtoh32(read_cap.block_length) &&
+            iprtoh32(read_cap.max_user_lba))  {
+
+            lba_divisor = (1000*1000*1000) /
+                iprtoh32(read_cap.block_length);
+
             device_capacity = iprtoh32(read_cap.max_user_lba) + 1;
-            sprintf(buffer,"%.2Lf GB", device_capacity/lba_divisor);
+            sprintf(buffer,"%.2Lf GB",
+                    device_capacity/lba_divisor);
+
             device_details_body(104, buffer);
         }
 
-        if (strlen(detail_device.ipr_dev->dev_name) > 0)
+        if (strlen(device->dev_name) > 0)
         {
-            device_details_body(11, detail_device.ipr_dev->dev_name);
+            device_details_body(11, device->dev_name);
         }
 
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(12, NULL);
-        device_details_body(13, ioa->pci_address);
+        device_details_body(13, device->ioa->pci_address);
 
-        sprintf(buffer,"%d", ioa->host_num);
+        sprintf(buffer,"%d", device->ioa->host_num);
         device_details_body(203, buffer);
 
         sprintf(buffer,"%d",scsi_channel);
@@ -2082,7 +2075,7 @@ int device_details(i_container *i_con)
         sprintf(buffer,"%d",scsi_lun);
         device_details_body(206, buffer);
 
-        rc =  ipr_inquiry(detail_device.ipr_dev->gen_name,
+        rc =  ipr_inquiry(device->gen_name,
                           0, &page0_inq, sizeof(page0_inq));
 
         for (i = 0; (i < page0_inq.page_length) && !rc; i++)
@@ -2092,13 +2085,19 @@ int device_details(i_container *i_con)
                 device_details_body(IPR_LINE_FEED, NULL);
                 device_details_body(208, NULL);
 
-                ipr_strncpy_0(buffer, std_inq.fru_number, IPR_STD_INQ_FRU_NUM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.fru_number,
+                              IPR_STD_INQ_FRU_NUM_LEN);
                 device_details_body(209, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.ec_level, IPR_STD_INQ_EC_LEVEL_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.ec_level,
+                              IPR_STD_INQ_EC_LEVEL_LEN);
                 device_details_body(210, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.part_number, IPR_STD_INQ_PART_NUM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.part_number,
+                              IPR_STD_INQ_PART_NUM_LEN);
                 device_details_body(7, buffer);
 
                 hex = (u8 *)&std_inq.std_inq_data;
@@ -2108,29 +2107,41 @@ int device_details(i_container *i_con)
                         hex[6], hex[7]);
                 device_details_body(211, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.z1_term, IPR_STD_INQ_Z1_TERM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.z1_term,
+                              IPR_STD_INQ_Z1_TERM_LEN);
                 device_details_body(212, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.z2_term, IPR_STD_INQ_Z2_TERM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.z2_term,
+                              IPR_STD_INQ_Z2_TERM_LEN);
                 device_details_body(213, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.z3_term, IPR_STD_INQ_Z3_TERM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.z3_term,
+                              IPR_STD_INQ_Z3_TERM_LEN);
                 device_details_body(214, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.z4_term, IPR_STD_INQ_Z4_TERM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.z4_term,
+                              IPR_STD_INQ_Z4_TERM_LEN);
                 device_details_body(215, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.z5_term, IPR_STD_INQ_Z5_TERM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.z5_term,
+                              IPR_STD_INQ_Z5_TERM_LEN);
                 device_details_body(216, buffer);
 
-                ipr_strncpy_0(buffer, std_inq.z6_term, IPR_STD_INQ_Z6_TERM_LEN);
+                ipr_strncpy_0(buffer,
+                              std_inq.z6_term,
+                              IPR_STD_INQ_Z6_TERM_LEN);
                 device_details_body(217, buffer);
                 break;
             }
         }
     }
    
-    s_out = screen_driver(&n_device_details,NULL,i_con);
+    s_out = screen_driver_new(&n_device_details,NULL,0,i_con);
     ipr_free(n_device_details.title);
     n_device_details.title = NULL;
     ipr_free(n_device_details.body);
@@ -2187,10 +2198,11 @@ int raid_screen(i_container *i_con)
     sprintf(n_raid_screen.title, string_buf);
 
     for (loop = 0; loop < n_raid_screen.num_opts; loop++) {
-        n_raid_screen.body = ipr_list_opts(n_raid_screen.body,
-                                           n_raid_screen.options[loop].key,
-                                           n_raid_screen.text_set,
-                                           n_raid_screen.options[loop].cat_num);
+        n_raid_screen.body =
+            ipr_list_opts(n_raid_screen.body,
+                          n_raid_screen.options[loop].key,
+                          n_raid_screen.text_set,
+                          n_raid_screen.options[loop].cat_num);
     }
     n_raid_screen.body = ipr_end_list(n_raid_screen.body);
 
@@ -2202,6 +2214,180 @@ int raid_screen(i_container *i_con)
     rc = s_out->rc;
     ipr_free(s_out);
     output = free_fn_out(output);
+    return rc;
+}
+
+char *raid_status_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+    char *header[] = {
+       /*   .        .                  .            .                           .          */
+       /*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
+        "OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
+        "OPT Name   PCI/SCSI Location          Description               Status"};
+    char *sep[]    = {
+        "--- ------ -------------------------- -------- ---------------- -----------------",
+        "--- ------ -------------------------- ------------------------- -----------------"};
+
+    string_buf = catgets(catd,n_raid_status.text_set, 2,
+                         "Type option, press Enter.");
+    buffer = ipr_realloc(buffer, strlen(string_buf) + 4);
+    cur_len = sprintf(buffer, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_raid_status.text_set, 3,
+                         "Display hardware resource information details");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  5=%s\n\n", string_buf);
+    header_lines += 2;
+
+    if (type > 1)
+        type = 0;
+    buffer = ipr_realloc(buffer, cur_len + strlen(header[type]) + strlen(sep[type]) + 8);
+    cur_len += sprintf(buffer + cur_len, "%s\n", header[type]);
+    cur_len += sprintf(buffer + cur_len, "%s\n", sep[type]);
+    header_lines += 2;
+
+    *num_lines = header_lines;
+    return buffer;
+}
+
+int raid_status(i_container *i_con)
+{
+    int rc, j, i, k;
+    int len = 0;
+    int num_lines = 0;
+    struct ipr_ioa *cur_ioa;
+    struct scsi_dev_data *scsi_dev_data;
+    struct screen_output *s_out;
+    char *string_buf;
+    int header_lines;
+    int array_id;
+    char *buffer[2];
+    int toggle = 1;
+    struct ipr_dev_record *dev_record;
+    struct ipr_query_res_state res_state;
+    mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
+
+    rc = RC_SUCCESS;
+    i_con = free_i_con(i_con);
+
+    check_current_config(false);
+   
+    /* Setup screen title */
+    string_buf = catgets(catd,n_raid_status.text_set,1,"Display Disk Array Status");
+    n_raid_status.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_raid_status.title, string_buf);
+
+    for (k=0; k<2; k++)
+        buffer[k] = raid_status_body_init(&header_lines, k);
+
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
+    {
+        if (cur_ioa->ioa.scsi_dev_data == NULL)
+            continue;
+
+        /* print Hot Spare devices*/
+        for (j = 0; j < cur_ioa->num_devices; j++)
+        {
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+            if (!ipr_is_hot_spare(&cur_ioa->dev[j]))
+            {
+                continue;
+            }
+
+            for (k=0; k<2; k++)
+                buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+
+            i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[j], list);  
+
+            num_lines++;
+        }
+
+        /* print volume set and associated devices*/
+        for (j = 0; j < cur_ioa->num_devices; j++)
+        {
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+            if (!ipr_is_volume_set(&cur_ioa->dev[j]))
+                continue;
+
+            /* query resource state to acquire protection level string */
+            rc = ipr_query_resource_state(cur_ioa->dev[j].gen_name,
+                                          &res_state);
+            strncpy(cur_ioa->dev[j].prot_level_str,
+                    res_state.dev.vset.prot_level_str, 8);
+
+            for (k=0; k<2; k++)
+                buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+
+            i_con = add_i_con(i_con,"\0",
+                              (char *)&cur_ioa->dev[j],
+                              list);
+
+            dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
+            array_id = dev_record->array_id;
+            num_lines++;
+
+            for (i = 0; i < cur_ioa->num_devices; i++)
+            {
+                scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+                dev_record = (struct ipr_dev_record *)cur_ioa->dev[i].qac_entry;
+
+                if (!(ipr_is_array_member(&cur_ioa->dev[i])) ||
+                     (ipr_is_volume_set(&cur_ioa->dev[i])) ||
+                     ((dev_record != NULL) &&
+                      (dev_record->array_id != array_id)))
+                {
+                    continue;
+                }
+
+                strncpy(cur_ioa->dev[i].prot_level_str,
+                        res_state.dev.vset.prot_level_str, 8);
+
+                for (k=0; k<2; k++)
+                    buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
+
+                i_con = add_i_con(i_con,"\0", (char *)&cur_ioa->dev[i], list);
+                num_lines++;
+            }
+        }
+    }
+
+
+    if (num_lines == 0)
+    {
+       string_buf = catgets(catd,n_raid_status.text_set,4,
+                            "No devices found");
+       len = strlen(buffer[i]);
+       buffer[i] = ipr_realloc(buffer[i], len +
+                                    strlen(string_buf) + 4);
+       sprintf(buffer[i] + len, "\n%s", string_buf);
+    }
+
+    toggle_field = 0;
+
+    do {
+        n_raid_status.body = buffer[toggle&1];
+        s_out = screen_driver_new(&n_raid_status,NULL,header_lines,i_con);
+        toggle++;
+    } while (s_out->rc == TOGGLE_SCREEN);
+
+    for (i=0; i<2; i++) {
+        ipr_free(buffer[i]);
+        buffer[i] = NULL;
+    }
+    n_raid_status.body = NULL;
+
+    ipr_free(n_raid_status.title);
+    n_raid_status.title = NULL;
+
+    rc = s_out->rc;
+    ipr_free(s_out);
     return rc;
 }
 
@@ -9492,6 +9678,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
     int i, rc;
     struct ipr_query_res_state res_state;
     u8 ioctl_buffer[255];
+    char raid_str[48];
     int status;
     int format_req = 0;
     struct ipr_mode_parm_hdr *mode_parm_hdr;
@@ -9592,9 +9779,13 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
             if (ipr_is_hot_spare(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "Hot Spare");
             else if (ipr_is_volume_set(ipr_dev))
-                len += sprintf(body + len, "%-25s ", "RAID #");
-            else if (ipr_is_array_member(ipr_dev))
-                len += sprintf(body + len, "%-25s ", "  RAID # Array Member");
+                len += sprintf(body + len, "RAID %-20s ",
+                               ipr_dev->prot_level_str);
+            else if (ipr_is_array_member(ipr_dev)) {
+                sprintf(raid_str,"  RAID %s Array Member",
+                        ipr_dev->prot_level_str);
+                len += sprintf(body + len, "%-25s ", raid_str);
+            }
             else if (ipr_is_af_dasd_device(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
             else
@@ -9653,7 +9844,9 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
         else if (res_state.not_oper)
             sprintf(body + len, "Not Operational\n");
         else if (res_state.not_ready ||
-                 (res_state.read_write_prot && (iprtoh32(res_state.failing_dev_ioasc) == 0x02040200u)))
+                 (res_state.read_write_prot &&
+                  (iprtoh32(res_state.dev.dasd.failing_dev_ioasc) ==
+                   0x02040200u)))
             sprintf(body + len, "Not ready\n");
         else if ((res_state.read_write_prot) || (is_rw_protected(ipr_dev)))
             sprintf(body + len, "R/W Protected\n");

@@ -71,7 +71,9 @@ $set 200 raid_screen
 
 $set 201 raid_status
 1 "Display Disk Array Status"
-3 "%e%q%r%f"
+2 "Type option, press Enter."
+3 "Display hardware resource information details"
+4 "No devices found"
 
 $ Other
 101 "Display Disk Array Status"

@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.6 2004/01/30 16:49:52 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.7 2004/01/30 21:02:05 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -1535,6 +1535,7 @@ void check_current_config(bool allow_rebuild_refresh)
             if ((scsi_dev_data->type == IPR_TYPE_DISK) ||
                 (scsi_dev_data->type == IPR_TYPE_AF_DISK))
             {
+                cur_ioa->dev[device_count].ioa = cur_ioa;
                 cur_ioa->dev[device_count].scsi_dev_data = scsi_dev_data;
                 cur_ioa->dev[device_count].qac_entry = NULL;
                 strcpy(cur_ioa->dev[device_count].dev_name, "");

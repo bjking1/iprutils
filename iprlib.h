@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.8 2004/01/30 16:49:53 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.9 2004/01/30 21:02:05 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -221,6 +221,29 @@ struct ipr_common_record
     u16 record_len;
 };
 
+struct ipr_vset_res_state
+{
+    u16                 stripe_size;
+    u8                  prot_level;
+    u8                  num_devices_in_vset;
+    u32                 reserved6;
+    u32                 ilid;
+    u32                 failing_dev_ioasc;
+    struct ipr_res_addr failing_dev_res_addr;
+    u32                 failing_dev_res_handle;
+    u8                  prot_level_str[8];
+};
+
+struct ipr_dasd_res_state
+{
+    u32                 data_path_width;  /* bits */
+    u32                 data_xfer_rate;   /* 100 KBytes/second */
+    u32                 ilid;
+    u32                 failing_dev_ioasc;
+    struct ipr_res_addr failing_dev_res_addr;
+    u32                 failing_dev_res_handle;
+};
+
 /**********************************************************/ 
 /*                                                        */
 /* L I T T L E    E N D I A N                             */
@@ -325,20 +348,6 @@ struct ipr_sdt_entry
     u16 priority;
 };
 
-struct ipr_vset_res_state
-{
-    u16 stripe_size;
-    u8 prot_level;
-    u8 num_devices_in_vset;
-    u32 reserved6;
-};
-
-struct ipr_dasd_res_state
-{
-    u32 data_path_width;  /* bits */
-    u32 data_xfer_rate;   /* 100 KBytes/second */
-};
-
 struct ipr_query_res_state
 {
     u8 reserved2:4;
@@ -364,30 +373,24 @@ struct ipr_query_res_state
         struct ipr_vset_res_state vset;
         struct ipr_dasd_res_state dasd;
     }dev;
-
-    u32 ilid;
-    u32 failing_dev_ioasc;
-    struct ipr_res_addr failing_dev_res_addr;
-    u32 failing_dev_res_handle;
-    u8 protection_level_str[8];
 };
 
 struct ipr_array_cap_entry
 {
-    u8                          prot_level;
+    u8   prot_level;
 #define IPR_DEFAULT_RAID_LVL "5"
-    u8                          reserved:7;
-    u8                          include_allowed:1;
-    u16                         reserved2;
-    u8                          reserved3;
-    u8                          max_num_array_devices;
-    u8                          min_num_array_devices;
-    u8                          min_mult_array_devices;
-    u16                         reserved4;
-    u16                         supported_stripe_sizes;
-    u16                         reserved5;
-    u16                         recommended_stripe_size;
-    u8                          prot_level_str[8];
+    u8   reserved:7;
+    u8   include_allowed:1;
+    u16  reserved2;
+    u8   reserved3;
+    u8   max_num_array_devices;
+    u8   min_num_array_devices;
+    u8   min_mult_array_devices;
+    u16  reserved4;
+    u16  supported_stripe_sizes;
+    u16  reserved5;
+    u16  recommended_stripe_size;
+    u8   prot_level_str[8];
 };
 
 struct ipr_array_record
@@ -713,20 +716,6 @@ struct ipr_sdt_entry
     u16 priority;
 };
 
-struct ipr_vset_res_state
-{
-    u16 stripe_size;
-    u8 prot_level;
-    u8 num_devices_in_vset;
-    u32 reserved6;
-};
-
-struct ipr_dasd_res_state
-{
-    u32 data_path_width;  /* bits */
-    u32 data_xfer_rate;   /* 100 KBytes/second */
-};
-
 struct ipr_query_res_state
 {
     u8 reserved1:1;
@@ -747,17 +736,10 @@ struct ipr_query_res_state
 
     u8 reserved5;
 
-    union
-    {
+    union {
         struct ipr_vset_res_state vset;
         struct ipr_dasd_res_state dasd;
-    }dev;
-
-    u32 ilid;
-    u32 failing_dev_ioasc;
-    struct ipr_res_addr failing_dev_res_addr;
-    u32 failing_dev_res_handle;
-    u8 protection_level_str[8];
+    } dev;
 };
 
 struct ipr_array_cap_entry
@@ -1058,18 +1040,18 @@ struct sg_map_info
 struct ipr_dev{
     char                       dev_name[64];
     char                       gen_name[64];
+    u8                         prot_level_str[8];
     u32                        is_start_cand:1;
     u32                        is_reclaim_cand:1;
     u32                        reserved:30;
-    u32                        pci_bus_number;
-    u32                        pci_slot;
     struct scsi_dev_data      *scsi_dev_data;
     struct ipr_common_record  *qac_entry;
+    struct ipr_ioa            *ioa;
 };
 
 #define IPR_MAX_IOA_DEVICES        (IPR_MAX_NUM_BUSES * 15 * 2 + 1)
 struct ipr_ioa {
-    struct ipr_dev              ioa;
+    struct ipr_dev                 ioa;
     u16                            ccin;
     u32                            host_addr;
     u32                            num_raid_cmds;
@@ -1081,7 +1063,7 @@ struct ipr_ioa {
     int                            host_num;
     char                           pci_address[16];
     char                           host_name[16];
-    struct ipr_dev              dev[IPR_MAX_IOA_DEVICES];
+    struct ipr_dev                 dev[IPR_MAX_IOA_DEVICES];
     struct ipr_array_query_data   *qac_data;
     struct ipr_supported_arrays   *supported_arrays;
     struct ipr_reclaim_query_data *reclaim_data;
