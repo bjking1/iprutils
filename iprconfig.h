@@ -59,28 +59,17 @@ int raid_start_loop(i_container * i_con);
 int configure_raid_start(i_container * i_con);
 int configure_raid_parameters(i_container * i_con);
 int confirm_raid_start(i_container * i_con);
-int raid_start_complete(i_container * i_con);
+int raid_start_complete();
 int raid_include(i_container * i_con);
 int configure_raid_include(i_container * i_con);
 int confirm_raid_include(i_container * i_con);
 int confirm_raid_include_device(i_container * i_con);
 int disk_unit_recovery(i_container * i_con);
-int device_concurrent_maintenance(i_container * i_con);
 
-int concurrent_add_device(i_container * i_con);
-int concurrent_remove_device(i_container * i_con);
-int issue_concurrent_maintenance(i_container * i_con);
+int concurrent_add_device(i_container *i_con);
+int concurrent_remove_device(i_container *i_con);
+int verify_conc_maint(i_container * i_con);
 
-int confirm_device_concurrent_maintenance_remove(i_container * i_con);
-int confirm_device_concurrent_maintenance_insert(i_container * i_con);
-int concurrent_maintenance_warning_remove(i_container * i_con);
-int concurrent_maintenance_warning_insert(i_container * i_con);
-int do_dasd_conc_maintenance_remove(i_container * i_con);
-int do_dasd_conc_maintenance_insert(i_container * i_con);
-int conc_maintenance_complt_remove(i_container * i_con);
-int conc_maintenance_complt_insert(i_container * i_con);
-int conc_maintenance_failed_remove(i_container * i_con);
-int conc_maintenance_failed_insert(i_container * i_con);
 int init_device(i_container * i_con);
 int confirm_init_device(i_container * i_con);
 int send_dev_inits(i_container * i_con);
@@ -133,19 +122,19 @@ ITEM **menu_test_menu(int field_index);
 typedef struct screen_node s_node;
 
 struct screen_opts {
-    int (*screen_function) (i_container *);
-    int cat_num;
-    char *key;
+	int (*screen_function) (i_container *);
+	int cat_num;
+	char *key;
 };
 
 struct screen_node {
-    int text_set;
-    int rc_flags;
-    int num_opts;
-    struct screen_opts *options;
-    char *title;
-    char *body;
-    char *footer;
+	int text_set;
+	int rc_flags;
+	int num_opts;
+	struct screen_opts *options;
+	char *title;
+	char *body;
+	char *footer;
 };
 
 struct screen_opts main_menu_opt[] = {
@@ -158,13 +147,13 @@ struct screen_opts main_menu_opt[] = {
 };
 
 s_node n_main_menu = {
-    101,
-    (EXIT_FLAG | CANCEL_FLAG),
-    NUM_OPTS(main_menu_opt),
-    &main_menu_opt[0],
-    NULL,
-    NULL,
-    "%e"
+	101,
+	(EXIT_FLAG | CANCEL_FLAG),
+	NUM_OPTS(main_menu_opt),
+	&main_menu_opt[0],
+	NULL,
+	NULL,
+	"%e"
 };
 
 struct screen_opts disk_status_opt[] = {
@@ -172,23 +161,23 @@ struct screen_opts disk_status_opt[] = {
 };
 
 s_node n_disk_status = {
-    102,
-    (CANCEL_FLAG),
-    NUM_OPTS(disk_status_opt),
-    &disk_status_opt[0],
-    NULL,
-    NULL,
-    "%e%q%r%t%f"
+	102,
+	(CANCEL_FLAG),
+	NUM_OPTS(disk_status_opt),
+	&disk_status_opt[0],
+	NULL,
+	NULL,
+	"%e%q%r%t%f"
 };
 
 s_node n_device_details = {
-    104,
-    (CANCEL_FLAG),
-    0,
-    NULL,
-    NULL,
-    NULL,
-    "%n%e%q%f"
+	104,
+	(CANCEL_FLAG),
+	0,
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q%f"
 };
 
 struct screen_opts raid_screen_opt[] = {
@@ -203,23 +192,23 @@ struct screen_opts raid_screen_opt[] = {
 };
 
 s_node n_raid_screen = {
-    200,
-    (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
-    NUM_OPTS(raid_screen_opt),
-    &raid_screen_opt[0],
-    NULL,
-    NULL,
-    "%e%q"
+	200,
+	(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	NUM_OPTS(raid_screen_opt),
+	&raid_screen_opt[0],
+	NULL,
+	NULL,
+	"%e%q"
 };
 
 s_node n_raid_status = {
-    201,
-    (CANCEL_FLAG),
-    NUM_OPTS(disk_status_opt),
-    &disk_status_opt[0],
-    NULL,
-    NULL,
-    "%e%q%r%t%f"
+	201,
+	(CANCEL_FLAG),
+	NUM_OPTS(disk_status_opt),
+	&disk_status_opt[0],
+	NULL,
+	NULL,
+	"%e%q%r%t%f"
 };
 
 struct screen_opts raid_stop_opt[] = {
@@ -230,14 +219,20 @@ s_node n_raid_stop = {
 	203,
 	(CANCEL_FLAG),
 	NUM_OPTS(raid_stop_opt),
-	&raid_stop_opt[0]
+	&raid_stop_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_raid_stop_fail = {
 	204,
 	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts confirm_raid_stop_opt[] = {
@@ -248,21 +243,10 @@ s_node n_confirm_raid_stop = {
 	205,
 	(CANCEL_FLAG),
 	NUM_OPTS(confirm_raid_stop_opt),
-	&confirm_raid_stop_opt[0]
-};
-
-s_node n_do_confirm_raid_stop = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_raid_stop_complete = {
-	206,
-	(NULL_FLAG),
-	0,
-	NULL
+	&confirm_raid_stop_opt[0],
+	NULL,
+	NULL,
+	"%q%t%f"
 };
 
 struct screen_opts raid_start_opt[] = {
@@ -273,53 +257,48 @@ s_node n_raid_start = {
 	202,
 	(CANCEL_FLAG | REFRESH_FLAG),
 	NUM_OPTS(raid_start_opt),
-	&raid_start_opt[0]
+	&raid_start_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_raid_start_fail = {
-    207,
-    (NULL_FLAG),
-    0,
-    NULL,
-    NULL,
-    NULL,
-    "%n%e%q"
-};
-
-s_node n_raid_start_loop = {
-	999,
-	(NULL_FLAG | EXIT_FLAG),
+	207,
+	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts configure_raid_start_opt[] = {
-	{NULL, 0, "\n"} /* configure_raid_parameters  */
+	{NULL, 0, "\n"}
 };
 
 s_node n_configure_raid_start = {
 	208,
 	(CANCEL_FLAG | REFRESH_FLAG),
 	NUM_OPTS(configure_raid_start_opt),
-	&configure_raid_start_opt[0]
-};
-
-s_node n_configure_raid_parameters = {
-	209,
-	(NULL_FLAG),
-	0,
-	NULL
+	&configure_raid_start_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 struct screen_opts confirm_raid_start_opt[] = {
-  {NULL, 0, "\n"} /* raid_start_complete */
+	{NULL, 0, "\n"} /* raid_start_complete */
 };
 
 s_node n_confirm_raid_start = {
 	210,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_raid_start_opt),
-	&confirm_raid_start_opt[0]
+	&confirm_raid_start_opt[0],
+	NULL,
+	NULL,
+	"%q%t%f"
 };
 
 s_node n_raid_start_complete = {
@@ -337,54 +316,58 @@ s_node n_raid_include = {
 	215,
 	(CANCEL_FLAG | REFRESH_FLAG),
 	NUM_OPTS(raid_include_opt),
-	&raid_include_opt[0]
+	&raid_include_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_raid_include_fail = {
 	216,
 	NULL_FLAG,
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts configure_raid_include_opt[] = {
-	{NULL, 0, "\n"}	/* confirm_raid_include */
+	{NULL, 0, "\n"}
 };
 
 s_node n_configure_raid_include = {
 	217,
 	(CANCEL_FLAG),
 	NUM_OPTS(configure_raid_include_opt),
-	&configure_raid_include_opt[0]
+	&configure_raid_include_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_configure_raid_include_fail = {
 	218,
 	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts confirm_raid_include_opt[] = {
-	{confirm_raid_include_device, 0, "\n"}
+	{NULL, 0, "\n"}
 };
 
 s_node n_confirm_raid_include = {
 	219,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_raid_include_opt),
-	&confirm_raid_include_opt[0]
-};
-
-struct screen_opts confirm_raid_include_device_opt[] = {
-	{NULL, 0, "c"}
-};
-
-s_node n_confirm_raid_include_device = {
-	220,
-	(NULL_FLAG),
-	NUM_OPTS(confirm_raid_include_device_opt),
-	&confirm_raid_include_device_opt[0]
+	&confirm_raid_include_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_dev_include_complete = {
@@ -394,93 +377,86 @@ s_node n_dev_include_complete = {
 	NULL
 };
 
-s_node n_af_include = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
 s_node n_af_include_fail = {
-        230,
+	230,
 	(NULL_FLAG),
 	0,
-	NULL
-};
-
-s_node n_af_remove = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 s_node n_af_remove_fail = {
-        231,
+	231,
 	(NULL_FLAG),
 	0,
-	NULL
-};
-
-s_node n_add_hot_spare = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 s_node n_add_hot_spare_fail = {
-        232,
+	232,
 	(NULL_FLAG),
 	0,
-	NULL
-};
-
-s_node n_remove_hot_spare = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 s_node n_remove_hot_spare_fail = {
-        233,
+	233,
 	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts hot_spare_opt[] = {
-  {NULL, 0, "\n"}, /* select_hot_spare */
+	{NULL, 0, "\n"},
 };
 
 s_node n_hot_spare = {
-        236,
+	236,
 	(CANCEL_FLAG),
 	NUM_OPTS(hot_spare_opt),
-	&hot_spare_opt[0]
+	&hot_spare_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 struct screen_opts select_hot_spare_opt[] = {
-  {NULL, 0, "\n"}
+	{NULL, 0, "\n"}
 };
 
 s_node n_select_hot_spare = {
-        240,
+	240,
 	(NULL_FLAG),
 	NUM_OPTS(select_hot_spare_opt),
-	&select_hot_spare_opt[0]
+	&select_hot_spare_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 struct screen_opts confirm_hot_spare_opt[] = {
-  {NULL, 0, "\n"} /* hot_spare_complete */
+	{NULL, 0, "\n"} /* hot_spare_complete */
 };
 
 s_node n_confirm_hot_spare = {
-        245,
+	245,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_hot_spare_opt),
-	&confirm_hot_spare_opt[0]
+	&confirm_hot_spare_opt[0],
+	NULL,
+	NULL,
+	"%q%t%f"
 };
 
 struct screen_opts disk_unit_recovery_opt[] = {
@@ -496,11 +472,20 @@ s_node n_disk_unit_recovery = {
 	300,
 	(EXIT_FLAG | CANCEL_FLAG),
 	NUM_OPTS(disk_unit_recovery_opt),
-	&disk_unit_recovery_opt[0]
+	&disk_unit_recovery_opt[0],
+	NULL,
+	NULL,
+	"%e%q"
 };
 
+#define IPR_CONC_REMOVE        1
+#define IPR_CONC_ADD           2
+#define IPR_VERIFY_CONC_REMOVE 3
+#define IPR_VERIFY_CONC_ADD    4
+#define IPR_WAIT_CONC_REMOVE   5
+#define IPR_WAIT_CONC_ADD      6
 struct screen_opts concurrent_add_device_opt[] = {
-	{issue_concurrent_maintenance, 0, "\n"}
+	{NULL, 0, "\n"}
 };
 
 s_node n_concurrent_add_device = {
@@ -511,21 +496,31 @@ s_node n_concurrent_add_device = {
 };
 
 struct screen_opts concurrent_remove_device_opt[] = {
-	{issue_concurrent_maintenance, 0, "\n"}
+	{NULL, 0, "\n"}
 };
 
 s_node n_concurrent_remove_device = {
-	291,
+	320,
 	(CANCEL_FLAG),
 	NUM_OPTS(concurrent_remove_device_opt),
-	&concurrent_remove_device_opt[0]
+	&concurrent_remove_device_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
-s_node n_device_concurrent_maintenance = {
-	999,
-	(CANCEL_FLAG),
-	0,
-	NULL
+struct screen_opts process_conc_maint_opt[] = {
+	{NULL, 0, "\n"}
+};
+
+s_node n_process_conc_maint = {
+	321,
+	(NULL_FLAG),
+	NUM_OPTS(process_conc_maint_opt),
+	&process_conc_maint_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 struct screen_opts init_device_opt[] = {
@@ -536,7 +531,10 @@ s_node n_init_device = {
 	312,
 	(CANCEL_FLAG),
 	NUM_OPTS(init_device_opt),
-	&init_device_opt[0]
+	&init_device_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 struct screen_opts confirm_inits_opt[] = {
@@ -547,7 +545,10 @@ s_node n_confirm_init_device = {
 	313,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_inits_opt),
-	&confirm_inits_opt[0]
+	&confirm_inits_opt[0],
+	NULL,
+	NULL,
+	"c=Confirm   %q%t%f"
 };
 
 s_node n_send_dev_inits = {
@@ -611,7 +612,7 @@ struct screen_opts raid_rebuild_opt[] = {
 };
 
 s_node n_raid_rebuild = {
-	321,
+	331,
 	(CANCEL_FLAG),
 	NUM_OPTS(raid_rebuild_opt),
 	&raid_rebuild_opt[0]
@@ -629,7 +630,7 @@ struct screen_opts confirm_raid_rebuild_opt[] = {
 };
 
 s_node n_confirm_raid_rebuild = {
-	321,
+	331,
 	(CANCEL_FLAG),
 	NUM_OPTS(raid_rebuild_opt),
 	&confirm_raid_rebuild_opt[0]
@@ -637,13 +638,6 @@ s_node n_confirm_raid_rebuild = {
 
 struct screen_opts configure_af_device_opt[] = {
 	{confirm_init_device, 0, "\n"}
-};
-
-s_node n_configure_af_device = {
-	312,
-	(NULL_FLAG),
-	NUM_OPTS(configure_af_device_opt),
-	&configure_af_device_opt[0]
 };
 
 struct screen_opts battery_maint_opt[] = {
@@ -674,14 +668,14 @@ struct screen_opts confirm_force_battery_error_opt[] = {
 };
 
 s_node n_confirm_force_battery_error = {
-	331,
+	341,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_force_battery_error_opt),
 	&confirm_force_battery_error_opt[0]
 };
 
 s_node n_force_battery_error = {
-	331,
+	341,
 	(NULL_FLAG),
 	0,
 	NULL
@@ -720,7 +714,7 @@ s_node n_change_bus_attr = { /* this is copied straight MENUS */
 };
 
 struct screen_opts confirm_bus_config_opt[] = {
-  {NULL, 0, "c"} /* confirm_bus_config_reset */
+	{NULL, 0, "c"} /* confirm_bus_config_reset */
 };
 
 
@@ -857,7 +851,7 @@ s_node n_ibm_boot_log = {
 };
 
 s_node n_print_device = {
-        700,
+	700,
 	(NULL_FLAG),
 	0,
 	NULL

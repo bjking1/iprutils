@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.15 2004/02/17 16:15:56 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.16 2004/02/17 16:34:44 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -70,9 +70,11 @@
 #define IPR_INTERNAL_DEV_TIMEOUT             (2 * 60)     /* 2 minutes */
 #define IPR_FORMAT_UNIT_TIMEOUT              (4 * 60 * 60) /* 4 hours */
 #define IPR_INTERNAL_TIMEOUT                 (30)         /* 30 seconds */
+#define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)         /* 35 seconds */
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (10 * 60)    /* 10 minutes */
-#define SET_DASD_TIMEOUTS_TIMEOUT			(2 * 60)
+#define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
+#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    10
 
 #define IPR_IOA_DEBUG                        0xDDu
 #define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
@@ -98,11 +100,12 @@
 #define IPR_QUERY_RESOURCE_STATE             0xC2
 #define IPR_QUERY_IOA_CONFIG                 0xC5
 #define IPR_QUERY_COMMAND_STATUS             0xCB
+#define IPR_SUSPEND_DEV_BUS                  0xC8u
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ					0xE8
 #define SKIP_WRITE				0xEA
 #define SET_DASD_TIMEOUTS			0xEC
-#define IPR_QUERY_ARRAY_CONFIG               0xF0
+#define IPR_QUERY_ARRAY_CONFIG            0xF0
 #define IPR_START_ARRAY_PROTECTION           0xF1
 #define IPR_STOP_ARRAY_PROTECTION            0xF2
 #define IPR_RESYNC_ARRAY_PROTECTION          0xF3
@@ -126,7 +129,9 @@
 #endif
 
 #define IPR_TYPE_AF_DISK             0xC
+#define IPR_TYPE_SES                 0xD
 #define IPR_TYPE_ADAPTER             0x1f
+#define IPR_TYPE_EMPTY_SLOT          0xff
 
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
@@ -744,9 +749,8 @@ struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
 	u8 prot_level_str[8];
-	u32 is_start_cand:1;
 	u32 is_reclaim_cand:1;
-	u32 reserved:30;
+	u32 reserved:31;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_common_record *qac_entry;
 	struct ipr_ioa *ioa;
@@ -768,6 +772,7 @@ struct ipr_ioa {
 	char host_name[16];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
 	struct ipr_array_query_data *qac_data;
+	struct ipr_array_record *start_array_qac_entry;
 	struct ipr_supported_arrays *supported_arrays;
 	struct ipr_reclaim_query_data *reclaim_data;
 	struct ipr_ioa *next;
@@ -1005,9 +1010,103 @@ struct ipr_dram_vpd {
 	u8 dram_size[IPR_VPD_DRAM_SIZE_LEN];
 };
 
+struct ipr_drive_elem_status
+{
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 select:1;
+	u8 predictive_fault:1;
+	u8 reserved:1;
+	u8 swap:1;
+	u8 status:4;
+
+	u8 reserved2:4;
+	u8 scsi_id:4;
+
+	u8 reserved3:4;
+	u8 insert:1;
+	u8 remove:1;
+	u8 reserved4:1;
+	u8 identify:1;
+
+	u8 reserved5:1;
+	u8 fault_requested:1;
+	u8 fault_sensed:1;
+	u8 reserved6:5;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 status:4;
+	u8 swap:1;
+	u8 reserved:1;
+	u8 predictive_fault:1;
+	u8 select:1;
+
+	u8 scsi_id:4;
+	u8 reserved2:4;
+
+	u8 identify:1;
+	u8 reserved4:1;
+	u8 remove:1;
+	u8 insert:1;
+	u8 reserved3:4;
+
+	u8 reserved6:5;
+	u8 fault_sensed:1;
+	u8 fault_requested:1;
+	u8 reserved5:1;
+#endif
+};
+
+struct ipr_encl_status_ctl_pg
+{
+	u8 page_code;
+	u8 health_status;
+	u16 byte_count;
+	u8 reserved1[4];
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 overall_status_select:1;
+	u8 overall_status_predictive_fault:1;
+	u8 overall_status_reserved:1;
+	u8 overall_status_swap:1;
+	u8 overall_status_reserved2:4;
+
+	u8 overall_status_reserved3;
+
+	u8 overall_status_reserved4:4;
+	u8 overall_status_insert:1;
+	u8 overall_status_remove:1;
+	u8 overall_status_reserved5:1;
+	u8 overall_status_identify:1;
+
+	u8 overall_status_reserved6:1;
+	u8 overall_status_fault_requested:1;
+	u8 overall_status_fault_sensed:1;
+	u8 overall_status_reserved7:4;
+	u8 overall_status_disable_resets:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 overall_status_reserved2:4;
+	u8 overall_status_swap:1;
+	u8 overall_status_reserved:1;
+	u8 overall_status_predictive_fault:1;
+	u8 overall_status_select:1;
+
+	u8 overall_status_reserved3;
+
+	u8 overall_status_identify:1;
+	u8 overall_status_reserved5:1;
+	u8 overall_status_remove:1;
+	u8 overall_status_insert:1;
+	u8 overall_status_reserved4:4;
+
+	u8 overall_status_disable_resets:1;
+	u8 overall_status_reserved7:4;
+	u8 overall_status_fault_sensed:1;
+	u8 overall_status_fault_requested:1;
+	u8 overall_status_reserved6:1;
+#endif
+	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES]; //FIXME is this constant limited to 10?
+};
+
 int get_proc_string(char *, char *, char *);
-int scan_device(struct scsi_dev_data *);
-int remove_device(struct scsi_dev_data *);
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int get_major_version(char *);
 int get_minor_version(char *);
@@ -1049,6 +1148,9 @@ int ipr_evaluate_device(char *, u32);
 int ipr_inquiry(char *, u8, void *, u8);
 void ipr_reset_adapter(struct ipr_ioa *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
+int ipr_suspend_device_bus(char *file, struct ipr_res_addr *res_addr, u8 option);
+int ipr_receive_diagnostics(char *file, u8 page, void *buff, int length);
+int ipr_send_diagnostics(char *file, void *buff, int length);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1059,20 +1161,16 @@ int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
-	    (strlen(device->dev_name) == 0) &&
-	    (device->scsi_dev_data) &&
-	    (device->scsi_dev_data->type == IPR_TYPE_AF_DISK))
+	    (device->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD))
 		return 1;
 	else
 		return 0;
 }
 
 static inline int ipr_is_volume_set(struct ipr_dev *device)
-{
+{       
 	if ((device->qac_entry != NULL) &&
-	    (strlen(device->dev_name) != 0) &&
-	    (device->scsi_dev_data) &&
-	    (device->scsi_dev_data->type == TYPE_DISK))
+	    (device->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD))
 		return 1;
 	else
 		return 0;

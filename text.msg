@@ -2,7 +2,9 @@ $quote "
 
 $set 0  Generic
 1 "Select one of the following"
-2 "Selction"
+2 "Selection"
+3 "Complete"
+4 "to return to menu, current operations will continue"
 
 $set 101  main_menu
 1 "Work with Disk Units"
@@ -93,12 +95,12 @@ $set 204 raid_stop_fail
  due to one or more of the following reasons:"
 3 "There are no device parity protected units in the system."
 4 "An IOA is in a condition that makes the disk units attached to\
- it read/write protected.  Examine the kernel messages log\
+ it read/write protected. Examine the kernel messages log\
  for any errors that are logged for the IO subsystem\
  and follow the appropriate procedure for the reference code to\
  correct the problem, if necessary."
 5 "Not all disk units attached to an advanced function IOA have\
- reported to the system.  Retry the operation."
+ reported to the system. Retry the operation."
 6 "The disk units are missing."
 7 "The disk unit/s are currently in use."
 
@@ -115,12 +117,12 @@ $set 207 raid_start_fail
  to one or more of the following reasons:"
 3 "There are not enough device parity capable units in the system."
 4 "An IOA is in a condition that makes the disk units attached to\
- it read/write protected.  Examine the kernel messages log\
+ it read/write protected. Examine the kernel messages log\
  for any errors that are logged for the IO subsystem\
  and follow the appropriate procedure for the reference code to\
  correct the problem, if necessary."
 5 "Not all disk units attached to an advanced function IOA have\
- reported to the system.  Retry the operation."
+ reported to the system. Retry the operation."
 6 "The disk units are missing."
 7 "The disk unit/s are currently in use."
 
@@ -136,495 +138,212 @@ $set 210 confirm_raid_start
 3 "Press Enter to continue."
 4 "Cancel to return and change your choice."
 
-
-
-
-
-
-
-
-
 $set 211 raid_start_complete
 1 "Start Device Parity Protection Status"
 2 "You selected to start device parity protection"
-3 "%3d%% Complete"
 
 $set 215 raid_include
 1 "Add a Device to a Disk Array"
-2 "Select the subsystem that the disk unit will be included.\
-\n\
-\nType choice, press Enter.\
-\n  1=Select Parity Array to Include Disk Unit\
-\n\
-\n         Parity  Serial                Resource\
-\nOption     Set   Number   Type  Model  Name\
-\n#1"
-3 "%e%q%f"
-
-$ Other
-101 "Add a Device to a Disk Array"
-102 "Select the subsystem that the disk unit will be included.\
-\n\
-\nType choice, press Enter.\
-\n  1=Select Parity Array to Include Disk Unit\
-\n\
-\n         Parity  Vendor    Product           Serial          Resource\
-\nOption     Set    ID         ID              Number   Model  Name\
-\n#1"
-103 "%e%q%f"
+2 "Select the subsystem that the disk unit will be included."
+3 "Type choice, press Enter."
+4 "Select Parity Array to Include Disk Unit"
 
 $set 216 raid_include_fail
 1 "Include Device Parity Protection Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are no device parity protected units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no device parity protected units in the system."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected. Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system. Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 217 configure_raid_include
 1 "Include Disk Units in Device Parity Protection"
-2 "Select the units to be included in Device Parity Protection\
-\n\
-\nType choice, press Enter.\
-\n  1=Add a Device to a Disk Array\
-\n\
-\n           Serial                Resource\
-\nOption     Number   Type  Model  Name\
-\n#1"
-3 "%e%q%f"
+2 "Select the units to be included in Device Parity Protection"
+3 "Type choice, press Enter."
+4 "Add a Device to a Disk Array"
 
 $set 218 configure_raid_include_fail
-
 1 "Include Disk Unit Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are not enough disk units available to be included.\
-\no  The disk unit that needs to be included is not at the right\
-\n   location.  Examine the 'message log' for the exposed unit\
-\n   and make sure that the replacement unit is at the correct\
-\n   location\
-\no  Not all disk units attached to an IOA have reported to the\
-\n   system.  Retry the operation.\
-#1"
-3 "%n%e%q"
-
-4 "\no  The disk unit to be included must be the same or greater\
-\n   capacity than the smallest device in the volume set and\
-\n   be formatted correctly\
-\no  The type/model of the disk units is not supported for the\
-\n   requested operation"
-
-5 "\no  All the disk units in a parity set must be the same capacity\
-\n   with a minumum number of 4 disk units and a maximum of 10 units\
-\n   in the resulting parity set\
-\no  The type/model of the disk units is not supported for the\
-\n   requested operation"
+ due to one or more of the following reasons:"
+3 "There are not enough disk units available to be included."
+4 "The disk unit that needs to be included is not at the right\
+ location. Examine the 'message log' for the exposed unit\
+ and make sure that the replacement unit is at the correct\
+ location"
+5 "Not all disk units attached to an IOA have reported to the\
+ system. Retry the operation."
+6 "The disk unit to be included must be the same or greater\
+ capacity than the smallest device in the volume set and\
+ be formatted correctly"
+7 "The type/model of the disk units is not supported for the\
+ requested operation"
 
 $set 219 confirm_raid_include
 1 "Confirm Disk Units to be Included"
 2 "ATTENTION: All listed device units will be formatted and zeroed before\
-\nlisted device is added to array.\
-\n\
-\nPress Enter to confirm your choice to have the system include\
-\n  the selected units in device parity protection\
-\nPress q=Cancel to return and change your choice.\
-\n\
-\n         Parity  Serial                Resource\
-\nOption     Set   Number   Type  Model  Name\
-\n#1"
-3 "%e%q%f"
-
-$set 220 confirm_raid_include_device
-1 "Confirm Initialize and Format Disk Unit"
-2 "Press 'c' to confirm your choice for 1=Initialize and format.\
-\nPress q to return to change your choice.\
-\n\
-\n               Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI\
-\nOption  Type   Number     ID    Position   Bus    Dev    Bus    ID   Lun\
-\n#1"
-3 "c=Confirm   %q%f"
+ listed device is added to array."
+3 "Press Enter to confirm your choice to have the system include\
+ the selected units in device parity protection"
+4 "Cancel to return and change your choice."
 
 $set 221 dev_include_complete
 1 "Include Disk Units in Device Parity Protection Status"
 2 "The operation to include units in the device parity protection\
-\nwill be done in several phases.  The phases are listed here\
-\nand the status will be indicated when known.\
-\n\
-\nPhase                                      Status\
-\n\
-\nPrepare to include units . . . . . . . . : %3d %%\
-\nInclude units  . . . . . . . . . . . . . : %3d %%"
-3 ""
+ will be done in two phases.  The device must first be formatted\
+ before device may be included into array set."
+3 "You selected to include a device in a device parity set"
 
 $set 230 af_include_fail
 1 "Format Device for Advanced Function Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are no eligible device units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no eligible device units in the system."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected. Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system. Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 231 af_remove_fail
 1 "Disable Device for Advanced Functions Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are no eligible device units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no eligible device units in the system."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected. Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system. Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 232 add_hot_spare_fail
 1 "Enable Device as Hot Spare Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are no eligible device units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no eligible device units in the system."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected. Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system. Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 233 remove_hot_spare_fail
 1 "Disable Device as Hot Spare Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are no eligible device units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no eligible device units in the system."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected. Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system.  Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 236
 1 "Configure a hot spare device"
-2 "Select the subsystems which disk units will be configured as hot spares\
-\n\
-\nType choice, press Enter.\
-\n  1=Select subsystem\
-\n\
-\n         Vendor    Product            Serial     PCI    PCI\
-\nOption    ID         ID               Number     Bus    Dev\
-\n#1"
-3 "%e%q%f"
-4 "Unconfigure a hot spare device"
-5 "Select the subsystems which disk units will be unconfigured as hot spares\
-\n\
-\nType choice, press Enter.\
-\n  1=Select subsystem\
-\n\
-\n         Vendor    Product            Serial     PCI    PCI\
-\nOption    ID         ID               Number     Bus    Dev\
-\n#1"
-6 "%e%q%f"
+2 "Select the subsystems which disk units will be configured as hot spares"
+3 "Type choice, press Enter."
+4 "Select subsystem"
+5 "Unconfigure a hot spare device"
+6 "Select the subsystems which disk units will be unconfigured as hot spares"
+7 "Type choice, press Enter."
+8 "Select subsystem"
 
 $set 240 select_hot_spare
 1 "Select Disk Units to Enable as Hot Spare"
-2 "Type option, press Enter.\
-\n 1=Select\
-\n\
-\n              Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI\
-\nOPT    Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun\
-\n#1"
-3 "%e%q%f"
+2 "Type option, press Enter."
+3 "Select"
 4 "Select Disk Units to Disable as Hot Spare"
-5 "Type option, press Enter.\
-\n 1=Select\
-\n\
-\n              Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI\
-\nOPT    Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun\
-\n#1"
-6 "%e%q%f"
+5 "Type option, press Enter."
+6 "Select"
 
 $set 245 confirm_hot_spare
 1 "Confirm Enable Hot Spare"
-2 "ATTENTION: Existing data on these disk units will not be preserved.\
-\n\
-\nPress Enter to continue.\
-\nPress q=Cancel to return and change your choice.\
-\n\
-\n               Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI\
-\nOption  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun\
-\n#1"
-3 "%q%f"
-4 "Confirm Disable Hot Spare"
-5 "ATTENTION: Existing data on these disk units will not be preserved.\
-\n\
-\n\
-\nPress Enter to continue.\
-\nPress q=Cancel to return and change your choice.\
-\n\
-\n               Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI\
-\nOption  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun\
-\n#1"
-6 "%q%f"
+2 "ATTENTION: Existing data on these disk units will not be preserved."
+3 "Press Enter to continue."
+4 "Cancel to return and change your choice."
+5 "Confirm Disable Hot Spare"
+6 "ATTENTION: Existing data on these disk units will not be preserved."
+7 "Press Enter to continue."
+8 "Cancel to return and change your choice."
 
-$ 3's
-$ ------------------------
-
-$set 280 disk_unit_recovery
+$set 300 disk_unit_recovery
 1 "Work with Disk Unit Recovery"
-2 "Select one of the following:\
-\n\
-\n     1. Concurrent Add Device\
-\n     2. Concurrent Remove/Replace Device\
-\n     3. Initialize and format disk unit\
-\n     4. Reclaim IOA cache storage\
-\n     5. Rebuild disk unit data\
-\n     6. Work with resources containing cache battery packs\
-\n\
-\n\
-\nSelection:  %1"
-3 "%e%q"
+2 "Concurrent Add Device"
+3 "Concurrent Remove/Replace Device"
+4 "Initialize and format disk unit"
+5 "Reclaim IOA cache storage"
+6 "Rebuild disk unit data"
+7 "Work with resources containing cache battery packs"
 
-$set 290 concurrent_add_device
-1 "Concurrent Add Device"
-2 "Type option, press Enter.\
-\n 1=add device\
-\n\
-\n     Vendor   Product            Resource             PCI/SCSI          Hardware\
-\nOPT   ID        ID               Name                   Loc             Status\
-\n#1"
-3 "%e%q%r%f"
+$set 301 concurrent_add_device
+1 "Concurrent Device Add"
+2 "Choose a single location for add operations"
+3 "Select"
 
-$set 291 device_concurrent_remove
-1 "Concurrent Remove/Replace Device"
-2 "Type option, press Enter.\
-\n 1=remove/replace device\
-\n\
-\n     Vendor   Product            Resource             PCI/SCSI          Hardware\
-\nOPT   ID        ID               Name                   Loc             Status\
-\n#1"
-3 "%e%q%r%f"
+$set 320 concurrent_remove_device
+1 "Concurrent Device Remove"
+2 "Choose a single location for remove operations"
+3 "Select"
+4 "Concurrent Device Add"
+5 "Choose a single location for add operations"
+6 "Select"
 
-
-$set 301 device_concurrent_maintenance
-
-1 "Device Concurrent Maintenance"
-2 "Type the choices, then press Enter.\
-3 "%n"
-
-$set 302 confirm_device_concurrent_maintenance_remove
-1 "Device Concurrent Maintenance Action"
-2 "Removal of device\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5\
-\n\
-\nYou have #6 minute(s) to perform the operation\
-\n\
-\nDuring this time, your system may seem unresponsive"
-3 "c=Confirm   %q"
-
-$set 303 confirm_device_concurrent_maintenance_insert
-1 "Device Concurrent Maintenance Action"
-2 "Installation of device\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5\
-\n\
-\nYou have #6 minute(s) to perform the operation\
-\n\
-\nDuring this time, your system may seem unresponsive"
-3 "c=Confirm   %q"
-
-
-$set 304 concurrent_maintenance_warning_remove
-1 "Device Concurrent Maintenance Action Warning"
-2 "The device currently located in\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5\
-\n\
-\nis not parity protected by the IOA. Removal of the device may\
-\ncause the system to HANG if it contains storage which is vital\
-\nor system operation. Proceed with extreme caution.\
-\n\
-\nPress r=Proceed with Concurrent remove\
-\nPress q=Cancel operation"
-3 "%qr=Confirm remove"
-
-$set 305 concurrent_maintenance_warning_insert
-$ generic
-1 "Device Concurrent Maintenance Action Warning"
-2 "The device previously located in:\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5\
-\n\
-\nwas not parity protected by the IOA. Installation of a new device\
-\nin this slot will allow the adapter to discard any existing cache\
-\ndata for the previously installed device.\
-\n\
-\n\
-\n\
-\n\
-\nPress i=Proceed with Concurrent install\
-\nPress q=Cancel operation"
-3 "%qi=Confirm install"
-
-$set 306 do_dasd_conc_maintenance_remove
-$ generic
-1 "Device Concurrent Maintenance Action In Progress"
-2 "\nPlease remove the device located in:\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5"
-3 ""
-
-$set 307 do_dasd_conc_maintenance_insert
-$ generic
-1 "Device Concurrent Maintenance Action In Progress"
-2 "\nPlease insert the device located in:\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5"
-3 ""
-
-
-$set 308 conc_maintenance_complt_remove
-$ generic
-1 "Concurrent Maintenance Results"
-2 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS COMPLETED SUCCESSFULLY.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = REMOVE\
-\n\
-\n\
-\n\
-\n\
-\n   Press 'c' to continue."
-3 ""
-
-$set 309 conc_maintenance_complt_insert
-
-$ generic
-1 "Concurrent Maintenance Results"
-2 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS COMPLETED SUCCESSFULLY.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = INSERT\
-\n\
-\n\
-\n\
-\n\
-\n   Press 'c' to continue."
-3 ""
-
-$ insert and format
-4 "Concurrent Maintenance Results"
-5 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS COMPLETED SUCCESSFULLY.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = INSERT\
-\n\
-\n   In order to make this device useable, it must be formatted.\
-\n   Press 'f' to proceed to the format screen.\
-\n   Or press 'c' to cancel."
-6 ""
-
-$set 310 conc_maintenance_failed_remove
-1 "Concurrent Maintenance Results"
-2 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS FAILED.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = REMOVE\
-\n\
-\n\
-\n   Press Enter to continue."
-3 ""
-
-$ remove with message 1
-4 "Concurrent Maintenance Results"
-5 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS FAILED.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = REMOVE\
-\n\
-\n Device concurrent maintenance failed, device in use\
-\n   Press Enter to continue."
-6 ""
-
-$ remove with message 2
-7 "Concurrent Maintenance Results"
-8 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS FAILED.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = REMOVE\
-\n\
-\n Device concurrent maintenance failed, device cannot be removed currently\
-\n   Press Enter to continue."
-9 ""
-
-
-$set 311 conc_maintenance_failed_insert
-1 "Concurrent Maintenance Results"
-2 "\nTHE CONCURRENT MAINTENANCE PROCEDURE HAS FAILED.\
-\n\
-\n   PCI Bus: #1  PCI Device: #2\
-\n   SCSI Channel: #3  SCSI Id: #4  SCSI Lun: #5   ACTION = INSERT\
-\n\
-\n\
-\n   Press Enter to continue."
-3 ""
+$set 321 process_conc_maint
+1 "Verify Device Concurrent Remove"
+2 "Verify the selected device for concurrent remove operations"
+3 "Press Enter when verification complete and ready to continue"
+4 "Cancel to return and change your choice."
+5 "Verify Device Concurrent Add"
+6 "Verify the seleted device for concurrent add operations"
+7 "Press Enter when verification complete and ready to continue"
+8 "Cancel to return and change your choice."
+9 "Complete Device Concurrent Remove"
+10 "Remove selected device"
+11 "Press Enter when selected device has been removed"
+12 "Cancel to return and change your choice."
+13 "Complete Device Concurrent Add"
+14 "Add device to selected location"
+15 "Press Enter when device has been installed"
+16 "Cancel to return and change your choice."
 
 $set 312 configure_af_device | init_device
-1 "Select Disk Units for Initialize and Format"
-2 "Type option, press Enter.\
-\n  1=Select\
-\n\
-\n       Vendor   Product           Serial    PCI    PCI   SCSI  SCSI  SCSI\
-\nOPT     ID        ID              Number    Bus    Dev    Bus   ID   Lun\
-\n#1"
-3 "%e%q%f"
+1 "Select Disk Units to format for Advanced Function"
+2 "Select Disk Units to format for JBOD Function"
+3 "Select Disk Units for Initialize and Format"
+4 "Type option, press Enter."
+5 "Select"
 
 $set 313
 1 "Confirm Initialize and Format Disk Unit"
-2 "Press 'c' to confirm your choice for 1=Initialize and format.\
-\nPress q to return to change your choice.\
-\n\
-\n        Vendor   Product           Serial    PCI    PCI   SCSI  SCSI  SCSI\
-\nOption   ID        ID              Number    Bus    Dev    Bus   ID   Lun\
-\n#1"
-3 "c=Confirm   %q%f"
+2 "Press 'c' to confirm your choice for 1=Initialize and format."
+3 "Return to change your choice."
 
 $set 314 dev_init_complete
 1 "Initialize and Format Status"
 2 "You selected to initialize and format a disk unit"
-3 "%3d%% Complete"
-
 4 "Please wait for the next screen."
 
 $set 315 reclaim_cache
@@ -642,7 +361,6 @@ $set 315 reclaim_cache
 \nOption    Type   Model   Number     Name"
 3 "%e%q"
 
-
 $set 316 confirm_reclaim
 1 "Confirm Reclaim IOA Cache Storage"
 2 "The disk units that may be affected by the function are displayed.\
@@ -657,7 +375,6 @@ $set 316 confirm_reclaim
 \n          Serial                 Resource\
 \nOption    Number   Type   Model  Name"
 3 "%e%q%f"
-
 
 $set 317 confirm_reclaim_warning
 1 ""
@@ -688,7 +405,7 @@ $set 319 reclaim_result
 \nlost sectors could not be determined."
 6 "%n%e%q"
 
-$set 321 raid_rebuild
+$set 331 raid_rebuild
 1 "Rebuild Disk Unit Data"
 2 "Select the units to be rebuilt\
 \n\
@@ -741,7 +458,7 @@ $set 330 battery_maint
 \n#1"
 3 "%e%q"
 
-$set 331 confirm_force_battery_error
+$set 341 confirm_force_battery_error
 1 "Force Battery Packs Into Error State"
 2 "ATTENTION: This service function should be run only under the direction\
 \nof the IBM Hardware Service Support\
@@ -783,6 +500,8 @@ $set 332 show_battery_info
 8 "No battery warning"
 9 "Battery warning issued"
 10 "Battery error issued"
+
+
 
 
 $ 4's
