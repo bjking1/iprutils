@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.44 2004/03/17 21:56:49 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.45 2004/03/19 23:13:12 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -543,8 +543,7 @@ void ipr_rescan(struct ipr_ioa *ioa, int bus, int id, int lun)
 
 	sprintf(buf, "%d %d %d", bus, id, lun);
 
-	class_device = sysfs_open_class_device("scsi_host",
-					       ioa->host_name);
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 	attr = sysfs_get_classdev_attr(class_device, "scan");
 	sysfs_write_attribute(attr, buf, strlen(buf));
 	sysfs_close_class_device(class_device);
@@ -1225,7 +1224,7 @@ int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_EVALUATE_DEVICE_TIMEOUT);
 
-	if (rc != 0)
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
 		scsi_cmd_err(dev, &sense_data, "Evaluate Device Capabilities", rc);
 
 	close(fd);
@@ -1753,6 +1752,7 @@ void check_current_config(bool allow_rebuild_refresh)
 	struct ipr_common_record *common_record;
 	struct ipr_dev_record *device_record;
 	struct ipr_array_record *array_record;
+	struct sense_data_t sense_data;
 	int *qac_entry_ref;
 
 	if (ipr_qac_data == NULL) {
@@ -1830,6 +1830,10 @@ void check_current_config(bool allow_rebuild_refresh)
 					common_record = (struct ipr_common_record *)
 						((unsigned long)common_record + ntohs(common_record->record_len));
 				}
+
+				/* Send Test Unit Ready to start device if its a volume set */
+				if (ipr_is_volume_set(&ioa->dev[device_count]))
+					ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
 				device_count++;
 			} else if (scsi_dev_data->type == IPR_TYPE_ADAPTER) {
@@ -3387,10 +3391,10 @@ struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 			if (scsi_dev_data == NULL)
 				continue;
 
-			if ((scsi_dev_data->host = res_addr->host) &&
-			    (scsi_dev_data->channel = res_addr->bus) &&
-			    (scsi_dev_data->id = res_addr->target) &&
-			    (scsi_dev_data->lun = res_addr->lun))
+			if ((scsi_dev_data->host == res_addr->host) &&
+			    (scsi_dev_data->channel == res_addr->bus) &&
+			    (scsi_dev_data->id == res_addr->target) &&
+			    (scsi_dev_data->lun == res_addr->lun))
 				return &cur_ioa->dev[j];
 		}
 	}

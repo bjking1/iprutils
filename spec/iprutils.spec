@@ -5,6 +5,7 @@ Release: 2
 License: CPL
 Group: Hardware/SCSI
 Vendor: IBM
+URL: http://www-124.ibm.com/storageio/
 Source0: iprutils-%version-src.tgz
 
 %description
@@ -55,3 +56,7 @@ rm -rf $RPM_BUILD_ROOT
 /etc/init.d/iprdump
 /etc/init.d/iprinit
 /etc/init.d/iprupdate
+
+%changelog
+* Tue Mar 17 2004 Brian King <brking@us.ibm.com> 2.0.2-3
+- Fixed 

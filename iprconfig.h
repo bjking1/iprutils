@@ -689,7 +689,7 @@ s_node n_wait_conc_add = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
-	.title    = __("Verify Device Concurrent Add"),
+	.title    = __("Complete Device Concurrent Add"),
 	.header   =  {
 		__("Add selected device\n\n"),
 		__("Press Enter when selected device has been installed\n"),
@@ -804,7 +804,7 @@ s_node n_confirm_reclaim_warning = {
 	.f_flags  = (CONFIRM_REC_FLAG | CANCEL_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(confirm_reclaim_warning_opt),
 	.options  = &confirm_reclaim_warning_opt[0],
-	.title    = " ",
+	.title    = __("Confirm Reclaim IOA Cache Storage"),
 	.header   = {
 		__("ATTENTION!!!   ATTENTION!!!   ATTENTION!!!   ATTENTION!!!\n"),
 		__("ATTENTION: Proceed with this function only if directed to from a "

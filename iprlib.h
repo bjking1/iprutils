@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.36 2004/03/17 23:56:10 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.37 2004/03/19 23:13:12 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -384,7 +384,7 @@ struct ipr_query_res_state {
 	u8 reserved1:1;
 	u8 not_oper:1;
 	u8 not_ready:1;
-	u8 not_func:1;
+	u8 not_func:1; /* xxx check this bit? */
 	u8 reserved2:4;
 
 	u8 read_write_prot:1;
@@ -1260,6 +1260,16 @@ static inline int ipr_is_array_member(struct ipr_dev *device)
 static inline int ipr_is_af(struct ipr_dev *device)
 {
 	if (device->qac_entry != NULL)
+		return 1;
+	else
+		return 0;
+}
+
+static inline int ipr_is_gscsi(struct ipr_dev *dev)
+{
+	if (!dev->qac_entry &&
+	    dev->scsi_dev_data &&
+	    dev->scsi_dev_data->type == TYPE_DISK)
 		return 1;
 	else
 		return 0;

@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.9 2004/02/27 20:50:33 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.10 2004/03/19 23:13:12 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
 				continue;
 			} else if (num_args == 2) {
 				length = 4;
-			} else if ((length % 4) != 0) {
+			} else if ((arg[0] % 4) != 0) {
 				iprprint("Length must be 4 byte multiple\n");
 				continue;
 			} else
