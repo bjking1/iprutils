@@ -815,7 +815,7 @@ $set 332 show_battery_info
 1 "Battery Information"
 2 "Resource Name . . . . . . . . . . . : #1\
 \nSerial Number . . . . . . . . . . . : #2\
-\nType-model  . . . . . . . . . . . . : #3\
+\nType  . . . . . . . . . . . . . . . : #3\
 \nPCI Address . . . . . . . . . . . . : #4\
 \nSCSI Host Number  . . . . . . . . . : #6\
 \nBattery type  . . . . . . . . . . . : #7\

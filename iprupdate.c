@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.4 2004/01/29 17:36:30 manderso Exp $
  */
 
 #include <unistd.h>
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
         sprintf(ucode_file, "/etc/microcode/ibmsis%X.img", p_cur_ioa->ccin);
 
         /* Do a page 0 inquiry to the adapter to get the supported page codes */
-        rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle,
+        rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_scsi_dev_data->resource_handle,
                          0x00, &page0_inq, sizeof(struct ipr_inquiry_page0));
 
         if (rc != 0)
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
             if (page0_inq.supported_page_codes[i] < 0xc0)
                 continue;
 
-            rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle,
+            rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_scsi_dev_data->resource_handle,
                              page0_inq.supported_page_codes[i], &page_cx_inq,
                              sizeof(struct ipr_inquiry_page_cx));
 
@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
         }
 
         /* Issue a page 3 inquiry to get the versioning information */
-        rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle,
+        rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_scsi_dev_data->resource_handle,
                          0x03, &page3_inq, sizeof(struct ipr_inquiry_page3));
 
         if (rc != 0)
@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
                 for (j = 0; j < p_cur_ioa->num_devices; j++)
                 {
                     /* If not a DASD, ignore */
-                    if (!IPR_IS_DASD_DEVICE(p_cur_ioa->dev[j].p_resource_entry->std_inq_data))
+                    if (!IPR_IS_DASD_DEVICE(p_cur_ioa->dev[j].p_scsi_dev_data->std_inq_data))
                         continue;
 
                     /* See if we can open device */
@@ -323,7 +323,7 @@ int main(int argc, char *argv[])
 
                     if ((dev_fd <= 1) && ((errno == ENOENT) || (errno == ENXIO)))
                     {
-                        scan_device(p_cur_ioa->dev[j].p_resource_entry->resource_address,
+                        scan_device(p_cur_ioa->dev[j].p_scsi_dev_data->resource_address,
                                     p_cur_ioa->host_num);
                     }
                     else
@@ -339,12 +339,12 @@ int main(int argc, char *argv[])
             p_device = &p_cur_ioa->dev[i];
 
             /* If not a DASD, ignore */
-            if (!IPR_IS_DASD_DEVICE(p_cur_ioa->dev[i].p_resource_entry->std_inq_data) ||
-                ((p_device->p_resource_entry->subtype != IPR_SUBTYPE_AF_DASD) &&
-                 (p_device->p_resource_entry->subtype != IPR_SUBTYPE_GENERIC_SCSI)))
+            if (!IPR_IS_DASD_DEVICE(p_cur_ioa->dev[i].p_scsi_dev_data->std_inq_data) ||
+                ((p_device->p_scsi_dev_data->subtype != IPR_SUBTYPE_AF_DASD) &&
+                 (p_device->p_scsi_dev_data->subtype != IPR_SUBTYPE_GENERIC_SCSI)))
                 continue;
 
-            if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI)
+            if (p_device->p_scsi_dev_data->subtype == IPR_SUBTYPE_GENERIC_SCSI)
                 p_dev_name = p_device->gen_name;
             else
                 p_dev_name = p_cur_ioa->ioa.dev_name;
@@ -354,14 +354,14 @@ int main(int argc, char *argv[])
 
             if (dev_fd > 1)
             {
-                if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
+                if (p_device->p_scsi_dev_data->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
                 {
                     rc = ipr_inquiry(dev_fd, 0,
                                      0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
                 }
                 else
                 {
-                    rc = ipr_inquiry(dev_fd, p_device->p_resource_entry->resource_handle,
+                    rc = ipr_inquiry(dev_fd, p_device->p_scsi_dev_data->resource_handle,
                                      0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
                 }
 
@@ -369,9 +369,9 @@ int main(int argc, char *argv[])
                 {
                     syslog(LOG_ERR, "Inquiry to %02X%02X%02X%02X failed. %m"IPR_EOL,
                            p_cur_ioa->host_no,
-                           p_device->p_resource_entry->resource_address.bus,
-                           p_device->p_resource_entry->resource_address.target,
-                           p_device->p_resource_entry->resource_address.lun);
+                           p_device->p_scsi_dev_data->resource_address.bus,
+                           p_device->p_scsi_dev_data->resource_address.target,
+                           p_device->p_scsi_dev_data->resource_address.lun);
                     close(dev_fd);
                     continue;
                 }
@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
                 device_update_blocked = 0;
 
                 /* check if vendor id is IBMAS400 */
-                if (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0)
+                if (memcmp(p_device->p_scsi_dev_data->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0)
                 {
                     sprintf(ucode_file, "/etc/microcode/device/ibmsis%02X%02X%02X%02X.img",
                             dasd_page3_inq.load_id[0], dasd_page3_inq.load_id[1],
@@ -387,7 +387,7 @@ int main(int argc, char *argv[])
                             dasd_page3_inq.load_id[3]);
                     image_offset = 0;
                 }
-                else if (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBM     ", 8) == 0)
+                else if (memcmp(p_device->p_scsi_dev_data->std_inq_data.vpids.vendor_id, "IBM     ", 8) == 0)
                 {
                     if (p_device->opens)
                     {
@@ -395,7 +395,7 @@ int main(int argc, char *argv[])
                     }
 
                     sprintf(ucode_file, "/etc/microcode/device/%.7s.%02X%02X%02X%02X",
-                            p_device->p_resource_entry->std_inq_data.vpids.product_id,
+                            p_device->p_scsi_dev_data->std_inq_data.vpids.product_id,
                             dasd_page3_inq.load_id[0], dasd_page3_inq.load_id[1],
                             dasd_page3_inq.load_id[2],
                             dasd_page3_inq.load_id[3]);
@@ -444,7 +444,7 @@ int main(int argc, char *argv[])
                 }
 
                 if ((memcmp(p_dasd_image_hdr->load_id, dasd_page3_inq.load_id, 4)) &&
-                    (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
+                    (memcmp(p_device->p_scsi_dev_data->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
                 {
                     syslog(LOG_ERR, "Firmware file corrupt: %s. %m"IPR_EOL, ucode_file);
                     close(dev_fd);
@@ -462,20 +462,20 @@ int main(int argc, char *argv[])
                     {
                         if (is_af_blocked(&p_cur_ioa->dev[j], 1))
                         {
-                            u320_disabled |= (1 << p_device->p_resource_entry->resource_address.bus) |
+                            u320_disabled |= (1 << p_device->p_scsi_dev_data->resource_address.bus) |
                                 IPR_SAVE_LIMITED_CONFIG;
                         }
 
                         syslog(LOG_ERR,"Device update to %02X%02X%02X%02X blocked, device in use."IPR_EOL,
                                p_cur_ioa->host_no,
-                               p_device->p_resource_entry->resource_address.bus,
-                               p_device->p_resource_entry->resource_address.target,
-                               p_device->p_resource_entry->resource_address.lun);
+                               p_device->p_scsi_dev_data->resource_address.bus,
+                               p_device->p_scsi_dev_data->resource_address.target,
+                               p_device->p_scsi_dev_data->resource_address.lun);
                         continue;
                     }
 
-                    if ((p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) &&
-                        (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
+                    if ((p_device->p_scsi_dev_data->subtype == IPR_SUBTYPE_GENERIC_SCSI) &&
+                        (memcmp(p_device->p_scsi_dev_data->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
                     {
                         /* updating AS400 drives which are 512 formatted is not a supported operation */
                         continue;
@@ -492,9 +492,9 @@ int main(int argc, char *argv[])
                     {
                         syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s from version %c%c%c%c to %c%c%c%c"IPR_EOL,
                                p_cur_ioa->host_no,
-                               p_device->p_resource_entry->resource_address.bus,
-                               p_device->p_resource_entry->resource_address.target,
-                               p_device->p_resource_entry->resource_address.lun,
+                               p_device->p_scsi_dev_data->resource_address.bus,
+                               p_device->p_scsi_dev_data->resource_address.target,
+                               p_device->p_scsi_dev_data->resource_address.lun,
                                ucode_file,
                                dasd_page3_inq.release_level[0],
                                dasd_page3_inq.release_level[1],
@@ -509,9 +509,9 @@ int main(int argc, char *argv[])
                     {
                         syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s"IPR_EOL,
                                p_cur_ioa->host_no,
-                               p_device->p_resource_entry->resource_address.bus,
-                               p_device->p_resource_entry->resource_address.target,
-                               p_device->p_resource_entry->resource_address.lun,
+                               p_device->p_scsi_dev_data->resource_address.bus,
+                               p_device->p_scsi_dev_data->resource_address.target,
+                               p_device->p_scsi_dev_data->resource_address.lun,
                                ucode_file);
                     }
 
@@ -519,7 +519,7 @@ int main(int argc, char *argv[])
                     image_size = ucode_stats.st_size - image_offset;
 
                     /* Do the update if the firmware file is newer than the firmware loaded on the DASD */
-                    if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
+                    if (p_device->p_scsi_dev_data->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
                     {
                         memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -536,16 +536,16 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        ipr_dev_write_buffer(dev_fd, p_device->p_resource_entry->resource_handle,
+                        ipr_dev_write_buffer(dev_fd, p_device->p_scsi_dev_data->resource_handle,
                                              p_dasd_image, image_size);
                     }
 
                     if (rc != 0)
                         syslog(LOG_ERR, "Write buffer to %02X%02X%02X%02X failed. %m"IPR_EOL,
                                p_cur_ioa->host_no,
-                               p_device->p_resource_entry->resource_address.bus,
-                               p_device->p_resource_entry->resource_address.target,
-                               p_device->p_resource_entry->resource_address.lun);
+                               p_device->p_scsi_dev_data->resource_address.bus,
+                               p_device->p_scsi_dev_data->resource_address.target,
+                               p_device->p_scsi_dev_data->resource_address.lun);
                 }
 
                 close(dev_fd);
@@ -583,7 +583,7 @@ int open_dev(struct ipr_ioa *p_ioa, struct ipr_device *p_device)
 {
     int dev_fd;
 
-    if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI)
+    if (p_device->p_scsi_dev_data->subtype == IPR_SUBTYPE_GENERIC_SCSI)
     {
         dev_fd = open(p_device->gen_name, O_RDWR);
 
@@ -591,7 +591,7 @@ int open_dev(struct ipr_ioa *p_ioa, struct ipr_device *p_device)
         {
             syslog(LOG_ERR, "Cannot open device %s. %m"IPR_EOL, p_device->gen_name);
             syslog(LOG_ERR, "Rescanning SCSI bus for device"IPR_EOL);
-            scan_device(p_device->p_resource_entry->resource_address, p_ioa->host_num);
+            scan_device(p_device->p_scsi_dev_data->resource_address, p_ioa->host_num);
 
             dev_fd = open(p_device->gen_name, O_RDWR);
         }

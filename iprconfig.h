@@ -7,6 +7,7 @@
 #define NUM_OPTS(x) (sizeof(x)/sizeof(struct screen_opts))
 
 #define REFRESH_SCREEN -13
+#define TOGGLE_SCREEN -14
 
 #define STATUS_SET 888
 #define EMPTY_STATUS 1
@@ -49,7 +50,6 @@ int disk_status(i_container * i_con);
 int disk_unit_details(i_container * i_con);
 int device_details(i_container * i_con);
 int raid_screen(i_container * i_con);
-int raid_status(i_container * i_con);
 int raid_stop(i_container * i_con);
 int confirm_raid_stop(i_container * i_con);
 int do_confirm_raid_stop(i_container * i_con);
@@ -177,7 +177,7 @@ s_node n_disk_status = {
     &disk_status_opt[0],
     NULL,
     NULL,
-    "%e%q%r%f"
+    "%e%q%r%t%f"
 };
 
 s_node n_device_details = {
@@ -191,7 +191,7 @@ s_node n_device_details = {
 };
 
 struct screen_opts raid_screen_opt[] = {
-	{raid_status,      2, "1"},
+	{disk_status,      2, "1"},
 	{raid_start,       3, "2"},
 	{raid_stop,        4, "3"},
 	{raid_include,     5, "4"},
@@ -209,16 +209,6 @@ s_node n_raid_screen = {
     NULL,
     NULL,
     "%e%q"
-};
-
-s_node n_raid_status = {
-    201,
-    (CANCEL_FLAG),
-    0,
-    NULL,
-    NULL,
-    NULL,
-    "%e%q%r%f"
 };
 
 struct screen_opts raid_stop_opt[] = {
