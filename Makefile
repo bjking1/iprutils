@@ -9,22 +9,22 @@ UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
 all: iprconfig iprupdate iprdump iprtrace iprdbg docs text
 
 iprconfig: iprconfig.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu -lsysfs
 
 iprupdate: iprupdate.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprupdate iprlib.o iprupdate.c
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprupdate iprlib.o iprupdate.c -lsysfs
 
 iprdump:iprdump.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdump iprlib.o iprdump.c
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdump iprlib.o iprdump.c -lsysfs
 
 iprtrace:iprtrace.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprtrace iprlib.o iprtrace.c
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprtrace iprlib.o iprtrace.c -lsysfs
 
 iprdbg:iprdbg.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs
 
 iprlib.o: iprlib.c
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c -lsysfs
 
 text:  text.msg
 	gencat text.cat text.msg
