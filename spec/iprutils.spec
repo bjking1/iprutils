@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.13.1
+Version: 2.0.13.2
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Nov 12 2004 Brian King <brking@us.ibm.com> 2.0.13.2
+- Fix iprconfig microcode download to ipr adapters.
 * Fri Oct 22 2004 Brian King <brking@us.ibm.com> 2.0.13.1
 - Fix iprinit to wait for scsi generic devices to show up in case we are
   racing with hotplug. Fixes the following error:

@@ -10,14 +10,12 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57.2.2 2004/10/25 22:31:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57.2.3 2004/11/12 19:05:46 bjking1 Exp $
  */
 
 #ifndef iprlib_h
 #include "iprlib.h"
 #endif
-
-#define IPR_HOTPLUG_FW_PATH "/usr/lib/hotplug/firmware/"
 
 static void default_exit_func()
 {
@@ -33,6 +31,7 @@ char *tool_name = NULL;
 void (*exit_func) (void) = default_exit_func;
 int ipr_debug = 0;
 int ipr_force = 0;
+char *hotplug_dir = NULL;
 int ipr_sg_required = 0;
 
 /* This table includes both unsupported 522 disks and disks that support 
@@ -2844,6 +2843,51 @@ static int fw_compare(const void *parm1,
 		      sizeof(second->version));
 }
 
+static int ipr_get_hotplug_dir()
+{
+	FILE *file;
+	char buf[100];
+	char *loc;
+
+	file = fopen(FIRMWARE_HOTPLUG_CONFIG_FILE, "r");
+
+	if (!file) {
+		syslog(LOG_ERR, "Failed to open %s. %m\n", FIRMWARE_HOTPLUG_CONFIG_FILE);
+		return -EIO;
+	}
+
+	clearerr(file);
+	do {
+		if (feof(file)) {
+			syslog(LOG_ERR, "Failed parsing %s. Reached end of file.\n",
+			       FIRMWARE_HOTPLUG_CONFIG_FILE);
+			return -EIO;
+		}
+		fgets(buf, 100, file);
+		loc = strstr(buf, FIRMWARE_HOTPLUG_DIR_TAG);
+	} while(!loc || buf[0] == '#');
+
+	loc = strchr(buf, '/');
+
+	fclose(file);
+
+	if (!loc) {
+		syslog(LOG_ERR, "Failed parsing %s.\n",  FIRMWARE_HOTPLUG_CONFIG_FILE);
+		return -EIO;
+	}
+
+	hotplug_dir = realloc(hotplug_dir, strlen(loc + 1));
+
+	if (!hotplug_dir)
+		return -ENOMEM;
+
+	strcpy(hotplug_dir, loc);
+	/* strip trailing \n */
+	hotplug_dir[strlen(hotplug_dir)-1] = '\0';
+
+	return 0;
+}
+
 int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 				struct ipr_fw_images **list)
 {
@@ -3135,6 +3179,9 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	if (fw_version >= ioa->msl && !force)
 		return;
 
+	if (ipr_get_hotplug_dir())
+		return;
+
 	fd = open(image->file, O_RDONLY);
 
 	if (fd < 0) {
@@ -3164,22 +3211,22 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 
 		tmp = strrchr(image->file, '/');
 		tmp++;
-		dir = opendir(IPR_HOTPLUG_FW_PATH);
+		dir = opendir(hotplug_dir);
 		if (!dir) {
-			syslog(LOG_ERR, "Failed to open %s\n", IPR_HOTPLUG_FW_PATH);
+			syslog(LOG_ERR, "Failed to open %s\n", hotplug_dir);
 			munmap(image_hdr, ucode_stats.st_size);
 			close(fd);
 			return;
 		}
 		closedir(dir);
-		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH".%s", tmp);
+		sprintf(ucode_file, "%s/.%s", hotplug_dir, tmp);
 		symlink(image->file, ucode_file);
 		sprintf(ucode_file, ".%s\n", tmp);
 		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 		attr = sysfs_get_classdev_attr(class_device, "update_fw");
 		rc = sysfs_write_attribute(attr, ucode_file, strlen(ucode_file));
 		sysfs_close_class_device(class_device);
-		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH".%s", tmp);
+		sprintf(ucode_file, "%s/.%s", hotplug_dir, tmp);
 		unlink(ucode_file);
 
 		if (rc != 0)

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44.2.2 2004/10/25 22:31:44 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44.2.3 2004/11/12 19:05:47 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -54,7 +54,9 @@
 
 #define UCODE_BASE_DIR "/usr/lib/microcode"
 #define LINUX_UCODE_BASE_DIR "/lib/firmware"
-#define HOTPLUG_BASE_DIR "/usr/lib/hotplug/firmware"
+
+#define FIRMWARE_HOTPLUG_DIR_TAG "FIRMWARE_DIR"
+#define FIRMWARE_HOTPLUG_CONFIG_FILE "/etc/hotplug/firmware.agent"
 
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
