@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.19 2005/03/07 17:20:19 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.20 2005/03/08 16:25:59 brking Exp $
  */
 
 #include <unistd.h>
@@ -130,6 +130,9 @@ static int any_download_needed()
 	struct ipr_ioa *ioa;
 	int rc = 0;
 
+	tool_init(1);
+	check_current_config(false);
+
 	for_each_ioa(ioa)
 		rc |= download_needed(ioa);
 
@@ -152,6 +155,11 @@ static void update_ioa(struct ipr_ioa *ioa)
 static void update_all()
 {
 	struct ipr_ioa *ioa;
+
+	polling_mode = 1;
+
+	tool_init(1);
+	check_current_config(false);
 
 	for_each_ioa(ioa)
 		update_ioa(ioa);
@@ -199,17 +207,13 @@ int main(int argc, char *argv[])
 
 	ipr_sg_required = 1;
 
-	tool_init(1);
-
-	check_current_config(false);
-
 	if (check_levels)
 		return any_download_needed();
 
-	if (!daemonize) {
-		update_all();
+	update_all();
+
+	if (!daemonize)
 		return 0;
-	}
 
 	force_devs = force_ioas = 0;
 	ipr_daemonize();

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.50 2005/03/07 17:20:19 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.51 2005/03/08 16:25:59 brking Exp $
  */
 
 #include <stdarg.h>
@@ -882,6 +882,7 @@ struct ipr_dev {
 	u8 prot_level_str[8];
 	u32 is_reclaim_cand:1;
 	u32 should_init:1;
+	u32 init_not_allowed:1;
 	struct scsi_dev_data *scsi_dev_data;
 	union {
 		struct ipr_common_record *qac_entry;

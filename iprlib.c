@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.65 2005/03/07 17:20:16 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.66 2005/03/08 16:25:59 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -992,6 +992,26 @@ static int same_dev(struct ipr_dev *first, struct ipr_dev *second)
 	return 1;
 }
 
+static int dev_init_allowed(struct ipr_dev *dev)
+{
+	struct ipr_query_res_state res_state;
+
+	if (!ipr_is_af_dasd_device(dev))
+		return 1;
+	if (!ipr_query_resource_state(dev, &res_state)) {
+		if (!res_state.read_write_prot && !res_state.prot_dev_failed)
+			return 1;
+	}
+	return 0;
+}
+
+static void resolve_dev(struct ipr_dev *new, struct ipr_dev *old)
+{
+	new->init_not_allowed = !dev_init_allowed(new);
+	if (!old->init_not_allowed || new->init_not_allowed)
+		new->should_init = 0;
+}
+
 static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 {
 	struct ipr_dev *dev, *old_dev;
@@ -1002,7 +1022,7 @@ static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 		for_each_dev(old_ioa, old_dev) {
 			if (!same_dev(dev, old_dev))
 				continue;
-			dev->should_init = 0;
+			resolve_dev(dev, old_dev);
 			break;
 		}
 	}
@@ -4670,17 +4690,6 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	if (mode_select(dev, &mode_pages, len)) {
 		scsi_err(dev, "Failed to setup mode page 0x0A\n");
 		return -EIO;
-	}
-	return 0;
-}
-
-static int dev_init_allowed(struct ipr_dev *dev)
-{
-	struct ipr_query_res_state res_state;
-
-	if (!ipr_query_resource_state(dev, &res_state)) {
-		if (!res_state.read_write_prot && !res_state.prot_dev_failed)
-			return 1;
 	}
 	return 0;
 }

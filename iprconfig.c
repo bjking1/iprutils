@@ -4841,20 +4841,16 @@ int start_conc_maint(i_container *i_con, int action)
 					continue;
 				}
 
-				if (action == IPR_CONC_ADD ||
-				    ses_data.elem_status[i].status != IPR_DRIVE_ELEM_STATUS_POPULATED)
-					continue;
-
 				for (l = 0; l < ioa->num_devices; l++) {
 					get_res_addr(&ioa->dev[l], &res_addr);
-
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
 						if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
 							break;
 						if (format_in_prog(&ioa->dev[l]))
 							break;
-
+						if (action == IPR_CONC_ADD)
+							break;
 						print_dev(k, &ioa->dev[l], buffer, "%1", ioa, k);
 						i_con = add_i_con(i_con,"\0", &ioa->dev[l]);
 
