@@ -4,6 +4,7 @@ Version: 1.0.0
 Release: 1
 License: IPL
 Group: Hardware/SCSI
+Vendor: IBM
 Source0: iprutils-%version-src.tgz
 
 %description
