@@ -145,7 +145,7 @@ struct screen_node {
 	struct screen_opts *options;
 	char *title;
 	char *body;
-	char *header[];
+	char *header[10];
 };
 
 struct screen_opts null_opt[] = {
@@ -153,7 +153,7 @@ struct screen_opts null_opt[] = {
 };
 
 struct screen_opts main_menu_opt[] = {
-	{disk_status,        "1", __("Display disk hardware status")},
+	{disk_status,        "1", __("Display hardware status")},
 	{raid_screen,        "2", __("Work with Disk Arrays")},
 	{disk_unit_recovery, "3", __("Work with disk unit recovery")},
 	{bus_config,         "4", __("Work with SCSI bus configuration")},
@@ -168,7 +168,7 @@ s_node n_main_menu = {
 	.f_flags  = (EXIT_FLAG),
 	.num_opts = NUM_OPTS(main_menu_opt),
 	.options  = &main_menu_opt[0],
-	.title    =  __("Work with Disk Units")
+	.title    =  __("IBM Power RAID Configuration Utility")
 };
 
 struct screen_opts disk_status_opt[] = {
@@ -180,7 +180,7 @@ s_node n_disk_status = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(disk_status_opt),
 	.options  = &disk_status_opt[0],
-	.title    = __("Display Disk Hardware Status"),
+	.title    = __("Display Hardware Status"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  5=Display hardware resource information details\n\n"),
@@ -210,8 +210,8 @@ struct screen_opts raid_screen_opt[] = {
 	{raid_start,       "2", __("Create a disk array")},
 	{raid_stop,        "3", __("Delete a disk array")},
 	{raid_include,     "4", __("Add a device to a disk array")},
-	{af_include,       "5", __("Format device for advanced function")},
-	{af_remove,        "6", __("Format device for JBOD function")},
+	{af_include,       "5", __("Format device for advanced function (522)")},
+	{af_remove,        "6", __("Format device for JBOD function (512)")},
 	{add_hot_spare,    "7", __("Configure a hot spare device")},
 	{remove_hot_spare, "8", __("Unconfigure a hot spare device")}
 };

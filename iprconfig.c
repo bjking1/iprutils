@@ -6964,8 +6964,8 @@ int change_driver_config(i_container *i_con)
 
 	body = body_init(n_change_driver_config.header, NULL);
 	sprintf(buffer,"%d", get_log_level(ioa));
-	body = add_line_to_body(body,_("Current Verbosity"), buffer);
-	body = add_line_to_body(body,_("New Verbosity"), "%2");
+	body = add_line_to_body(body,_("Current Log Level"), buffer);
+	body = add_line_to_body(body,_("New Log Level"), "%2");
 
 	n_change_driver_config.body = body;
 	s_out = screen_driver(&n_change_driver_config,0,i_con);
