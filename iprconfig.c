@@ -5147,6 +5147,9 @@ int start_conc_maint(i_container *i_con, int action)
 				for (l=0; l<cur_ioa->num_devices; l++) {
 					scsi_dev_data = cur_ioa->dev[l].scsi_dev_data;
 
+					if (scsi_dev_data == NULL)
+						continue;
+
 					if ((scsi_dev_data->channel == ses_channel) &&
 					    (scsi_dev_data->id == ses_data.elem_status[i].scsi_id)) {
 
