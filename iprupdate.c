@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.4 2004/01/29 17:36:30 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.5 2004/02/02 16:41:54 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -235,8 +235,8 @@ int main(int argc, char *argv[])
         }
 
         p_lid_info = (struct ipr_software_inq_lid_info *)
-            ((unsigned long)p_image_hdr + iprtoh32(p_image_hdr->lid_table_offset) + 4);
-        num_binary_lids = iprtoh32(*((u32*)p_lid_info - 1));
+            ((unsigned long)p_image_hdr + ntohl(p_image_hdr->lid_table_offset) + 4);
+        num_binary_lids = ntohl(*((u32*)p_lid_info - 1));
 
         /* Compare the two */
         for (i = 0; (i < num_binary_lids) && (do_download == 0); i++, p_lid_info++)
@@ -294,8 +294,8 @@ int main(int argc, char *argv[])
              on the next adapter. Would have to remember the child's PID
              so we could wait on it when we were done, though. This would also
              greatly complicate the load source case */
-            buffer = (void *)((unsigned long)p_image_hdr + iprtoh32(p_image_hdr->header_length));
-            length = ucode_stats.st_size - iprtoh32(p_image_hdr->header_length);
+            buffer = (void *)((unsigned long)p_image_hdr + ntohl(p_image_hdr->header_length));
+            length = ucode_stats.st_size - ntohl(p_image_hdr->header_length);
 
             /* The write buffer here takes care of both the IOA shutdown and the
              reset of the adapter */

@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.9 2004/01/30 23:41:21 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.10 2004/02/02 16:41:54 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -450,7 +450,7 @@ int ipr_start_array(char *file, struct ipr_array_query_data *qac_data,
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(qac_data->resp_len);
+    int length = ntohs(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -499,7 +499,7 @@ int ipr_stop_array(char *file, struct ipr_array_query_data *qac_data, int hot_sp
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(qac_data->resp_len);
+    int length = ntohs(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -544,7 +544,7 @@ int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *qac_data)
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(qac_data->resp_len);
+    int length = ntohs(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -576,7 +576,7 @@ int ipr_add_array_device(char *file, struct ipr_array_query_data *qac_data)
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(qac_data->resp_len);
+    int length = ntohs(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -1044,7 +1044,7 @@ int ipr_evaluate_device(char *file, u32 res_handle)
 
     memset(cdb, 0, IPR_CCB_CDB_LEN);
 
-    resource_handle = iprtoh32(res_handle);
+    resource_handle = ntohl(res_handle);
 
     cdb[0] = IPR_EVALUATE_DEVICE;
     cdb[2] = (u8)(resource_handle >> 24);
@@ -1092,7 +1092,7 @@ int ipr_inquiry(char *file, u8 page, void *buff, u8 length)
                   &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
     if (rc != 0)
-        syslog(LOG_ERR, "Evaluate Device to %s failed. %m\n", file);
+        syslog(LOG_ERR, "Inquiry to %s failed. %m\n", file);
 
     close(fd);
     return rc;
@@ -1309,7 +1309,7 @@ void get_sg_ioctl_data(struct sg_map_info *sg_map_info, int num_devs)
 
         close(fd);
         if ((rc >= 0) &&
-            (sg_map_info[num_sg_devices].sg_dat.scsi_type == IPR_TYPE_DISK))
+            (sg_map_info[num_sg_devices].sg_dat.scsi_type == TYPE_DISK))
         {
             temp_max_sd_devs = 0;
 
@@ -1535,7 +1535,7 @@ void check_current_config(bool allow_rebuild_refresh)
             if (scsi_dev_data->host != cur_ioa->host_num)
                 continue;
 
-            if ((scsi_dev_data->type == IPR_TYPE_DISK) ||
+            if ((scsi_dev_data->type == TYPE_DISK) ||
                 (scsi_dev_data->type == IPR_TYPE_AF_DISK))
             {
                 cur_ioa->dev[device_count].ioa = cur_ioa;
@@ -1572,7 +1572,7 @@ void check_current_config(bool allow_rebuild_refresh)
                     }                    
 
                     common_record = (struct ipr_common_record *)
-                        ((unsigned long)common_record + iprtoh16(common_record->record_len));
+                        ((unsigned long)common_record + ntohs(common_record->record_len));
                 }
 
                 /* find sg_map_info matching resource entry */
@@ -1630,7 +1630,7 @@ void check_current_config(bool allow_rebuild_refresh)
             }
 
             common_record = (struct ipr_common_record *)
-                ((unsigned long)common_record + iprtoh16(common_record->record_len));
+                ((unsigned long)common_record + ntohs(common_record->record_len));
         }
 
         cur_ioa->num_devices = device_count;
@@ -1959,7 +1959,7 @@ void ipr_save_page_28(struct ipr_ioa *ioa,
                     IPR_CATEGORY_BUS,
                     page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    (iprtoh32(page_28_cur->attr[i].max_xfer_rate) *
+                    (ntohl(page_28_cur->attr[i].max_xfer_rate) *
                      (page_28_cur->attr[i].bus_width / 8))/10);
 
             if (page_28_ipr->attr[i].max_xfer_rate)
@@ -2119,13 +2119,13 @@ void ipr_set_page_28(struct ipr_ioa *cur_ioa,
         {
             if (limited_config & (1 << page_28_cur->attr[i].res_addr.bus))
             {
-                max_xfer_rate = ((iprtoh32(page_28_cur->attr[i].max_xfer_rate)) *
+                max_xfer_rate = ((ntohl(page_28_cur->attr[i].max_xfer_rate)) *
                      page_28_cur->attr[i].bus_width)/(10 * 8);
 
                 if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate)
                 {
                     page_28_cur->attr[i].max_xfer_rate =
-                        htoipr32(IPR_LIMITED_MAX_XFER_RATE * 10 /
+                        htonl(IPR_LIMITED_MAX_XFER_RATE * 10 /
                                  (page_28_cur->attr[i].bus_width / 8));
                 }
 
@@ -2136,7 +2136,7 @@ void ipr_set_page_28(struct ipr_ioa *cur_ioa,
                             IPR_CATEGORY_BUS,
                             page_28_cur->attr[i].res_addr.bus);
                     sprintf(value_str,"%d",
-                            (iprtoh32(page_28_cur->attr[i].max_xfer_rate) *
+                            (ntohl(page_28_cur->attr[i].max_xfer_rate) *
                              (page_28_cur->attr[i].bus_width / 8))/10);
 
                     ipr_config_file_entry(file_name,
@@ -2161,13 +2161,13 @@ void ipr_set_page_28(struct ipr_ioa *cur_ioa,
                 {
                     sscanf(value_str,"%d", &new_value);
 
-                    max_xfer_rate = ((iprtoh32(page_28_dflt->attr[i].max_xfer_rate)) *
+                    max_xfer_rate = ((ntohl(page_28_dflt->attr[i].max_xfer_rate)) *
                                      page_28_cur->attr[i].bus_width)/(10 * 8);
 
                     if (new_value <= max_xfer_rate)
                     {
                         page_28_cur->attr[i].max_xfer_rate =
-                            htoipr32(new_value * 10 /
+                            htonl(new_value * 10 /
                                      (page_28_cur->attr[i].bus_width / 8));
                     }
                     else
@@ -2180,7 +2180,7 @@ void ipr_set_page_28(struct ipr_ioa *cur_ioa,
                                 IPR_CATEGORY_BUS,
                                 page_28_cur->attr[i].res_addr.bus);
                         sprintf(value_str,"%d",
-                                (iprtoh32(page_28_cur->attr[i].max_xfer_rate) *
+                                (ntohl(page_28_cur->attr[i].max_xfer_rate) *
                                  (page_28_cur->attr[i].bus_width / 8))/10);
 
                         ipr_config_file_entry(file_name,
@@ -2301,13 +2301,13 @@ void ipr_set_page_28_init(struct ipr_ioa *cur_ioa,
 
         if ((limited_config & (1 << page_28_cur->attr[i].res_addr.bus)))
         {
-            max_xfer_rate = ((iprtoh32(page_28_cur->attr[i].max_xfer_rate)) *
+            max_xfer_rate = ((ntohl(page_28_cur->attr[i].max_xfer_rate)) *
                              page_28_cur->attr[i].bus_width)/(10 * 8);
 
             if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate)
             {
                 page_28_cur->attr[i].max_xfer_rate =
-                    htoipr32(IPR_LIMITED_MAX_XFER_RATE * 10 /
+                    htonl(IPR_LIMITED_MAX_XFER_RATE * 10 /
                              (page_28_cur->attr[i].bus_width / 8));
             }
         }
@@ -2471,4 +2471,34 @@ bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
         }
     }   
     return false;
+}
+
+int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
+{
+    struct sysfs_class_device *class_device;
+    struct sysfs_attribute *dev_attr;
+    struct sysfs_device *device;
+    char *sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
+
+    class_device = sysfs_open_class_device("scsi_device",
+					   sysfs_dev_name);
+
+    if (!class_device)
+	    return -EIO;
+
+    device = sysfs_get_classdev_device(class_device);
+
+    if (!device) {
+	    sysfs_close_class_device(class_device);
+	    return -EIO;
+    }
+
+    dev_attr = sysfs_get_device_attr(device, attr);
+    if (sysfs_write_attribute(dev_attr, value, strlen(value))) {
+	    sysfs_close_class_device(class_device);
+	    return -EIO;
+    }
+
+    sysfs_close_class_device(class_device);
+    return 0;
 }

@@ -1952,12 +1952,12 @@ int device_details(i_container *i_con)
         sprintf(buffer,"RAID %s", device->prot_level_str);
         device_details_body(102, buffer);
 
-        if (iprtoh16(ipr_array_record->stripe_size) > 1024)
+        if (ntohs(ipr_array_record->stripe_size) > 1024)
             sprintf(buffer,"%d M",
-                    iprtoh16(ipr_array_record->stripe_size)/1024);
+                    ntohs(ipr_array_record->stripe_size)/1024);
         else
             sprintf(buffer,"%d k",
-                    iprtoh16(ipr_array_record->stripe_size));
+                    ntohs(ipr_array_record->stripe_size));
 
         device_details_body(103, buffer);
         
@@ -1966,18 +1966,18 @@ int device_details(i_container *i_con)
                                   &read_cap16);
 
         if ((rc == 0) &&
-            (iprtoh32(read_cap16.max_user_lba_hi) ||
-             iprtoh32(read_cap16.max_user_lba_lo)) &&
-            iprtoh32(read_cap16.block_length)) {
+            (ntohl(read_cap16.max_user_lba_hi) ||
+             ntohl(read_cap16.max_user_lba_lo)) &&
+            ntohl(read_cap16.block_length)) {
 
-            max_user_lba_int = iprtoh32(read_cap16.max_user_lba_hi);
+            max_user_lba_int = ntohl(read_cap16.max_user_lba_hi);
             max_user_lba_int <<= 32;
-            max_user_lba_int |= iprtoh32(read_cap16.max_user_lba_lo);
+            max_user_lba_int |= ntohl(read_cap16.max_user_lba_lo);
 
             device_capacity = max_user_lba_int + 1;
 
             lba_divisor  =
-                (1000*1000*1000) / iprtoh32(read_cap16.block_length);
+                (1000*1000*1000) / ntohl(read_cap16.block_length);
 
             sprintf(buffer,"%.2Lf GB",device_capacity/lba_divisor);
             device_details_body(104, buffer);
@@ -2057,13 +2057,13 @@ int device_details(i_container *i_con)
                       IPR_SERIAL_NUM_LEN);
         device_details_body(6, serial_num);
 
-        if (iprtoh32(read_cap.block_length) &&
-            iprtoh32(read_cap.max_user_lba))  {
+        if (ntohl(read_cap.block_length) &&
+            ntohl(read_cap.max_user_lba))  {
 
             lba_divisor = (1000*1000*1000) /
-                iprtoh32(read_cap.block_length);
+                ntohl(read_cap.block_length);
 
-            device_capacity = iprtoh32(read_cap.max_user_lba) + 1;
+            device_capacity = ntohl(read_cap.max_user_lba) + 1;
             sprintf(buffer,"%.2Lf GB",
                     device_capacity/lba_divisor);
 
@@ -3436,7 +3436,7 @@ int configure_raid_parameters(i_container *i_con)
     prot_level_list = malloc(sizeof(struct prot_level));
     prot_level_list[raid_index].is_valid_entry = 0;
 
-    for (i=0; i<iprtoh16(supported_arrays->num_entries); i++)
+    for (i=0; i<ntohs(supported_arrays->num_entries); i++)
     {
         if ((selected_count <= cur_array_cap_entry->max_num_array_devices) &&
             (selected_count >= cur_array_cap_entry->min_num_array_devices) &&
@@ -3453,12 +3453,12 @@ int configure_raid_parameters(i_container *i_con)
             prot_level_list[raid_index].is_valid_entry = 0;
         }
         cur_array_cap_entry = (struct ipr_array_cap_entry *)
-            ((void *)cur_array_cap_entry + iprtoh16(supported_arrays->entry_length));
+            ((void *)cur_array_cap_entry + ntohs(supported_arrays->entry_length));
     }
 
     raid_index = raid_index_default;
     cur_array_cap_entry = prot_level_list[raid_index].array_cap_entry;
-    stripe_sz = iprtoh16(cur_array_cap_entry->recommended_stripe_size);
+    stripe_sz = ntohs(cur_array_cap_entry->recommended_stripe_size);
 
     form = new_form(input_fields);
 
@@ -3568,7 +3568,7 @@ int configure_raid_parameters(i_container *i_con)
 
                     /* find recommended stripe size */
                     cur_array_cap_entry = prot_level_list[raid_index].array_cap_entry;
-                    stripe_sz = iprtoh16(cur_array_cap_entry->recommended_stripe_size);
+                    stripe_sz = ntohs(cur_array_cap_entry->recommended_stripe_size);
                 }
             }
             else if (cur_field_index == 2)
@@ -3578,7 +3578,7 @@ int configure_raid_parameters(i_container *i_con)
                 for (i=0; i<16; i++)
                 {
                     stripe_sz_mask = 1 << i;
-                    if ((stripe_sz_mask & iprtoh16(cur_array_cap_entry->supported_stripe_sizes))
+                    if ((stripe_sz_mask & ntohs(cur_array_cap_entry->supported_stripe_sizes))
                         == stripe_sz_mask)
                     {
                         index++;
@@ -3598,7 +3598,7 @@ int configure_raid_parameters(i_container *i_con)
                 {
                     stripe_sz_mask = 1 << i;
                     raid_item[index] = (ITEM *)NULL;
-                    if ((stripe_sz_mask & iprtoh16(cur_array_cap_entry->supported_stripe_sizes))
+                    if ((stripe_sz_mask & ntohs(cur_array_cap_entry->supported_stripe_sizes))
                         == stripe_sz_mask)
                     {
                         stripe_sz_list[index] = stripe_sz_mask;
@@ -3607,7 +3607,7 @@ int configure_raid_parameters(i_container *i_con)
                         else
                             sprintf(stripe_menu_str[index].line,"%d k",stripe_sz_mask);
 
-                        if (stripe_sz_mask == iprtoh16(cur_array_cap_entry->recommended_stripe_size))
+                        if (stripe_sz_mask == ntohs(cur_array_cap_entry->recommended_stripe_size))
                         {
                             sprintf(buffer,"%s - recommend",stripe_menu_str[index].line);
                             raid_item[index] = new_item(buffer, "");
@@ -3852,7 +3852,7 @@ int confirm_raid_start(i_container *i_con)
                             }
                             common_record = (struct ipr_common_record *)
                                 ((unsigned long)common_record +
-                                 iprtoh16(common_record->record_len));
+                                 ntohs(common_record->record_len));
                         }
                         if (!found)
                         {
@@ -3864,7 +3864,7 @@ int confirm_raid_start(i_container *i_con)
                     }
                     common_record_saved = (struct ipr_common_record *)
                         ((unsigned long)common_record_saved +
-                         iprtoh16(common_record_saved->record_len));
+                         ntohs(common_record_saved->record_len));
                 }
 
                 if (!found)
@@ -4313,7 +4313,7 @@ int raid_include(i_container *i_con)
                     (struct ipr_array_cap_entry *)supported_arrays->data;
                 include_allowed = 0;
                 for (j = 0;
-                     j < iprtoh16(supported_arrays->num_entries);
+                     j < ntohs(supported_arrays->num_entries);
                      j++)
                 {
                     if (cur_array_cap_entry->prot_level ==
@@ -4326,7 +4326,7 @@ int raid_include(i_container *i_con)
 
                     cur_array_cap_entry = (struct ipr_array_cap_entry *)
                         ((void *)cur_array_cap_entry +
-                         iprtoh16(supported_arrays->entry_length));
+                         ntohs(supported_arrays->entry_length));
                 }
 
                 if (!include_allowed)
@@ -4530,7 +4530,7 @@ int configure_raid_include(i_container *i_con)
                     supported_arrays = (struct ipr_supported_arrays *)common_record;
                     cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
 
-                    for (i=0; i<iprtoh16(supported_arrays->num_entries); i++)
+                    for (i=0; i<ntohs(supported_arrays->num_entries); i++)
                     {
                         if (cur_array_cap_entry->prot_level == raid_level)
                         {
@@ -4541,7 +4541,7 @@ int configure_raid_include(i_container *i_con)
                     }
                 }
                 common_record = (struct ipr_common_record *)
-                    ((unsigned long)common_record + iprtoh16(common_record->record_len));
+                    ((unsigned long)common_record + ntohs(common_record->record_len));
             }
         }
     }
@@ -4767,7 +4767,7 @@ int confirm_raid_include(i_container *i_con)
 
                 common_record = (struct ipr_common_record *)
                     ((unsigned long)common_record +
-                     iprtoh16(common_record->record_len));
+                     ntohs(common_record->record_len));
             }
         }
         cur_raid_cmd = cur_raid_cmd->next;
@@ -4904,7 +4904,7 @@ int confirm_raid_include_device(i_container *i_con)
 
                 common_record = (struct ipr_common_record *)
                     ((unsigned long)common_record +
-                     iprtoh16(common_record->record_len));
+                     ntohs(common_record->record_len));
             }
         }
         cur_raid_cmd = cur_raid_cmd->next;
@@ -5034,7 +5034,7 @@ int format_include_cand()
                 }
                 common_record = (struct ipr_common_record *)
                     ((unsigned long)common_record +
-                     iprtoh16(common_record->record_len));
+                     ntohs(common_record->record_len));
             }
         }
         cur_raid_cmd = cur_raid_cmd->next;
@@ -5192,7 +5192,7 @@ int dev_include_complete(u8 num_devs)
                             }
                             common_record = (struct ipr_common_record *)
                                 ((unsigned long)common_record +
-                                 iprtoh16(common_record->record_len));
+                                 ntohs(common_record->record_len));
                         }
                         if (!found)
                         {
@@ -5202,7 +5202,7 @@ int dev_include_complete(u8 num_devs)
                     }
                     common_record_saved = (struct ipr_common_record *)
                         ((unsigned long)common_record_saved +
-                         iprtoh16(common_record_saved->record_len));
+                         ntohs(common_record_saved->record_len));
                 }
 
                 if (!found)
@@ -5651,7 +5651,7 @@ int confirm_reclaim(i_container *i_con)
   {
       scsi_dev_data = reclaim_ioa->dev[j].scsi_dev_data;
       if ((scsi_dev_data == NULL) ||
-          (scsi_dev_data->type != IPR_TYPE_DISK))  //FIXME correct check?
+          (scsi_dev_data->type != TYPE_DISK))  //FIXME correct check?
           continue;
 
       /* Do a query resource state to see whether or not the device will be affected by the operation */
@@ -5785,12 +5785,12 @@ int reclaim_result(i_container *i_con)
         {
             if (reclaim_ioa->reclaim_data->num_blocks_needs_multiplier)
             {
-                sprintf(out_str, "%12d", iprtoh16(reclaim_ioa->reclaim_data->num_blocks) *
+                sprintf(out_str, "%12d", ntohs(reclaim_ioa->reclaim_data->num_blocks) *
                         IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER);
             }
             else
             {
-                sprintf(out_str, "%12d", iprtoh16(reclaim_ioa->reclaim_data->num_blocks));
+                sprintf(out_str, "%12d", ntohs(reclaim_ioa->reclaim_data->num_blocks));
             }
             mvaddstr(8, 0, "Press Enter to continue.");
         }
@@ -5913,7 +5913,7 @@ int configure_af_device(i_container *i_con, int action_code)
 
             /* If not a DASD, disallow format */
             if ((scsi_dev_data == NULL) ||
-                (scsi_dev_data->type != IPR_TYPE_DISK) ||
+                (scsi_dev_data->type != TYPE_DISK) ||
                 (ipr_is_hot_spare(&cur_ioa->dev[j])))
                 continue;
 
@@ -5953,7 +5953,7 @@ int configure_af_device(i_container *i_con, int action_code)
 
                 }
             }
-            else if (scsi_dev_data->type == IPR_TYPE_DISK)
+            else if (scsi_dev_data->type == TYPE_DISK)
             {
                 if (action_code == IPR_REMOVE)
                     continue;
@@ -7516,7 +7516,7 @@ int change_bus_attr(i_container *i_con)
                                    O_ACTIVE);
                 }
                 sprintf(max_xfer_rate_str[j],"%d MB/s",
-                        (iprtoh32(page_28_cur->attr[j].max_xfer_rate) *
+                        (ntohl(page_28_cur->attr[j].max_xfer_rate) *
                          page_28_cur->attr[j].bus_width)/(10 * 8));
                 set_field_buffer(input_fields[input_field_index++],
                                  0,
@@ -7765,7 +7765,7 @@ int init_device(i_container *i_con)
 
             /* If not a DASD, disallow format */
             if ((scsi_dev_data == NULL) ||
-                (scsi_dev_data->type != IPR_TYPE_DISK) ||
+                (scsi_dev_data->type != TYPE_DISK) ||
                 (ipr_is_hot_spare(&cur_ioa->dev[j])))
                 continue;
 
@@ -7839,7 +7839,7 @@ int init_device(i_container *i_con)
                     }
                 }
             }
-            else if (scsi_dev_data->type == IPR_TYPE_DISK)
+            else if (scsi_dev_data->type == TYPE_DISK)
             {
                 /* We allow the user to format the drive if nobody is using it */
                 if (cur_ioa->dev[j].scsi_dev_data->opens != 0)
@@ -8265,7 +8265,7 @@ int bus_attr_menu(struct ipr_ioa *cur_ioa,
             userptr = malloc(sizeof(int) * num_menu_items);
 
             menu_index = 0;
-            switch (((iprtoh32(page_28_dflt->attr[j].max_xfer_rate)) *
+            switch (((ntohl(page_28_dflt->attr[j].max_xfer_rate)) *
                      page_28_cur->attr[j].bus_width)/(10 * 8))
             {
                 case 320:
@@ -8322,11 +8322,11 @@ int bus_attr_menu(struct ipr_ioa *cur_ioa,
             menu_item[menu_index] = (ITEM *)NULL;
             rc = display_menu(menu_item, start_row, menu_index, &retptr);
             if ((rc == RC_SUCCESS) &&
-                (iprtoh32(page_28_cur->attr[j].max_xfer_rate) !=
+                (ntohl(page_28_cur->attr[j].max_xfer_rate) !=
                  ((*retptr) * 8)/page_28_cur->attr[j].bus_width))
             {
                 page_28_cur->attr[j].max_xfer_rate =
-                    htoipr32(((*retptr) * 8)/page_28_cur->attr[j].bus_width);
+                    htonl(((*retptr) * 8)/page_28_cur->attr[j].bus_width);
                 page_28_ipr->attr[j].max_xfer_rate =
                     page_28_chg->attr[j].max_xfer_rate;
             }
@@ -9954,7 +9954,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
             sprintf(body + len, "Not Operational\n");
         else if (res_state.not_ready ||
                  (res_state.read_write_prot &&
-                  (iprtoh32(res_state.dev.dasd.failing_dev_ioasc) ==
+                  (ntohl(res_state.dev.dasd.failing_dev_ioasc) ==
                    0x02040200u)))
             sprintf(body + len, "Not ready\n");
         else if ((res_state.read_write_prot) || (is_rw_protected(ipr_dev)))

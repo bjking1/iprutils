@@ -6,7 +6,7 @@ include version.mk
 CFLAGS = -g -Wall $(IPR_DEFINES) -DIPR_IPRUTILS
 UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
 
-all: iprconfig iprupdate iprdump iprtrace iprdbg docs text
+all: iprconfig iprupdate iprdump iprinit iprdbg docs text 
 
 iprconfig: iprconfig.c iprlib.o text
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu -lsysfs
@@ -17,8 +17,8 @@ iprupdate: iprupdate.c iprlib.o
 iprdump:iprdump.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdump iprlib.o iprdump.c -lsysfs
 
-iprtrace:iprtrace.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprtrace iprlib.o iprtrace.c -lsysfs
+iprinit:iprinit.c iprlib.o
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprinit iprlib.o iprinit.c -lsysfs
 
 iprdbg:iprdbg.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs

@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.4 2004/02/02 16:41:53 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -191,25 +191,25 @@ int main(int argc, char *argv[])
 
                 /* get length of data obtained from within buffer */
                 dump_header = (struct dump_header *)&ipr_ioctl->buffer[0];
-                write(f_dump, &ipr_ioctl->buffer[0], iprtoh32(dump_header->total_length));
+                write(f_dump, &ipr_ioctl->buffer[0], ntohl(dump_header->total_length));
                 close(f_dump);
 
                 /* parse through buffer and find the IPR_DUMP_TEXT_ID
                  information */
                 dump_entry_header =
-                    (struct dump_entry_header *)&ipr_ioctl->buffer[iprtoh32(dump_header->first_entry_offset)];
+                    (struct dump_entry_header *)&ipr_ioctl->buffer[ntohl(dump_header->first_entry_offset)];
 
-                while (iprtoh32(dump_entry_header->id) != IPR_DUMP_TEXT_ID)
+                while (ntohl(dump_entry_header->id) != IPR_DUMP_TEXT_ID)
                 {
                     dump_entry_header = (struct dump_entry_header *)
                         ((unsigned long)dump_entry_header +
                          sizeof(struct dump_entry_header) +
-                         iprtoh32(dump_entry_header->length));
+                         ntohl(dump_entry_header->length));
                 }
 
                 syslog(LOG_ERR,"*********************************************************"IPR_EOL);
                 syslog(LOG_ERR, "Dump of ipr IOA has completed to file:  %s"IPR_EOL, iprdump_fn);
-                if (iprtoh32(dump_entry_header->id) == IPR_DUMP_TEXT_ID)
+                if (ntohl(dump_entry_header->id) == IPR_DUMP_TEXT_ID)
                 {
                     index = 0;
                     while (dump_entry_header->data[index] != 0)

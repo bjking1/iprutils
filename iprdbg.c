@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.4 2004/02/02 16:41:53 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
 
                     for (i = 0; i < 16; i++)
                     {
-                        bus_speed = iprtoh32(buffer[i]) & 0x0000000f;
+                        bus_speed = ntohl(buffer[i]) & 0x0000000f;
 
                         for (j = 0; j < sizeof(bus_speeds)/sizeof(struct ipr_bus_speeds); j++)
                         {
@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
                      (i < (length / 4)) && (j < 4);
                      j++, i++)
                 {
-                    iprprint("%08X ", iprtoh32(buffer[i]));
+                    iprprint("%08X ", ntohl(buffer[i]));
                     memcpy(&ascii_buffer[j*4], &buffer[i], 4);
                     for (k = 0; k < 4; k++)
                     {
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
 
             /* Byte swap everything */
             for (i = 0; i < num_args-2; i++)
-                write_buf[i] = htoipr32(arg[i]);
+                write_buf[i] = htonl(arg[i]);
 
             debug_ioctl(fd, IPRDBG_WRITE, address, 0,
                         write_buf, (num_args-2)*4);
@@ -331,7 +331,7 @@ int main(int argc, char *argv[])
             }
 
             /* Byte swap the data */
-            write_buf[0] = htoipr32(arg[0]);
+            write_buf[0] = htonl(arg[0]);
 
             debug_ioctl(fd, IPRDBG_WRITE, address, arg[1],
                         write_buf, 4);
@@ -434,7 +434,7 @@ int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
 
 int format_flit(struct ipr_flit *p_flit)
 {
-    int num_entries = iprtoh32(p_flit->num_entries) - 1;
+    int num_entries = ntohl(p_flit->num_entries) - 1;
     struct ipr_flit_entry *p_flit_entry;
 
     signed int path_length;
@@ -470,15 +470,15 @@ int format_flit(struct ipr_flit *p_flit)
 
         path_length = strlen(path);
 
-        iprprint("LID Name:   %s  (%8X)\n", lid_name, iprtoh32(p_flit_entry->load_name));
+        iprprint("LID Name:   %s  (%8X)\n", lid_name, ntohl(p_flit_entry->load_name));
         iprprint("Time Stamp: %s\n", time);
         iprprint("LID Path:   %s\n", lid_name);
         iprprint("Text Segment:  Address %08X,  Length %8X\n",
-               iprtoh32(p_flit_entry->text_ptr), iprtoh32(p_flit_entry->text_len));
+               ntohl(p_flit_entry->text_ptr), ntohl(p_flit_entry->text_len));
         iprprint("Data Segment:  Address %08X,  Length %8X\n",
-               iprtoh32(p_flit_entry->data_ptr), iprtoh32(p_flit_entry->data_len));
+               ntohl(p_flit_entry->data_ptr), ntohl(p_flit_entry->data_len));
         iprprint("BSS Segment:   Address %08X,  Length %8X\n",
-               iprtoh32(p_flit_entry->bss_ptr), iprtoh32(p_flit_entry->bss_len));
+               ntohl(p_flit_entry->bss_ptr), ntohl(p_flit_entry->bss_len));
         iprprint("\n");
     }
 
