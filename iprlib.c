@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.27 2004/03/03 18:54:18 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.28 2004/03/03 22:18:26 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -1503,6 +1503,8 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 		if (sysfs_attr)
 			ipr_strncpy_0(scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
 
+		strcpy(scsi_dev_data->dev_name,"");
+		strcpy(scsi_dev_data->gen_name,"");
 		num_devs++;
 	}
 	sysfs_close_class(sysfs_device_class);
