@@ -5174,6 +5174,7 @@ int start_conc_maint(i_container *i_con, int action)
 					scsi_dev_data->channel = ses_channel;
 					scsi_dev_data->id = scsi_dev_data->id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
+					local_dev[local_dev_count]->ioa = cur_ioa;
 
 					for (k=0; k<2; k++)
 						buffer[k] = print_device(local_dev[local_dev_count],buffer[k],"%1",cur_ioa, k);
