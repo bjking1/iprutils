@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.38 2004/03/12 21:01:27 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.39 2004/03/12 21:08:19 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -3365,7 +3365,7 @@ struct ipr_dev *get_dev(struct ipr_res_addr *res_addr)
 
 			if ((scsi_dev_data->host = res_addr->host) &&
 			    (scsi_dev_data->channel = res_addr->bus) &&
-			    (scsi_dev_data->target = res_addr->id) &&
+			    (scsi_dev_data->id = res_addr->target) &&
 			    (scsi_dev_data->lun = res_addr->lun))
 				return &cur_ioa->dev[j];
 		}

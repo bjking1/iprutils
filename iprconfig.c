@@ -4688,7 +4688,7 @@ int process_conc_maint(i_container *i_con, int action)
 	if (!rc) {
 		if (action == IPR_VERIFY_CONC_REMOVE) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_REMOVE);
-			evaluate_device(ipr_dev, 0);
+			evaluate_device(ipr_dev, ipr_dev->ioa, 0);
 		} else if (action == IPR_VERIFY_CONC_ADD) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_ADD);
 			res_addr.host = ipr_dev->scsi_dev_data->host;
@@ -4714,7 +4714,7 @@ void get_dev_raid_level(struct ipr_ioa *cur_ioa)
 {
 	int j, i;
 	struct ipr_array_record *array_record;
-	char prot_level_str[32];
+	char *prot_level_str;
 	struct ipr_dev_record *dev_record;
 	int array_id;
 
@@ -8513,7 +8513,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 				    ((sense_data.error_code & 0x7F) == 0x70) &&
 				    ((sense_data.sense_key & 0x0F) == 0x02) && /* NOT READY */
 				    (sense_data.add_sense_code == 0x04) &&     /* LOGICAL UNIT NOT READY */
-				    (sense_data.add_sense_code_qual == 0x04))  /* FORMAT IN PROGRESS */
+				    (sense_data.add_sense_code_qual == 0x04)) {/* FORMAT IN PROGRESS */
 
 					percent_cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
 					format_in_progress++;
