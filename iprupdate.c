@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
  */
 
 #include <unistd.h>
@@ -43,7 +43,6 @@ int main(int argc, char *argv[])
 {
     int rc = 0;
     struct stat ucode_stats;
-    struct ipr_ioctl_cmd_internal ioa_cmd;
     struct ipr_inquiry_page0 page0_inq;
     struct ipr_inquiry_page3 page3_inq;
     struct ipr_inquiry_page_cx page_cx_inq;
@@ -69,6 +68,8 @@ int main(int argc, char *argv[])
     int image_size;
     int device_update_blocked;
     int u320_disabled;
+    void *buffer;
+    u32 length;
 
     struct software_inq_lid_info
     {
@@ -133,14 +134,8 @@ int main(int argc, char *argv[])
         sprintf(ucode_file, "/etc/microcode/ibmsis%X.img", p_cur_ioa->ccin);
 
         /* Do a page 0 inquiry to the adapter to get the supported page codes */
-        memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-        ioa_cmd.buffer = &page0_inq;
-        ioa_cmd.buffer_len = sizeof(struct ipr_inquiry_page0);
-        ioa_cmd.cdb[1] = 0x01;
-        ioa_cmd.cdb[2] = 0x00;
-        ioa_cmd.read_not_write = 1;
-
-        rc = ipr_ioctl(fd, INQUIRY, &ioa_cmd);
+        rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle,
+                         0x00, &page0_inq, sizeof(struct ipr_inquiry_page0));
 
         if (rc != 0)
         {
@@ -157,14 +152,9 @@ int main(int argc, char *argv[])
             if (page0_inq.supported_page_codes[i] < 0xc0)
                 continue;
 
-            memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-            ioa_cmd.buffer = &page_cx_inq;
-            ioa_cmd.buffer_len = sizeof(struct ipr_inquiry_page_cx);
-            ioa_cmd.cdb[1] = 0x01;
-            ioa_cmd.cdb[2] = page0_inq.supported_page_codes[i];
-            ioa_cmd.read_not_write = 1;
-
-            rc = ipr_ioctl(fd, INQUIRY, &ioa_cmd);
+            rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle,
+                             page0_inq.supported_page_codes[i], &page_cx_inq,
+                             sizeof(struct ipr_inquiry_page_cx));
 
             if (rc != 0)
             {
@@ -197,14 +187,8 @@ int main(int argc, char *argv[])
         }
 
         /* Issue a page 3 inquiry to get the versioning information */
-        memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-        ioa_cmd.buffer = &page3_inq;
-        ioa_cmd.buffer_len = sizeof(struct ipr_inquiry_page3);
-        ioa_cmd.cdb[1] = 0x01;
-        ioa_cmd.cdb[2] = 0x03;
-        ioa_cmd.read_not_write = 1;
-
-        rc = ipr_ioctl(fd, INQUIRY, &ioa_cmd);
+        rc = ipr_inquiry(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle,
+                         0x03, &page3_inq, sizeof(struct ipr_inquiry_page3));
 
         if (rc != 0)
         {
@@ -288,7 +272,7 @@ int main(int argc, char *argv[])
         u320_disabled = 0;
         
         /* check for mode page 28 changes before adapter reset */
-        sprintf(config_file_name,"%x_%x", p_cur_ioa->ccin, p_cur_ioa->host_addr);
+        sprintf(config_file_name,"%x_%s", p_cur_ioa->ccin, p_cur_ioa->pci_address);
         if (RC_SUCCESS == ipr_config_file_valid(config_file_name))
         {
             ipr_set_page_28(p_cur_ioa, IPR_LIMITED_CONFIG,
@@ -310,16 +294,12 @@ int main(int argc, char *argv[])
              on the next adapter. Would have to remember the child's PID
              so we could wait on it when we were done, though. This would also
              greatly complicate the load source case */
-
-            memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-            ioa_cmd.buffer = (void *)((unsigned long)p_image_hdr + iprtoh32(p_image_hdr->header_length));
-            ioa_cmd.buffer_len = ucode_stats.st_size - iprtoh32(p_image_hdr->header_length);
-            ioa_cmd.read_not_write = 0;
+            buffer = (void *)((unsigned long)p_image_hdr + iprtoh32(p_image_hdr->header_length));
+            length = ucode_stats.st_size - iprtoh32(p_image_hdr->header_length);
 
             /* The write buffer here takes care of both the IOA shutdown and the
              reset of the adapter */
-
-            rc = ipr_ioctl(fd, WRITE_BUFFER, &ioa_cmd);
+            rc = ipr_write_buffer(fd, buffer, length);
 
             if (rc != 0)
                 syslog(LOG_ERR, "Write buffer to %s failed. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
@@ -376,52 +356,19 @@ int main(int argc, char *argv[])
             {
                 if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
                 {
-                    memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
-                    memset(cdb, 0, IPR_CCB_CDB_LEN);
-
-                    /* Issue page 3 inquiry */
-                    cdb[0] = INQUIRY;
-                    cdb[1] = 0x01; /* EVPD */
-                    cdb[2] = 0x03; /* Page 3 */
-                    cdb[4] = sizeof(dasd_page3_inq);
-
-                    rc = sg_ioctl(dev_fd, cdb, &dasd_page3_inq,
-                                  sizeof(dasd_page3_inq),
-                                  SG_DXFER_FROM_DEV, &sense_data, 30);
-
-                    if (rc == CHECK_CONDITION)
-                    {
-                        syslog(LOG_ERR, "Page 3 inquiry to %02X%02X%02X%02X failed: %x %x %x"IPR_EOL,
-                               p_device->p_resource_entry->host_no,
-                               p_device->p_resource_entry->resource_address.bus,
-                               p_device->p_resource_entry->resource_address.target,
-                               p_device->p_resource_entry->resource_address.lun,
-                               sense_data.sense_key & 0x0F,
-                               sense_data.add_sense_code,
-                               sense_data.add_sense_code_qual);
-                        close(dev_fd);
-                        continue;
-                    }
+                    rc = ipr_inquiry(dev_fd, 0,
+                                     0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
                 }
                 else
                 {
-                    memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-
-                    ioa_cmd.buffer = &dasd_page3_inq;
-                    ioa_cmd.buffer_len = sizeof(dasd_page3_inq);
-                    ioa_cmd.cdb[1] = 0x01;
-                    ioa_cmd.cdb[2] = 0x03;
-                    ioa_cmd.read_not_write = 1;
-                    ioa_cmd.device_cmd = 1;
-                    ioa_cmd.resource_address = p_device->p_resource_entry->resource_address;
-
-                    rc = ipr_ioctl(dev_fd, INQUIRY, &ioa_cmd);
+                    rc = ipr_inquiry(dev_fd, p_device->p_resource_entry->resource_handle,
+                                     0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
                 }
 
                 if (rc != 0)
                 {
                     syslog(LOG_ERR, "Inquiry to %02X%02X%02X%02X failed. %m"IPR_EOL,
-                           p_device->p_resource_entry->host_no,
+                           p_cur_ioa->host_no,
                            p_device->p_resource_entry->resource_address.bus,
                            p_device->p_resource_entry->resource_address.target,
                            p_device->p_resource_entry->resource_address.lun);
@@ -453,11 +400,6 @@ int main(int argc, char *argv[])
                             dasd_page3_inq.load_id[2],
                             dasd_page3_inq.load_id[3]);
                     image_offset = sizeof(struct ipr_dasd_ucode_header);
-                }
-                else if ((platform == IPR_ISERIES) || (platform == IPR_PSERIES))
-                {
-                    close(dev_fd);
-                    continue;
                 }
                 else
                 {
@@ -525,7 +467,7 @@ int main(int argc, char *argv[])
                         }
 
                         syslog(LOG_ERR,"Device update to %02X%02X%02X%02X blocked, device in use."IPR_EOL,
-                               p_device->p_resource_entry->host_no,
+                               p_cur_ioa->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
                                p_device->p_resource_entry->resource_address.lun);
@@ -549,7 +491,7 @@ int main(int argc, char *argv[])
                         isprint(dasd_page3_inq.release_level[3]))
                     {
                         syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s from version %c%c%c%c to %c%c%c%c"IPR_EOL,
-                               p_device->p_resource_entry->host_no,
+                               p_cur_ioa->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
                                p_device->p_resource_entry->resource_address.lun,
@@ -566,7 +508,7 @@ int main(int argc, char *argv[])
                     else
                     {
                         syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s"IPR_EOL,
-                               p_device->p_resource_entry->host_no,
+                               p_cur_ioa->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
                                p_device->p_resource_entry->resource_address.lun,
@@ -594,19 +536,13 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-                        ioa_cmd.buffer = (void *)p_dasd_image;
-                        ioa_cmd.buffer_len = image_size;
-                        ioa_cmd.read_not_write = 0;
-                        ioa_cmd.device_cmd = 1;
-                        ioa_cmd.resource_address = p_device->p_resource_entry->resource_address;
-
-                        rc = ipr_ioctl(dev_fd, WRITE_BUFFER, &ioa_cmd);
+                        ipr_dev_write_buffer(dev_fd, p_device->p_resource_entry->resource_handle,
+                                             p_dasd_image, image_size);
                     }
 
                     if (rc != 0)
                         syslog(LOG_ERR, "Write buffer to %02X%02X%02X%02X failed. %m"IPR_EOL,
-                               p_device->p_resource_entry->host_no,
+                               p_cur_ioa->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
                                p_device->p_resource_entry->resource_address.lun);

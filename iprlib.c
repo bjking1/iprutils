@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -23,7 +23,6 @@ struct ipr_ioa *p_head_ipr_ioa = NULL;
 struct ipr_ioa *p_last_ipr_ioa = NULL;
 int driver_major = 0;
 int driver_minor = 0;
-enum ipr_platform platform = IPR_UNKNOWN_PLATFORM;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -263,6 +262,7 @@ struct unsupported_af_dasd unsupported_af[] =
 
 void tool_init(char *tool_name)
 {
+  /* FIXME - host_no is the name of the proc file, dev_name = /dev/ipr* where * = minor number */
     DIR *proc_dir;
     struct dirent *dir_entry;
     char line[100], temp[100], proc_fname[100], *p_char, *p_temp, *p_temp2;
@@ -272,7 +272,6 @@ void tool_init(char *tool_name)
     int rc, minor_num, major_num;
     dev_t major_minor;
     struct stat file_stat;
-    char platform_str[100];
 
     /* Find all the IPR IOAs attached and save away vital info about them */
     proc_dir = opendir("/proc/scsi/ipr");
@@ -291,12 +290,11 @@ void tool_init(char *tool_name)
             /* Driver Version */
             if (get_proc_string(proc_fname, "Driver Version:", line) == 0)
             {
-                exit_on_error("%s incompatible with current driver"IPR_EOL,tool_name);
+                exit_on_error("%s Unable to extract Driver Version"IPR_EOL,tool_name);
             }
 
             p_ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
             memset(p_ipr_ioa,0,sizeof(struct ipr_ioa));
-
             p_temp = &line[16];
 
             p_temp2 = strchr(p_temp, '\n');
@@ -306,12 +304,12 @@ void tool_init(char *tool_name)
 
             if ((driver_major = get_major_version(proc_fname)) == -1)
             {
-                exit_on_error("%s incompatible with current driver"IPR_EOL,tool_name);
+                exit_on_error("%s Invalid Major Driver Version entry"IPR_EOL,tool_name);
             }
 
             if ((driver_minor = get_minor_version(proc_fname)) == -1)
             {
-                exit_on_error("%s incompatible with current driver"IPR_EOL,tool_name);
+                exit_on_error("%s Invalid Minor Driver Version entry"IPR_EOL,tool_name);
             }
 
             if (driver_major != IPR_MAJOR_RELEASE)
@@ -324,7 +322,7 @@ void tool_init(char *tool_name)
             /* Get the CCIN */
             if (get_proc_string(proc_fname, "IBM", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to extract CCIN in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
@@ -332,14 +330,14 @@ void tool_init(char *tool_name)
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Invalid CCIN entry in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Firmware Version */
             if (get_proc_string(proc_fname, "Firmware Version:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to extract Firmware Version %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
@@ -350,20 +348,8 @@ void tool_init(char *tool_name)
                 *p_temp2 = '\0';
             strcpy(p_ipr_ioa->firmware_version, p_temp);
 
-            /* Get the resource name */
-            if (get_proc_string(proc_fname, "Resource Name:", line) == 0)
-            {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            rc = sscanf(line, "Resource Name: %s", p_ipr_ioa->ioa.dev_name);
-
-            if (rc < 1)
-            {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
+            /* Generate the resource name */
+            sprintf(p_ipr_ioa->ioa.dev_name, "/dev/ipr%d", driver_minor);
 
             strcpy(p_ipr_ioa->ioa.gen_name, p_ipr_ioa->ioa.dev_name);
             p_ipr_ioa->ccin = ccin;
@@ -376,7 +362,7 @@ void tool_init(char *tool_name)
             /* get major number here */
             if (get_proc_string(proc_fname, "Major Number:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to extract Major Number in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
             else
@@ -385,7 +371,7 @@ void tool_init(char *tool_name)
 
                 if (rc < 1)
                 {
-                    exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                    exit_on_error("%s: %s Invalid Major Number in driver %s"IPR_EOL,
                                   tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
                 }
             }
@@ -411,25 +397,25 @@ void tool_init(char *tool_name)
                 mknod(p_ipr_ioa->ioa.dev_name, S_IFCHR|S_IRUSR|S_IWUSR, major_minor);
             }
 
-            /* Host address */
-            if (get_proc_string(proc_fname, "Host Address:", line) == 0)
+            /* PCI address */
+            if (get_proc_string(proc_fname, "PCI Address:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to extract PCI Address from driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            rc = sscanf(line, "Host Address: %X", &p_ipr_ioa->host_addr);
+            rc = sscanf(line, "PCI Address: %s", p_ipr_ioa->pci_address);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Invalid PCI Address in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Get the serial number */
             if (get_proc_string(proc_fname, "Serial Number:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to extract Serial Number from driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
@@ -437,14 +423,14 @@ void tool_init(char *tool_name)
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Invalid Serial Number in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Part Number */
             if (get_proc_string(proc_fname, "Card Part Number:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to extrace Card Part Number in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
@@ -452,31 +438,9 @@ void tool_init(char *tool_name)
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                exit_on_error("%s: %s Invalid Card Part Number in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
-
-            /* Platform */
-            if (get_proc_string(proc_fname, "Platform:", line) == 0)
-            {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            rc = sscanf(line, "Platform: %s", platform_str);
-
-            if (rc < 1)
-            {
-                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            if (strcmp(platform_str, "iSeries") == 0)
-                platform = IPR_ISERIES;
-            else if (strcmp(platform_str, "pSeries") == 0)
-                platform = IPR_PSERIES;
-            else
-                platform = IPR_GENERIC;
 
             if (p_last_ipr_ioa)
             {
@@ -553,38 +517,532 @@ int remove_device(struct ipr_res_addr resource_addr, struct ipr_ioa *p_ioa)
     return 0;
 }
 
-int ipr_ioctl(int fd, u32 cmd, struct ipr_ioctl_cmd_internal *p_ioctl_cmd)
+int ipr_start_array(int fd, struct ipr_array_query_data *p_qac_data,
+                    int stripe_size, int prot_level, int hot_spare)
 {
-    struct ipr_ioctl_cmd_type2 *p_cmd;
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    int length = iprtoh16(p_qac_data->resp_len);
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], (void *)p_qac_data, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+    ioa_ioctl->buffer_len = length;
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_START_ARRAY_PROTECTION;
+    if (hot_spare)
+        ioa_ioctl->cmd_pkt.cdb[1] = 0x01;
+
+    ioa_ioctl->cmd_pkt.cdb[4] = (u8)(stripe_size >> 8);
+    ioa_ioctl->cmd_pkt.cdb[5] = (u8)(stripe_size);
+    ioa_ioctl->cmd_pkt.cdb[6] = prot_level;
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_start_array_protection(int fd, struct ipr_array_query_data *p_qac_data,
+                               int stripe_size, int prot_level)
+{
+    return ipr_start_array(fd, p_qac_data, stripe_size, prot_level, 0);
+}
+
+int ipr_add_hot_spare(int fd, struct ipr_array_query_data *p_qac_data)
+{
+    return ipr_start_array(fd, p_qac_data, 0, 0, 1);
+}
+
+int ipr_stop_array(int fd, struct ipr_array_query_data *p_qac_data, int hot_spare)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    int length = iprtoh16(p_qac_data->resp_len);
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], (void *)p_qac_data, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+    ioa_ioctl->buffer_len = length;
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_STOP_ARRAY_PROTECTION;
+    if (hot_spare)
+        ioa_ioctl->cmd_pkt.cdb[1] = 0x01;
+
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_stop_array_protection(int fd, struct ipr_array_query_data *p_qac_data)
+{
+    return ipr_stop_array(fd, p_qac_data, 0);
+}
+
+int ipr_remove_hot_spare(int fd, struct ipr_array_query_data *p_qac_data)
+{
+    return ipr_stop_array(fd, p_qac_data, 1);
+}
+
+int ipr_rebuild_device_data(int fd, struct ipr_array_query_data *p_qac_data)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    int length = iprtoh16(p_qac_data->resp_len);
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], (void *)p_qac_data, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+    ioa_ioctl->buffer_len = length;
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_REBUILD_DEVICE_DATA;
+
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_add_array_device(int fd, struct ipr_array_query_data *p_qac_data)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    int length = iprtoh16(p_qac_data->resp_len);
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], (void *)p_qac_data, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+    ioa_ioctl->buffer_len = length;
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_ADD_ARRAY_DEVICE;
+
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_query_command_status(int fd, u32 res_handle, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
     int rc;
 
-    p_cmd = malloc(sizeof(struct ipr_ioctl_cmd_type2) + p_ioctl_cmd->buffer_len);
-    memset(p_cmd, 0, sizeof(struct ipr_ioctl_cmd_type2) + p_ioctl_cmd->buffer_len);
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_cmd_status));
+    ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = sizeof(struct ipr_cmd_status);
 
-    if (!p_ioctl_cmd->read_not_write)
-        memcpy(p_cmd->buffer, p_ioctl_cmd->buffer, p_ioctl_cmd->buffer_len);
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_QUERY_COMMAND_STATUS;
 
-    p_cmd->driver_cmd = p_ioctl_cmd->driver_cmd;
-    p_cmd->device_cmd = p_ioctl_cmd->device_cmd;
-    p_cmd->resource_address = p_ioctl_cmd->resource_address;
-    p_cmd->buffer_len = p_ioctl_cmd->buffer_len;
-    p_cmd->read_not_write = p_ioctl_cmd->read_not_write;
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
 
-    memcpy(p_cmd->cdb, p_ioctl_cmd->cdb, IPR_CDB_LEN);
-    p_cmd->cdb[0] = cmd;
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
 
-    p_cmd->type = IPR_IOCTL_TYPE_2;
-    p_cmd->reserved = 0;
-
-    rc = ioctl(fd, IPR_IOCTL_SEND_COMMAND, p_cmd);
-
-    if (p_ioctl_cmd->read_not_write)
-        memcpy(p_ioctl_cmd->buffer, p_cmd->buffer, p_ioctl_cmd->buffer_len);
-
-    free(p_cmd);
+    memcpy(buff, &ioa_ioctl->buffer[0], sizeof(struct ipr_cmd_status));
+    free(ioa_ioctl);
 
     return rc;
-};
+}
+
+int ipr_query_resource_state(int fd, u32 res_handle, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_query_res_state));
+    ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = sizeof(struct ipr_query_res_state);
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_QUERY_RESOURCE_STATE;
+
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    memcpy(buff, &ioa_ioctl->buffer[0], sizeof(struct ipr_query_res_state));
+    free(ioa_ioctl);
+
+    return rc;
+}
+
+int ipr_mode_sense(int fd, u8 page, u32 res_handle, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + IPR_MODE_SENSE_LENGTH);
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_DEV_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = IPR_MODE_SENSE_LENGTH;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = MODE_SENSE;
+
+    ioa_ioctl->cmd_pkt.cdb[2] = page;
+    ioa_ioctl->cmd_pkt.cdb[4] = ioa_ioctl->buffer_len;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    memcpy(buff, &ioa_ioctl->buffer[0], IPR_MODE_SENSE_LENGTH);
+    free(ioa_ioctl);
+
+    return rc;
+}
+
+int ipr_mode_select(int fd, u32 res_handle, void *buff, int length)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], buff, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = length;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = MODE_SELECT;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+    free(ioa_ioctl);
+
+    return rc;
+}
+
+int ipr_read_capacity_16(int fd, u32 res_handle, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_read_cap16));
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_DEV_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = sizeof(struct ipr_read_cap16);
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_SERVICE_ACTION_IN;
+    ioa_ioctl->cmd_pkt.cdb[1] = IPR_READ_CAPACITY_16;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    memcpy(buff, &ioa_ioctl->buffer[0], sizeof(struct ipr_read_cap16));
+    free(ioa_ioctl);
+
+    return rc;
+}
+
+int ipr_read_capacity(int fd, u32 res_handle, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_read_cap));
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_DEV_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = sizeof(struct ipr_read_cap);
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = READ_CAPACITY;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    memcpy(buff, &ioa_ioctl->buffer[0], sizeof(struct ipr_read_cap));
+    free(ioa_ioctl);
+
+    return rc;
+}
+
+int ipr_reclaim_cache_store(int fd, int action, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    struct ipr_reclaim_cache_ioctl *reclaim_ioctl;
+    int rc;
+
+    if ((action & IPR_RECLAIM_PERFORM) == IPR_RECLAIM_PERFORM)
+    {
+        reclaim_ioctl = calloc(1,sizeof(struct ipr_reclaim_cache_ioctl) + sizeof(struct ipr_reclaim_query_data));
+        reclaim_ioctl->buffer_len = sizeof(struct ipr_reclaim_query_data);
+  
+        rc = ioctl(fd, IPR_IOCTL_RECLAIM_CACHE, ioa_ioctl);
+
+        memcpy(buff, &reclaim_ioctl->buffer[0], sizeof(struct ipr_reclaim_query_data));
+    }
+    else
+    {
+        ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_reclaim_query_data));
+        ioa_ioctl->timeout_in_sec = IPR_INTERNAL_TIMEOUT;
+        ioa_ioctl->buffer_len = sizeof(struct ipr_reclaim_query_data);
+        ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+
+        ioa_ioctl->cmd_pkt.request_type =IPR_RQTYPE_IOACMD;
+        ioa_ioctl->cmd_pkt.write_not_read = 0;
+        ioa_ioctl->cmd_pkt.cdb[0] = IPR_RECLAIM_CACHE_STORE;
+        ioa_ioctl->cmd_pkt.cdb[1] = (u8)action;
+
+        rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+        memcpy(buff, &ioa_ioctl->buffer[0], sizeof(struct ipr_reclaim_query_data));
+    }
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_start_stop_stop(int fd, u32 res_handle)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl));
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_DEV_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = 0;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = START_STOP;
+    ioa_ioctl->cmd_pkt.cdb[4] = IPR_START_STOP_STOP;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_format_unit(int fd, u32 res_handle)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    u8 *p_defect_list_hdr;
+
+    ioa_ioctl = calloc(1, sizeof(struct ipr_passthru_ioctl) + IPR_DEFECT_LIST_HDR_LEN);
+    ioa_ioctl->timeout_in_sec = IPR_FORMAT_UNIT_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = IPR_DEFECT_LIST_HDR_LEN;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = FORMAT_UNIT;
+    ioa_ioctl->cmd_pkt.cdb[1] = IPR_FORMAT_DATA;
+    ioa_ioctl->cmd_pkt.cdb[4] = 1;
+
+    p_defect_list_hdr = &ioa_ioctl->buffer[0];
+    p_defect_list_hdr[1] = IPR_FORMAT_IMMED;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_evaluate_device(int fd, u32 res_handle)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    u32 resource_handle;
+
+    resource_handle = iprtoh32(res_handle);
+
+    ioa_ioctl = calloc(1, sizeof(struct ipr_passthru_ioctl));
+    ioa_ioctl->timeout_in_sec = IPR_EVALUATE_DEVICE_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = 0;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_EVALUATE_DEVICE;
+    ioa_ioctl->cmd_pkt.cdb[2] = (u8)(resource_handle >> 24);
+    ioa_ioctl->cmd_pkt.cdb[3] = (u8)(resource_handle >> 16);
+    ioa_ioctl->cmd_pkt.cdb[4] = (u8)(resource_handle >> 8);
+    ioa_ioctl->cmd_pkt.cdb[5] = (u8)(resource_handle);
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_mode_sense_page_28(int fd, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_pagewh_28));
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_TIMEOUT;
+    ioa_ioctl->buffer_len = sizeof(struct ipr_pagewh_28);
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_MODE_SENSE;
+    ioa_ioctl->cmd_pkt.cdb[2] = 0x28;
+    ioa_ioctl->cmd_pkt.cdb[4] = ioa_ioctl->buffer_len;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    memcpy(buff, &ioa_ioctl->buffer[0], sizeof(struct ipr_pagewh_28));
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_mode_select_page_28(int fd, void *buff)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+    struct ipr_mode_parm_hdr *p_mode_parm_header;
+    u8 length;
+
+    p_mode_parm_header = (struct ipr_mode_parm_hdr *)buff; 
+    length = p_mode_parm_header->length + 1;
+    p_mode_parm_header->length = 0;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], buff, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_TIMEOUT;
+    ioa_ioctl->buffer_len = length;
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_MODE_SELECT;
+    ioa_ioctl->cmd_pkt.cdb[1] = 0x11;
+    ioa_ioctl->cmd_pkt.cdb[4] = length;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    //FIXME!!! update driver as well.
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+u32 ipr_max_xfer_rate(int fd, int bus)
+{
+    struct ipr_bus_attributes *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_bus_attributes));
+    ioa_ioctl->bus = bus;
+
+    rc = ioctl(fd, IPR_IOCTL_GET_BUS_CAPABILITIES, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return htoipr32(ioa_ioctl->max_xfer_rate);
+}
+
+int ipr_inquiry(int fd, u32 res_handle, u8 page, void *buff, u8 length)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    struct sense_data_t sense_data;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_DEV_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = length;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 0;
+    ioa_ioctl->cmd_pkt.cdb[0] = INQUIRY;
+    if (page != IPR_STD_INQUIRY)
+    {
+        ioa_ioctl->cmd_pkt.cdb[1] = 0x01;
+        ioa_ioctl->cmd_pkt.cdb[2] = page;
+    }
+    ioa_ioctl->cmd_pkt.cdb[4] = length;
+
+    if (res_handle) {
+        rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+        memcpy(buff, &ioa_ioctl->buffer[0], length);
+    } else {
+        rc = sg_ioctl(fd, &ioa_ioctl->cmd_pkt.cdb[0], buff,
+                      length, SG_DXFER_FROM_DEV,
+                      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+    }
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_write_buffer(int fd, void *buff, u32 length)
+{
+    struct ipr_ucode_download_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_ucode_download_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], buff, length);
+    ioa_ioctl->buffer_len = length;
+
+    rc = ioctl(fd, IPR_IOCTL_UCODE_DOWNLOAD, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
+
+int ipr_dev_write_buffer(int fd, u32 res_handle, void *buff, u32 length)
+{
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    int rc;
+
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + length);
+    memcpy(&ioa_ioctl->buffer[0], buff, length);
+
+    ioa_ioctl->timeout_in_sec = IPR_WRITE_BUFFER_TIMEOUT;
+    ioa_ioctl->res_handle = res_handle;
+    ioa_ioctl->buffer_len = length;
+
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
+    ioa_ioctl->cmd_pkt.write_not_read = 1;
+    ioa_ioctl->cmd_pkt.cdb[0] = WRITE_BUFFER;
+    ioa_ioctl->cmd_pkt.cdb[1] = 5;
+    ioa_ioctl->cmd_pkt.cdb[6] = (ioa_ioctl->buffer_len & 0xff0000) >> 16;
+    ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0x00ff00) >> 8;
+    ioa_ioctl->cmd_pkt.cdb[8]= ioa_ioctl->buffer_len & 0x0000ff;
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
+
+    free(ioa_ioctl);
+    return rc;
+}
 
 #define IPR_MAX_XFER 0x8000
 int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
@@ -685,11 +1143,7 @@ int get_major_version(char *proc_file_name)
 	if (p_temp2)
 		*p_temp2 = '\0';
 
-	/* Advance pointer to start of version number */
-	p_temp += 5;
-
-	p_temp2 = strchr(p_temp, ' ');
-
+	p_temp2 = strchr(p_temp, '.');
 	*p_temp2 = '\0';
 
 	return strtoul(p_temp, NULL, 10);
@@ -704,21 +1158,13 @@ int get_minor_version(char *proc_file_name)
 	if (get_proc_string(proc_file_name, "Driver Version:", line) == 0)
 		return -1;
 
-	p_temp = &line[16];
+	p_temp = &line[18];
 
 	p_temp2 = strchr(p_temp, '\n');
 	if (p_temp2)
 		*p_temp2 = '\0';
 
-	p_temp2 = strstr(p_temp, "Rev.");
-
-	/* Advance pointer to start of revision number */
-	p_temp2 += 5;
-
-	p_temp = p_temp2;
-
 	p_temp2 = strchr(p_temp, '.');
-
 	*p_temp2 = '\0';
 
 	return strtoul(p_temp, NULL, 10);
@@ -972,7 +1418,8 @@ void check_current_config(bool allow_rebuild_refresh)
     struct sg_proc_info *p_sg_proc_info;
     int  num_sg_devices, fd, rc, device_count, j, k;
     struct ipr_ioa *p_cur_ioa;
-    struct ipr_ioctl_cmd_internal ioa_cmd;
+    struct ipr_passthru_ioctl *ioa_ioctl;
+    struct ipr_query_config_ioctl *query_ioctl;
     struct ipr_array_query_data  *p_cur_array_query_data;
     struct ipr_resource_table *p_cur_res_table;
     struct ipr_resource_entry res_entry;
@@ -1025,17 +1472,24 @@ void check_current_config(bool allow_rebuild_refresh)
         }
 
         /* Get Query Array Config Data */
-        memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
+        ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + sizeof(struct ipr_array_query_data));
+        ioa_ioctl->timeout_in_sec = IPR_ARRAY_CMD_TIMEOUT;
+        ioa_ioctl->buffer_len = sizeof(struct ipr_array_query_data);
+        ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
 
-        ioa_cmd.buffer = p_cur_array_query_data;
-        ioa_cmd.buffer_len = sizeof(struct ipr_array_query_data);
+        ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+        ioa_ioctl->cmd_pkt.write_not_read = 0;
+        ioa_ioctl->cmd_pkt.cdb[0] = IPR_QUERY_ARRAY_CONFIG;
+
         if (allow_rebuild_refresh)
-            ioa_cmd.cdb[1] = 0;
+            ioa_ioctl->cmd_pkt.cdb[1] = 0;
         else
-            ioa_cmd.cdb[1] = 0x80; /* Prohibit Rebuild Candidate Refresh */
-        ioa_cmd.read_not_write = 1;
+            ioa_ioctl->cmd_pkt.cdb[1] = 0x80; /* Prohibit Rebuild Candidate Refresh */
 
-        rc = ipr_ioctl(fd, IPR_QUERY_ARRAY_CONFIG, &ioa_cmd);
+        ioa_ioctl->cmd_pkt.cdb[7] = (ioa_ioctl->buffer_len & 0xff00) >> 8;
+        ioa_ioctl->cmd_pkt.cdb[8] = ioa_ioctl->buffer_len & 0xff;
+
+        rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
 
         if (rc != 0)
         {
@@ -1044,17 +1498,20 @@ void check_current_config(bool allow_rebuild_refresh)
 
             p_cur_array_query_data->num_records = 0;
         }
+        else 
+        {
+            memcpy(p_cur_array_query_data,&ioa_ioctl->buffer[0], sizeof(struct ipr_array_query_data));
+        }
+
+        free(ioa_ioctl);
 
         p_cur_ioa->p_qac_data = p_cur_array_query_data;
 
         /* Get Query IOA Config Data */
-        memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
+        query_ioctl = calloc(1,sizeof(struct ipr_query_config_ioctl) + sizeof(struct ipr_resource_table));
+        query_ioctl->buffer_len = sizeof(struct ipr_resource_table);
 
-        ioa_cmd.buffer = p_cur_res_table;
-        ioa_cmd.buffer_len = sizeof(struct ipr_resource_table);
-        ioa_cmd.read_not_write = 1;
-
-        rc = ipr_ioctl(fd, IPR_QUERY_IOA_CONFIG, &ioa_cmd);
+        rc = ioctl(fd, IPR_IOCTL_QUERY_CONFIGURATION, query_ioctl);
 
         if (rc != 0)
         {
@@ -1062,6 +1519,14 @@ void check_current_config(bool allow_rebuild_refresh)
             close(fd);
             continue;
         }
+
+        else 
+        {
+            memcpy(p_cur_res_table,&query_ioctl->buffer[0], sizeof(struct ipr_resource_table));
+        }
+
+        free(query_ioctl);
+
         p_cur_ioa->p_resource_table = p_cur_res_table;
         close(fd);
 
@@ -1104,7 +1569,7 @@ void check_current_config(bool allow_rebuild_refresh)
                 found = 0;
                 tried_scsi_add = 0;
                 tried_everything = 0;
-                while (!found && !tried_everything && !res_entry.is_hidden)
+                while (!found && !tried_everything && !ipr_is_hidden(&res_entry))
                 {
                     for (k = 0; k < num_sg_devices; k++)
                     {
@@ -1133,7 +1598,7 @@ void check_current_config(bool allow_rebuild_refresh)
                             /* sleep(1);  give mid-layer a moment to process */
 
                             /* Re-Get sg data via SG_GET_SCSI_ID ioctl 
-                            get_sg_ioctl_data(p_sg_map_info, num_sg_devices); */
+                             get_sg_ioctl_data(p_sg_map_info, num_sg_devices); */
 
                             tried_scsi_add = 1;
                         }
@@ -1142,11 +1607,11 @@ void check_current_config(bool allow_rebuild_refresh)
                             tried_everything = 1;
 
                             /* log error 
-                            syslog(LOG_ERR,"Device not found host %d, bus %d, target %d, lun %d",
-                                   p_cur_ioa->host_num,
-                                   res_entry.resource_address.bus,
-                                   res_entry.resource_address.target,
-                                   res_entry.resource_address.lun); */
+                             syslog(LOG_ERR,"Device not found host %d, bus %d, target %d, lun %d",
+                             p_cur_ioa->host_num,
+                             res_entry.resource_address.bus,
+                             res_entry.resource_address.target,
+                             res_entry.resource_address.lun); */
                         }
                     }
                 }
@@ -1455,8 +1920,8 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
     int update_entry;
 
     /* gets Host Address to create file_name */
-    sprintf(file_name,"%x_%x",
-            p_ioa->ccin, p_ioa->host_addr);
+    sprintf(file_name,"%x_%s",
+            p_ioa->ccin, p_ioa->pci_address);
 
     for (i = 0;
          i < p_page_28_cur->page_hdr.num_dev_entries;
@@ -1565,7 +2030,6 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
                      int reset_scheduled)
 {
     int rc, i;
-    struct ipr_ioctl_cmd_internal ioa_cmd;
     char current_mode_settings[255];
     char changeable_mode_settings[255];
     char default_mode_settings[255];
@@ -1580,16 +2044,11 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
     int new_value;
     u32 max_xfer_rate;
 
+    memset(current_mode_settings,0,sizeof(current_mode_settings));
+    memset(changeable_mode_settings,0,sizeof(changeable_mode_settings));
+    memset(default_mode_settings,0,sizeof(default_mode_settings));
+
     /* mode sense page28 to get current parms */
-    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
-
-    ioa_cmd.buffer = p_mode_parm_hdr;
-    ioa_cmd.buffer_len = 255;
-    ioa_cmd.cdb[2] = 0x28;
-    ioa_cmd.read_not_write = 1;
-    ioa_cmd.driver_cmd = 1;
-
     fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
     if (fd <= 1)
     {
@@ -1597,7 +2056,8 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
         return;
     }
 
-    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
+    rc = ipr_mode_sense_page_28(fd, p_mode_parm_hdr);
 
     if (rc != 0)
     {
@@ -1613,47 +2073,34 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
 
     /* now issue mode sense to get changeable parms */
     p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
-
-    ioa_cmd.buffer = p_mode_parm_hdr;
-    ioa_cmd.buffer_len = 255;
-    ioa_cmd.cdb[2] = 0x68;
-
-    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
-
-    if (rc != 0)
-    {
-        close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
-               p_cur_ioa->ioa.dev_name);
-        return;
-    }
-
     p_page_28_chg = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get default parms */
     p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
-
-    ioa_cmd.buffer = p_mode_parm_hdr;
-    ioa_cmd.buffer_len = 255;
-    ioa_cmd.cdb[2] = 0xA8;
-
-    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
-
-    if (rc != 0)
-    {
-        close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
-               p_cur_ioa->ioa.dev_name);
-        return;
-    }
-
     p_page_28_dflt = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
+    /* determine changable and default values */
+    for (i = 0;
+         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i++)
+    {
+        p_page_28_chg->attr[i].qas_capability = 0;
+        p_page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
+                                            // vend/prod & subsystem id)
+        p_page_28_chg->attr[i].bus_width = 1;
+        p_page_28_chg->attr[i].max_xfer_rate = 1;
+
+        p_page_28_dflt->attr[i].qas_capability = 0;
+        p_page_28_dflt->attr[i].scsi_id = p_page_28_cur->attr[i].scsi_id;
+        p_page_28_dflt->attr[i].bus_width = 16;
+        p_page_28_dflt->attr[i].max_xfer_rate = ipr_max_xfer_rate(fd, p_page_28_cur->attr[i].res_addr.bus);
+    }
+
     /* extract data from saved file to send in mode select */
-    sprintf(file_name,"%x_%x",
-            p_cur_ioa->ccin, p_cur_ioa->host_addr);
+    sprintf(file_name,"%x_%s",
+            p_cur_ioa->ccin, p_cur_ioa->pci_address);
 
     for (i = 0;
          i < p_page_28_cur->page_hdr.num_dev_entries;
@@ -1820,13 +2267,7 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
     }
 
     /* issue mode sense and reset if necessary */
-    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
-    ioa_cmd.buffer = p_page_28_sense;
-    ioa_cmd.buffer_len = sizeof(struct ipr_pagewh_28);
-    ioa_cmd.read_not_write = 0;
-    ioa_cmd.driver_cmd = 1;
-
-    rc = ipr_ioctl(fd, IPR_MODE_SELECT_PAGE_28, &ioa_cmd);
+    rc = ipr_mode_select_page_28(fd, p_page_28_sense);
 
     if (rc != 0)
     {
@@ -1839,7 +2280,7 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
     if ((is_reset_req) &&
         (!reset_scheduled))
     {
-        rc = ipr_ioctl(fd, IPR_RESET_HOST_ADAPTER, &ioa_cmd);
+        rc = ioctl(fd, IPR_IOCTL_RESET_IOA);
     }
 
     close(fd);
@@ -1849,7 +2290,6 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
                           int limited_config)
 {
     int rc, i;
-    struct ipr_ioctl_cmd_internal ioa_cmd;
     char current_mode_settings[255];
     char changeable_mode_settings[255];
     char default_mode_settings[255];
@@ -1861,15 +2301,9 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
     struct ipr_page_28 page_28_ipr;
     u32 max_xfer_rate;
 
-    /* Mode sense page28 to get current parms */
-    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
-
-    ioa_cmd.buffer = p_mode_parm_hdr;
-    ioa_cmd.buffer_len = 255;
-    ioa_cmd.cdb[2] = 0x28;
-    ioa_cmd.read_not_write = 1;
-    ioa_cmd.driver_cmd = 1;
+    memset(current_mode_settings,0,sizeof(current_mode_settings));
+    memset(changeable_mode_settings,0,sizeof(changeable_mode_settings));
+    memset(default_mode_settings,0,sizeof(default_mode_settings));
 
     fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
     if (fd <= 1)
@@ -1878,7 +2312,9 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
         return;
     }
 
-    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
+    /* Mode sense page28 to get current parms */
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
+    rc = ipr_mode_sense_page_28(fd, p_mode_parm_hdr);
 
     if (rc != 0)
     {
@@ -1894,43 +2330,30 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
 
     /* Now issue mode sense to get changeable parms */
     p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
-
-    ioa_cmd.buffer = p_mode_parm_hdr;
-    ioa_cmd.buffer_len = 255;
-    ioa_cmd.cdb[2] = 0x68;
-
-    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
-
-    if (rc != 0)
-    {
-        close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
-               p_cur_ioa->ioa.dev_name);
-        return;
-    }
-
     p_page_28_chg = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get default parms */
     p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
-
-    ioa_cmd.buffer = p_mode_parm_hdr;
-    ioa_cmd.buffer_len = 255;
-    ioa_cmd.cdb[2] = 0xA8;
-
-    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
-
-    if (rc != 0)
-    {
-        close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
-               p_cur_ioa->ioa.dev_name);
-        return;
-    }
-
     p_page_28_dflt = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+
+    /* determine changable and default values */
+    for (i = 0;
+         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i++)
+    {
+        p_page_28_chg->attr[i].qas_capability = 0;
+        p_page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
+                                            // vend/prod & subsystem id)
+        p_page_28_chg->attr[i].bus_width = 1;
+        p_page_28_chg->attr[i].max_xfer_rate = 1;
+
+        p_page_28_dflt->attr[i].qas_capability = 0;
+        p_page_28_dflt->attr[i].scsi_id = p_page_28_cur->attr[i].scsi_id;
+        p_page_28_dflt->attr[i].bus_width = 16;
+        p_page_28_dflt->attr[i].max_xfer_rate = ipr_max_xfer_rate(fd, p_page_28_cur->attr[i].res_addr.bus);
+    }
 
     for (i = 0;
          i < p_page_28_cur->page_hdr.num_dev_entries;
@@ -1963,13 +2386,7 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
     /* Issue mode select */
     if (issue_mode_select)
     {
-        memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
-        ioa_cmd.buffer = p_page_28_sense;
-        ioa_cmd.buffer_len = sizeof(struct ipr_pagewh_28);
-        ioa_cmd.read_not_write = 0;
-        ioa_cmd.driver_cmd = 1;
-
-        rc = ipr_ioctl(fd, IPR_MODE_SELECT_PAGE_28, &ioa_cmd);
+        rc = ipr_mode_select_page_28(fd, p_page_28_sense);
 
         if (rc != 0)
         {
@@ -1990,26 +2407,11 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
     close(fd);
 }
 
-void iprlog_location(struct ipr_resource_entry *p_resource)
+void iprlog_location(struct ipr_ioa *p_ioa)
 {
-    if (platform == IPR_ISERIES)
-    {
-        syslog(LOG_ERR,"  Frame ID: %s, Card position: %s",
-               p_resource->frame_id, p_resource->slot_label);
-    }
-    else
-    {
-        if (platform == IPR_PSERIES)
-            syslog(LOG_ERR, 
-                   "  Location: %s, Bus: %d, Device: %d, Host num: %d",
-                   p_resource->pseries_location, p_resource->pci_bus_number,
-                   p_resource->pci_slot, p_resource->host_no);
-        else
-            syslog(LOG_ERR, 
-                   "  Bus: %d, Device: %d, Host num: %d",
-                   p_resource->pci_bus_number,
-                   p_resource->pci_slot, p_resource->host_no);
-    }
+  syslog(LOG_ERR, 
+	 "  PCI Address: %s, Host num: %d",
+	 p_ioa->pci_address, p_ioa->host_no); /* FIXME */
 }
 
 bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)

@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -388,35 +388,46 @@ int main(int argc, char *argv[])
 int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
                 int *buffer, int len)
 {
-    struct ipr_ioctl_cmd_internal ioa_cmd;
     int rc;
+    struct ipr_passthru_ioctl *ioa_ioctl;
 
-    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
+    ioa_ioctl = calloc(1,sizeof(struct ipr_passthru_ioctl) + len);
 
-    ioa_cmd.buffer = buffer;
-    ioa_cmd.buffer_len = len;
-    ioa_cmd.cdb[0] = IPR_IOA_DEBUG;
-    ioa_cmd.cdb[1] = cmd;
-    ioa_cmd.cdb[2] = (ioa_adx >> 24) & 0xff;
-    ioa_cmd.cdb[3] = (ioa_adx >> 16) & 0xff;
-    ioa_cmd.cdb[4] = (ioa_adx >> 8) & 0xff;
-    ioa_cmd.cdb[5] = ioa_adx & 0xff;
-    ioa_cmd.cdb[6] = (mask >> 24) & 0xff;
-    ioa_cmd.cdb[7] = (mask >> 16) & 0xff;
-    ioa_cmd.cdb[8] = (mask >> 8) & 0xff;
-    ioa_cmd.cdb[9] = mask & 0xff;
-    ioa_cmd.cdb[10] = (len >> 24) & 0xff;
-    ioa_cmd.cdb[11] = (len >> 16) & 0xff;
-    ioa_cmd.cdb[12] = (len >> 8) & 0xff;
-    ioa_cmd.cdb[13] = len & 0xff;
+    ioa_ioctl->timeout_in_sec = IPR_INTERNAL_TIMEOUT;
+    ioa_ioctl->buffer_len = len;
+    ioa_ioctl->res_handle = IPR_IOA_RESOURCE_HANDLE;
 
-    if (cmd != IPRDBG_WRITE)
-        ioa_cmd.read_not_write = 1;
+    ioa_ioctl->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
+    ioa_ioctl->cmd_pkt.cdb[0] = IPR_IOA_DEBUG;
+    ioa_ioctl->cmd_pkt.cdb[1] = cmd;
+    ioa_ioctl->cmd_pkt.cdb[2] = (ioa_adx >> 24) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[3] = (ioa_adx >> 16) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[4] = (ioa_adx >> 8) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[5] = ioa_adx & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[6] = (mask >> 24) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[7] = (mask >> 16) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[8] = (mask >> 8) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[9] = mask & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[10] = (len >> 24) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[11] = (len >> 16) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[12] = (len >> 8) & 0xff;
+    ioa_ioctl->cmd_pkt.cdb[13] = len & 0xff;
 
-    rc = ipr_ioctl(fd, IPR_IOA_DEBUG, &ioa_cmd);
+    if (cmd == IPRDBG_WRITE)
+    {
+        ioa_ioctl->cmd_pkt.write_not_read = 1;
+        memcpy(&ioa_ioctl->buffer[0], buffer, len);
+    }
+
+    rc = ioctl(fd, IPR_IOCTL_PASSTHRU, ioa_ioctl);
 
     if (rc != 0)
         fprintf(stderr, "Debug IOCTL failed. %d\n", errno);
+
+    if (cmd != IPRDBG_WRITE)
+    {
+        memcpy(buffer, &ioa_ioctl->buffer[0], len);
+    }
 
     return rc;
 }

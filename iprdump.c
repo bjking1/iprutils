@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -25,7 +25,7 @@
 int main(int argc, char *argv[])
 {
     int rc = 0;
-    struct ipr_ioctl_cmd_type2 *ioa_cmd;
+    struct ipr_dump_ioctl *ipr_ioctl;
     DIR *dump_dir;
     struct dirent *dir_entry;
     char *p_temp;
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
          ioa_num < num_ioas;
          p_cur_ioa = p_cur_ioa->p_next, ioa_num++)
     {
-        ioa_cmd = malloc(sizeof(struct ipr_ioctl_cmd_type2) + IPRDUMP_SIZE);
+        ipr_ioctl = calloc(1,sizeof(struct ipr_dump_ioctl) + IPRDUMP_SIZE);
 
         fd = open(p_cur_ioa->ioa.dev_name, O_RDWR | O_NONBLOCK);
 
@@ -169,15 +169,9 @@ int main(int argc, char *argv[])
         }
 
         while (1) {
-            memset(ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_type2) + IPRDUMP_SIZE);
+            ipr_ioctl->buffer_len = IPRDUMP_SIZE;
 
-            ioa_cmd->buffer_len = IPRDUMP_SIZE;
-            ioa_cmd->cdb[0] = IPR_DUMP_IOA;
-
-            ioa_cmd->type = IPR_IOCTL_TYPE_2;
-            ioa_cmd->driver_cmd = 1;
-
-            rc = ioctl(fd, IPR_IOCTL_SEND_COMMAND, ioa_cmd);
+            rc = ioctl(fd, IPR_IOCTL_DUMP_IOA, ipr_ioctl);
 
             if (rc != 0)
             {
@@ -196,14 +190,14 @@ int main(int argc, char *argv[])
                 }
 
                 /* get length of data obtained from within buffer */
-                dump_header = (struct dump_header *)ioa_cmd->buffer;
-                write(f_dump, ioa_cmd->buffer, iprtoh32(dump_header->total_length));
+                dump_header = (struct dump_header *)&ipr_ioctl->buffer[0];
+                write(f_dump, &ipr_ioctl->buffer[0], iprtoh32(dump_header->total_length));
                 close(f_dump);
 
                 /* parse through buffer and find the IPR_DUMP_TEXT_ID
                  information */
                 dump_entry_header =
-                    (struct dump_entry_header *)&ioa_cmd->buffer[iprtoh32(dump_header->first_entry_offset)];
+                    (struct dump_entry_header *)&ipr_ioctl->buffer[iprtoh32(dump_header->first_entry_offset)];
 
                 while (iprtoh32(dump_entry_header->id) != IPR_DUMP_TEXT_ID)
                 {
@@ -261,7 +255,7 @@ int main(int argc, char *argv[])
                 new_dumpID++;
             }
         }
-        free(ioa_cmd);
+        free(ipr_ioctl);
         close(fd);
     }
     return rc;

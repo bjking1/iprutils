@@ -12,7 +12,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/Attic/iprtrace.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/Attic/iprtrace.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
  */
 
 #include <stdio.h>
@@ -40,68 +40,61 @@
 #include "iprlib.h"
 #endif
 
-struct ipr_trace_entry
-{
+struct ipr_trace_entry {
 	u32 element[4];
 };
 
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-    struct ipr_ioctl_cmd_internal ioa_cmd;
     struct ipr_trace_entry *p_trace_entry;
+    struct ipr_get_trace_ioctl *ipr_ioctl;
     int num_trace_entries;
     int fd, rc, i;
 
-    if (argc != 2)
-    {
-        printf("Usage: iprtrace [controller]"IPR_EOL);
-        printf("  Example: iprtrace /dev/ipr0"IPR_EOL);
+    if (argc != 2) {
+        printf("Usage: iprtrace [controller]" IPR_EOL);
+        printf("  Example: iprtrace /dev/ipr0" IPR_EOL);
         return -1;
     }
 
-    openlog("iprtrace",
-            LOG_PERROR | /* Print error to stderr as well */
-            LOG_PID |    /* Include the PID with each error */
-            LOG_CONS,    /* Write to system console if there is an error
-                          sending to system logger */
+    openlog("iprtrace", LOG_PERROR |	/* Print error to stderr as well */
+            LOG_PID |	/* Include the PID with each error */
+            LOG_CONS,	/* Write to system console if there is an error
+                         sending to system logger */
             LOG_USER);
 
     fd = open(argv[1], O_RDWR);
 
-    if (fd <= 1)
-    {
-        syslog(LOG_ERR, "Cannot open %s. %m"IPR_EOL, argv[1]);
+    if (fd <= 1) {
+        syslog(LOG_ERR, "Cannot open %s. %m" IPR_EOL, argv[1]);
         return -1;
     }
 
-    num_trace_entries = IPR_DUMP_TRACE_ENTRY_SIZE/sizeof(struct ipr_trace_entry);
+    num_trace_entries =
+        IPR_DUMP_TRACE_ENTRY_SIZE / sizeof(struct ipr_trace_entry);
 
-    p_trace_entry = malloc(IPR_DUMP_TRACE_ENTRY_SIZE);
+    ipr_ioctl = calloc(1,sizeof(struct ipr_ucode_download_ioctl) +
+                       IPR_DUMP_TRACE_ENTRY_SIZE);
+    p_trace_entry = &ipr_ioctl->buffer[0];
+    ipr_ioctl->buffer_len = IPR_DUMP_TRACE_ENTRY_SIZE;
 
-    memset(ioa_cmd.cdb, 0, 16);
+    rc = ioctl(fd, IPR_IOCTL_GET_TRACE, ipr_ioctl);
 
-    ioa_cmd.buffer = p_trace_entry;
-    ioa_cmd.buffer_len = IPR_DUMP_TRACE_ENTRY_SIZE;
-    ioa_cmd.read_not_write = 1;
-    ioa_cmd.driver_cmd = 1;
-
-    rc = ipr_ioctl(fd, IPR_GET_TRACE, &ioa_cmd);
-
+    free(ipr_ioctl);
     close(fd);
 
-    if (rc != 0)
-    {
-        syslog(LOG_ERR, "Get trace failed. %m"IPR_EOL);
+    if (rc != 0) {
+        syslog(LOG_ERR, "Get trace failed. %m" IPR_EOL);
         return -1;
     }
 
-    for (i = 0; i < num_trace_entries; i++)
-    {
+    for (i = 0; i < num_trace_entries; i++) {
         printf("0x%08x  0x%08x  0x%08x  0x%08x\n",
-               p_trace_entry[i].element[0], p_trace_entry[i].element[1],
-               p_trace_entry[i].element[2], p_trace_entry[i].element[3]);
+               p_trace_entry[i].element[0],
+               p_trace_entry[i].element[1],
+               p_trace_entry[i].element[2],
+               p_trace_entry[i].element[3]);
     }
 
     return 0;
 }
-
