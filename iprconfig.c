@@ -8852,7 +8852,6 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			status = ipr_mode_sense(ipr_dev, 0x0a, &ioctl_buffer);
 
 			if (status == CHECK_CONDITION &&
-			    sense_data.sense_key == 0x03 &&
 			    sense_data.add_sense_code == 0x31 &&
 			    sense_data.add_sense_code_qual == 0x00) {
 				format_req = 1;
@@ -8873,7 +8872,6 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 						rc = ipr_test_unit_ready(ipr_dev, &sense_data);
 
 						if (rc == CHECK_CONDITION &&
-						    sense_data.sense_key == 0x03 &&
 						    sense_data.add_sense_code == 0x31 &&
 						    sense_data.add_sense_code_qual == 0x00)
 							format_req = 1;
@@ -8934,10 +8932,13 @@ int is_format_allowed(struct ipr_dev *dev)
 	} else {
 		rc = ipr_test_unit_ready(dev, &sense_data);
 
-		if (rc == CHECK_CONDITION &&
-		    (sense_data.error_code & 0x7F) == 0x70&&
-		    (sense_data.sense_key & 0x0F) == 0x02)
-			return 0;
+		if (rc == CHECK_CONDITION && (sense_data.error_code & 0x7F) == 0x70) {
+			if (sense_data.add_sense_code == 0x31 &&
+			    sense_data.add_sense_code_qual == 0x00)
+				return 1;
+			else if ((sense_data.sense_key & 0x0F) == 0x02)
+				return 0;
+		}
 	}
 
 	return 1;

@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.13.3
+Version: 2.0.13.4
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Dec 7 2004 Brian King <brking@us.ibm.com> 2.0.13.4
+- Fix handling of medium format corrupt drives for drives
+  that return NOT_READY instead of MEDIUM_ERROR.
 * Fri Dec 1 2004 Brian King <brking@us.ibm.com> 2.0.13.3
 - Fix iprconfig RAID start bug for systems with multiple RAID adapters.
 - Fix iprconfig RAID include bug for systems with multiple RAID adapters.
