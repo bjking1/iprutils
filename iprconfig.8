@@ -1,120 +1,88 @@
 .TH IPRCONFIG 8 "March 2003"
 .SH NAME
-iprconfig \- IBM storage adapter configuration/recovery utility
+iprconfig \- IBM Power RAID storage adapter configuration/recovery utility
 .SH SYNOPIPR
-.BI "iprconfig [-e editor] [-k dir] [-p mode]"
+.BI "iprconfig [-e editor] [-k dir]"
 .sp
 .BI "iprconfig --version"
 .SH DESCRIPTION
 .B iprconfig
-is used to configure IBM storage adapters, display information
-about them, and to perform IOA and disk unit recovery scenarios. It was originally
-designed to emulate IBM iSeries DST/SST green screens and should have similar
-behavior. The interface is completely menu driven. The various screens will
-look slightly different depending on the hardware platform iprconfig is
-being run on. The various menu options are: 
+is used to configure IBM Power RAID storage adapters, display information
+about them, and to perform adapter and disk unit recovery. 
+The menu options are: 
 .PP
 .B 1. Display disk hardware status.
 .br
 This option can be used to display various information regarding
-the SCSI IOAs attached to the system and the disk units controlled by
-them. For each IOA and disk unit, their serial number, type,
-model number, resource name, and hardware status will be 
-available. The model numbers are:
+the IBM Power RAID adapters attached to the system and the disk 
+units controlled by them. For each adapter and disk unit, their 
+/dev name, physical location, description, vendor/product ID, and
+hardware status will be available. Beside each resource is an OPT 
+field. By entering a 5 beside any resource, detailed information 
+about that resource can be obtained. For an adapter resource, this 
+will display the driver version, the adapter firmware version, 
+and the physical location amongst other things.
 .PP
-001	IOA resource
+.B 2. Work with Disk Arrays
 .br
-020	JBOD Disk unit resource
-.br
-050	Disk unit resource
-.br
-060	Compressed disk unit
-.br
-07x	Parity protected disk unit
-.br
-08x	Compressed, parity protected disk unit
-.br
-090	Hot Spare disk unit
-.br
-200	Parity set resource
-.br
-.br
-Note: for the 07x and 08x models, the x describes the amount
-of the device which is used as parity. 4 = 1/4 parity, 
-2 = 1/8 parity, 1 = 1/16 parity, 0 = no parity, 9 = other parity distribution.
-.PP
-By selecting Display disk unit details from this screen it is possible
-to obtain the physical location for each resource listed. This information
-can be used to locate failing devices. On this 
-screen, beside each resource is an OPT field. By entering a 5 beside
-any resource, detailed information about that resource can be obtained.
-For an IOA resource, this will display the driver version, the IOA
-firmware version, and the physical location amongst other things.
-.PP
-.B 2. Work with device parity protection
-.br
-This option will present a second menu containing device parity related
+This option will present a second menu containing disk array related
 commands. 
 .PP
-.B Display device parity status
-is used to display the status of hardware parity protection
-on the system. 
+.B Display disk array status
+is used to display the status of disk arrays on the system. 
 .PP
-.B Start device parity protection
-is used to combine a set of devices into one or more disk arrays/parity sets.
-.B ATTENTION:
-Data on selected devices will NOT be preserved when creating the parity set.
+.B Create a disk array
+is used to create a disk array.
 .PP
-.B Stop device parity protection
-is used to stop device parity protection and delete disk arrays.
-Selecting this option will provide you with a candidate list of disk arrays 
-which can be stopped. If you have devices which are in disk arrays and they 
-are not available as candidates to stop, you may need to format the 
-devices using iprconfig.
+.B Delete a disk array
+is used to delete disk arrays. Selecting this option will provide you 
+with list of disk arrays which can be deleted.
 .PP
-.B Include unit in device parity protection
-is used to allow compatible devices to be included into an existing
-parity protected array.
-.B ATTENTION:
-All data on the devices to be included will be lost
-as the devices will be zeroed before being included into the array.  Data already on
-a device in the existing array will not be affected.
+.B Add a device to a disk array
+is used to include devices of similar capacity into an existing disk 
+array. This function is currently only supported for RAID 5 disk arrays.
 .PP
-.B Work with disk unit configuration
-is used to create and delete hot spare devices and to enable and disable device
-advanced functions. In order to create a disk array when starting from JBOD disks (020),
-the disks must first be enabled for advanced function which will reformat the devices.
+.B Format device for advanced function
+is used to format disks to 522 bytes/sector so that they may be used in
+a disk array.
+.PP
+.B Format device for JBOD function
+is used to format disks to 512 bytes/sector so that they may be used 
+as standalone disks.
+.PP
+.B Configure a hot spare device
+is used to designate a device as a dedicated hot spare.
+.PP
+.B Unconfigure a hot spare device
+is used to unconfigure a previously configured hot spare.
 .PP
 .B 3. Work with disk unit recovery
 is used to perform the following disk unit recovery actions:
 .PP
-.B Device Concurrent Maintenance.
-.br
-This is used to add or replace disk units from the system concurrent with running.
-Not all systems support device concurrent maintenance. Concurrent maintenance is
-currently only supported with SES (SCSI Enclosure Services) packaging.
-To use this facility, you will need to know the physical location of the 
-device you would like to replace. Device concurrent maintenance can be used to
-add a new device to a running system and to replace a failed device. Extreme
-caution should be used when performing device concurrent maintenance.
+.B Concurrent Add Device
+is used to concurrently add a new disk to a running system. This feature
+is only supported with SES (SCSI Enclosure Services) packaging.
+.PP
+.B Concurrent Remove/Replace Device
+is used to concurrently remove and replace a disk from a running system.
+This feature is only supported with SES (SCSI Enclosure Services) packaging.
 .PP
 .B Initialize and format disk unit
 is used to issue a SCSI format command to attached devices. A format
-unit command has special meaning to the IOA and is used as a service
+unit command has special meaning to the adapter and is used as a service
 action for certain error conditions. Formatting a disk unit will lose
-all data on that drive. To make a compressed disk unit usable a format
-can must used.
+all data on that drive.
 .PP
 .B Reclaim IOA cache storage
 is used to repair cache error conditions. 
-.B Warning!
+.B ATTENTION:
 Use this option with care. This is used to discard data from the cache
 and may result in data loss. This option is designed to be used by
 authorized IBM hardware customer engineers.
 .PP
 .B Rebuild disk unit data
-is generally used following concurrent maintenance.  Select this option after
-failing array member device has been replaced to reconstruct the device as 
+is generally used following concurrent maintenance. Select this option after
+a failing array member device has been replaced to reconstruct the device as 
 an active array member.
 .PP
 .B Work with resources containing cache battery packs
@@ -125,9 +93,12 @@ they can be replaced prior to failure.
 Once an error has been forced on a rechargeable cache battery pack write
 caching will be disabled until the battery pack is replaced.
 .PP
-.B 4. Work with configuration
-is used to change configurable driver and adapter options, such as driver
-verbosity, maximum bus speed allowed, initiator SCSI ID, etc.
+.B 4. Work with SCSI bus configuration
+is used to change configurable SCSI bus attributes, such as maximum SCSI
+bus speed, SCSI initiator ID, etc.
+.PP
+.B 5. Work with driver configuration
+is used to change driver configurable attributes, such as log_level.
 .PP
 .B 5. Analyze Log
 is an option available to analyze /var/log/messages* files. By default
@@ -152,26 +123,19 @@ changed with this parameter.
 Kernel messages root directory. Root directory to look for kernel messages.
 Default is /var/log.
 .TP
-.B -p mode
-Select the mode in which device location data should be displayed.  Mode options are 
-.B iseries, pseries
-and
-.B
-generic.
-.TP
 .B \-\-version
 Print version number of 
 .B iprconfig
 .SH AUTHOR
-Brian King (bjking1@us.ibm.com)
+Brian King (brking@us.ibm.com)
 .SH NOTES
 .TP
 .B Notes on using under iSeries 5250 telnet
 .PP
 Only use this utility across 5250 telnet when there are no other options
 available to you. Since there may be occasions when 5250 telnet is your only
-option to access your Linux console, every attempt has been made to make 
-this utility usable under 5250 telnet. By following a few guidelines,
+option to access your iSeries Linux console, every attempt has been made to 
+make this utility usable under 5250 telnet. By following a few guidelines,
 you can make your 5250 telnet experience more productive and much less
 frustrating.
 .PP

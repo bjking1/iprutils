@@ -17,80 +17,41 @@ This is an ncurses based utility used to configure ipr adapters and devices.
 The basic functions of this tool are:
 
 CONFIGURATION
-1. Display disk hardware status.  This can be used to display all native disk attached
-to your Linux partition. Using this option it is possible to obtain the physical location
+1. Display disk hardware status.  This can be used to display all SCSI disks attached
+to your system. Using this option it is possible to obtain the physical location
 of each device on the system.
-2. Work with SCSI Bus Configuration.  With some adapters, this enablement allows
-flexibility in setting some SCSI Bus operating parameters such is Max Bus Throughput
-and host SCSI ID.
+2. Work with SCSI Bus Configuration.  This allows flexibility in setting some
+SCSI Bus parameters such is Max Bus Throughput and host SCSI ID.
 3. Work with Driver Configuration.  Currently allows adjustment to the devices drivers
-debug verbosity level and internal trace enablement.
+log level.
 
 RAID
-4. Stop parity protection. This utility allows you to stop existing arrays.  Data stored
+4. Delete a disk array. Allows you to delete existing arrays.  Data stored
 on the devices will not be preserved after issuing this command.
-5. Start parity protection.  This option is used to combine a set of previously non-
-redundant devices into one or more data redundant arrays.  WARNING:  All data on
-targeted devices will be lost as ALL targeted devices are zeroed when array is created.
-6. Include device.  This option allows compatible devices to be included into an existing
-parity protected array.  WARNING:  All data on the devices to be included will be lost
-as the devices will be zeroed before being included into the array.  Data already on
-a device in the existing array will not be affected.
-7. Configure hot spare device.  With some adapters, this allows additional protection
-by configuring a hot spare device which can be used to automatically replace a failed device
-in a parity set.  WARNING:  All data on the devices to be configured as hot spare may be
-lost.
-8. Format Device for advanced function/Format Device for JBOD (Just a Bunch Of Dasd) function.
-Some adapters now support two modes of interacion with dasd devices.  The devices can be
-formatted for use in a RAID set in which the device must be configured for RAID
-before being usable or the devices can be formatted as a JBOD device and be used without
-data protection.
+5. Create a disk array.  Used to create a disk array.
+6. Add a device to a disk array.  This option allows devices of similar capacity
+to be included into an existing disk array.
+7. Configure a hot spare device.  Configure a disk to become a hot spare, capable
+of being used by the adapter to automatically replace a failed device
+8. Format Device for advanced function/Format Device for JBOD (Just a Bunch Of DASD) function.
+Disk devices can either be formatted to 512 bytes/sector or 522 bytes/sector. Devices must
+be formatted to 522 bytes/sector, or advanced function format, in order to be used in
+a disk array or as a hot spare. Devices not in a disk array can be formatted to
+512 bytes/sector so they can be used directly by the operating system.
 
 
 RECOVERY
-9. Rebuild parity protection.  This option is generally used following concurrent
-maintenance.  Select this option after failing array member device has been replaced to
-reconstruct device as an Active array member.
+9. Rebuild disk unit data.  This option is generally used following concurrent
+maintenance.  Select this option after a failing array member device has been replaced to
+reconstruct device as an active array member.
 10. Device concurrent maintenance. This can be used to concurrently add or replace disk
 units from a running system.
 11. Reclaim IOA cache storage. This is to be used by IBM hardware service personnel only. 
 Use of this function is potentially dangerous and may delete data from the non-volatile
 write cache on the adapter.
 12. Initialize and format disk unit. This allows you to issue an actual SCSI format command 
-to natively attached disks. Proceed with caution when using this option.
+to SCSI disks. Proceed with caution when using this option.
 13. Work with Resources Containing Cache Battery Packs.  A set of displays are used to view
 the current status of the Cache Battery on resources containing battery packs and allow
 maintanence actions to be performed against those resources when necessary.
 14. Analyze Log. This allows you to view the error messages logged by the ipr device driver.
-
-
-Troubleshooting direct attach DASD:
-
-Q1. I just moved some DASD over to my linux partition and now they don't work. I get Data
-Protect sense data looking error logs. 
-A1. More than likely the DASD are being read/write protected by the adapter for some reason.
-Use the iprconfig utility, take option 5. Analyze Log, then option 1. Use vi to view 
-IBM Storage error messages. If you wish to use an editor more familiar to
-you than vi, select option 5 first to change the editor. (If you get into vi and get stuck
-type Esc-q!-Enter. This should get you out.) This will display the errors logged by the
-ipr device driver. 
-Now look for "Configuration Error". If you have an error log that looks similar to this:
-
-Configuration Error. The following devices contain
-attributes not supported by this driver
-Refer to the appropriate Linux on iSeries service documents
-Device                                  Serial #  COMP
-/dev/scsi/host0/bus0/target0/lun0/disc  00452957  Yes
-
-Then you have devices that are using compression. To make the devices usable under Linux,
-you will need to verify that the device is not part of a parity  protected array.  Use
-iprconfig, take option 2 from the main menu to Work with device parity protection, then
-option 1 to display device parity status.  If you see the same device as an array member,
-then take option 3 from the Work with  Device Parity  Protection  screen  to stop  device
-parity  protection.  When the device is not parity protected, you will need to initialize
-the devices. To do this use iprconfig, take option 3, then option 2. Initialize and format
-disk unit and select the devices you wish to format. When the format is complete, the
-devices should now be usable to Linux. If the devices you are having difficulty getting
-to work are not listed as candidates for format or you are still having problems, contact
-your next level of support.
-
