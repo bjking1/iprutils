@@ -27,6 +27,9 @@ test -x $IPRDUMP || exit 5
 
 start() {
     echo -n "Starting ipr dump daemon"
+    if [ ! -d /sys/class/scsi_generic ] ; then
+        modprobe sg
+    fi
     start_daemon $IPRDUMP
 
     RETVAL=$?

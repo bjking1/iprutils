@@ -27,6 +27,9 @@ test -x $IPRUPDATE || exit 5
 
 start() {
 	echo "Checking ipr microcode levels"
+	if [ ! -d /sys/class/scsi_generic ] ; then
+	    modprobe sg
+	fi
 	$IPRUPDATE
 
 	RETVAL=$?

@@ -245,6 +245,7 @@ int main(int argc, char *argv[])
 	strcpy(log_root_dir, parm_dir);
 	strcpy(editor, parm_editor);
 
+	system("modprobe sg");
 	exit_func = tool_exit_func;
 	tool_init("iprconfig");
 

@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.6
+Version: 2.0.7
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -47,6 +47,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Apr 16 2004 Brian King <brking@us.ibm.com> 2.0.7
+- Load sg module in init.d scripts if not loaded
+- Load sg module in iprconfig if not loaded
 * Wed Apr 14 2004 Brian King <brking@us.ibm.com> 2.0.6
 - Battery maintenance fixes.
 - Fix to properly display failed status for pulled physical disks.

@@ -27,6 +27,9 @@ test -x $IPRINIT || exit 5
 
 start() {
     echo -n "Starting ipr initialization daemon"
+    if [ ! -d /sys/class/scsi_generic ] ; then
+        modprobe sg
+    fi
     start_daemon $IPRINIT --daemon
 
     RETVAL=$?
