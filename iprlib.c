@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.19 2004/02/23 19:54:29 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.20 2004/02/23 22:22:50 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2155,7 +2155,7 @@ int ipr_get_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 
 	for_each_bus_attr(bus, page_28, i) {
 		busno = bus->res_addr.bus;
-		sbus->bus[busno].max_xfer_rate = bus->max_xfer_rate;
+		sbus->bus[busno].max_xfer_rate = ntohl(bus->max_xfer_rate);
 		sbus->bus[busno].qas_capability = bus->qas_capability;
 		sbus->bus[busno].scsi_id = bus->scsi_id;
 		sbus->bus[busno].bus_width = bus->bus_width;
@@ -2197,10 +2197,10 @@ int ipr_set_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus, int save)
 			ipr_save_bus_attr(ioa, i, IPR_BUS_WIDTH, value_str, 1);
 		}
 
-		bus->max_xfer_rate = sbus->bus[busno].max_xfer_rate;
+		bus->max_xfer_rate = htonl(sbus->bus[busno].max_xfer_rate);
 		if (save && bus->max_xfer_rate != old_settings.bus[busno].max_xfer_rate) {
 			sprintf(value_str, "%d",
-				IPR_BUS_XFER_RATE_TO_THRUPUT(bus->max_xfer_rate,
+				IPR_BUS_XFER_RATE_TO_THRUPUT(sbus->bus[busno].max_xfer_rate,
 							     bus->bus_width));
 			ipr_save_bus_attr(ioa, i, IPR_MAX_XFER_RATE_STR, value_str, 1);
 		}
