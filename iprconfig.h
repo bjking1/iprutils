@@ -47,6 +47,8 @@ struct info_container {
 	int x;            /* cursor x position of user selection */
 };
 
+#define for_each_icon(icon) for (icon = i_con_head; icon; icon = icon->next_item)
+
 struct screen_output {
 	int rc;
 	i_container *i_con;
@@ -117,7 +119,9 @@ int confirm_change_bus_attr(i_container *i_con);
 int driver_config(i_container * i_con);
 int change_driver_config(i_container *i_con);
 int disk_config(i_container * i_con);
+int ioa_config(i_container * i_con);
 int change_disk_config(i_container *);
+int change_ioa_config(i_container *);
 int download_ucode(i_container *);
 int choose_ucode(i_container *);
 int log_menu(i_container *);
@@ -174,8 +178,9 @@ struct screen_opts main_menu_opt[] = {
 	{bus_config,         "4", __("Work with SCSI bus configuration")},
 	{driver_config,      "5", __("Work with driver configuration")},
 	{disk_config,        "6", __("Work with disk configuration")},
-	{download_ucode,     "7", __("Download microcode")},
-	{log_menu,           "8", __("Analyze log")}
+	{ioa_config,         "7", __("Work with adapter configuration")},
+	{download_ucode,     "8", __("Download microcode")},
+	{log_menu,           "9", __("Analyze log")}
 };
 
 s_node n_main_menu = {
@@ -241,7 +246,7 @@ struct screen_opts raid_screen_opt[] = {
 	{raid_start,       "2", __("Create a disk array")},
 	{raid_stop,        "3", __("Delete a disk array")},
 	{raid_include,     "4", __("Add a device to a disk array")},
-	{af_include,       "5", __("Format device for advanced function (522)")},
+	{af_include,       "5", __("Format device for RAID function")},
 	{af_remove,        "6", __("Format device for JBOD function (512)")},
 	{add_hot_spare,    "7", __("Create a hot spare")},
 	{remove_hot_spare, "8", __("Delete a hot spare")}
@@ -300,6 +305,8 @@ s_node n_raid_stop_fail = {
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"), /* xxx? */
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -352,6 +359,8 @@ s_node n_raid_start_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -415,6 +424,8 @@ s_node n_raid_include_fail = {
 		__("o Not all disks attached to an advanced function IOA have"
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -444,6 +455,8 @@ s_node n_configure_raid_include_fail = {
 		   "capacity than the smallest device in the disk array and "
 		   "be formatted correctly\n"),
 		__("o The disk is not supported for the requested operation\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -474,7 +487,7 @@ s_node n_dev_include_complete = {
 
 s_node n_af_include_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
-	.title    = __("Format Device for Advanced Function (522) Failed"),
+	.title    = __("Format Device for RAID Function Failed"),
 	.header = {
 		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
@@ -488,6 +501,8 @@ s_node n_af_include_fail = {
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"), /* xxx */
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -507,6 +522,8 @@ s_node n_af_remove_fail = {
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -525,6 +542,8 @@ s_node n_add_hot_spare_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -544,6 +563,8 @@ s_node n_remove_hot_spare_fail = {
 		   "reported to the system.  Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -726,7 +747,7 @@ s_node n_af_init_device = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(init_device_opt),
 	.options  = &init_device_opt[0],
-	.title    = __("Select Disks to format for Advanced Function (522)"),
+	.title    = __("Select Disks to format for RAID Function"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
@@ -871,6 +892,8 @@ s_node n_raid_rebuild_fail = {
 		__("o Not all disks attached to an IOA have reported to the "
 		   "system. Retry the operation.\n"),
 		__("o The disk is not supported for the requested operation.\n"),
+		__("o You attempting to perform this operation on a secondary IOA. "
+		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -1070,6 +1093,40 @@ s_node n_change_disk_config = {
 	.title    = __("Change Configuration of Disk"),
 	.header   = {
 		__("Current Disk configurations are shown. To change "
+		   "setting hit 'c' for options menu. Hightlight "
+		   "desired option then hit Enter.\n"),
+		__("  c=Change Setting\n\n"),
+		"" }
+};
+
+struct screen_opts ioa_config_opt[] = {
+	{change_ioa_config, "\n"}
+};
+
+s_node n_ioa_config = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(ioa_config_opt),
+	.options  = &ioa_config_opt[0],
+	.title    = __("Change Adapter Configuration"),
+	.header   = {
+		__("Type option, press Enter.\n"),
+		__("  1=Change Adapter Configuration\n\n"),
+		"" }
+};
+
+struct screen_opts change_ioa_attr_opt[] = {
+	{NULL, "c"},
+	{NULL, "\n"}
+};
+
+s_node n_change_ioa_config = {
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG | FWD_FLAG | MENU_FLAG),
+	.num_opts = NUM_OPTS(change_ioa_attr_opt),
+	.options  = &change_ioa_attr_opt[0],
+	.title    = __("Change Configuration of Adapter"),
+	.header   = {
+		__("Current Adapter configurations are shown. To change "
 		   "setting hit 'c' for options menu. Hightlight "
 		   "desired option then hit Enter.\n"),
 		__("  c=Change Setting\n\n"),

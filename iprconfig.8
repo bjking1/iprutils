@@ -3,11 +3,11 @@
 .\" All Rights Reserved. This program and the accompanying
 .\" materials are made available under the terms of the
 .\" Common Public License v1.0 which accompanies this distribution.
-.TH IPRCONFIG 8 "March 2003"
+.TH IPRCONFIG 8 "November 2004"
 .SH NAME
 iprconfig \- IBM Power RAID storage adapter configuration/recovery utility
 .SH SYNOPIPR
-.BI "iprconfig [-e editor] [-k dir]"
+.BI "iprconfig [-e editor] [-k dir] [-c command /dev/sgX]"
 .sp
 .BI "iprconfig --version --debug --force"
 .SH DESCRIPTION
@@ -108,10 +108,14 @@ is used to change driver configurable attributes, such as log_level.
 .B 6. Work with disk configuration
 is used to change configurable disk attributes, such as queue depth.
 .PP
-.B 7. Download microcode
+.B 7. Work with adapter configuration
+is used to change configurable adapter attributes, such as dual adapter
+preferred primary adapter.
+.PP
+.B 8. Download microcode
 is used to download microcode to ipr adapters and attached SCSI disks.
 .PP
-.B 8. Analyze Log
+.B 9. Analyze Log
 is an option available to analyze /var/log/messages* files. By default
 it will use vi as the editor to open the concatenated error log files.
 This can be changed by using option 6 on the
@@ -133,6 +137,18 @@ changed with this parameter.
 .B -k directory
 Kernel messages root directory. Root directory to look for kernel messages.
 Default is /var/log.
+.TP
+.B -c command /dev/sgX
+Do not start user interface, but rather perform the specified action on the
+sg device. Supported actions include:
+.PP
+.B primary
+When running in dual initiator RAID environments, set this adapter as the
+preferred primary adapter.
+.PP
+.B secondary
+When running in dual initiator RAID environments, set this adapter as the
+preferred secondary adapter.
 .TP
 .B \-\-version
 Print version number of 

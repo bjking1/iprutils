@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.46 2004/09/09 17:52:35 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.47 2004/12/10 20:22:43 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -54,7 +54,7 @@
 #define IPR_DASD_UCODE_HDR 2
 
 #define UCODE_BASE_DIR "/usr/lib/microcode"
-#define HOTPLUG_BASE_DIR "/lib/firmware"
+#define LINUX_UCODE_BASE_DIR "/lib/firmware"
 
 #define FIRMWARE_HOTPLUG_DIR_TAG "FIRMWARE_DIR"
 #define FIRMWARE_HOTPLUG_CONFIG_FILE "/etc/hotplug/firmware.agent"
@@ -116,6 +116,8 @@
 #define IPR_SERVICE_ACTION_IN                0x9E
 #define IPR_MAINTENANCE_IN                   0xA3
 #define  IPR_QUERY_MULTI_ADAPTER_STATUS	   0x01
+#define IPR_MAINTENANCE_OUT                  0xA4
+#define  IPR_CHANGE_MULTI_ADAPTER_ASSIGNMENT 0x02
 #define IPR_QUERY_RESOURCE_STATE             0xC2
 #define IPR_QUERY_COMMAND_STATUS             0xCB
 #define IPR_SUSPEND_DEV_BUS                  0xC8u
@@ -176,6 +178,7 @@ extern int runtime;
 extern void (*exit_func) (void);
 extern int ipr_debug;
 extern int ipr_force;
+extern int ipr_sg_required;
 extern char *hotplug_dir;
 extern struct zeroed_dev *head_zdev;
 extern struct zeroed_dev *tail_zdev;
@@ -590,6 +593,16 @@ struct ipr_dev_record {
       for (i = 0, rcd = (struct ipr_common_record *)qac->data; i < qac->num_records; \
            i++, rcd = (struct ipr_common_record *)((unsigned long)rcd + ntohs(rcd->record_len)))
 
+#define for_each_dev_rcd(rcd, i, qac) \
+      for (i = 0, rcd = (struct ipr_dev_record *)qac->data; i < qac->num_records; \
+           i++, rcd = (struct ipr_dev_record *)((unsigned long)rcd + ntohs(rcd->common.record_len))) \
+              if (rcd->common.record_id == IPR_RECORD_ID_DEVICE_RECORD)
+
+#define for_each_array_rcd(rcd, i, qac) \
+      for (i = 0, rcd = (struct ipr_array_record *)qac->data; i < qac->num_records; \
+           i++, rcd = (struct ipr_array_record *)((unsigned long)rcd + ntohs(rcd->common.record_len))) \
+              if (rcd->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
+
 struct ipr_std_inq_data {
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 peri_qual:3;
@@ -747,6 +760,9 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 
 #define IPR_CONFIG_DIR "/etc/ipr/"
 
+#define IPR_CATEGORY_IOA "Adapter"
+#define IPR_DA_PREFERRED_PRIMARY "PREFERRED_PRIMARY"
+
 #define IPR_CATEGORY_BUS "Bus"
 #define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
 #define IPR_HOST_SCSI_ID "HOST_SCSI_ID"
@@ -790,6 +806,62 @@ struct scsi_dev_data {
 	char gen_name[64];
 };
 
+struct ipr_path_entry {
+	u8 state;
+#define IPR_PATH_FUNCTIONAL		0
+#define IPR_PATH_NOT_FUNCTIONAL	1
+	u8 local_bus_num;
+	u8 remote_bus_num;
+	u8 reserved;
+	u8 local_connection_id[8];
+	u8 remote_connection_id[8];
+};
+
+struct ipr_dual_ioa_entry {
+	u32 length;
+	u8 link_state;
+#define IPR_IOA_LINK_STATE_NOT_OPER	0
+#define IPR_IOA_LINK_STATE_OPER	1
+	u8 cur_state;
+#define IPR_IOA_STATE_PRIMARY		2
+#define IPR_IOA_STATE_SECONDARY	3
+#define IPR_IOA_STATE_NO_PREFERENCE	4
+	u8 reserved;
+	u8 token;
+	u8 reserved2[4];
+	u8 remote_vendor_id[IPR_VENDOR_ID_LEN];
+	u8 remote_prod_id[IPR_PROD_ID_LEN];
+	u8 remote_sn[IPR_SERIAL_NUM_LEN];
+	u32 num_path_entries;
+	struct ipr_path_entry path[0]; /* variable length */
+};
+
+struct ipr_phys_bus_entry {
+	u8 bus_num;
+	u8 reserved[3];
+	u8 conn_id[8];
+};
+
+struct ipr_ioa_cap_entry {
+	u32 length;
+	u8 reserved;
+	u8 preferred_role;
+	u8 token;
+	u8 reserved2[4];
+	u8 num_bus_entries;
+	struct ipr_phys_bus_entry bus[0];
+};
+
+struct ipr_multi_ioa_status {
+	u32 length;
+	u32 num_entries;
+	struct ipr_ioa_cap_entry cap;
+	u8 buf[16 * 1024];
+/*
+ *	struct ipr_dual_ioa_entry ioa[0];
+ */
+};
+
 struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
@@ -809,6 +881,7 @@ struct ipr_dev {
 struct ipr_ioa {
 	struct ipr_dev ioa;
 	u16 ccin;
+	u16 af_block_size;
 	u32 host_addr;
 	u32 num_raid_cmds;
 	u32 msl;
@@ -819,14 +892,17 @@ struct ipr_ioa {
 	u8 scsi_id_changeable:1;
 	u8 dual_raid_support:1;
 	u8 is_secondary:1;
+	u16 pci_vendor;
+	u16 pci_device;
 	u16 subsystem_vendor;
 	u16 subsystem_device;
 	char dual_state[16];
-	char saved_dual_state[16];
+	char preferred_dual_state[16];
 	int host_num;
 	char pci_address[16];
 	char host_name[16];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
+	struct ipr_multi_ioa_status ioa_status;
 	struct ipr_array_query_data *qac_data;
 	struct ipr_array_record *start_array_qac_entry;
 	struct ipr_supported_arrays *supported_arrays;
@@ -855,41 +931,6 @@ struct ipr_array_query_data {
 	u8 reserved;
 	u8 num_records;
 	u8 data[IPR_QAC_BUFFER_SIZE];
-};
-
-struct ipr_path_entry {
-	u8 state;
-#define IPR_PATH_FUNCTIONAL		0
-#define IPR_PATH_NOT_FUNCTIONAL	1
-	u8 local_bus_num;
-	u8 remote_bus_num;
-	u8 reserved;
-	u8 local_connection_id[8];
-	u8 remote_connection_id[8];
-};
-
-struct ipr_dual_ioa_entry {
-	u32 length;
-	u8 link_state;
-#define IPR_IOA_LINK_STATE_NOT_OPER	0
-#define IPR_IOA_LINK_STATE_OPER	1
-	u8 cur_state;
-	u8 saved_state;
-#define IPR_IOA_STATE_UNASSIGNED	0
-#define IPR_IOA_STATE_STANDALONE	1
-#define IPR_IOA_STATE_PRIMARY		2
-#define IPR_IOA_STATE_SECONDARY	3
-	u8 token;
-	u8 remote_vendor_id[IPR_VENDOR_ID_LEN];
-	u8 remote_prod_id[IPR_PROD_ID_LEN];
-	u8 remote_sn[IPR_SERIAL_NUM_LEN];
-	u32 num_path_entries;
-	struct ipr_path_entry path[64]; /* variable length */
-};
-
-struct ipr_multi_ioa_status {
-	u32 length;
-	struct ipr_dual_ioa_entry ioa[8]; /* variable length */
 };
 
 struct ipr_block_desc {
@@ -968,6 +1009,10 @@ struct ipr_disk_attr {
 
 struct ipr_vset_attr {
 	int queue_depth;
+};
+
+struct ipr_ioa_attr {
+	int preferred_primary;
 };
 
 struct ipr_dasd_timeout_record {
@@ -1122,8 +1167,6 @@ struct ipr_cfc_vpd {
 	u8 ascii_len;
 	u8 cache_size[IPR_VPD_CACHE_SIZE_LEN];
 	struct ipr_std_inq_vpids vpids;
-	u8 model_num[3];
-	u8 reserved2[9];
 	u8 revision_level[4];
 	u8 serial_num[IPR_SERIAL_NUM_LEN];
 	u8 ascii_part_num[12];
@@ -1239,12 +1282,15 @@ struct ipr_encl_status_ctl_pg
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
+int ipr_set_preferred_primary(struct ipr_ioa *, int);
+int set_preferred_primary(char *, int);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
 void tool_init();
 void exit_on_error(char *, ...);
 bool is_af_blocked(struct ipr_dev *, int);
 int ipr_query_array_config(struct ipr_ioa *, bool, bool, int, void *);
+int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, int, void *);
 int ipr_query_command_status(struct ipr_dev *, void *);
 int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);
@@ -1262,12 +1308,12 @@ int ipr_add_hot_spare(struct ipr_ioa *);
 int ipr_rebuild_device_data(struct ipr_ioa *);
 int ipr_test_unit_ready(struct ipr_dev *, struct sense_data_t *);
 int ipr_format_unit(struct ipr_dev *);
-int ipr_add_array_device(struct ipr_ioa *, struct ipr_array_query_data *);
+int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 void ipr_reset_adapter(struct ipr_ioa *);
-void ipr_rescan(struct ipr_ioa *, int, int, int);
+void ipr_scan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_suspend_device_bus(struct ipr_ioa *, struct ipr_res_addr *, u8);
@@ -1279,12 +1325,15 @@ int ipr_set_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *, int);
 int ipr_write_buffer(struct ipr_dev *, void *, int);
 int enable_af(struct ipr_dev *);
 int get_max_bus_speed(struct ipr_ioa *, int);
+int ipr_get_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *);
 int ipr_get_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
 int ipr_modify_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
+int ipr_set_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *, int);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int ipr_set_dasd_timeouts(struct ipr_dev *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
+int get_ses_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
 void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 void ipr_init_dev(struct ipr_dev *);
@@ -1307,6 +1356,7 @@ char *get_prot_level_str(struct ipr_supported_arrays *, int);
 u32 get_ioa_fw_version(struct ipr_ioa *);
 int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
+u32 get_dasd_ucode_version(char *, int);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1324,7 +1374,7 @@ static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 }
 
 static inline int ipr_is_volume_set(struct ipr_dev *device)
-{       
+{
 	if ((device->qac_entry != NULL) &&
 	    (device->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD))
 		return 1;
@@ -1433,6 +1483,9 @@ if (dev->scsi_dev_data) { \
 
 #define ioa_err(ioa, fmt, ...) \
       ioa_log(LOG_ERR, ioa, fmt, ##__VA_ARGS__)
+
+#define ioa_dbg(ioa, fmt, ...) \
+      syslog_dbg("%s: " fmt, ioa->pci_address, ##__VA_ARGS__)
 
 #define ioa_cmd_err(ioa, sense, cmd, rc) \
 do { \

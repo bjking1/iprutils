@@ -29,6 +29,9 @@ iprinit:iprinit.c iprlib.o
 iprdbg:iprdbg.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs
 
+iprucode:iprucode.c iprlib.o
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprucode iprlib.o iprucode.c -lsysfs
+
 iprlib.o: iprlib.c iprlib.h
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
 

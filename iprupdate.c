@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.16 2004/09/09 17:52:36 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.17 2004/12/10 20:22:44 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -26,14 +26,7 @@
 
 static int ioa_needs_update(struct ipr_ioa *ioa, int silent)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	u32 fw_version;
-
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "fw_version");
-	sscanf(attr->value, "%8X", &fw_version);
-	sysfs_close_class_device(class_device);
+	u32 fw_version = get_ioa_fw_version(ioa);
 
 	if (fw_version >= ioa->msl)
 		return 0;
@@ -139,7 +132,7 @@ int main(int argc, char *argv[])
 
 	check_current_config(false);
 
-	for (ioa = ipr_ioa_head; ioa; ioa = ioa->next) {
+	for_each_ioa(ioa) {
 		if (check_levels)
 			rc |= ioa_needs_update(ioa, 0);
 		else

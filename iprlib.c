@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.59 2004/09/09 17:52:35 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.60 2004/12/10 20:22:43 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -32,6 +32,7 @@ void (*exit_func) (void) = default_exit_func;
 int ipr_debug = 0;
 int ipr_force = 0;
 char *hotplug_dir = NULL;
+int ipr_sg_required = 0;
 
 struct zeroed_dev
 {
@@ -559,31 +560,46 @@ struct ioa_parms {
 static const struct ioa_parms ioa_parms [] = {
 	{.ccin = 0x5702, .scsi_id_changeable = 1,
 	.msl = 0x02080029, .fw_name = "44415254" },
-	{.ccin = 0x5703, .scsi_id_changeable = 0,
+	{.ccin = 0x1974, .scsi_id_changeable = 1,
+	.msl = 0x02080037, .fw_name = "44415254" },
+	{.ccin = 0x5703, .scsi_id_changeable = 1,
 	.msl = 0x03090059, .fw_name = "5052414D" },
+	{.ccin = 0x1975, .scsi_id_changeable = 1,
+	.msl = 0x03090068, .fw_name = "5052414D" },
 	{.ccin = 0x5709, .scsi_id_changeable = 0,
 	.msl = 0x030D0047, .fw_name = "5052414E" },
+	{.ccin = 0x1976, .scsi_id_changeable = 0,
+	.msl = 0x030D0056, .fw_name = "5052414E" },
 	{.ccin = 0x570A, .scsi_id_changeable = 0,
 	.msl = 0x020A004E, .fw_name = "44415255" },
 	{.ccin = 0x570B, .scsi_id_changeable = 0,
 	.msl = 0x020A004E, .fw_name = "44415255" },
 	{.ccin = 0x2780, .scsi_id_changeable = 0,
-	.msl = 0x030E0039, .fw_name = "5349530E" },
+	.msl = 0x030E0040, .fw_name = "5349530E" },
 };
 
-static void setup_ioa_parms(struct ipr_ioa *ioa)
+static const struct ioa_parms *get_ioa_fw(struct ipr_ioa *ioa)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ioa_parms); i++) {
-		if (ioa->ccin == ioa_parms[i].ccin) {
-			ioa->scsi_id_changeable = ioa_parms[i].scsi_id_changeable;
-			ioa->msl = ioa_parms[i].msl;
-			return;
-		}
+		if (ioa->ccin == ioa_parms[i].ccin)
+			return &ioa_parms[i];
 	}
 
+	return NULL;
+}
+
+static void setup_ioa_parms(struct ipr_ioa *ioa)
+{
+	const struct ioa_parms *ioa_parms = get_ioa_fw(ioa);
+
 	ioa->scsi_id_changeable = 1;
+
+	if (ioa_parms) {
+		ioa->scsi_id_changeable = ioa_parms->scsi_id_changeable;
+		ioa->msl = ioa_parms->msl;
+	}
 }
 
 void tool_init(char *name)
@@ -592,7 +608,7 @@ void tool_init(char *name)
 	struct ipr_ioa *ipr_ioa;
 	struct sysfs_driver *sysfs_ipr_driver;
 	struct dlist *ipr_devs;
-	char *pci_address, bus[100];
+	char *pci_address, bus[100], buf[100];
 
 	struct sysfs_class *sysfs_host_class;
 	struct sysfs_class *sysfs_device_class;
@@ -672,6 +688,15 @@ void tool_init(char *name)
 									   "subsystem_device");
 					sscanf(sysfs_attr->value, "0x%4X", &temp);
 					ipr_ioa->subsystem_device = temp;
+
+					sysfs_attr = sysfs_get_device_attr(sysfs_pci_device,
+									   "vendor");
+					sscanf(sysfs_attr->value, "0x%4X", &temp);
+					ipr_ioa->pci_vendor = temp;
+					sysfs_attr = sysfs_get_device_attr(sysfs_pci_device,
+									   "device");
+					sscanf(sysfs_attr->value, "0x%4X", &temp);
+					ipr_ioa->pci_device = temp;
 					break;
 				}
 			}
@@ -684,11 +709,9 @@ void tool_init(char *name)
 			class_devices = sysfs_get_class_devices(sysfs_device_class);
 			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 				sysfs_device_device = sysfs_get_classdev_device(class_device);
-				sysfs_host_device = sysfs_get_device_parent(sysfs_device_device);
+				sprintf(buf, "%d:255:255:255", ipr_ioa->host_num);
 
-				if ((strcmp(ipr_ioa->host_name, sysfs_host_device->name) == 0) && 
-				    (strstr(sysfs_device_device->name, ":255:255:255"))) {
-
+				if (!strcmp(buf, sysfs_device_device->name)) {
 					sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "model");
 					sscanf(sysfs_attr->value, "%4X", &temp);
 					ipr_ioa->ccin = temp;
@@ -729,7 +752,7 @@ void ipr_reset_adapter(struct ipr_ioa *ioa)
 	sysfs_close_class_device(class_device);
 }
 
-void ipr_rescan(struct ipr_ioa *ioa, int bus, int id, int lun)
+void ipr_scan(struct ipr_ioa *ioa, int bus, int id, int lun)
 {
 	struct sysfs_class_device *class_device;
 	struct sysfs_attribute *attr;
@@ -743,27 +766,16 @@ void ipr_rescan(struct ipr_ioa *ioa, int bus, int id, int lun)
 	sysfs_close_class_device(class_device);
 }
 
-int ipr_query_array_config(struct ipr_ioa *ioa,
-			   bool allow_rebuild_refresh, bool set_array_id,
-			   int array_id, void *buff)
+int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
+			     bool allow_rebuild_refresh, bool set_array_id,
+			     int array_id, void *buff)
 {
-	int fd;
 	int length = sizeof(struct ipr_array_query_data);
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
 
 	ioa->nr_ioa_microcode = 0;
-
-	if (strlen(ioa->ioa.gen_name) == 0)
-		return -ENOENT;
-
-	fd = open(ioa->ioa.gen_name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
-		return errno;
-	}
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -792,6 +804,40 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 			 sense_data.add_sense_code_qual == 0x85)
 			ioa->nr_ioa_microcode = 1;
 	}
+
+	return rc;
+}
+
+int ipr_query_array_config(struct ipr_ioa *ioa,
+			   bool allow_rebuild_refresh, bool set_array_id,
+			   int array_id, void *buff)
+{
+	int fd, rc;
+
+	ioa->nr_ioa_microcode = 0;
+
+	if (strlen(ioa->ioa.gen_name) == 0) {
+		scsi_err((&ioa->ioa), "Adapter sg device does not exist\n");
+		return -ENOENT;
+	}
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
+		return errno;
+	}
+
+	rc = flock(fd, LOCK_EX);
+	if (rc) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not lock %s. %m\n", ioa->ioa.gen_name);
+		close(fd);
+		return errno;
+	}
+
+	rc = __ipr_query_array_config(ioa, fd, allow_rebuild_refresh,
+				      set_array_id, array_id, buff);
 
 	close(fd);
 	return rc;
@@ -976,24 +1022,13 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 	return rc;
 }
 
-int ipr_add_array_device(struct ipr_ioa *ioa,
+int ipr_add_array_device(struct ipr_ioa *ioa, int fd,
 			 struct ipr_array_query_data *qac_data)
 {
-	int fd;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
 	int length = ntohs(qac_data->resp_len);
-
-	if (strlen(ioa->ioa.gen_name) == 0)
-		return -ENOENT;
-
-	fd = open(ioa->ioa.gen_name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
-		return errno;
-	}
 
 	ipr_update_qac_with_zeroed_devs(ioa);
 
@@ -1010,7 +1045,6 @@ int ipr_add_array_device(struct ipr_ioa *ioa,
 	if (rc != 0)
 		ioa_cmd_err(ioa, &sense_data, "Add Array Device", rc);
 
-	close(fd);
 	return rc;
 }
 
@@ -1020,14 +1054,18 @@ int ipr_query_command_status(struct ipr_dev *dev, void *buff)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int length = sizeof(struct ipr_cmd_status);
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1054,14 +1092,18 @@ int ipr_query_resource_state(struct ipr_dev *dev, void *buff)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int length = sizeof(struct ipr_query_res_state);
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1088,14 +1130,18 @@ int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 	struct sense_data_t sense_data;
 	int fd, rc;
 	u8 length = IPR_MODE_SENSE_LENGTH; /* xxx FIXME? */
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1128,14 +1174,18 @@ int ipr_mode_select(struct ipr_dev *dev, void *buff, int length)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1210,14 +1260,18 @@ int ipr_read_capacity(struct ipr_dev *dev, void *buff)
 	struct sense_data_t sense_data;
 	int rc;
 	int length = sizeof(struct ipr_read_cap);
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1242,14 +1296,18 @@ int ipr_read_capacity_16(struct ipr_dev *dev, void *buff)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int length = sizeof(struct ipr_read_cap16);
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1317,14 +1375,18 @@ int ipr_start_stop_start(struct ipr_dev *dev)
 	struct sense_data_t sense_data;
 	int rc;
 	int length = 0;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1350,14 +1412,18 @@ int ipr_start_stop_stop(struct ipr_dev *dev)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int length = 0;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1377,20 +1443,24 @@ int ipr_start_stop_stop(struct ipr_dev *dev)
 	return rc;
 }
 
-int ipr_test_unit_ready(struct ipr_dev *dev,
-			struct sense_data_t *sense_data)
+int __ipr_test_unit_ready(struct ipr_dev *dev,
+			  struct sense_data_t *sense_data)
 {
 	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	int length = 0;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1402,10 +1472,19 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 		      length, SG_DXFER_FROM_DEV,
 		      sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
+	close(fd);
+	return rc;
+
+}
+
+int ipr_test_unit_ready(struct ipr_dev *dev,
+			struct sense_data_t *sense_data)
+{
+	int rc = __ipr_test_unit_ready(dev, sense_data);
+
 	if (rc != 0 && sense_data->sense_key != NOT_READY)
 		scsi_cmd_err(dev, sense_data, "Test Unit Ready", rc);
 
-	close(fd);
 	return rc;
 }
 
@@ -1416,14 +1495,18 @@ int ipr_format_unit(struct ipr_dev *dev)
 	struct sense_data_t sense_data;
 	u8 *defect_list_hdr;
 	int length = IPR_DEFECT_LIST_HDR_LEN;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1457,14 +1540,18 @@ int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 	struct sense_data_t sense_data;
 	u32 resource_handle;
 	int length = 0;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1494,14 +1581,18 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1532,8 +1623,9 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	struct sense_data_t sense_data;
 	struct ipr_disk_attr attr;
 	int old_qdepth;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(name) == 0)
 		return -ENOENT;
 
 	if ((rc = ipr_get_dev_attr(dev, &attr))) {
@@ -1552,10 +1644,10 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 		return rc;
 	}
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s.\n",dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s.\n",name);
 		return errno;
 	}
 
@@ -1571,12 +1663,18 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 		      length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_WRITE_BUFFER_TIMEOUT);
 
-	if (rc != 0)
+	if (rc != 0) {
 		scsi_cmd_err(dev, &sense_data, "Write buffer", rc);
-	else
+	} else {
 		sleep(5);
 
+		/* Wait for the device to come back to life */
+		for (i = 0, rc = -1; rc && (i < 60); i ++)
+			rc = __ipr_test_unit_ready(dev, sense_data)
+	}
+
 	close(fd);
+
 	attr.queue_depth = old_qdepth;
 	rc = ipr_set_dev_attr(dev, &attr, 0);
 
@@ -1626,14 +1724,18 @@ int ipr_receive_diagnostics(struct ipr_dev *dev,
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1662,14 +1764,18 @@ int ipr_send_diagnostics(struct ipr_dev *dev, void *buff, int length)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
+	char *name = dev->gen_name;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1813,7 +1919,7 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 
 	/* check if scatter gather should be used */
 	if (xfer_len > IPR_MAX_XFER) {
-		iovec_count = xfer_len/IPR_MAX_XFER + 1;
+		iovec_count = (xfer_len/IPR_MAX_XFER) + 1;
 		iovec = malloc(iovec_count * sizeof(sg_iovec_t));
 
 		buff_len = xfer_len;
@@ -1821,14 +1927,14 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 
 		for (i = 0; (i < iovec_count) && (buff_len != 0); i++) {
 			iovec[i].iov_base = malloc(segment_size);
-			memcpy(iovec[i].iov_base, data + IPR_MAX_XFER * i, segment_size);
+			memcpy(iovec[i].iov_base, data + (IPR_MAX_XFER * i), segment_size);
 			iovec[i].iov_len = segment_size;
 
 			buff_len -= segment_size;
 			if (buff_len < segment_size)
 				segment_size = buff_len;
 		}
-		iovec_count = i;
+
 		dxferp = (void *)iovec;
 	} else {
 		iovec_count = 0;
@@ -1893,6 +1999,54 @@ int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 			 sense_data, timeout_in_sec, 0);
 };
 
+int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
+{
+	int fd, rc;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	struct ipr_dev *dev = &ioa->ioa;
+
+	if (strlen(dev->gen_name) == 0)
+		return -ENOENT;
+
+	fd = open(dev->gen_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_MAINTENANCE_OUT;
+	cdb[1] = IPR_CHANGE_MULTI_ADAPTER_ASSIGNMENT;
+	if (preferred_primary)
+		cdb[3] = IPR_IOA_STATE_PRIMARY;
+	else
+		cdb[3] = IPR_IOA_STATE_NO_PREFERENCE;
+
+	rc = sg_ioctl(fd, cdb, NULL, 0, SG_DXFER_NONE,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		scsi_cmd_err(dev, &sense_data, "Change Multi Adapter Assignment", rc);
+
+	close(fd);
+	return rc;
+}
+
+int set_preferred_primary(char *sg_name, int preferred_primary)
+{
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa) {
+		if (!strcmp(ioa->ioa.gen_name, sg_name))
+			return ipr_set_preferred_primary(ioa, preferred_primary);
+	}
+
+	return -ENXIO;
+}
+
 int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 {
 	int num_devs = 0;
@@ -1917,7 +2071,6 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 	}
 
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
-
 		scsi_dev_base = realloc(scsi_dev_base,
 					sizeof(struct scsi_dev_data) * (num_devs + 1));
 		scsi_dev_data = &scsi_dev_base[num_devs];
@@ -1986,7 +2139,8 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 
 static void get_sg_names(int num_devs)
 {
-	int i;
+	int i, fd;
+	int sg_delay = 3;
 	struct sysfs_class *sysfs_device_class;
 	struct dlist *class_devices;
 	struct sysfs_class_device *class_device;
@@ -2015,6 +2169,21 @@ static void get_sg_names(int num_devs)
 				    sysfs_device_device->name)) {
 				sprintf(scsi_dev_table[i].gen_name, _PATH_DEV"%s",
 					class_device->name);
+				for (sg_delay = 3, fd = 0; sg_delay && ipr_sg_required; sg_delay--) {
+					fd = open(scsi_dev_table[i].gen_name, O_RDWR);
+					if (fd != -1) {
+						close(fd);
+						break;
+					}
+
+					syslog_dbg("Waiting for %s to show up\n",
+						   scsi_dev_table[i].gen_name);
+					sleep(1);
+				}
+
+				if (fd == -1)
+					syslog_dbg("Failed to open %s. %d %d\n", scsi_dev_table[i].gen_name,
+						   sg_delay, ipr_sg_required);
 				break;
 			}
 		}
@@ -2085,10 +2254,9 @@ struct ipr_dual_ioa_state {
 };
 
 static struct ipr_dual_ioa_state dual_ioa_states [] = {
-	{IPR_IOA_STATE_UNASSIGNED, "Unassigned"},
-	{IPR_IOA_STATE_STANDALONE, "Standalone"},
 	{IPR_IOA_STATE_PRIMARY, "Primary"},
-	{IPR_IOA_STATE_SECONDARY, "Secondary"}
+	{IPR_IOA_STATE_SECONDARY, "Secondary"},
+	{IPR_IOA_STATE_NO_PREFERENCE, "No Preference"}
 };
 
 static void print_ioa_state(char *buf, u8 state)
@@ -2102,31 +2270,41 @@ static void print_ioa_state(char *buf, u8 state)
 		}
 	}
 
-	strcpy(buf, "Unknown");
+	sprintf(buf, "Unknown (%d)", state);
 }
 
 static void get_dual_ioa_state(struct ipr_ioa *ioa)
 {
 	int rc;
-	struct ipr_multi_ioa_status ioa_status;
+	struct ipr_dual_ioa_entry *ioa_entry;
 
-	sprintf(ioa->dual_state, "Standalone");
-	sprintf(ioa->saved_dual_state, "Standalone");
+	sprintf(ioa->dual_state, "Primary");
+	sprintf(ioa->preferred_dual_state, "No Preference");
 
 	if (!ioa->dual_raid_support)
 		return;
 
-	rc = ipr_query_multi_ioa_status(ioa, &ioa_status, sizeof(ioa_status));
+	rc = ipr_query_multi_ioa_status(ioa, &ioa->ioa_status, sizeof(ioa->ioa_status));
 
 	if (rc)
 		return;
 
-	print_ioa_state(ioa->dual_state, ioa_status.ioa[0].cur_state);
-	print_ioa_state(ioa->saved_dual_state, ioa_status.ioa[0].saved_state);
-	if (ioa_status.ioa[0].cur_state == IPR_IOA_STATE_SECONDARY)
+	ioa_entry = (struct ipr_dual_ioa_entry *)
+		(((unsigned long)&ioa->ioa_status.cap) + ntohl(ioa->ioa_status.cap.length));
+	if (ntohl(ioa->ioa_status.num_entries))
+		print_ioa_state(ioa->dual_state, ioa_entry->cur_state);
+	print_ioa_state(ioa->preferred_dual_state, ioa->ioa_status.cap.preferred_role);
+	if (ioa_entry->cur_state == IPR_IOA_STATE_SECONDARY)
 		ioa->is_secondary = 1;
 	else
 		ioa->is_secondary = 0;
+}
+
+#define IPR_DEFAULT_AF_BLOCK_SIZE 522
+
+static void get_af_block_size(struct ipr_ioa *ioa)
+{
+	ioa->af_block_size = IPR_DEFAULT_AF_BLOCK_SIZE;
 }
 
 void check_current_config(bool allow_rebuild_refresh)
@@ -2182,6 +2360,7 @@ void check_current_config(bool allow_rebuild_refresh)
 			ioa->ioa_dead = 1;
 
 		get_dual_ioa_state(ioa);
+		get_af_block_size(ioa);
 
 		/* Get Query Array Config Data */
 		rc = ipr_query_array_config(ioa, allow_rebuild_refresh,
@@ -2205,7 +2384,8 @@ void check_current_config(bool allow_rebuild_refresh)
 
 			if (scsi_dev_data->type == TYPE_DISK ||
 			    scsi_dev_data->type == IPR_TYPE_AF_DISK ||
-			    scsi_dev_data->type == TYPE_ENCLOSURE) {
+			    scsi_dev_data->type == TYPE_ENCLOSURE ||
+			    scsi_dev_data->type == TYPE_PROCESSOR) {
 				ioa->dev[device_count].ioa = ioa;
 				ioa->dev[device_count].scsi_dev_data = scsi_dev_data;
 				ioa->dev[device_count].qac_entry = NULL;
@@ -2215,9 +2395,7 @@ void check_current_config(bool allow_rebuild_refresh)
 				       scsi_dev_data->gen_name);
 
 				/* find array config data matching resource entry */
-				common_record = (struct ipr_common_record *)qac_data->data;
-
-				for (k = 0; k < qac_data->num_records; k++) {
+				for_each_qac_entry(common_record, k, qac_data) {
 					if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 						device_record = (struct ipr_dev_record *)common_record;
 						if (device_record->resource_addr.bus == scsi_dev_data->channel &&
@@ -2237,9 +2415,6 @@ void check_current_config(bool allow_rebuild_refresh)
 							break;
 						}
 					}                    
-
-					common_record = (struct ipr_common_record *)
-						((unsigned long)common_record + ntohs(common_record->record_len));
 				}
 
 				/* Send Test Unit Ready to start device if its a volume set */
@@ -2255,9 +2430,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 		/* now scan qac device and array entries to see which ones have
 		 not been referenced */
-		common_record = (struct ipr_common_record *)qac_data->data;
-
-		for (k = 0; k < qac_data->num_records; k++) {
+		for_each_qac_entry(common_record, k, qac_data) {
 			if (qac_entry_ref[k] > 1)
 				syslog(LOG_ERR,
 				       "Query Array Config entry referenced more than once\n");
@@ -2282,9 +2455,6 @@ void check_current_config(bool allow_rebuild_refresh)
 					device_count++;
 				}
 			}
-
-			common_record = (struct ipr_common_record *)
-				((unsigned long)common_record + ntohs(common_record->record_len));
 		}
 
 		ioa->num_devices = device_count;
@@ -2458,6 +2628,14 @@ static void ipr_save_dev_attr(struct ipr_dev *dev, char *field,
 	ipr_save_attr(dev->ioa, category, field, value, update);
 }
 
+static void ipr_save_ioa_attr(struct ipr_ioa *ioa, char *field,
+			     char *value, int update)
+{
+	char category[16];
+	sprintf(category,"[%s]", IPR_CATEGORY_IOA);
+	ipr_save_attr(ioa, category, field, value, update);
+}
+
 static int ipr_get_saved_attr(struct ipr_ioa *ioa, char *category,
 				  char *field, char *value)
 {
@@ -2517,6 +2695,14 @@ static int ipr_get_saved_dev_attr(struct ipr_dev *dev,
 	return ipr_get_saved_attr(dev->ioa, category, field, value);
 }
 
+static int ipr_get_saved_ioa_attr(struct ipr_ioa *ioa,
+				  char *field, char *value)
+{
+	char category[16];
+	sprintf(category,"[%s]", IPR_CATEGORY_IOA);
+	return ipr_get_saved_attr(ioa, category, field, value);
+}
+
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
 	char temp[100];
@@ -2532,6 +2718,23 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 
 	attr->format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
 
+	return 0;
+}
+
+int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
+{
+	struct ipr_dual_ioa_entry *ioa_entry;
+
+	attr->preferred_primary = 0;
+
+	if (!ioa->dual_raid_support)
+		return 0;
+
+	ioa_entry = (struct ipr_dual_ioa_entry *)
+		(((unsigned long)&ioa->ioa_status.cap) + ntohl(ioa->ioa_status.cap.length));
+
+	if (ioa->ioa_status.cap.preferred_role == IPR_IOA_STATE_PRIMARY)
+		attr->preferred_primary = 1;
 	return 0;
 }
 
@@ -2552,6 +2755,17 @@ int ipr_modify_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &attr->format_timeout);
 
+	return 0;
+}
+
+int ipr_modify_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
+{
+	char temp[100];
+	int rc;
+
+	rc = ipr_get_saved_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp);
+	if (rc == RC_SUCCESS)
+		sscanf(temp, "%d", &attr->preferred_primary);
 	return 0;
 }
 
@@ -2596,6 +2810,26 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 	return 0;
 }
 
+int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
+{
+	struct ipr_ioa_attr old_attr;
+	char temp[100];
+
+	if (ipr_get_ioa_attr(ioa, &old_attr))
+		return -EIO;
+
+	if (attr->preferred_primary != old_attr.preferred_primary) {
+		sprintf(temp, "%d", attr->preferred_primary);
+		if (ipr_set_preferred_primary(ioa, attr->preferred_primary))
+			return -EIO;
+		if (save)
+			ipr_save_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
+	}
+
+	get_dual_ioa_state(ioa);
+	return 0;
+}
+
 static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
 	{FORMAT_UNIT, 0, __constant_cpu_to_be16(3 * 60 * 60)},
 	{TEST_UNIT_READY, 0, __constant_cpu_to_be16(30)},
@@ -2631,13 +2865,16 @@ int ipr_set_dasd_timeouts(struct ipr_dev *dev)
 	struct sense_data_t sense_data;
 	struct ipr_dasd_timeouts timeouts;
 	struct ipr_disk_attr attr;
+	char *name = dev->gen_name;
 
-	fd = open(dev->gen_name, O_RDWR);
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	fd = open(name, O_RDWR);
 
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n",
-			       dev->ioa->ioa.gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -3127,99 +3364,7 @@ static int ipr_get_hotplug_dir()
 	return 0;
 }
 
-u32 get_ioa_fw_version(struct ipr_ioa *ioa)
-{
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	u32 fw_version;
-
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "fw_version");
-	sscanf(attr->value, "%8X", &fw_version);
-	sysfs_close_class_device(class_device);
-
-	return fw_version;
-}
-
-int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
-				struct ipr_fw_images **list)
-{
-	char etc_ucode_file[100];
-	const struct ioa_parms *parms = NULL;
-	struct dirent **dirent;
-	struct ipr_fw_images *ret = NULL;
-	struct stat stats;
-	int i, rc, j = 0;
-	char lname[200];
-	u32 fw_version;
-
-	*list = NULL;
-
-	for (i = 0; i < ARRAY_SIZE(ioa_parms); i++) {
-		if (ioa_parms[i].ccin == ioa->ccin) {
-			parms = &ioa_parms[i];
-			break;
-		}
-	}
-
-	if (parms) {
-		rc = scandir(UCODE_BASE_DIR, &dirent, NULL, alphasort);
-
-		for (i = 0; i < rc && rc > 0; i++) {
-			if (strstr(dirent[i]->d_name, parms->fw_name) == dirent[i]->d_name) {
-				ret = realloc(ret, sizeof(*ret) * (j + 1));
-				sprintf(ret[j].file, UCODE_BASE_DIR"/%s",
-					dirent[i]->d_name);
-				ret[j].version = get_ioa_ucode_version(ret[j].file);
-				ret[j].has_header = 1;
-				j++;
-			}
-		}
-		for (i = 0; i < rc; i++)
-			free(dirent[i]);
-		if (rc > 0)
-			free(dirent);
-	}
-
-	rc = scandir(HOTPLUG_BASE_DIR, &dirent, NULL, alphasort);
-
-	fw_version = get_ioa_fw_version(ioa);
-
-	sprintf(lname, "pci.%04X%04X.%02X", ioa->subsystem_vendor,
-		ioa->subsystem_device, (fw_version >> 16) & 0xff);
-
-	for (i = 0; i < rc && rc > 0; i++) {
-		if (strstr(dirent[i]->d_name, lname)) {
-			ret = realloc(ret, sizeof(*ret) * (j + 1));
-			sprintf(ret[j].file, HOTPLUG_BASE_DIR"/%s",
-				dirent[i]->d_name);
-			ret[j].version = get_ioa_ucode_version(ret[j].file);
-			ret[j].has_header = 1;
-			j++;
-		}
-	}
-	for (i = 0; i < rc; i++)
-		free(dirent[i]);
-	if (rc > 0)
-		free(dirent);
-
-	sprintf(etc_ucode_file, "/etc/microcode/ibmsis%X.img", ioa->ccin);
-	if (!stat(etc_ucode_file, &stats)) {
-		ret = realloc(ret, sizeof(*ret) * (j + 1));
-		strcpy(ret[j].file, etc_ucode_file);
-		ret[j].version = get_ioa_ucode_version(ret[j].file);
-		ret[j].has_header = 1;
-		j++;
-	}
-
-	if (ret)
-		qsort(ret, j, sizeof(*ret), fw_compare);
-
-	*list = ret;
-	return j;
-}
-
-static u32 get_dasd_ucode_version(char *ucode_file, int ftype)
+u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 {
 	int fd;
 	struct stat ucode_stats;
@@ -3232,7 +3377,7 @@ static u32 get_dasd_ucode_version(char *ucode_file, int ftype)
 	if (fd == -1)
 		return 0;
 
-	if (ftype == IPR_DASD_UCODE_ETC) {
+	if (has_hdr) {
 		rc = fstat(fd, &ucode_stats);
 
 		if (rc != 0) {
@@ -3269,16 +3414,127 @@ static u32 get_dasd_ucode_version(char *ucode_file, int ftype)
 	return rc;
 }
 
+u32 get_ioa_fw_version(struct ipr_ioa *ioa)
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	u32 fw_version;
+
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, "fw_version");
+	sscanf(attr->value, "%8X", &fw_version);
+	sysfs_close_class_device(class_device);
+
+	return fw_version;
+}
+
+static u8 get_ioa_image_type(struct ipr_ioa *ioa)
+{
+	u32 fw_version = get_ioa_fw_version(ioa);
+	return ((fw_version & 0x00ff0000) >> 16);
+}
+
+static void get_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
+{
+	const struct ioa_parms *ioa_parms = get_ioa_fw(ioa);
+
+	if (ioa_parms)
+		sprintf(buf, ioa_parms->fw_name);
+	else
+		sprintf(buf, "534953%02X", get_ioa_image_type(ioa));
+}
+
+static void get_linux_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
+{
+	sprintf(buf, "pci.%04X%04X.%02X", ioa->pci_vendor, ioa->pci_device,
+		get_ioa_image_type(ioa));
+}
+
+static void init_ioa_ucode_entry(struct ipr_fw_images *img)
+{
+	img->version = get_ioa_ucode_version(img->file);
+	img->has_header = 0;
+}
+
+static void init_disk_ucode_entry(struct ipr_fw_images *img)
+{
+	img->version = get_dasd_ucode_version(img->file, 0);
+	img->has_header = 1;
+}
+
+static void init_disk_ucode_entry_nohdr(struct ipr_fw_images *img)
+{
+	img->version = get_dasd_ucode_version(img->file, 1);
+	img->has_header = 0;
+}
+
+static int scan_fw_dir(char *path, char *name, struct ipr_fw_images **list, int len,
+		       void (*init)(struct ipr_fw_images *))
+{
+	struct dirent **dirent;
+	int rc, i;
+	struct ipr_fw_images *ret = *list;
+
+	rc = scandir(path, &dirent, NULL, alphasort);
+
+	for (i = 0; i < rc && rc > 0; i++) {
+		if (strstr(dirent[i]->d_name, name) == dirent[i]->d_name) {
+			ret = realloc(ret, sizeof(*ret) * (len + 1));
+			sprintf(ret[len].file, "%s/%s", path, dirent[i]->d_name);
+			init(&ret[len]);
+			len++;
+		}
+	}
+
+	for (i = 0; i < rc; i++)
+		free(dirent[i]);
+	if (rc > 0)
+		free(dirent);
+
+	*list = ret;
+	return len;
+}
+
+int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
+				struct ipr_fw_images **list)
+{
+	char buf[100];
+	struct ipr_fw_images *ret = NULL;
+	int len = 0;
+
+	*list = NULL;
+
+	get_ioa_fw_name(ioa, buf);
+
+	len = scan_fw_dir(UCODE_BASE_DIR, buf, &ret, len, init_ioa_ucode_entry);
+
+	get_linux_ioa_fw_name(ioa, buf);
+
+	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len, init_ioa_ucode_entry);
+
+	sprintf(buf, "ibmsis%X.img", ioa->ccin);
+
+	len = scan_fw_dir("/etc/microcode", buf, &ret, len, init_ioa_ucode_entry);
+
+	sprintf(buf, "ibmsis%X.img", get_ioa_image_type(ioa));
+
+	len = scan_fw_dir("/etc/microcode", buf, &ret, len, init_ioa_ucode_entry);
+
+	if (ret)
+		qsort(ret, len, sizeof(*ret), fw_compare);
+
+	*list = ret;
+	return len;
+}
+
 int get_dasd_firmware_image_list(struct ipr_dev *dev,
 				 struct ipr_fw_images **list)
 {
-	char etc_ucode_file[100];
-	char prefix[100];
-	struct dirent **dirent;
+	char buf[100];
 	struct ipr_fw_images *ret = NULL;
 	struct ipr_dasd_inquiry_page3 page3_inq;
-	struct stat stats;
-	int i, rc, j = 0;
+	int rc;
+	int len = 0;
 
 	*list = NULL;
 
@@ -3290,83 +3546,82 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 		return -EIO;
 	}
 
-	sprintf(prefix, "%.7s.%02X%02X%02X%02X",
+	sprintf(buf, "%.7s.%02X%02X%02X%02X",
 		dev->scsi_dev_data->product_id,
 		page3_inq.load_id[0], page3_inq.load_id[1],
 		page3_inq.load_id[2], page3_inq.load_id[3]);
 
-	rc = scandir(UCODE_BASE_DIR, &dirent, NULL, alphasort);
+	len = scan_fw_dir(UCODE_BASE_DIR, buf, &ret, len,
+			  init_disk_ucode_entry_nohdr);
 
-	if (rc > 0) {
-		rc--;
+	if (memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8) == 0)
+		sprintf(buf, "ibmsis%02X%02X%02X%02X.img",
+			page3_inq.load_id[0], page3_inq.load_id[1],
+			page3_inq.load_id[2], page3_inq.load_id[3]);
 
-		for (i = rc ; i >= 0; i--) {
-			if (strstr(dirent[i]->d_name, prefix) == dirent[i]->d_name) {
-				ret = realloc(ret, sizeof(*ret) * (j + 1));
-				sprintf(ret[j].file, UCODE_BASE_DIR"/%s",
-					dirent[i]->d_name);
-				ret[j].version = get_dasd_ucode_version(ret[j].file,
-									IPR_DASD_UCODE_USRLIB);
-				ret[j].has_header = 0;
-				j++;
-				break;
-			}
-		}
-		for (i = rc; i >= 0; i--)
-			free(dirent[i]);
-		free(dirent);
-	}
+	len = scan_fw_dir("/etc/microcode/device", buf, &ret, len,
+			  init_disk_ucode_entry);
 
-	rc = scandir(HOTPLUG_BASE_DIR, &dirent, NULL, alphasort);
+	sprintf(buf, "%.7s.%02X%02X%02X%02X",
+		dev->scsi_dev_data->product_id,
+		page3_inq.load_id[0], page3_inq.load_id[1],
+		page3_inq.load_id[2], page3_inq.load_id[3]);
 
-	if (rc > 0) {
-		rc--;
+	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len,
+			  init_disk_ucode_entry_nohdr);
 
-		for (i = rc ; i >= 0; i--) {
-			if (strstr(dirent[i]->d_name, "IBM-") &&
-			    strstr(dirent[i]->d_name, prefix)) {
-				ret = realloc(ret, sizeof(*ret) * (j + 1));
-				sprintf(ret[j].file, HOTPLUG_BASE_DIR"/%s",
-					dirent[i]->d_name);
-				ret[j].version = get_dasd_ucode_version(ret[j].file,
-									IPR_DASD_UCODE_USRLIB);
-				ret[j].has_header = 0;
-				j++;
-				break;
-			}
-		}
-		for (i = rc; i >= 0; i--)
-			free(dirent[i]);
-		free(dirent);
-	}
-
-	sprintf(etc_ucode_file, "/etc/microcode/device/%s", prefix);
-
-	if (!stat(etc_ucode_file, &stats)) {
-		if (memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8) == 0) {
-			sprintf(prefix, "ibmsis%02X%02X%02X%02X.img",
-				page3_inq.load_id[0], page3_inq.load_id[1],
-				page3_inq.load_id[2], page3_inq.load_id[3]);
-		}
-
-		ret = realloc(ret, sizeof(*ret) * (j + 1));
-		strcpy(ret[j].file, etc_ucode_file);
-		ret[j].version = get_dasd_ucode_version(ret[j].file,
-							IPR_DASD_UCODE_ETC);
-		if (memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8) == 0)
-			ret[j].has_header = 0;
-		else
-			ret[j].has_header = 1;
-		j++;
-	}
-
-	if (ret)
-		qsort(ret, j, sizeof(*ret), fw_compare);
+	if (len)
+		qsort(ret, len, sizeof(*ret), fw_compare);
 	else
-		syslog_dbg("Could not find firmware file %s.\n", prefix);
+		scsi_dbg(dev, "Could not find device firmware file\n");
 
 	*list = ret;
-	return j;
+	return len;
+}
+
+int get_ses_firmware_image_list(struct ipr_dev *dev,
+				struct ipr_fw_images **list)
+{
+	char buf[100];
+	struct ipr_fw_images *ret = NULL;
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	int rc;
+	int len = 0;
+
+	/* xxx */
+	return 0;
+
+	*list = NULL;
+
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+
+	if (rc != 0) {
+		scsi_dbg(dev, "Inquiry failed\n");
+		return -EIO;
+	}
+
+	sprintf(buf, "%02X%02X%02X%02X",
+		page3_inq.load_id[0], page3_inq.load_id[1],
+		page3_inq.load_id[2], page3_inq.load_id[3]);
+
+	len = scan_fw_dir(UCODE_BASE_DIR, buf, &ret, len,
+			  init_disk_ucode_entry_nohdr);
+
+	sprintf(buf, "IBM-%02X%02X%02X%02X",
+		page3_inq.load_id[0], page3_inq.load_id[1],
+		page3_inq.load_id[2], page3_inq.load_id[3]);
+
+	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len,
+			  init_disk_ucode_entry_nohdr);
+
+	if (len)
+		qsort(ret, len, sizeof(*ret), fw_compare);
+	else
+		scsi_dbg(dev, "Could not find device firmware file\n");
+
+	*list = ret;
+	return len;
 }
 
 struct ipr_ioa_desc {
@@ -3376,9 +3631,12 @@ struct ipr_ioa_desc {
 
 struct ipr_ioa_desc ioa_desc [] = {
 	{0x5702, "PCI-X Dual Channel Ultra320 SCSI Adapter [5702]"},
+	{0x1974, "PCI-X Dual Channel Ultra320 SCSI Adapter [1974]"},
 	{0x5703, "PCI-X Dual Channel Ultra320 SCSI RAID Adapter [5703]"},
+	{0x1975, "PCI-X Dual Channel Ultra320 SCSI RAID Adapter [1975]"},
 	{0x2780, "PCI-X Quad Channel Ultra320 SCSI RAID Adapter [2780]"},
 	{0x5709, "SCSI RAID Enablement Card for PCI-X Dual Channel Ultra320 SCSI Integrated Controller [5709]"},
+	{0x1976, "SCSI RAID Enablement Card for PCI-X Dual Channel Ultra320 SCSI Integrated Controller [1976]"},
 	{0x570A, "PCI-X Dual Channel SCSI Integrated Controller (Adapter bus) [570A]"},
 	{0x570B, "PCI-X Dual Channel SCSI Integrated Controller (Adapter bus) [570B]"}
 };
@@ -3498,6 +3756,8 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	close(fd);
 }
 
+/* xxx make a general routine to do write buffer that takes a
+ struct ipr_fw_images as input */
 void ipr_update_disk_fw(struct ipr_dev *dev,
 			struct ipr_fw_images *image, int force)
 {
@@ -3614,11 +3874,15 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
+	char *name = dev->gen_name;
 
-	fd = open(dev->gen_name, O_RDWR);
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	fd = open(name, O_RDWR);
 	if (fd <= 1) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -3699,6 +3963,8 @@ static int page0x0a_setup(struct ipr_dev *dev)
 
 	if (page->queue_algorithm_modifier != 1)
 		return 0;
+	if (page->tst == 1 && page->qerr != 3)
+		return 0;
 	if (page->qerr != 1)
 		return 0;
 	if (page->dque != 0)
@@ -3730,17 +3996,28 @@ static int setup_page0x0a(struct ipr_dev *dev)
 
 	IPR_SET_MODE(ch_page->queue_algorithm_modifier,
 		     page->queue_algorithm_modifier, 1);
-	IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
+	IPR_SET_MODE(ch_page->tst, page->tst, 1);
+	IPR_SET_MODE(ch_page->qerr, page->qerr, 3);
 	IPR_SET_MODE(ch_page->dque, page->dque, 0);
+
+	if (page->tst != 1 || page->qerr != 3) {
+		scsi_dbg(dev, "Cannot set QERR/TST for multi-initiator. "
+			 "TST=%d, QERR=%d\n", page->tst, page->qerr);
+
+		IPR_SET_MODE(ch_page->tst, page->tst, 0);
+		IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
+
+		if (page->tst != 0 || page->qerr != 1) {
+			scsi_dbg(dev, "Cannot set QERR/TST for single-initiator. "
+				 "TST=%d, QERR=%d\n", page->tst, page->qerr);
+			return -EIO;
+		}
+	}
+
 
 	if (page->queue_algorithm_modifier != 1) {
 		scsi_dbg(dev, "Cannot set QAM=1\n");
 		return -EIO;
-	}
-
-	if (page->qerr != 1) {
-		scsi_dbg(dev, "Cannot set QERR=1\n");
-			return -EIO;
 	}
 
 	if (page->dque != 0) {
@@ -3968,22 +4245,22 @@ void ipr_init_ioa(struct ipr_ioa *ioa)
 
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 {
-	struct ipr_ioa *cur_ioa;
+	struct ipr_ioa *ioa;
 	int j;
 	struct scsi_dev_data *scsi_dev_data;
 
-	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-		for (j = 0; j < cur_ioa->num_devices; j++) {
-			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+	for_each_ioa(ioa) {
+		for (j = 0; j < ioa->num_devices; j++) {
+			scsi_dev_data = ioa->dev[j].scsi_dev_data;
 
-			if (scsi_dev_data == NULL)
+			if (!scsi_dev_data)
 				continue;
 
 			if (scsi_dev_data->host == res_addr->host &&
 			    scsi_dev_data->channel == res_addr->bus &&
 			    scsi_dev_data->id == res_addr->target &&
 			    scsi_dev_data->lun == res_addr->lun)
-				return &cur_ioa->dev[j];
+				return &ioa->dev[j];
 		}
 	}
 
@@ -3992,27 +4269,21 @@ struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 
 struct ipr_dev *get_dev_from_handle(u32 res_handle)
 {
-	struct ipr_ioa *cur_ioa;
+	struct ipr_ioa *ioa;
 	int j;
-	struct ipr_dev_record *device_record;
-	struct ipr_array_record *array_record;
 
-	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-		for (j = 0; j < cur_ioa->num_devices; j++) {
-			device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
-			array_record = (struct ipr_array_record *)cur_ioa->dev[j].qac_entry;
-
-			if (device_record == NULL)
+	for_each_ioa(ioa) {
+		for (j = 0; j < ioa->num_devices; j++) {
+			if (!ioa->dev[j].qac_entry)
 				continue;
 
-			if (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
-			    device_record->resource_handle == res_handle)
-				return &cur_ioa->dev[j];
+			if (ioa->dev[j].qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+			    ioa->dev[j].dev_rcd->resource_handle == res_handle)
+				return &ioa->dev[j];
 
-			if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD &&
-			    array_record->resource_handle == res_handle)
-				return &cur_ioa->dev[j];
-
+			if (ioa->dev[j].qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD &&
+			    ioa->dev[j].array_rcd->resource_handle == res_handle)
+				return &ioa->dev[j];
 		}
 	}
 

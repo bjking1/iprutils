@@ -31,9 +31,8 @@
 struct devs_to_init_t {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
-	int change_size;
-#define IPR_522_BLOCK 522
-#define IPR_512_BLOCK 512
+	int new_block_size;
+#define IPR_JBOD_BLOCK_SIZE 512
 	int cmplt;
 	int do_init;
 	int dev_type;
@@ -1098,7 +1097,7 @@ static void verify_device(struct ipr_dev *dev)
 
 					if (block_desc->block_length[1] == 0x02 && 
 					    block_desc->block_length[2] == 0x00)
-						evaluate_device(dev, dev->ioa, IPR_512_BLOCK);
+						evaluate_device(dev, dev->ioa, IPR_JBOD_BLOCK_SIZE);
 				}
 			}
 		}
@@ -1116,7 +1115,7 @@ static void verify_device(struct ipr_dev *dev)
 					     !(block_desc->block_length[2] == 0x00)) &&
 					    dev->ioa->qac_data->num_records != 0) {
 						enable_af(dev);
-						evaluate_device(dev, dev->ioa, IPR_522_BLOCK);
+						evaluate_device(dev, dev->ioa, dev->ioa->af_block_size);
 					}
 				}
 			}
@@ -1129,7 +1128,6 @@ int main_menu(i_container *i_con)
 	int rc;
 	int j;
 	struct ipr_ioa *ioa;
-	int loop;
 	struct screen_output *s_out;
 	struct scsi_dev_data *scsi_dev_data;
 
@@ -1144,10 +1142,10 @@ int main_menu(i_container *i_con)
 		}
 	}
 
-	for (loop = 0; loop < n_main_menu.num_opts; loop++) {
+	for (j = 0; j < n_main_menu.num_opts; j++) {
 		n_main_menu.body = ipr_list_opts(n_main_menu.body,
-						 n_main_menu.options[loop].key,
-						 n_main_menu.options[loop].list_str);
+						 n_main_menu.options[j].key,
+						 n_main_menu.options[j].list_str);
 	}
 
 	n_main_menu.body = ipr_end_list(n_main_menu.body);
@@ -1349,6 +1347,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	struct ipr_dram_vpd dram_vpd;
 	struct ipr_inquiry_page0 page0_inq;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
+	struct ipr_dual_ioa_entry *ioa_entry;
 	int rc, i;
 	char buffer[200];
 	int cache_size;
@@ -1380,7 +1379,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	sprintf(buffer,"%08X", fw_level);
 	body = add_line_to_body(body,_("Firmware Version"), buffer);
 	if (!dev->ioa->ioa_dead) {
-		ipr_strncpy_0(buffer, cfc_vpd.serial_num, IPR_SERIAL_NUM_LEN);
+		ipr_strncpy_0(buffer, ioa_vpd.std_inq_data.serial_num, IPR_SERIAL_NUM_LEN);
 		body = add_line_to_body(body,_("Serial Number"), buffer);
 		ipr_strncpy_0(buffer, ioa_vpd.ascii_part_num, IPR_VPD_PART_NUM_LEN);
 		body = add_line_to_body(body,_("Part Number"), buffer);
@@ -1398,17 +1397,31 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 		body = add_line_to_body(body,_("DRAM Size"), buffer);
 	}
 	body = add_line_to_body(body,_("Resource Name"), dev->gen_name);
-	if (dev->ioa->dual_raid_support) {
-		body = add_line_to_body(body,_("Current Dual Adapter State"),
-					dev->ioa->dual_state);
-		body = add_line_to_body(body,_("Saved Dual Adapter State"),
-					dev->ioa->saved_dual_state);
-	}
 	body = add_line_to_body(body,"", NULL);
 	body = add_line_to_body(body,_("Physical location"), NULL);
 	body = add_line_to_body(body,_("PCI Address"), dev->ioa->pci_address);
 	sprintf(buffer,"%d", dev->ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
+	if (dev->ioa->dual_raid_support) {
+		ioa_entry = (struct ipr_dual_ioa_entry *)
+			(((unsigned long)&dev->ioa->ioa_status.cap) +
+			 ntohl(dev->ioa->ioa_status.cap.length));
+		body = add_line_to_body(body,"", NULL);
+		body = add_line_to_body(body,_("Current Dual Adapter State"),
+					dev->ioa->dual_state);
+		body = add_line_to_body(body,_("Preferred Dual Adapter State"),
+					dev->ioa->preferred_dual_state);
+		if (ntohl(dev->ioa->ioa_status.num_entries)) {
+			ipr_strncpy_0(buffer, ioa_entry->remote_vendor_id, IPR_VENDOR_ID_LEN);
+			body = add_line_to_body(body,_("Remote Adapter Manufacturer"), buffer);
+			ipr_strncpy_0(buffer, ioa_entry->remote_prod_id, IPR_PROD_ID_LEN);
+			body = add_line_to_body(body,_("Remote Adapter Machine Type And Model"),
+						buffer);
+			ipr_strncpy_0(buffer, ioa_entry->remote_sn, IPR_SERIAL_NUM_LEN);
+			body = add_line_to_body(body,_("Remote Adapter Serial Number"), buffer);
+		}
+	}
+
 	return body;
 }
 
@@ -1934,9 +1947,7 @@ int confirm_raid_stop(i_container *i_con)
 
 	body_init_status(buffer, n_confirm_raid_stop.header, &header_lines);
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
 		if (!cur_raid_cmd)
 			continue;
@@ -2200,9 +2211,7 @@ int raid_start_loop(i_container *i_con)
 	char *input;
 	i_container *temp_i_con;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
 		if (!cur_raid_cmd)
 			continue;
@@ -2290,10 +2299,7 @@ int configure_raid_start(i_container *i_con)
 
 		found = 0;
 
-		for (temp_i_con = i_con_head;
-		     temp_i_con != NULL;
-		     temp_i_con = temp_i_con->next_item) {
-
+		for_each_icon(temp_i_con) {
 			ipr_dev = (struct ipr_dev *)temp_i_con->data;
 			input = temp_i_con->field_data;
 
@@ -2307,7 +2313,7 @@ int configure_raid_start(i_container *i_con)
 
 		if (found != 0) {
 			/* Go to parameters screen */
-			rc = configure_raid_parameters(i_con_head_saved);
+			rc = configure_raid_parameters(i_con);
 
 			if ((rc &  EXIT_FLAG) ||
 			    !(rc & CANCEL_FLAG))
@@ -2315,9 +2321,7 @@ int configure_raid_start(i_container *i_con)
 
 			/* User selected Cancel, clear out current selections
 			 for redisplay */
-			for (temp_i_con = i_con_head;
-			     temp_i_con != NULL;
-			     temp_i_con = temp_i_con->next_item) {
+			for_each_icon(temp_i_con) {
 				ipr_dev = (struct ipr_dev *)temp_i_con->data;
 				input = temp_i_con->field_data;
 
@@ -3022,7 +3026,7 @@ int confirm_raid_rebuild(i_container *i_con)
 	i_container *temp_i_con;
 	struct screen_output *s_out;
 
-	for (temp_i_con = i_con_head; temp_i_con; temp_i_con = temp_i_con->next_item) {
+	for_each_icon(temp_i_con) {
 		cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
 		if (!cur_raid_cmd)
 			continue;
@@ -3109,7 +3113,7 @@ int raid_include(i_container *i_con)
 
 	for_each_ioa(ioa) {
 		for (i = 0; i < ioa->num_devices; i++) {
-			if (!ipr_is_volume_set(&ioa->dev[i]))
+			if (!ipr_is_volume_set(&ioa->dev[i]) || ioa->is_secondary)
 				continue;
 
 			array_rcd = ioa->dev[i].array_rcd;
@@ -3184,7 +3188,7 @@ int raid_include(i_container *i_con)
 
 int configure_raid_include(i_container *i_con)
 {
-	int j, k;
+	int j, k, i;
 	int found = 0;
 	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_array_query_data *qac_data = calloc(1,sizeof(struct ipr_array_query_data));
@@ -3203,9 +3207,7 @@ int configure_raid_include(i_container *i_con)
 	int toggle = 0;
 	struct screen_output *s_out;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		cur_raid_cmd = i_con->data;
 		if (!cur_raid_cmd)
 			continue;
@@ -3238,7 +3240,7 @@ int configure_raid_include(i_container *i_con)
 		free(qac_data);
 	else  {
 		cur_raid_cmd->qac = qac_data;
-		for_each_qac_entry(common_record, k, qac_data) {
+		for_each_qac_entry(common_record, i, qac_data) {
 			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 				for (j = 0; j < ioa->num_devices; j++) {
 					scsi_dev_data = ioa->dev[j].scsi_dev_data;
@@ -3273,7 +3275,7 @@ int configure_raid_include(i_container *i_con)
 		}
 	}
 
-	if (found <= min_mult_array_devices) {
+	if (found < min_mult_array_devices) {
 		/* Include Device Parity Protection Failed */
 		n_configure_raid_include_fail.body = body_init(n_configure_raid_include_fail.header, NULL);
 		s_out = screen_driver(&n_configure_raid_include_fail,0,i_con);
@@ -3311,9 +3313,7 @@ int configure_raid_include(i_container *i_con)
 	 is satisfied */
 	found = 0;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		input = temp_i_con->field_data;
 		if (strcmp(input, "1") == 0)
 			found++;
@@ -3325,7 +3325,7 @@ int configure_raid_include(i_container *i_con)
 		return 25 | REFRESH_FLAG; 
 	}
 
-	for (temp_i_con = i_con_head; temp_i_con; temp_i_con = temp_i_con->next_item) {
+	for_each_icon(temp_i_con) {
 		dev = (struct ipr_dev *)temp_i_con->data;
 		if (!dev)
 			continue;
@@ -3482,18 +3482,47 @@ int format_include_cand()
 	return num_devs;
 }
 
+static int update_include_qac_data(struct ipr_array_query_data *old_qac,
+				   struct ipr_array_query_data *new_qac)
+{
+	struct ipr_dev_record *old_dev_rcd, *new_dev_rcd;
+	int found, i, j;
+
+	for_each_dev_rcd(old_dev_rcd, i, old_qac) {
+		if (!old_dev_rcd->issue_cmd)
+			continue;
+
+		found = 0;
+		for_each_dev_rcd(new_dev_rcd, j, new_qac) {
+			if (new_dev_rcd->resource_handle != old_dev_rcd->resource_handle)
+				continue;
+
+			new_dev_rcd->issue_cmd = 1;
+			new_dev_rcd->known_zeroed = 1;
+			found = 1;
+			break;
+		}
+
+		if (!found)
+			return 26;
+	}
+
+	return 0;
+}
+
 int dev_include_complete(u8 num_devs)
 {
 	int done_bad;
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
 	int not_done = 0;
-	int rc, j;
+	int rc, j, fd;
 	struct devs_to_init_t *cur_dev_init;
 	u32 percent_cmplt = 0;
 	struct ipr_ioa *ioa;
 	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_common_record *common_record;
+	struct ipr_array_query_data qac_data;
 
 	n_dev_include_complete.body = n_dev_include_complete.header[0];
 
@@ -3549,11 +3578,42 @@ int dev_include_complete(u8 num_devs)
 			continue;
 
 		ioa = cur_raid_cmd->ioa;
+		memset(&qac_data, 0, sizeof(qac_data));
 
-		rc = ipr_add_array_device(ioa, cur_raid_cmd->qac);
+		fd = open(ioa->ioa.gen_name, O_RDWR);
+		if (fd <= 1) {
+			rc = 26;
+			continue;
+		}
+
+		rc = flock(fd, LOCK_EX);
+		if (rc) {
+			rc = 26;
+			close(fd);
+			continue;
+		}
+
+		rc = __ipr_query_array_config(ioa, fd, 0, 1,
+					      cur_raid_cmd->array_id, &qac_data);
+
+		if (rc != 0) {
+			rc = 26;
+			close(fd);
+			continue;
+		}
+
+		rc = update_include_qac_data(cur_raid_cmd->qac, &qac_data);
+		if (rc != 0) {
+			close(fd);
+			continue;
+		}
+
+		rc = ipr_add_array_device(ioa, fd, &qac_data);
 
 		if (rc != 0)
 			rc = 26;
+
+		close(fd);
 	}
 
 	not_done = 0;
@@ -3645,7 +3705,7 @@ int configure_af_device(i_container *i_con, int action_code)
 	struct scsi_dev_data *scsi_dev_data;
 	int can_init, max_y, max_x;
 	int dev_type;
-	int change_size;
+	int new_block_size;
 	char *buffer[2];
 	int num_devs = 0;
 	struct ipr_ioa *ioa;
@@ -3654,6 +3714,9 @@ int configure_af_device(i_container *i_con, int action_code)
 	int header_lines;
 	s_node *n_screen;
 	struct screen_output *s_out;
+	u8 ioctl_buffer[IPR_MODE_SENSE_LENGTH];
+	struct ipr_mode_parm_hdr *mode_parm_hdr;
+	struct ipr_block_desc *block_desc;
 
 	getmaxyx(stdscr,max_y,max_x);
 	move(max_y-1,0);
@@ -3675,6 +3738,9 @@ int configure_af_device(i_container *i_con, int action_code)
 	body_init_status(buffer, n_screen->header, &header_lines);
 
 	for_each_ioa(ioa) {
+		if (ioa->is_secondary)
+			continue;
+
 		for (j = 0; j < ioa->num_devices; j++) {
 			can_init = 1;
 			scsi_dev_data = ioa->dev[j].scsi_dev_data;
@@ -3693,9 +3759,9 @@ int configure_af_device(i_container *i_con, int action_code)
 				if (action_code == IPR_INCLUDE) {
 					if (ipr_device_is_zeroed(&ioa->dev[j]))
 						continue;
-					change_size = 0;
+					new_block_size = 0;
 				} else
-					change_size = IPR_512_BLOCK;
+					new_block_size = IPR_JBOD_BLOCK_SIZE;
 
 				dev_type = IPR_AF_DASD_DEVICE;
 
@@ -3712,14 +3778,35 @@ int configure_af_device(i_container *i_con, int action_code)
 						can_init = 0;
 				} else
 					can_init = is_format_allowed(&ioa->dev[j]);
-			} else if (scsi_dev_data->type == TYPE_DISK &&
-				   ioa->qac_data->num_records) {
+			} else if (scsi_dev_data->type == TYPE_DISK){
 
-				if (action_code == IPR_REMOVE)
+				/* If on a JBOD adapter */
+				if (!ioa->qac_data->num_records) {
+					if (action_code != IPR_REMOVE)
+						continue;
+
+					if (!(rc = ipr_mode_sense(&ioa->dev[j], 0, ioctl_buffer))) {
+						mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+
+						if (mode_parm_hdr->block_desc_len > 0) {
+							block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
+
+							if (block_desc->block_length[1] != (ioa->af_block_size >> 8) ||
+							    block_desc->block_length[2] != (ioa->af_block_size & 0xff))
+								continue;
+						} else
+							continue;
+					} else
+						continue;
+				} else if (is_af_blocked(&ioa->dev[j], 0))
 					continue;
 
+				if (action_code == IPR_REMOVE)
+					new_block_size = IPR_JBOD_BLOCK_SIZE;
+				else
+					new_block_size = ioa->af_block_size;
+
 				dev_type = IPR_JBOD_DASD_DEVICE;
-				change_size = IPR_522_BLOCK;
 
 				/* We allow the user to format the drive if nobody is using it, or
 				 the device is read write protected. If the drive fails, then is replaced
@@ -3728,11 +3815,6 @@ int configure_af_device(i_container *i_con, int action_code)
 				 into a state where the system can use it */
 				if (ioa->dev[j].scsi_dev_data->opens != 0) {
 					syslog(LOG_ERR, _("Format not allowed to %s, device in use\n"), ioa->dev[j].gen_name); 
-					continue;
-				}
-
-				if (is_af_blocked(&ioa->dev[j], 0)) {
-					/* error log is posted in is_af_blocked() routine */
 					continue;
 				}
 
@@ -3752,7 +3834,7 @@ int configure_af_device(i_container *i_con, int action_code)
 
 				dev_init_tail->ioa = ioa;
 				dev_init_tail->dev_type = dev_type;
-				dev_init_tail->change_size = change_size;
+				dev_init_tail->new_block_size = new_block_size;
 				dev_init_tail->dev = &ioa->dev[j];
 
 				print_dev(k, &ioa->dev[j], buffer, "%1", ioa, k);
@@ -3917,9 +3999,7 @@ int hot_spare(i_container *i_con, int action)
 
 	found = 0;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
 		if (cur_raid_cmd)  {
 			input = temp_i_con->field_data;
@@ -4045,9 +4125,7 @@ int select_hot_spare(i_container *i_con, int action)
 
 		found = 0;
 
-		for (temp_i_con = i_con_head; temp_i_con != NULL;
-		temp_i_con = temp_i_con->next_item) {
-
+		for_each_icon(temp_i_con) {
 			ipr_dev = (struct ipr_dev *)temp_i_con->data;
 			if (ipr_dev != NULL) {
 				input = temp_i_con->field_data;
@@ -4259,9 +4337,7 @@ int process_conc_maint(i_container *i_con, int action)
 	int time = 12;
 	int max_y, max_x;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		input = temp_i_con->field_data;
 
 		if (strcmp(input, "1") == 0) {
@@ -4407,7 +4483,7 @@ int process_conc_maint(i_container *i_con, int action)
 			move(max_y-1,0);
 			printw(_("Operation in progress - please wait"));
 			refresh();
-			ipr_rescan(ioa, res_addr.bus, res_addr.target, res_addr.lun);
+			ipr_scan(ioa, res_addr.bus, res_addr.target, res_addr.lun);
 
 			while (time--) {
 				check_current_config(false);
@@ -4525,6 +4601,8 @@ int start_conc_maint(i_container *i_con, int action)
 	body_init_status(buffer, n_screen->header, &header_lines);
 
 	for_each_ioa(ioa) {
+		if (ioa->is_secondary)
+			continue;
 		for (j = 0; j < ioa->num_devices; j++) {
 			scsi_dev_data = ioa->dev[j].scsi_dev_data;
 			if (!scsi_dev_data || scsi_dev_data->type != TYPE_ENCLOSURE)
@@ -4741,7 +4819,7 @@ int init_device(i_container *i_con)
 				dev_init_tail->ioa = ioa;
 				dev_init_tail->dev_type = dev_type;
 				dev_init_tail->dev = &ioa->dev[j];
-				dev_init_tail->change_size = 0;
+				dev_init_tail->new_block_size = 0;
 
 				print_dev(k, &ioa->dev[j], buffer, "%1", ioa, k);
 				i_con = add_i_con(i_con,"\0",dev_init_tail);
@@ -4797,9 +4875,7 @@ int confirm_init_device(i_container *i_con)
 	int post_attention = 0;
 	struct ipr_dev *dev;
 
-	for (temp_i_con = i_con_head;
-	     temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		if (temp_i_con->data == NULL)
 			continue;
 
@@ -4871,6 +4947,7 @@ int send_dev_inits(i_container *i_con)
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
 	struct ipr_block_desc *block_desc;
 	struct scsi_dev_data *scsi_dev_data;
+	struct ipr_ioa *ioa;
 	int status;
 	int opens;
 	u8 failure = 0;
@@ -4888,6 +4965,7 @@ int send_dev_inits(i_container *i_con)
 		    cur_dev_init->dev_type == IPR_AF_DASD_DEVICE) {
 
 			num_devs++;
+			ioa = cur_dev_init->ioa;
 
 			rc = ipr_query_resource_state(cur_dev_init->dev, &res_state);
 
@@ -4923,7 +5001,7 @@ int send_dev_inits(i_container *i_con)
 
 			ipr_disable_qerr(cur_dev_init->dev);
 
-			if (cur_dev_init->change_size == IPR_512_BLOCK) {
+			if (cur_dev_init->new_block_size == IPR_JBOD_BLOCK_SIZE) {
 				/* Issue mode select to change block size */
 				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 				memset(ioctl_buffer, 0, 255);
@@ -4933,8 +5011,8 @@ int send_dev_inits(i_container *i_con)
 
 				/* Setup block size */
 				block_desc->block_length[0] = 0x00;
-				block_desc->block_length[1] = 0x02;
-				block_desc->block_length[2] = 0x00;
+				block_desc->block_length[1] = IPR_JBOD_BLOCK_SIZE >> 8;
+				block_desc->block_length[2] = IPR_JBOD_BLOCK_SIZE & 0xff;
 
 				rc = ipr_mode_select(cur_dev_init->dev,ioctl_buffer,
 						     sizeof(struct ipr_block_desc) +
@@ -4979,32 +5057,36 @@ int send_dev_inits(i_container *i_con)
 
 			ipr_disable_qerr(cur_dev_init->dev);
 
-			if (cur_dev_init->change_size == IPR_522_BLOCK) {
-				/* Issue mode select to setup block size */
-				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-				memset(ioctl_buffer, 0, 255);
+			/* Issue mode select to setup block size */
+			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+			memset(ioctl_buffer, 0, 255);
 
-				mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+			mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
 
-				block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
+			block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
 
-				/* Setup block size */
+			/* xxx Setup block size */
+			if (cur_dev_init->new_block_size == ioa->af_block_size) {
 				block_desc->block_length[0] = 0x00;
-				block_desc->block_length[1] = 0x02;
-				block_desc->block_length[2] = 0x0a;
+				block_desc->block_length[1] = ioa->af_block_size >> 8;
+				block_desc->block_length[2] = ioa->af_block_size & 0xff;
+			} else {
+				block_desc->block_length[0] = 0x00;
+				block_desc->block_length[1] = IPR_JBOD_BLOCK_SIZE >> 8;
+				block_desc->block_length[2] = IPR_JBOD_BLOCK_SIZE & 0xff;
+			}
 
-				length = sizeof(struct ipr_block_desc) +
-					sizeof(struct ipr_mode_parm_hdr);
+			length = sizeof(struct ipr_block_desc) +
+				sizeof(struct ipr_mode_parm_hdr);
 
-				status = ipr_mode_select(cur_dev_init->dev,
-							 &ioctl_buffer, length);
+			status = ipr_mode_select(cur_dev_init->dev,
+						 &ioctl_buffer, length);
 
-				if (status) {
-					cur_dev_init->do_init = 0;
-					num_devs--;
-					failure++;
-					continue;
-				}
+			if (status && cur_dev_init->new_block_size == ioa->af_block_size) {
+				cur_dev_init->do_init = 0;
+				num_devs--;
+				failure++;
+				continue;
 			}
 
 			/* Issue format */
@@ -5100,16 +5182,20 @@ int dev_init_complete(u8 num_devs)
 
 				ioa = dev->ioa;
 
-				if (dev->change_size != 0) {
-					if (dev->change_size == IPR_522_BLOCK)
-						enable_af(dev->dev);
-
-					/* send evaluate device down */
-					evaluate_device(dev->dev,
-							ioa, dev->change_size);
+				if (dev->new_block_size != ioa->af_block_size && ipr_is_gscsi(dev->dev)) {
+					ipr_write_dev_attr(dev->dev, "rescan", "1");
+					ipr_init_dev(dev->dev);
 				}
 
-				ipr_add_zeroed_dev(dev->dev);
+				if (dev->new_block_size != 0) {
+					if (dev->new_block_size == ioa->af_block_size)
+						enable_af(dev->dev);
+
+					evaluate_device(dev->dev, ioa, dev->new_block_size);
+				}
+
+				if (dev->new_block_size == ioa->af_block_size || ipr_is_af_dasd_device(dev->dev))
+					ipr_add_zeroed_dev(dev->dev);
 			}
 
 			flush_stdscr();
@@ -5221,9 +5307,7 @@ int confirm_reclaim(i_container *i_con)
 	int ioa_num = 0;
 	char *prot_level_str;
 
-	for (temp_i_con = i_con_head; temp_i_con;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		ioa = (struct ipr_ioa *) temp_i_con->data;
 		if (!ioa)
 			continue;
@@ -5708,7 +5792,7 @@ int battery_fork(i_container *i_con)
 
 	i_container *temp_i_con;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
+	for_each_icon(temp_i_con) {
 		ioa = (struct ipr_ioa *)temp_i_con->data;
 		if (ioa == NULL)
 			continue;
@@ -5892,9 +5976,7 @@ int change_bus_attr(i_container *i_con)
 
 	rc = RC_SUCCESS;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		ioa = (struct ipr_ioa *)temp_i_con->data;
 		if (ioa == NULL)
 			continue;
@@ -6021,7 +6103,7 @@ int change_bus_attr(i_container *i_con)
 		s_out = screen_driver(&n_change_bus_attr,header_lines,i_con);
 		rc = s_out->rc;
 
-		for (temp_i_con = i_con_head; temp_i_con; temp_i_con = temp_i_con->next_item) {
+		for_each_icon(temp_i_con) {
 			if (!temp_i_con->field_data[0]) {
 				bus_attr = (struct bus_attr *)temp_i_con->data;
 				rc = bus_attr_menu(ioa, bus_attr, temp_i_con->y, header_lines);
@@ -6649,9 +6731,7 @@ int change_driver_config(i_container *i_con)
 	char *body = NULL;
 	char *input;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		ioa = (struct ipr_ioa *)(temp_i_con->data);
 		if (ioa == NULL)
 			continue;
@@ -6741,7 +6821,9 @@ int disk_config(i_container * i_con)
 			    (ipr_is_hot_spare(&ioa->dev[j])) ||
 			    (ipr_is_volume_set(&ioa->dev[j])) ||
 			    (ipr_is_array_member(&ioa->dev[j])))
+				continue;
 
+			if (ipr_is_af_dasd_device(&ioa->dev[j]) && ioa->is_secondary)
 				continue;
 
 			print_dev(k, &ioa->dev[j], buffer, "%1", ioa, k);
@@ -6754,7 +6836,7 @@ int disk_config(i_container * i_con)
 		for (j = 0; j < ioa->num_devices; j++) {
 			scsi_dev_data = ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL ) ||
-			    ioa->ioa_dead ||
+			    ioa->ioa_dead || ioa->is_secondary ||
 			    (!ipr_is_hot_spare(&ioa->dev[j])))
 
 				continue;
@@ -6794,6 +6876,8 @@ int disk_config(i_container * i_con)
 				    (ipr_is_volume_set(&ioa->dev[i])) ||
 				    ((dev_record != NULL) &&
 				     (dev_record->array_id != array_id)))
+					continue;
+				if (ioa->is_secondary)
 					continue;
 
 				strncpy(ioa->dev[i].prot_level_str, prot_level_str, 8);
@@ -6967,9 +7051,7 @@ int change_disk_config(i_container * i_con)
 
 	rc = RC_SUCCESS;
 
-	for (temp_i_con = i_con_head; temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		ipr_dev = (struct ipr_dev *)temp_i_con->data;
 		if (ipr_dev == NULL)
 			continue;
@@ -7030,7 +7112,8 @@ int change_disk_config(i_container * i_con)
 		rc = s_out->rc;
 
 		found = 0;
-		for (temp_i_con = i_con_head; temp_i_con; temp_i_con = temp_i_con->next_item) {
+
+		for_each_icon(temp_i_con) {
 			if (!temp_i_con->field_data[0]) {
 				config_attr = (struct disk_config_attr *)temp_i_con->data;
 				rc = disk_config_menu(ipr_dev, config_attr, temp_i_con->y, header_lines);
@@ -7077,6 +7160,218 @@ int change_disk_config(i_container * i_con)
 	return rc;
 }
 
+int ioa_config(i_container * i_con)
+{
+	int rc, k;
+	int len = 0;
+	int num_lines = 0;
+	struct ipr_ioa *ioa;
+	struct screen_output *s_out;
+	int header_lines;
+	char *buffer[2];
+	int toggle = 1;
+
+	rc = RC_SUCCESS;
+	i_con = free_i_con(i_con);
+
+	check_current_config(false);
+	body_init_status(buffer, n_ioa_config.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		if (ioa->ioa.scsi_dev_data == NULL)
+			continue;
+		if (!ioa->dual_raid_support)
+			continue;
+
+		print_dev(k, &ioa->ioa, buffer, "%1", ioa, k);
+		i_con = add_i_con(i_con, "\0", &ioa->ioa);
+		num_lines++;
+	}
+
+	if (num_lines == 0) {
+		for (k = 0; k < 2; k++) {
+			len = strlen(buffer[k]);
+			buffer[k] = realloc(buffer[k], len +
+						strlen(_(no_dev_found)) + 8);
+			sprintf(buffer[k] + len, "\n%s", _(no_dev_found));
+		}
+	}
+
+	do {
+		n_ioa_config.body = buffer[toggle&1];
+		s_out = screen_driver(&n_ioa_config,header_lines,i_con);
+		toggle++;
+	} while (s_out->rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+	n_ioa_config.body = NULL;
+
+	rc = s_out->rc;
+	free(s_out);
+	return rc;
+}
+
+struct ioa_config_attr {
+	int option;
+	int preferred_primary;
+};
+
+int ioa_config_menu(struct ipr_dev *ipr_dev, struct ioa_config_attr *ioa_config_attr,
+		    int start_row, int header_lines)
+{
+	int i;
+	int num_menu_items;
+	int menu_index;
+	ITEM **menu_item = NULL;
+	int *retptr;
+	int *userptr = NULL;
+	int rc = RC_SUCCESS;
+
+	/* start_row represents the row in which the top most
+	 menu item will be placed.  Ideally this will be on the
+	 same line as the field in which the menu is opened for*/
+	start_row += 2; /* for title */  /* FIXME */
+
+	if (ioa_config_attr->option == 1) {
+		num_menu_items = 2;
+		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+		userptr = malloc(sizeof(int) * num_menu_items);
+
+		menu_index = 0;
+		menu_item[menu_index] = new_item("None","");
+		userptr[menu_index] = 0;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+
+		menu_index++;
+
+		menu_item[menu_index] = new_item("Primary","");
+		userptr[menu_index] = 1;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+		menu_index++;
+
+		menu_item[menu_index] = (ITEM *)NULL;
+		rc = display_menu(menu_item, start_row, menu_index, &retptr);
+		if (rc == RC_SUCCESS)
+			ioa_config_attr->preferred_primary = *retptr;
+
+		i = 0;
+		while (menu_item[i] != NULL)
+			free_item(menu_item[i++]);
+		free(menu_item);
+		free(userptr);
+		menu_item = NULL;
+	}
+
+	return rc;
+}
+
+int change_ioa_config(i_container * i_con)
+{
+	int rc;
+	i_container *i_con_head_saved;
+	struct ipr_dev *ipr_dev;
+	char pref_str[20];
+	char buffer[128];
+	i_container *temp_i_con;
+	int found = 0;
+	char *input;
+	struct ioa_config_attr ioa_config_attr[3];
+	struct ioa_config_attr *config_attr = NULL;
+	struct ipr_ioa_attr ioa_attr;
+	int header_lines = 0;
+	char *body = NULL;
+	struct screen_output *s_out;
+
+	rc = RC_SUCCESS;
+
+	for_each_icon(temp_i_con) {
+		ipr_dev = (struct ipr_dev *)temp_i_con->data;
+		if (ipr_dev == NULL)
+			continue;
+
+		input = temp_i_con->field_data;
+		if (strcmp(input, "1") == 0) {
+			found++;
+			break;
+		}	
+	}
+
+	if (!found)
+		return INVALID_OPTION_STATUS;
+
+	rc = ipr_get_ioa_attr(ipr_dev->ioa, &ioa_attr);
+	if (rc)
+		return 66 | EXIT_FLAG;
+
+	i_con_head_saved = i_con_head; /* FIXME */
+	i_con_head = i_con = NULL;
+
+	body = body_init(n_change_disk_config.header, &header_lines);
+	sprintf(buffer, "Adapter: %s/%d   %s %s\n", ipr_dev->ioa->pci_address,
+		ipr_dev->ioa->host_num, ipr_dev->scsi_dev_data->vendor_id,
+		ipr_dev->scsi_dev_data->product_id);
+	body = add_line_to_body(body, buffer, NULL);
+	header_lines += 2;
+
+	body = add_line_to_body(body,_("Preferred Dual Adapter State"), "%13");
+	ioa_config_attr[0].option = 1;
+	ioa_config_attr[0].preferred_primary = ioa_attr.preferred_primary;
+	if (ioa_attr.preferred_primary)
+		sprintf(pref_str, "Primary");
+	else
+		sprintf(pref_str, "None");
+	i_con = add_i_con(i_con, pref_str, &ioa_config_attr[0]);
+
+	n_change_ioa_config.body = body;
+	while (1) {
+		s_out = screen_driver(&n_change_ioa_config, header_lines, i_con);
+		rc = s_out->rc;
+
+		found = 0;
+		for_each_icon(temp_i_con) {
+			if (!temp_i_con->field_data[0]) {
+				config_attr = (struct ioa_config_attr *)temp_i_con->data;
+				rc = ioa_config_menu(ipr_dev, config_attr, temp_i_con->y, header_lines);
+
+				if (rc == CANCEL_FLAG)
+					rc = RC_SUCCESS;
+
+				if (config_attr->option == 1) {
+					if (config_attr->preferred_primary)
+						sprintf(temp_i_con->field_data, "Primary");
+					else
+						sprintf(temp_i_con->field_data, "None");
+					ioa_attr.preferred_primary = config_attr->preferred_primary;
+				}
+				found++;
+				break;
+			}
+		}
+
+		if (rc)
+			goto leave;
+
+		if (!found)
+			break;
+	}
+
+	ipr_set_ioa_attr(ipr_dev->ioa, &ioa_attr, 1);
+
+	leave:
+
+	free(n_change_ioa_config.body);
+	n_change_ioa_config.body = NULL;
+	free_i_con(i_con);
+	i_con_head = i_con_head_saved;
+	free(s_out);
+	return rc;
+}
+
 int download_ucode(i_container * i_con)
 {
 	int rc, j, i, k;
@@ -7109,21 +7404,23 @@ int download_ucode(i_container * i_con)
 			continue;
 
 		print_dev(k, &ioa->ioa, buffer, "%1", ioa, k);
-		i_con = add_i_con(i_con,"\0",&ioa->ioa);
+		i_con = add_i_con(i_con, "\0", &ioa->ioa);
 
 		num_lines++;
 
 		/* print JBOD and non-member AF devices*/
 		for (j = 0; j < ioa->num_devices; j++) {
 			scsi_dev_data = ioa->dev[j].scsi_dev_data;
-			if ((scsi_dev_data == NULL) ||
-			    ioa->ioa_dead ||
+			if ((scsi_dev_data == NULL) || ioa->ioa_dead ||
 			    ((scsi_dev_data->type != TYPE_DISK) &&
-			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)) ||
+			     (scsi_dev_data->type != IPR_TYPE_AF_DISK) /* &&
+			     (scsi_dev_data->type != TYPE_ENCLOSURE) &&
+			     (scsi_dev_data->type != TYPE_PROCESSOR) */) ||
 			    (ipr_is_hot_spare(&ioa->dev[j])) ||
 			    (ipr_is_volume_set(&ioa->dev[j])) ||
 			    (ipr_is_array_member(&ioa->dev[j])))
-
+				continue;
+			if (ioa->is_secondary)
 				continue;
 
 			print_dev(k, &ioa->dev[j], buffer, "%1", ioa, k);
@@ -7134,11 +7431,9 @@ int download_ucode(i_container * i_con)
 
 		/* print Hot Spare devices*/
 		for (j = 0; j < ioa->num_devices; j++) {
-			scsi_dev_data = ioa->dev[j].scsi_dev_data;
-			if ((scsi_dev_data == NULL ) ||
-			    ioa->ioa_dead ||
-			    (!ipr_is_hot_spare(&ioa->dev[j])))
-
+			if (ioa->ioa_dead || !ipr_is_hot_spare(&ioa->dev[j]))
+				continue;
+			if (ioa->is_secondary)
 				continue;
 
 			print_dev(k, &ioa->dev[j], buffer, "%1", ioa, k);
@@ -7149,7 +7444,7 @@ int download_ucode(i_container * i_con)
 
 		/* print volume set and associated devices*/
 		for (j = 0; j < ioa->num_devices; j++) {
-			if (!ipr_is_volume_set(&ioa->dev[j]))
+			if (!ipr_is_volume_set(&ioa->dev[j]) || ioa->is_secondary)
 				continue;
 
 			array_record = ioa->dev[j].array_rcd;
@@ -7260,8 +7555,8 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 {
 	struct ipr_fw_images *list;
 	struct ipr_fw_images *fw_image;
-	char *body;
-	int header_lines;
+	char *body = NULL;
+	int header_lines = 0;
 	int list_count, rc, i;
 	char buffer[256];
 	int found = 0;
@@ -7275,9 +7570,14 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	struct ipr_dasd_inquiry_page3 page3_inq;
 	struct ipr_res_addr res_addr;
 
-	if (ipr_dev->scsi_dev_data &&
-	    ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+	if (!ipr_dev->scsi_dev_data)
+		return 67 | EXIT_FLAG;
+	if (ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
 		rc = get_ioa_firmware_image_list(ipr_dev->ioa, &list);
+/*
+	else if (ipr_dev->scsi_dev_data->type == TYPE_ENCLOSURE || ipr_dev->scsi_dev_data->type == TYPE_PROCESSOR)
+		rc = get_ses_firmware_image_list(ipr_dev, &list);
+*/
 	else
 		rc = get_dasd_firmware_image_list(ipr_dev, &list);
 
@@ -7339,7 +7639,7 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	i_con_head = i_con = NULL;
 
 	if (list_count) {
-		for (i=0; i<list_count; i++) {
+		for (i = 0; i < list_count; i++) {
 			version_swp = htonl(list[i].version);
 			version = (char *)&version_swp;
 			if (isprint(version[0]) && isprint(version[1]) &&
@@ -7358,15 +7658,12 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	}
 
 	n_choose_ucode.body = body;
-	s_out = screen_driver(&n_choose_ucode,header_lines,i_con);
+	s_out = screen_driver(&n_choose_ucode, header_lines, i_con);
 
 	free(n_choose_ucode.body);
 	n_choose_ucode.body = NULL;
 
-	for (temp_i_con = i_con_head;
-	     temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		fw_image =(struct ipr_fw_images *)(temp_i_con->data);
 
 		if (ipr_dev == NULL)
@@ -7397,14 +7694,13 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	else
 		sprintf(buffer," 1   %.8X        %s\n",fw_image->version,fw_image->file);
 
-	body = add_line_to_body(body,buffer, NULL);
+	body = add_line_to_body(body, buffer, NULL);
 
 	n_confirm_download_ucode.body = body;
 	s_out = screen_driver(&n_confirm_download_ucode,header_lines,i_con);
 
 	free(n_confirm_download_ucode.body);
 	n_confirm_download_ucode.body = NULL;
-
 
 	if (!s_out->rc)
 		rc = update_ucode(ipr_dev, fw_image);
@@ -7429,10 +7725,7 @@ int choose_ucode(i_container * i_con)
 	if (i_con == NULL)
 		return 1;
 
-	for (temp_i_con = i_con_head;
-	     temp_i_con != NULL;
-	     temp_i_con = temp_i_con->next_item) {
-
+	for_each_icon(temp_i_con) {
 		ipr_dev =(struct ipr_dev *)(temp_i_con->data);
 
 		if (ipr_dev == NULL)
@@ -8068,6 +8361,50 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 		len += 12-tab_stop;
 
+		if (ipr_is_volume_set(ipr_dev)) {
+			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
+
+			if (!rc) {
+
+				array_record = ipr_dev->array_rcd;
+				status_record = cmd_status.record;
+
+				for (i=0; i < cmd_status.num_records; i++, status_record++) {
+
+					if (array_record->array_id == status_record->array_id) {
+						if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
+							percent_cmplt = status_record->percent_complete;
+					}
+				}
+			}
+		} else if (ipr_is_af_dasd_device(ipr_dev)) {
+			rc = ipr_query_command_status(ipr_dev, &cmd_status);
+
+			if ((rc == 0) && (cmd_status.num_records != 0)) {
+
+				status_record = cmd_status.record;
+				if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
+				    (status_record->status != IPR_CMD_STATUS_FAILED)) {
+
+					percent_cmplt = status_record->percent_complete;
+					format_in_progress++;
+				}
+			}
+		} else if (ipr_is_gscsi(ipr_dev)) {
+			/* Send Test Unit Ready to find percent complete in sense data. */
+			rc = ipr_test_unit_ready(ipr_dev, &sense_data);
+
+			if ((rc == CHECK_CONDITION) &&
+			    ((sense_data.error_code & 0x7F) == 0x70) &&
+			    ((sense_data.sense_key & 0x0F) == 0x02) && /* NOT READY */
+			    (sense_data.add_sense_code == 0x04) &&     /* LOGICAL UNIT NOT READY */
+			    (sense_data.add_sense_code_qual == 0x04)) {/* FORMAT IN PROGRESS */
+
+				percent_cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
+				format_in_progress++;
+			}
+		}
+
 		if (!(type&1)) {
 			len += sprintf(body + len, "%-8s %-16s ",
 				       vendor_id, product_id);
@@ -8078,24 +8415,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 				sprintf(ioctl_buffer, "RAID %s Disk Array",
 					ipr_dev->prot_level_str);
 				len += sprintf(body + len, "%-25s ", ioctl_buffer);
-
-				rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
-
-				if (!rc) {
-
-					array_record = ipr_dev->array_rcd;
-					status_record = cmd_status.record;
-
-					for (i=0; i < cmd_status.num_records; i++, status_record++) {
-
-						if (array_record->array_id == status_record->array_id) {
-							if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
-								percent_cmplt = status_record->percent_complete;
-						}
-					}
-				}
-			}
-			else if (ipr_is_array_member(ipr_dev)) {
+			} else if (ipr_is_array_member(ipr_dev)) {
 				if (type&2)
 					sprintf(raid_str,"  RAID %s Array Member",
 						ipr_dev->prot_level_str);
@@ -8105,39 +8425,14 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	
 				len += sprintf(body + len, "%-25s ", raid_str);
 
-			}
-			else if (ipr_is_af_dasd_device(ipr_dev)) {
-
-				rc = ipr_query_command_status(ipr_dev, &cmd_status);
-
-				if ((rc == 0) && (cmd_status.num_records != 0)) {
-
-					status_record = cmd_status.record;
-					if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
-					    (status_record->status != IPR_CMD_STATUS_FAILED)) {
-
-						percent_cmplt = status_record->percent_complete;
-						format_in_progress++;
-					}
-				}
-
+			} else if (ipr_is_af_dasd_device(ipr_dev))
 				len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
-			} else {
-				/* Send Test Unit Ready to find percent complete in sense data. */
-				rc = ipr_test_unit_ready(ipr_dev, &sense_data);
-
-				if ((rc == CHECK_CONDITION) &&
-				    ((sense_data.error_code & 0x7F) == 0x70) &&
-				    ((sense_data.sense_key & 0x0F) == 0x02) && /* NOT READY */
-				    (sense_data.add_sense_code == 0x04) &&     /* LOGICAL UNIT NOT READY */
-				    (sense_data.add_sense_code_qual == 0x04)) {/* FORMAT IN PROGRESS */
-
-					percent_cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
-					format_in_progress++;
-				}
-
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE)
+				len += sprintf(body + len, "%-25s ", "Enclosure");
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
+				len += sprintf(body + len, "%-25s ", "Processor");
+			else
 				len += sprintf(body + len, "%-25s ", "Physical Disk");
-			}
 		}
 
 		if (ipr_is_af(ipr_dev)) {
@@ -8157,35 +8452,31 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			status = ipr_mode_sense(ipr_dev, 0x0a, &ioctl_buffer);
 
 			if (status == CHECK_CONDITION &&
-			    sense_data.sense_key == 0x03 &&
 			    sense_data.add_sense_code == 0x31 &&
 			    sense_data.add_sense_code_qual == 0x00) {
 				format_req = 1;
-			} else if (status) {
-				res_state.not_oper = 1;
 			} else {
-				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+				if (!status) {
+					mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-				if (mode_parm_hdr->block_desc_len > 0) {
-					block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
+					if (mode_parm_hdr->block_desc_len > 0) {
+						block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
 
-					if ((block_desc->block_length[1] != 0x02) ||
-					    (block_desc->block_length[2] != 0x00))
-
-						format_req = 1;
-					else {
-						/* check device with test unit ready */
-						rc = ipr_test_unit_ready(ipr_dev, &sense_data);
-
-						if (rc == CHECK_CONDITION &&
-						    sense_data.sense_key == 0x03 &&
-						    sense_data.add_sense_code == 0x31 &&
-						    sense_data.add_sense_code_qual == 0x00)
+						if ((block_desc->block_length[1] != 0x02) ||
+						    (block_desc->block_length[2] != 0x00))
 							format_req = 1;
-						else if (rc)
-							res_state.not_oper = 1;
 					}
 				}
+
+				/* check device with test unit ready */
+				rc = ipr_test_unit_ready(ipr_dev, &sense_data);
+
+				if (rc == CHECK_CONDITION &&
+				    sense_data.add_sense_code == 0x31 &&
+				    sense_data.add_sense_code_qual == 0x00)
+					format_req = 1;
+				else if (rc)
+					res_state.not_oper = 1;
 			}
 		}
 
@@ -8243,16 +8534,20 @@ int is_format_allowed(struct ipr_dev *dev)
 	} else {
 		rc = ipr_test_unit_ready(dev, &sense_data);
 
-		if (rc == CHECK_CONDITION &&
-		    (sense_data.error_code & 0x7F) == 0x70&&
-		    (sense_data.sense_key & 0x0F) == 0x02)
-			return 0;
+		if (rc == CHECK_CONDITION && (sense_data.error_code & 0x7F) == 0x70) {
+			if (sense_data.add_sense_code == 0x31 &&
+			    sense_data.add_sense_code_qual == 0x00)
+				return 1;
+			else if ((sense_data.sense_key & 0x0F) == 0x02)
+				return 0;
+
+		}
 	}
 
 	return 1;
 }
 
-void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa, int change_size)
+void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa, int new_block_size)
 {
 	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
 	struct ipr_res_addr res_addr;
@@ -8283,7 +8578,7 @@ void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa, int change_si
 	device_converted = 0;
 
 	while (!device_converted && timeout) {
-		/* FIXME how to determine evaluate device completed? */
+		/* xxx FIXME how to determine evaluate device completed? */
 		device_converted = 1;
 		sleep(1);
 		timeout--;
@@ -8422,10 +8717,22 @@ i_container *add_i_con(i_container *i_con, char *f, void *d)
 	return new_i_con;
 }
 
+static void usage()
+{
+	printf(_("Usage: iprconfig [options]\n"));
+	printf(_("  Options: -e name    Default editor for viewing error logs\n"));
+	printf(_("           -k dir     Kernel messages root directory\n"));
+	printf(_("           --version  Print iprconfig version\n"));
+	printf(_("           --debug    Enable additional error logging\n"));
+	printf(_("           --force    Disable safety checks. See man page for details.\n"));
+	printf(_("  Use quotes around parameters with spaces\n"));
+}
+
 int main(int argc, char *argv[])
 {
-	int  next_editor, next_dir, i, rc;
-	char parm_editor[200], parm_dir[200];
+	int  next_editor, next_dir, next_cmd, next_dev, i, rc;
+	char parm_editor[200], parm_dir[200], cmd[200], dev[200];
+	int non_interactive = 0;
 
 	ipr_ioa_head = ipr_ioa_tail = NULL;
 
@@ -8446,11 +8753,15 @@ int main(int argc, char *argv[])
 	if (argc > 1) {
 		next_editor = 0;
 		next_dir = 0;
+		next_cmd = 0;
+		next_dev = 0;
 		for (i = 1; i < argc; i++) {
 			if (strcmp(argv[i], "-e") == 0)
 				next_editor = 1;
 			else if (strcmp(argv[i], "-k") == 0)
 				next_dir = 1;
+			else if (strcmp(argv[i], "-c") == 0)
+				next_cmd = 1;
 			else if (strcmp(argv[i], "--version") == 0) {
 				printf("iprconfig: %s\n", IPR_VERSION_STR);
 				exit(1);
@@ -8464,14 +8775,16 @@ int main(int argc, char *argv[])
 			} else if (next_dir) {
 				strcpy(parm_dir, argv[i]);
 				next_dir = 0;
+			} else if (next_cmd) {
+				strcpy(cmd, argv[i]);
+				non_interactive = 1;
+				next_cmd = 0;
+				next_dev = 1;
+			} else if (next_dev) {
+				strcpy(dev, argv[i]);
+				next_dev = 0;
 			} else {
-				printf(_("Usage: iprconfig [options]\n"));
-				printf(_("  Options: -e name    Default editor for viewing error logs\n"));
-				printf(_("           -k dir     Kernel messages root directory\n"));
-				printf(_("           --version  Print iprconfig version\n"));
-				printf(_("           --debug    Enable additional error logging\n"));
-				printf(_("           --force    Disable safety checks. See man page for details.\n"));
-				printf(_("  Use quotes around parameters with spaces\n"));
+				usage();
 				exit(1);
 			}
 		}
@@ -8483,6 +8796,17 @@ int main(int argc, char *argv[])
 	system("modprobe sg");
 	exit_func = tool_exit_func;
 	tool_init("iprconfig");
+
+	if (non_interactive) {
+		check_current_config(false);
+		if (strcmp(cmd, "primary") == 0)
+			return set_preferred_primary(dev, 1);
+		else if (strcmp(cmd, "secondary") == 0)
+			return set_preferred_primary(dev, 0);
+
+		usage();
+		exit(1);
+	}
 
 	initscr();
 	cbreak(); /* take input chars one at a time, no wait for \n */
