@@ -4642,14 +4642,13 @@ int process_conc_maint(i_container *i_con, int action)
 	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
 
-		ipr_dev = (struct ipr_dev *)temp_i_con->data;
-		if (ipr_dev == NULL)
-			continue;
-
 		input = temp_i_con->field_data;
 
-		if (strcmp(input, "1") == 0)
-			found++;
+		if (strcmp(input, "1") == 0) {
+			ipr_dev = (struct ipr_dev *)temp_i_con->data;
+			if (ipr_dev != NULL)
+				found++;
+		}
 	}
 
 	if (found != 1)
@@ -4691,8 +4690,9 @@ int process_conc_maint(i_container *i_con, int action)
 		    (scsi_dev_data->channel != ipr_dev->scsi_dev_data->channel))
 			continue;
 
+		found = 0;
 		for (i=0; i<((ntohs(ses_data.byte_count)-8)/sizeof(struct ipr_drive_elem_status)); i++) {
-			if (scsi_dev_data->id == ses_data.elem_status[i].scsi_id) {
+			if (ipr_dev->scsi_dev_data->id == ses_data.elem_status[i].scsi_id) {
 				found++;
 
 				if ((action == IPR_VERIFY_CONC_REMOVE)  ||
@@ -4761,7 +4761,7 @@ int process_conc_maint(i_container *i_con, int action)
 
 	/* turn light off flashing light */
 	ses_data.overall_status_select = 1;
-	ses_data.overall_status_disable_resets = 1;
+	ses_data.overall_status_disable_resets = 0;
 	ses_data.overall_status_insert = 0;
 	ses_data.overall_status_remove = 0;
 	ses_data.overall_status_identify = 0;
@@ -4914,12 +4914,13 @@ int start_conc_maint(i_container *i_con, int action)
 					}
 				}
 
-				if (!found) {
+				if (!found && ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					local_dev = realloc(local_dev, (sizeof(void *) *
 									local_dev_count) + 1);
 					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
 					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
 					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
+					scsi_dev_data->host = cur_ioa->host_num;
 					scsi_dev_data->channel = ses_channel;
 					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
