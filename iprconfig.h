@@ -884,8 +884,8 @@ s_node n_battery_maint = {
 	.title    = __("Work with Resources Containing Cache Battery Packs"),
 	.header   = {
 		__("Type options, press Enter\n"),
-		__("  1=Display battery information\n\n"),
-		__("  2=Force battery pack into error state\n"),
+		__("  1=Display battery information\n"),
+		__("  2=Force battery pack into error state\n\n"),
 		"" }
 };
 
@@ -900,12 +900,12 @@ s_node n_confirm_force_battery_error = {
 	.title    = __("Force Battery Packs Into Error State"),
 	.header   = {
 		__("ATTENTION: This service function should be run only "
-		   "under the direction of the IBM Hardware Service Support\n"),
-		__("You have selected to force a cache batter error on an IOA\n"),
+		   "under the direction of the IBM Hardware Service Support\n\n"),
+		__("You have selected to force a cache batter error on an IOA\n\n"),
 		__("You will have to replace the Cache Battery Pack in each selected "
-		   "IOA to resume normal operations.\n"),
+		   "IOA to resume normal operations.\n\n"),
 		__("System performance could be significantly degraded until the cache "
-		   "battery packs are replaced on the selected IOAs.\n"),
+		   "battery packs are replaced on the selected IOAs.\n\n"),
 		__("  c=Continue to force the following battery packs into an error state\n\n"),
 		"" },
 };
