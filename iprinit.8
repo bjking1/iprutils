@@ -1,35 +1,36 @@
-.\" (C) Copyright 2000, 2004
+.\" (C) Copyright 2000, 2005
 .\" International Business Machines Corporation and others.
 .\" All Rights Reserved. This program and the accompanying
 .\" materials are made available under the terms of the
 .\" Common Public License v1.0 which accompanies this distribution.
-.TH IPRDUMP 8 "February 2005"
+.TH IPRINIT 8 "February 2005"
 .SH NAME
-iprdump - IBM Power RAID adapter dump utility
+iprinit - IBM Power RAID adapter/device initialization utility
 .SH SYNOPSIS
-.B "iprdump [-d directory]"
+.B iprinit
 .sp
-.BI "iprdump --version --debug --use-polling --use-uevents"
+.BI "iprinit --debug --daemon --use-polling --use-uevents"
 .SH DESCRIPTION
-.B iprdump
-is used to gather information in the event of an adapter failure.
-The dump data will by default be saved in the /var/log/ directory with the
-prefix iprdump.# where # will be the dump ID of the file. The ipr dump
-utility will make a log in the system error log when a dump is taken. 
-The iprdump utility can be started at any time and will properly handle 
-adapters being dynamically added and removed from the system.
+.B iprinit
+is used to setup IBM Power RAID adapters and devices for optimal 
+performance. It will enable U320 scsi speeds if it is determined the 
+disk enclosure supports it. It will also enable tagged command queuing.
+Any scsi bus attributes, such as bus width, or disk attributes, such 
+as queue depth, that have been setup by iprconfig will be loaded as well. 
+It is desired that this be called in the boot process, using the init.d
+script provided.
 .SH OPTIONS
 .TP
 .B \-\-version
 Print the version number of
-.B iprdump
+.B iprinit
 .TP
 .B \-\-debug
 Enable additional error logging. Enabling this will result in additional 
 errors logging to /var/log/messages.
 .TP
-.B \-d <directory>
-Directory where dump data is to be stored.  Default is /var/log/.
+.B \-\-daemon
+Run as a daemon to handle adapters and devices being hotplugged.
 .TP
 .B \-\-use-polling
 Do not use netlink/uevent notification, but rather poll for adapter and
@@ -40,5 +41,4 @@ Use netlink/uevent notification rather than polling for adapter and
 device configuration changes. If not specified, polling will be used
 until the first uevent notification appears, then netlink will be used.
 .SH AUTHOR
-Originally written by Michael Anderson <mjanders@us.ibm.com>. Rewritten
-for the 2.6 kernel by Brian King <brking@us.ibm.com>.
+Brian King (brking@us.ibm.com)

@@ -36,33 +36,29 @@ iprucode:iprucode.c iprlib.o
 iprlib.o: iprlib.c iprlib.h
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
 
-docs: iprconfig.8 iprupdate.8 iprdump.8
-	mkdir -p docs
-	cp *.8 docs/
-	gzip -f docs/iprconfig.8
-	gzip -f docs/iprupdate.8
-	gzip -f docs/iprdump.8
+%.gz : %.8
+	gzip -f -c $< > $<.gz
 
-pdfs: docs
-	nroff -man iprconfig.8 > docs/iprconfig.nroff
-	nroff -man iprupdate.8 > docs/iprupdate.nroff
-	nroff -man iprdump.8 > docs/iprdump.nroff
-	a2ps -B --columns=1 -R -o docs/iprconfig.ps docs/iprconfig.nroff
-	a2ps -B --columns=1 -R -o docs/iprupdate.ps docs/iprupdate.nroff
-	a2ps -B --columns=1 -R -o docs/iprdump.ps docs/iprdump.nroff
-	ps2pdf docs/iprconfig.ps docs/iprconfig.pdf
-	ps2pdf docs/iprupdate.ps docs/iprupdate.pdf
-	ps2pdf docs/iprdump.ps docs/iprdump.pdf
-	rm docs/iprupdate.nroff docs/iprconfig.nroff docs/iprdump.nroff
+%.nroff : %.8
+	nroff -man $< > $@
+
+%.ps : %.nroff
+	a2ps -B --columns=1 -R -o $@ $<
+
+%.pdf : %.ps
+	ps2pdf $< $@
+
+docs : $(patsubst %.8,%.gz,$(wildcard *.8))
+
+pdfs : $(patsubst %.8,%.pdf,$(wildcard *.8))
 
 utils: ./*.c ./*.h
 	cd ..
 	$(TAR)
 
 clean:
-	rm -f iprupdate iprconfig iprdump iprinit iprdbg iprupdate.ps iprupdate.pdf *.o
-	rm -f iprconfig.ps iprconfig.pdf iprdump.pdf iprdump.ps *.tgz *.rpm
-	rm -rf docs
+	rm -f iprupdate iprconfig iprdump iprinit iprdbg *.o
+	rm -f *.ps *.pdf *.nroff *.gz *.tgz *.rpm
 
 install: all
 	install -d $(INSTALL_MOD_PATH)/sbin
@@ -72,9 +68,10 @@ install: all
 	install --mode=755 iprinit $(INSTALL_MOD_PATH)/sbin/iprinit
 	install --mode=700 iprdbg $(INSTALL_MOD_PATH)/sbin/iprdbg
 	install -d $(INSTALL_MOD_PATH)/usr/share/man/man8
-	install docs/iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz
-	install docs/iprupdate.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprupdate.8.gz
-	install docs/iprdump.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprdump.8.gz
+	install iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz
+	install iprupdate.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprupdate.8.gz
+	install iprdump.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprdump.8.gz
+	install iprinit.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprinit.8.gz
 
 rpm: *.c *.h *.8
 	-make clean
