@@ -1098,6 +1098,7 @@ s_node n_download_ucode_in_progress = {
 	.title    = __("Microcode Download In Progress"),
 	.header   = {
 		__("Please wait for the microcode update to complete\n"),
+		__("This process may take several minutes\n"),
 		"" }
 };
 
@@ -1249,7 +1250,7 @@ const char *screen_status[] = {
 	/* 64 */ __("Default log values restored"),
 	/* 65 */ __("Editor returned %d. Try setting the default editor."),
       /* 66 */ __("Failed to change disk configuration."),
-      /* 67 */ __("Microcode Download failed.")
+      /* 67 */ __("Microcode Download failed."),
       /* NOTE:  127 maximum limit */
 };
 

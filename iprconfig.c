@@ -841,11 +841,9 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 	return s_out;
 }
 
-int complete_screen_driver(s_node *n_screen, int percent, int allow_exit)
+static int __complete_screen_driver(s_node *n_screen, char *complete, int allow_exit)
 {
 	int stdscr_max_y,stdscr_max_x,center,len;
-	char *complete = _("Complete");
-	char *percent_comp;
 	int ch;
 	char *exit = _("Return to menu, current operations will continue.");
 	char *exit_str;
@@ -859,11 +857,9 @@ int complete_screen_driver(s_node *n_screen, int percent, int allow_exit)
 	mvaddstr(0,(center - len/2) > 0 ? center-len/2:0, n_screen->title);
 	mvaddstr(2,0,n_screen->body);
 
-	percent_comp = malloc(strlen(complete) + 8);
-	sprintf(percent_comp,"%3d%% %s",percent, complete);
-	len = strlen(percent_comp);
+	len = strlen(complete);
 	mvaddstr(stdscr_max_y/2,(center - len/2) > 0 ? center - len/2:0,
-		 percent_comp);
+		 complete);
 
 	if (allow_exit) {
 		exit_str = malloc(strlen(exit) + strlen(EXIT_KEY_LABEL) + 8);
@@ -885,8 +881,42 @@ int complete_screen_driver(s_node *n_screen, int percent, int allow_exit)
 
 	move(stdscr_max_y - 1, stdscr_max_x - 1);
 	refresh();
-
 	return 0;
+}
+
+int complete_screen_driver(s_node *n_screen, int percent, int allow_exit)
+{
+	char *complete = _("Complete");
+	char *percent_comp;
+	int rc;
+
+	percent_comp = malloc(strlen(complete) + 8);
+	sprintf(percent_comp,"%3d%% %s", percent, complete);
+
+	rc = __complete_screen_driver(n_screen, percent_comp, allow_exit);
+	free(percent_comp);
+
+	return rc;
+}
+
+static int time_screen_driver(s_node *n_screen, unsigned long seconds, int allow_exit)
+{
+	char *complete = _("Elapsed Time: ");
+	char *comp_str;
+	int rc, hours, minutes;
+
+	hours = seconds/3600;
+	seconds -= (hours * 3600);
+	minutes = seconds/60;
+	seconds -= (minutes *60);
+
+	comp_str = malloc(strlen(complete) + 40);
+	sprintf(comp_str,"%s%d:%02d:%02ld", complete, hours, minutes, seconds);
+
+	rc = __complete_screen_driver(n_screen, comp_str, allow_exit);
+	free(comp_str);
+
+	return rc;
 }
 
 char *ipr_list_opts(char *body, char *key, char *list_str)
@@ -7495,7 +7525,6 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 {
 	char *body;
 	int header_lines, status, time = 0;
-	int percent = 0;
 	pid_t pid, done;
 	struct ipr_dasd_inquiry_page3 page3_inq;
 	u32 fw_version;
@@ -7503,7 +7532,7 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 
 	body = body_init(n_download_ucode_in_progress.header, &header_lines);
 	n_download_ucode_in_progress.body = body;
-	complete_screen_driver(&n_download_ucode_in_progress, percent, 0);
+	time_screen_driver(&n_download_ucode_in_progress, time, 0);
 
 	pid = fork();
 
@@ -7512,10 +7541,7 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 			done = waitpid(pid, &status, WNOHANG);
 			sleep(1);
 			time++;
-			percent = (time * 100) / 60;
-			if (percent > 99)
-				percent = 99;
-			complete_screen_driver(&n_download_ucode_in_progress, percent, 0);
+			time_screen_driver(&n_download_ucode_in_progress, time, 0);
 		} while (done == 0);			
 	} else {
 		if (dev->scsi_dev_data && dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
@@ -7524,9 +7550,6 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 			ipr_update_disk_fw(dev, fw_image, 1);
 		exit(0);
 	}
-
-	complete_screen_driver(&n_download_ucode_in_progress, 100, 0);
-	sleep(1);
 
 	memset(&page3_inq, 0, sizeof(page3_inq));
 	ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
@@ -8254,7 +8277,6 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	struct ipr_cmd_status_record *status_record;
 	int percent_cmplt = 0;
 	int format_in_progress = 0;
-	int is_start_cand = 0;
 
 	if (body)
 		len = strlen(body);
@@ -8279,6 +8301,8 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			len += sprintf(body + len,"            %-8s %-16s ",
 				       scsi_dev_data->vendor_id,
 				       scsi_dev_data->product_id);
+		else if (ipr_dev->ioa->qac_data->num_records)
+			len += sprintf(body + len,"            %-25s ","SCSI RAID Adapter");
 		else
 			len += sprintf(body + len,"            %-25s ","SCSI Adapter");
 
@@ -8326,20 +8350,13 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
 				array_record = (struct ipr_array_record *)common_record;
 
-				if (array_record->start_cand) {
-					tab_stop  = sprintf(body + len,"            ");
-					ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
-					product_id[0] = '\0';
-					is_start_cand = 1;
-				} else {
-					tab_stop  = sprintf(body + len,"%d:%d:%d ",
-							    array_record->last_resource_addr.bus,
-							    array_record->last_resource_addr.target,
-							    array_record->last_resource_addr.lun);
-					ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
-					ipr_strncpy_0(product_id , array_record->product_id,
-						      IPR_PROD_ID_LEN);
-				}
+				tab_stop  = sprintf(body + len,"%d:%d:%d ",
+						    array_record->last_resource_addr.bus,
+						    array_record->last_resource_addr.target,
+						    array_record->last_resource_addr.lun);
+				ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , array_record->product_id,
+					      IPR_PROD_ID_LEN);
 			}
 		}
 
@@ -8359,14 +8376,9 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			if (ipr_is_hot_spare(ipr_dev))
 				len += sprintf(body + len, "%-25s ", "Hot Spare");
 			else if (ipr_is_volume_set(ipr_dev)) {
-				if (is_start_cand) {
-					len += sprintf(body + len, "%-25s ",
-						       "SCSI RAID Adapter");
-				} else {
-					sprintf(ioctl_buffer, "RAID %s Disk Array",
-						ipr_dev->prot_level_str);
-					len += sprintf(body + len, "%-25s ", ioctl_buffer);
-				}
+				sprintf(ioctl_buffer, "RAID %s Disk Array",
+					ipr_dev->prot_level_str);
+				len += sprintf(body + len, "%-25s ", ioctl_buffer);
 
 				rc = ipr_query_command_status(&cur_ioa->ioa, &cmd_status);
 
@@ -8468,45 +8480,40 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 		if (format_in_progress)
 			sprintf(body + len, "%d%% Formatted\n", percent_cmplt);
-		else if (is_start_cand)
-			sprintf(body + len, "Available");
 		else if (!scsi_dev_data)
 			sprintf(body + len, "Missing\n");
 		else if (!scsi_dev_data->online)
 			sprintf(body + len, "Offline\n");
 		else if (res_state.not_oper)
-			sprintf(body + len, "Not Operational\n");
+			sprintf(body + len, "Failed\n");
 		else if (res_state.not_ready ||
 			 (res_state.read_write_prot &&
-			  (ntohl(res_state.dasd.failing_dev_ioasc) ==
-			   0x02040200u)))
+			  (ntohl(res_state.dasd.failing_dev_ioasc) == 0x02040200u)))
 			sprintf(body + len, "Not ready\n");
 		else if ((res_state.read_write_prot) || (is_rw_protected(ipr_dev)))
 			sprintf(body + len, "R/W Protected\n");
 		else if (res_state.prot_dev_failed)
-			sprintf(body + len, "DPY/Failed\n");
+			sprintf(body + len, "Failed\n");
 		else if (res_state.prot_suspended)
-			sprintf(body + len, "DPY/Unprotected\n");
+			sprintf(body + len, "Degraded\n");
 		else if (res_state.prot_resuming) {
-			if ((type == 0) || (percent_cmplt == 0))
-				sprintf(body + len, "DPY/Rebuilding\n");
+			if (type == 0 || percent_cmplt == 0)
+				sprintf(body + len, "Rebuilding\n");
 			else
 				sprintf(body + len, "%d%% Rebuilt\n", percent_cmplt);
 		}
-		else if (res_state.degraded_oper)
-			sprintf(body + len, "Perf Degraded\n");
-		else if (res_state.service_req)
-			sprintf(body + len, "Redundant Hw Fail\n");
+		else if (res_state.degraded_oper || res_state.service_req)
+			sprintf(body + len, "Degraded\n");
 		else if (format_req)
 			sprintf(body + len, "Format Required\n");
 		else
 		{
 			if (ipr_is_array_member(ipr_dev))
-				sprintf(body + len, "DPY/Active\n");
+				sprintf(body + len, "Optimal\n");
 			else if (ipr_is_hot_spare(ipr_dev))
-				sprintf(body + len, "HS/Active\n");
+				sprintf(body + len, "Active\n");
 			else
-				sprintf(body + len, "Operational\n");
+				sprintf(body + len, "Active\n");
 		}
 	}
 	return body;

@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.33 2004/03/11 02:37:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.34 2004/03/11 20:51:26 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -367,12 +367,24 @@ static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 
 int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 {
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
 	const struct ses_table_entry *ste = get_ses_entry(ioa, bus);
+	u32 fw_version;
+	int max_xfer_rate = IPR_MAX_XFER_RATE;
 
-	if (ste)
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, "fw_version");
+	sscanf(attr->value, "%8X", &fw_version);
+	sysfs_close_class_device(class_device);
+
+	if (fw_version < ioa->msl)
+		max_xfer_rate = IPR_SAFE_XFER_RATE;
+
+	if (ste && ste->max_bus_speed_limit < max_xfer_rate)
 		return ste->max_bus_speed_limit;
 
-	return IPR_MAX_XFER_RATE;
+	return max_xfer_rate;
 }
 
 struct ioa_parms {
@@ -384,17 +396,17 @@ struct ioa_parms {
 
 static const struct ioa_parms ioa_parms [] = {
 	{.ccin = 0x5702, .scsi_id_changeable = 1,
-	.msl = 0xffffffff, .fw_name = "44415254" },
+	.msl = 0x02080029, .fw_name = "44415254" },
 	{.ccin = 0x5703, .scsi_id_changeable = 0,
-	.msl = 0xffffffff, .fw_name = "5052414D" },
+	.msl = 0x03090059, .fw_name = "5052414D" },
 	{.ccin = 0x5709, .scsi_id_changeable = 0,
-	.msl = 0xffffffff, .fw_name = "5052414E" },
+	.msl = 0x030D0047, .fw_name = "5052414E" },
 	{.ccin = 0x570A, .scsi_id_changeable = 0,
-	.msl = 0xffffffff, .fw_name = "44415255" },
+	.msl = 0x020A004E, .fw_name = "44415255" },
 	{.ccin = 0x570B, .scsi_id_changeable = 0,
-	.msl = 0xffffffff, .fw_name = "44415255" },
+	.msl = 0x020A004E, .fw_name = "44415255" },
 	{.ccin = 0x2780, .scsi_id_changeable = 0,
-	.msl = 0xffffffff, .fw_name = "unknown" },
+	.msl = 0x030E0039, .fw_name = "unknown" },
 };
 
 static void setup_ioa_parms(struct ipr_ioa *ioa)
@@ -536,6 +548,8 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 	struct sense_data_t sense_data;
 	int rc;
 
+	ioa->nr_ioa_microcode = 0;
+
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
 
@@ -567,6 +581,10 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 	if (rc != 0) {
 		if (sense_data.sense_key != ILLEGAL_REQUEST)
 			ioa_cmd_err(ioa, &sense_data, "Query Array Config", rc);
+		else if (sense_data.sense_key == NOT_READY &&
+			 sense_data.add_sense_code == 0x40 &&
+			 sense_data.add_sense_code_qual == 0x85)
+			ioa->nr_ioa_microcode = 1;
 	}
 
 	close(fd);
@@ -2834,14 +2852,14 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 			return;
 		}
 		closedir(dir);
-		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH"%s", tmp);
+		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH".%s", tmp);
 		symlink(image->file, ucode_file);
-		sprintf(ucode_file, "%s\n", tmp);
+		sprintf(ucode_file, ".%s\n", tmp);
 		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 		attr = sysfs_get_classdev_attr(class_device, "update_fw");
 		rc = sysfs_write_attribute(attr, ucode_file, strlen(ucode_file));
 		sysfs_close_class_device(class_device);
-		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH"%s", tmp);
+		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH".%s", tmp);
 		unlink(ucode_file);
 
 		if (rc != 0)

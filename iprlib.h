@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.26 2004/03/11 02:37:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.27 2004/03/11 20:51:26 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -721,6 +721,7 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_FORMAT_TIMEOUT "FORMAT_UNIT_TIMEOUT"
 
 #define IPR_MAX_XFER_RATE 320
+#define IPR_SAFE_XFER_RATE 160
 
 /* Internal return codes */
 #define RC_SUCCESS          0
