@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.53 2004/05/03 01:15:27 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.54 2004/05/03 01:41:45 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1556,8 +1556,10 @@ int enable_af(struct ipr_dev *dev)
 	if (ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq)))
 		return -EIO;
 
-	if (!__device_supported(dev, &std_inq))
+	if (!__device_supported(dev, &std_inq)) {
+		scsi_dbg(dev, "Unsupported device attached\n");
 		return -EIO;
+	}
 
 	if (set_supported_devs(dev, &std_inq))
 		return -EIO;
@@ -2194,6 +2196,7 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 
 	if (ipr_read_dev_attr(dev, "queue_depth", temp))
 		return -EIO;
+
 	attr->queue_depth = strtoul(temp, NULL, 10);
 
 	if (ipr_read_dev_attr(dev, "tcq_enable", temp))
@@ -2622,24 +2625,30 @@ int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	char *sysfs_dev_name;
 	int rc;
 
-	if (!dev->scsi_dev_data)
+	if (!dev->scsi_dev_data) {
+		scsi_dbg(dev, "Cannot read dev attr %s. NULL scsi data\n", attr);
 		return -ENOENT;
+	}
 
 	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
 
 	class_device = sysfs_open_class_device("scsi_device",
 					       sysfs_dev_name);
-	if (!class_device)
+	if (!class_device) {
+		scsi_dbg(dev, "Failed to open scsi_device class device. %m\n");
 		return -EIO;
+	}
 
 	device = sysfs_get_classdev_device(class_device);
 	if (!device) {
+		scsi_dbg(dev, "Failed to get classdev device. %m\n");
 		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
 
 	dev_attr = sysfs_get_device_attr(device, attr);
 	if (!dev_attr) {
+		scsi_dbg(dev, "Failed to get %s attribute. %m\n", attr);
 		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
@@ -2647,6 +2656,7 @@ int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	rc = sysfs_read_attribute(dev_attr);
 
 	if (rc) {
+		scsi_dbg(dev, "Failed to read %s attribute. %m\n", attr);
 		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
@@ -3194,9 +3204,6 @@ static int setup_page0x01(struct ipr_dev *dev)
 	IPR_SET_MODE(ch_page->awre, page->awre, 1);
 	IPR_SET_MODE(ch_page->arre, page->arre, 1);
 
-	page->awre = 1;
-	page->arre = 1;
-
 	if (page->awre != 1)
 		goto error;
 	if (page->arre != 1)
@@ -3267,12 +3274,20 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
 	IPR_SET_MODE(ch_page->dque, page->dque, 0);
 
-	if (page->queue_algorithm_modifier != 1)
+	if (page->queue_algorithm_modifier != 1) {
+		scsi_dbg(dev, "Cannot set QAM=1\n");
 		return -EIO;
-	if (page->qerr != 1)
+	}
+
+	if (page->qerr != 1) {
+		scsi_dbg(dev, "Cannot set QERR=1\n");
 		return -EIO;
-	if (page->dque != 0)
+	}
+
+	if (page->dque != 0) {
+		scsi_dbg(dev, "Cannot set dque=0\n");
 		return -EIO;
+	}
 
 	len = mode_pages.hdr.length + 1;
 	mode_pages.hdr.length = 0;
