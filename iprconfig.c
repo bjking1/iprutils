@@ -6995,6 +6995,8 @@ int confirm_change_bus_attr(i_container *i_con)
 		return rc;
 
 	rc = ipr_set_bus_attr(cur_ioa, page_28_cur, 1);
+	if (!rc)
+		rc = 45 | EXIT_FLAG;
 	return rc;
 }
 
