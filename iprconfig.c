@@ -1983,6 +1983,22 @@ int device_details(i_container *i_con)
             device_details_body(104, buffer);
         }
         device_details_body(11, device->dev_name);
+
+        device_details_body(IPR_LINE_FEED, NULL);
+        device_details_body(12, NULL);
+        device_details_body(13, device->ioa->pci_address);
+
+        sprintf(buffer,"%d", device->ioa->host_num);
+        device_details_body(203, buffer);
+
+        sprintf(buffer,"%d",scsi_channel);
+        device_details_body(204, buffer);
+
+        sprintf(buffer,"%d",scsi_id);
+        device_details_body(205, buffer);
+
+        sprintf(buffer,"%d",scsi_lun);
+        device_details_body(206, buffer);
     } else {
         string_buf = catgets(catd,n_device_details.text_set,201,"Title");
 
@@ -2842,6 +2858,95 @@ int raid_stop_complete()
     }
 }
 
+char *add_line_to_body(char *body, char *new_text, char *line_fill)
+{
+    int body_len = strlen(body);
+    int new_text_len = strlen(new_text);
+    int line_fill_len = strlen(line_fill);
+    int rem_length;
+    int new_text_offset = 0;
+    int max_y, max_x;
+    int len;
+
+    getmaxyx(stdscr,max_y,max_x);
+
+    len = body_len;
+    rem_length = max_x - 1;
+
+    while (len != 0) {
+        if (body[len--] == '\n')
+            break;
+        rem_length--;
+    }
+
+    while (1) {
+        if (new_text_len < rem_length) {
+            /* done, all data fits in current line */
+            body = realloc(body, body_len + new_text_len + 4);
+            sprintf(body + body_len, "%s\n", &new_text[new_text_offset]);
+            break;
+        }
+
+        len = rem_length;
+        while (len != 0) {
+            if (new_text[len--] == ' ') {
+                /* found a place to \n */
+                break;
+            }
+        }
+
+        if (len == 0)
+            /* no space to fit any word */
+            return 0;
+
+        /* adjust len to compensate for space and 0 based array */
+        len += 2;
+
+        body = realloc(body, body_len + len +
+                       line_fill_len + 4);
+        strncpy(body + body_len, new_text + new_text_offset, len);
+        body_len += len;
+        new_text_offset += len;
+        new_text_len -= len;
+
+        body_len += sprintf(body + body_len, "\n%s", line_fill);
+        rem_length = max_x - 1 - line_fill_len;
+    }
+
+    return body;
+}
+
+void setup_fail_screen(s_node *n_screen, int start_index, int end_index)
+{
+    char *string_buf;
+    char *body;
+    int i, len;
+
+    string_buf = catgets(catd, n_screen->text_set, 1, "Requested Action Failed");
+    n_screen->title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_raid_start_fail.title, string_buf);
+
+    /* header */
+    string_buf = catgets(catd, n_screen->text_set, 2, "");
+    body = malloc(strlen(string_buf) + 8);
+    sprintf(body, "\n\n");
+
+    body = add_line_to_body(body, string_buf, "   ");
+    len = strlen(body);
+
+    body = realloc(body, len + 4);
+    len += sprintf(body + len, "\n");
+
+    for (i = start_index; i <= end_index; i++) {
+        body = realloc(body, len + 4);
+        sprintf(body + len, "o ");
+        string_buf = catgets(catd, n_screen->text_set, i, "");
+        body = add_line_to_body(body, string_buf, "  ");
+        len = strlen(body);
+    }
+    n_screen->body = body;
+}
+
 int raid_start(i_container *i_con)
 {
     int rc, i, array_num;
@@ -2931,16 +3036,20 @@ int raid_start(i_container *i_con)
         }
     }
 
-    if (array_num == 1)
-    {
-        s_out = screen_driver(&n_raid_start_fail,output,i_con); /* Start Device Parity Protection Failed */
+    if (array_num == 1) {
+        /* Start Device Parity Protection Failed */
+        setup_fail_screen(&n_raid_start_fail, 3, 7);
+
+        s_out = screen_driver(&n_raid_start_fail,output,i_con);
+
+        free(n_raid_start_fail.title);
+        n_raid_start_fail.title = NULL;
+        free(n_raid_start_fail.body);
+        n_raid_start_fail.body = NULL;
+
         rc = s_out->rc;
         free(s_out);
-    }
-
-
-    else
-    {
+    } else {
         output->next = add_fn_out(output->next,1,out_str);
 
         s_out = screen_driver(&n_raid_start,output,i_con);
@@ -2949,10 +3058,9 @@ int raid_start(i_container *i_con)
 
         cur_raid_cmd = raid_cmd_head;
 
-        while(cur_raid_cmd)
-        {
-            if (cur_raid_cmd->qac_data)
-            {
+        while(cur_raid_cmd) {
+            if (cur_raid_cmd->qac_data) {
+
                 free(cur_raid_cmd->qac_data);
                 cur_raid_cmd->qac_data = NULL;
             }

@@ -277,10 +277,13 @@ s_node n_raid_start = {
 };
 
 s_node n_raid_start_fail = {
-	207,
-	(NULL_FLAG),
-	0,
-	NULL
+    207,
+    (NULL_FLAG),
+    0,
+    NULL,
+    NULL,
+    NULL,
+    "%n%e%q"
 };
 
 s_node n_raid_start_loop = {

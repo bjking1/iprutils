@@ -75,13 +75,6 @@ $set 201 raid_status
 3 "Display hardware resource information details"
 4 "No devices found"
 
-$ Other
-101 "Display Disk Array Status"
-102 "Parity  Serial          Resource      PCI    PCI   SCSI  SCSI  SCSI  Status\
-\n  Set   Number   Model  Name          Bus    Dev    Bus    ID   Lun\
-\n#1"
-103 "%e%q%r%f"
-
 $set 202 raid_start
 $ iSeries
 1 "Create a Disk Array"
@@ -145,20 +138,17 @@ $set 206 raid_stop_complete
 
 $set 207 raid_start_fail
 1 "Create a Disk Array Failed"
-2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are not enough device parity capable units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+2 "There are no disk units eligible for the selected operation due to one or more of the following reasons:"
+3 "There are not enough device parity capable units in the system."
+4 "An IOA is in a condition that makes the disk units attached to \
+   it read/write protected.  Examine the kernel messages log \
+   for any errors that are logged for the IO subsystem \
+   and follow the appropriate procedure for the reference code to \
+   correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have \
+   reported to the system.  Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 208 configure_raid_start
 1 "Select Disk Units for Parity Protection"

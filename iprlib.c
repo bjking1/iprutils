@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.7 2004/01/30 21:02:05 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.8 2004/01/30 22:52:13 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -1592,6 +1592,7 @@ void check_current_config(bool allow_rebuild_refresh)
             }
             else if (scsi_dev_data->type == IPR_TYPE_ADAPTER)
             {
+                cur_ioa->ioa.ioa = cur_ioa;
                 cur_ioa->ioa.scsi_dev_data = scsi_dev_data;
             }
         }
