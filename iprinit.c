@@ -8,7 +8,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.3 2004/02/04 23:11:19 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.4 2004/02/17 16:15:56 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -26,6 +26,12 @@
 
 #define GPDD_TCQ_DEPTH "64"
 #define AF_DISK_TCQ_DEPTH 64
+
+/* xxx HUP signal handler. Called by rc.d script on reload/restart
+ called by iprconfig at appropriate times. */
+
+/* daemonize and loop through all AF DASD, looking for read/write timeouts
+ to be different than we expect. If so, re-initialize the device */
 
 struct ipr_dasd_timeout_record {
 	u8 op_code;
@@ -151,31 +157,30 @@ static int enable_af(struct ipr_dev *dev)
 
 static int mode_select(char *file, void *buff, int length)
 {
-    int fd;
-    u8 cdb[IPR_CCB_CDB_LEN];
-    struct sense_data_t sense_data;
-    int rc;
+	int fd;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	int rc;
 
-    fd = open(file, O_RDWR);
-    if (fd <= 1)
-    {
-        syslog(LOG_ERR, "Could not open %s. %m\n",file);
-        return errno;
-    }
+	fd = open(file, O_RDWR);
+	if (fd <= 1) {
+		syslog(LOG_ERR, "Could not open %s. %m\n",file);
+		return errno;
+	}
 
-    memset(cdb, 0, IPR_CCB_CDB_LEN);
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
-    cdb[0] = MODE_SELECT;
-    cdb[1] = 0x11;
-    cdb[4] = length;
+	cdb[0] = MODE_SELECT;
+	cdb[1] = 0x11;
+	cdb[4] = length;
 
-    rc = sg_ioctl(fd, cdb, buff,
-                  length, SG_DXFER_TO_DEV,
-                  &sense_data, IPR_INTERNAL_TIMEOUT);
+	rc = sg_ioctl(fd, cdb, buff,
+		      length, SG_DXFER_TO_DEV,
+		      &sense_data, IPR_INTERNAL_TIMEOUT);
 
-    /* xxx additional parm to enable dumping sense data? */
-    close(fd);
-    return rc;
+	/* xxx additional parm to enable dumping sense data? */
+	close(fd);
+	return rc;
 }
 
 static int setup_page0x01(struct ipr_dev *dev)
@@ -304,6 +309,7 @@ static void init_vset_dev(struct ipr_dev *dev)
  */
 static void init_gpdd_dev(struct ipr_dev *dev)
 {
+	/* xxx check changeable parms for all mode pages */
 	if (setup_page0x0a(dev)) {
 		syslog(LOG_ERR, "Failed to enable TCQing for %s.\n",
 		       dev->scsi_dev_data->sysfs_device_name);
@@ -323,6 +329,8 @@ static void init_gpdd_dev(struct ipr_dev *dev)
  */
 static void init_af_dev(struct ipr_dev *dev)
 {
+	if (set_dasd_timeouts(dev))
+		return;
 	if (setup_page0x01(dev))
 		return;
 	if (setup_page0x0a(dev))
@@ -330,8 +338,6 @@ static void init_af_dev(struct ipr_dev *dev)
 	if (setup_page0x20(dev))
 		return;
 	if (enable_af(dev))
-		return;
-	if(set_dasd_timeouts(dev))
 		return;
 }
 
@@ -341,7 +347,15 @@ static void init_af_dev(struct ipr_dev *dev)
  */
 static void init_ioa_dev(struct ipr_dev *dev)
 {
-	
+	char fname[64];
+
+	sprintf(fname,"%x_%s", dev->ioa->ccin, dev->ioa->pci_address);
+	if (RC_SUCCESS == ipr_config_file_valid(fname))
+		ipr_set_page_28(dev->ioa, IPR_NORMAL_CONFIG, 0);
+	else
+		ipr_set_page_28_init(dev->ioa, IPR_NORMAL_CONFIG);
+
+
 }
 
 static void init_dev(struct ipr_dev *dev)
@@ -390,9 +404,7 @@ int main(int argc, char *argv[])
 		if (strcmp(argv[1], "--version") == 0) {
 			printf("iprinit: %s\n", IPR_VERSION_STR);
 			return 0;
-		}
-		else
-		{
+		} else {
 			printf("Usage: iprinit [options]\n");
 			printf("  Options: --version    Print iprinit version\n");
 			return -EINVAL;

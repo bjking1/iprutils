@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.13 2004/02/05 16:04:26 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.14 2004/02/17 16:15:56 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -258,6 +258,92 @@ struct unsupported_af_dasd unsupported_af[] =
     }
 };
 
+struct ses_table_entry {
+	char product_id[17];
+	char compare_product_id_byte[17];
+	u32 max_bus_speed_limit;
+};
+
+static const struct ses_table_entry ses_table[] = {
+	{"2104-DL1        ", "XXXXXXXXXXXXXXXX", 80},
+	{"2104-TL1        ", "XXXXXXXXXXXXXXXX", 80},
+	{"HSBP07M P U2SCSI", "XXXXXXXXXXXXXXXX", 80},
+	{"HSBP05M P U2SCSI", "XXXXXXXXXXXXXXXX", 80},
+	{"HSBP05M S U2SCSI", "XXXXXXXXXXXXXXXX", 80},
+	{"HSBP06E ASU2SCSI", "XXXXXXXXXXXXXXXX", 80},
+	{"2104-DU3        ", "XXXXXXXXXXXXXXXX", 160},
+	{"2104-TU3        ", "XXXXXXXXXXXXXXXX", 160},
+	{"HSBP04C RSU2SCSI", "XXXXXXX*XXXXXXXX", 160},
+	{"HSBP06E RSU2SCSI", "XXXXXXX*XXXXXXXX", 160},
+	{"St  V1S2        ", "XXXXXXXXXXXXXXXX", 160},
+	{"HSBPD4M  PU3SCSI", "XXXXXXX*XXXXXXXX", 160},
+	{"VSBPD1H   U3SCSI", "XXXXXXX*XXXXXXXX", 160}
+};
+
+static int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
+{
+	int i, j, matches;
+	struct ipr_dev *dev = ioa->dev;
+	const struct ses_table_entry *ste = ses_table;
+
+	for (i = 0; i < ioa->num_devices; i++, dev++) {
+		if (!dev->scsi_dev_data)
+			continue;
+		if (dev->channel = bus && dev->type == TYPE_ENCLOSURE)
+			break;
+	}
+
+	if (i == ioa->num_devices)
+		return IPR_MAX_BUS_SPEED;
+	if (strncmp(dev->scsi_dev_data->vendor_id, "IBM", 3))
+		return IPR_MAX_BUS_SPEED;
+
+	for (i = 0; i < ARRAY_SIZE(ses_table); i++, ste++) {
+		for (j = 0, matches = 0; j < IPR_PROD_ID_LEN; j++) {
+			if (ste->compare_product_id_byte[j] == 'X') {
+				if (dev->scsi_dev_data->product_id[j] == ste->product_id[j])
+					matches++;
+				else
+					break;
+			} else
+				matches++;
+		}
+
+		if (matches == IPR_PROD_ID_LEN)
+			return ste-L>max_bus_speed_limit;
+	}
+
+	return IPR_MAX_BUS_SPEED;
+}
+
+struct ioa_parms {
+	int ccin;
+	int scsi_id_changeable;
+};
+
+static const struct ioa_parms ioa_parms [] = {
+	{.ccin:0x5702, .scsi_id_changeable: 1},
+	{.ccin:0x5703, .scsi_id_changeable: 0},
+	{.ccin:0x5709, .scsi_id_changeable: 0},
+	{.ccin:0x570A, .scsi_id_changeable: 0},
+	{.ccin:0x570B, .scsi_id_changeable: 0},
+	{.ccin:0x2780, .scsi_id_changeable: 0},
+};
+
+static void setup_ioa_parms(struct ipr_ioa *ioa)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ioa_parms); i++) {
+		if (ioa->ccin == ioa_parms[i].ccin) {
+			ioa->scsi_id_changeable = ioa_parms[i].scsi_id_changeable;
+			return;
+		}
+	}
+
+	ioa->scsi_id_changeable = 0;
+}
+
 void tool_init(char *tool_name)
 {
     int ccin;
@@ -295,7 +381,7 @@ void tool_init(char *tool_name)
             strcpy(ipr_ioa->pci_address, pci_address);
 
             /* driver version */
-            strcpy(ipr_ioa->driver_version,"2");  //FIXME pick up version from modinfo?
+	    strcpy(ipr_ioa->driver_version,"2");  /* FIXME pick up version from modinfo? */
 
             sysfs_host_class = sysfs_open_class("scsi_host");
             class_devices = sysfs_get_class_devices(sysfs_host_class);
@@ -323,6 +409,7 @@ void tool_init(char *tool_name)
                     sysfs_model_attr = sysfs_get_device_attr(sysfs_device_device, "model");
                     sscanf(sysfs_model_attr->value, "%4X", &ccin);
                     ipr_ioa->ccin = ccin;
+					setup_ioa_parms(ipr_ioa);
                     break;
                 }
             }
@@ -331,15 +418,11 @@ void tool_init(char *tool_name)
             ipr_ioa->next = NULL;
             ipr_ioa->num_raid_cmds = 0;
 
-            if (ipr_ioa_tail)
-            {
+			if (ipr_ioa_tail) {
                 ipr_ioa_tail->next = ipr_ioa;
                 ipr_ioa_tail = ipr_ioa;
-            }
-            else
-            {
+			} else
                 ipr_ioa_tail = ipr_ioa_head = ipr_ioa;
-            }
 
             num_ioas++;
         }
@@ -350,7 +433,7 @@ void tool_init(char *tool_name)
     return;
 }
 
-/* Try to dynamically add this device */
+/* xxx - delete Try to dynamically add this device */
 int scan_device(struct scsi_dev_data *scsi_dev_data)
 {
     char cmd[200];
@@ -367,7 +450,7 @@ int scan_device(struct scsi_dev_data *scsi_dev_data)
     return 0;
 }
 
-/* Try to dynamically remove this device */
+/* xxx - delete Try to dynamically remove this device */
 int remove_device(struct scsi_dev_data *scsi_dev_data)
 {
     char cmd[200];
@@ -1522,7 +1605,6 @@ void check_current_config(bool allow_rebuild_refresh)
             cur_qac_data->num_records = 0;
 
         cur_ioa->qac_data = cur_qac_data;
-        cur_ioa->start_array_qac_entry = NULL;
 
         device_count = 0;
         memset(cur_ioa->dev, 0, IPR_MAX_IOA_DEVICES * sizeof(struct ipr_dev));
@@ -1620,21 +1702,13 @@ void check_current_config(bool allow_rebuild_refresh)
             if ((common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
                 (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
 
-                array_record = (struct ipr_array_record *)common_record;
-                if ((common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)
-                    && (array_record->start_cand))
+                /* add phantom qac entry to ioa device list */
+                cur_ioa->dev[device_count].scsi_dev_data = NULL;
+                cur_ioa->dev[device_count].qac_entry = common_record;
 
-                    cur_ioa->start_array_qac_entry = array_record;
-                else {
-
-                    /* add phantom qac entry to ioa device list */
-                    cur_ioa->dev[device_count].scsi_dev_data = NULL;
-                    cur_ioa->dev[device_count].qac_entry = common_record;
-
-                    strcpy(cur_ioa->dev[device_count].dev_name, "");
-                    strcpy(cur_ioa->dev[device_count].gen_name, "");
-                    device_count++;
-                }
+                strcpy(cur_ioa->dev[device_count].dev_name, "");
+                strcpy(cur_ioa->dev[device_count].gen_name, "");
+                device_count++;
             }
 
             common_record = (struct ipr_common_record *)
@@ -1674,178 +1748,168 @@ int num_device_opens(int host_num, int channel, int id, int lun)
 
 void exit_on_error(char *s, ...)
 {
-    va_list args;
-    char usr_str[256];
+	va_list args;
+	char usr_str[256];
 
-    va_start(args, s);
-    vsprintf(usr_str, s, args);
-    va_end(args);
+	va_start(args, s);
+	vsprintf(usr_str, s, args);
+	va_end(args);
 
-    closelog();
-    openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER); //FIXME xxx
-    syslog(LOG_ERR,"%s",usr_str);
-    closelog();
-    openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
+	closelog();
+	openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER); /* xxx FIXME */
+	syslog(LOG_ERR,"%s",usr_str);
+	closelog();
+	openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
 
-    exit(1);
+	exit(1);
 }
 
-void ipr_config_file_hdr(char *file_name)
+static void ipr_config_file_hdr(char *file_name)
 {
-    FILE *fd;
-    char cmd_str[64];
+	FILE *fd;
+	char cmd_str[64];
 
-    /* check if file currently exists */
-    fd = fopen(file_name, "r");
-    if (fd) {
+	/* check if file currently exists */
+	fd = fopen(file_name, "r");
+	if (fd) {
+		fclose(fd);
+		return;
+	}
+
+	/* be sure directory is present */
+	sprintf(cmd_str,"install -d %s",IPR_CONFIG_DIR);
+	system(cmd_str);
+
+	/* otherwise, create new file */
+	fd = fopen(file_name, "w");
+	if (fd == NULL) {
+		syslog(LOG_ERR, "Could not open %s. %m\n", file_name);
+		return;
+	}
+
+	fprintf(fd,"# DO NOT EDIT! Software generated configuration file for\n");
+	fprintf(fd,"# ipr SCSI device subsystem\n\n");
+	fprintf(fd,"# Use iprconfig to configure\n");
+	fprintf(fd,"# See \"man iprconfig\" for more information\n\n");
 	fclose(fd);
-	return;
-    }
-
-    /* be sure directory is present */
-    sprintf(cmd_str,"install -d %s",IPR_CONFIG_DIR);
-    system(cmd_str);
-
-    /* otherwise, create new file */
-    fd = fopen(file_name, "w");
-    if (fd == NULL) {
-	syslog(LOG_ERR, "Could not open %s. %m\n", file_name);
-	return;
-    }
-
-    fprintf(fd,"# DO NOT EDIT! Software generated configuration file for\n");
-    fprintf(fd,"# ipr SCSI device subsystem\n\n");
-    fprintf(fd,"# Use iprconfig to configure\n");
-    fprintf(fd,"# See \"man iprconfig\" for more information\n\n");
-    fclose(fd);
 }
 
-void  ipr_config_file_entry(char *usr_file_name,
-                            char *category, char *field,
-                            char *value, int update)
+static void ipr_save_bus_attr(struct ipr_ioa *ioa, int bus,
+			      char *field, char *value, int update)
 {
-    FILE *fd, *temp_fd;
-    char file_name[64];
-    char temp_file_name[64];
-    char line[64];
-    int category_found = 0;
-    int field_found = 0;
+	char category[16], fname[64];
+	FILE *fd, *temp_fd;
+	char temp_fname[64], line[64];
+	int bus_found = 0;
+	int field_found = 0;
 
-    sprintf(file_name,"%s%s",IPR_CONFIG_DIR, usr_file_name);
+	sprintf(fname, "%s%x_%s", IPR_CONFIG_DIR, ioa->ccin, ioa->pci_address);
+	ipr_config_file_hdr(fname);
 
-    /* verify common header comments */
-    ipr_config_file_hdr(file_name);
+	sprintf(category,"[%s %d]", IPR_CATEGORY_BUS, bus);
 
-    fd = fopen(file_name, "r");
+	fd = fopen(fname, "r");
+	if (fd == NULL)
+		return;
 
-    if (fd == NULL)
-        return;
+	sprintf(temp_fname, "%s.1", fname);
+	temp_fd = fopen(temp_fname, "w");
+	if (temp_fd == NULL) {
+		syslog(LOG_ERR, "Could not open %s. %m\n", temp_fname);
+		return;
+	}
 
-    sprintf(temp_file_name,"%s.1",file_name);
-    temp_fd = fopen(temp_file_name, "w");
-    if (temp_fd == NULL) {
-        syslog(LOG_ERR, "Could not open %s. %m\n", temp_file_name);
-        return;
-    }
+	while (fgets(line, 64, fd)) {
+		if (strstr(line, category) && line[0] != '#') {
+			bus_found = 1;
+		} else {
+			if (bus_found) {
+				if (line[0] == '[') {
+					bus_found = 0;
+					if (!field_found) {
+						if (!update)
+							fprintf(temp_fd, "# ");
 
-    while (fgets(line,64,fd)) {
-        if ((strstr(line, category)) && (line[0] != '#')) {
-            category_found = 1;
-        } else {
-            if (category_found) {
-                if (line[0] == '[') {
-                    category_found = 0;
-                    if (!field_found) {
-                        if (!update)
-                            fprintf(temp_fd, "# ");
+						fprintf(temp_fd,"%s %s\n",field,value);
+					}
+				}
 
-                        fprintf(temp_fd,"%s %s\n",field,value);
-                    }
-                }
+				if (strstr(line, field)) {
+					if (update)
+						sprintf(line,"%s %s\n",field,value);
 
-                if (strstr(line, field)) {
-                    if (update)
-                        sprintf(line,"%s %s\n",field,value);
+					field_found = 1;
+				}
+			}
+		}
 
-                    field_found = 1;
-                }
-            }
-        }
+		fputs(line, temp_fd);
+	} 
 
-        fputs(line, temp_fd);
-    } 
+	if (!field_found) {
+		if (!bus_found)
+			fprintf(temp_fd,"\n%s\n", category);
 
-    if (!field_found) {
-        if (!category_found)
-            fprintf(temp_fd,"\n%s\n", category);
+		if (!update)
+			fprintf(temp_fd, "# ");
 
-        if (!update)
-            fprintf(temp_fd, "# ");
+		fprintf(temp_fd,"%s %s\n", field, value);
+	}
 
-        fprintf(temp_fd,"%s %s\n", field, value);
-    }
-
-    sprintf(line,"mv %s %s", temp_file_name, file_name);
-    system(line);
-
-    fclose(fd);
-    fclose(temp_fd);
+	if (rename(temp_fname, fname))
+		syslog(LOG_ERR, "Could not save %s.\n", fname);
+	fclose(fd);
+	fclose(temp_fd);
 }
 
-int  ipr_config_file_read(char *usr_file_name,
-                          char *category,
-                          char *field,
-                          char *value)
+static int ipr_get_saved_bus_attr(struct ipr_ioa *ioa, int bus,
+				  char *field, char *value)
 {
-    FILE *fd;
-    char file_name[64];
-    char line[64];
-    char *str_ptr;
-    int category_found;
+	FILE *fd;
+	char fname[64], line[64], category[16], *str_ptr;
+	int bus_found;
 
-    sprintf(file_name,"%s%s",IPR_CONFIG_DIR, usr_file_name);
+	sprintf(category,"[%s %d]", IPR_CATEGORY_BUS, bus);
+	sprintf(fname, "%s%x_%s", IPR_CONFIG_DIR, ioa->ccin, ioa->pci_address);
 
-    fd = fopen(file_name, "r");
-    if (fd == NULL)
-        return RC_FAILED;
+	fd = fopen(fname, "r");
+	if (fd == NULL)
+		return RC_FAILED;
 
-    while (fgets(line,64,fd)) {
-        if (line[0] != '#') {
-            if (strstr(line, category))
-                category_found = 1;
-            else if (category_found) {
-                if (line[0] == '[')
-                    category_found = 0;
+	while (NULL != fgets(line, 64, fd)) {
+		if (line[0] != '#') {
+			if (strstr(line, category))
+				bus_found = 1;
+			else if (bus_found) {
+				if (line[0] == '[')
+					bus_found = 0;
 
-                if (str_ptr = strstr(line, field)) {
-                    str_ptr += strlen(field);
-                    while (str_ptr[0] == ' ')
-                        str_ptr++;
-                    sprintf(value,"%s\n",str_ptr);
-                    fclose(fd);
-                    return RC_SUCCESS;
-                }
-            }
-        }
-    } 
-
-    fclose(fd);
-    return RC_FAILED;
+				if ((str_ptr = strstr(line, field))) {
+					str_ptr += strlen(field);
+					while (str_ptr[0] == ' ')
+						str_ptr++;
+					sprintf(value,"%s\n",str_ptr);
+					fclose(fd);
+					return RC_SUCCESS;
+				}
+			}
+		}
+	} 
 }
 
-int ipr_config_file_valid(char *usr_file_name)
+int ipr_config_file_valid(struct ipr_ioa *ioa)
 {
-    FILE *fd;
-    char file_name[64];
+	FILE *fd;
+	char file_name[64];
 
-    sprintf(file_name,"%s%s",IPR_CONFIG_DIR, usr_file_name);
+	sprintf(file_name,"%s%x_%s",IPR_CONFIG_DIR, ioa->ccin, ioa->pci_address);
 
-    fd = fopen(file_name, "r");
-    if (fd == NULL)
-        return RC_FAILED;
+	fd = fopen(file_name, "r");
+	if (fd == NULL)
+		return RC_FAILED;
 
-    fclose(fd);
-    return RC_SUCCESS;
+	fclose(fd);
+	return RC_SUCCESS;
 }
 
 void ipr_save_page_28(struct ipr_ioa *ioa,
@@ -1853,119 +1917,210 @@ void ipr_save_page_28(struct ipr_ioa *ioa,
                       struct ipr_page_28 *page_28_chg,
                       struct ipr_page_28 *page_28_ipr)
 {
-    char file_name[64];
-    char category[16];
-    char value_str[16];
-    int i, update_entry;
+	char value_str[16];
+	int i;
 
-    /* gets Host Address to create file_name */
-    sprintf(file_name,"%x_%s",
-            ioa->ccin, ioa->pci_address);
+	for (i = 0; i < page_28_cur->page_hdr.num_dev_entries; i++) {
+		if (page_28_chg->attr[i].qas_capability) {
+			sprintf(value_str,"%d",
+				page_28_cur->attr[i].qas_capability);
+			ipr_save_bus_attr(ioa, page_28_cur->attr[i].res_addr.bus,
+					  IPR_QAS_CAPABILITY, value_str,
+					  page_28_ipr->attr[i].qas_capability);
+		}
 
-    for (i = 0; i < page_28_cur->page_hdr.num_dev_entries; i++) {
-        if (page_28_chg->attr[i].qas_capability) {
-            sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-                    page_28_cur->attr[i].res_addr.bus);
-            sprintf(value_str,"%d",
-                    page_28_cur->attr[i].qas_capability);
+		if (page_28_chg->attr[i].scsi_id) {
+			sprintf(value_str,"%d",
+				page_28_cur->attr[i].scsi_id);
+			ipr_save_bus_attr(ioa, page_28_cur->attr[i].res_addr.bus,
+					  IPR_HOST_SCSI_ID, value_str,
+					  page_28_ipr->attr[i].scsi_id);
+		}
 
-            if (page_28_ipr->attr[i].qas_capability)
-                update_entry = 1;
-            else
-                update_entry = 0;
+		if (page_28_chg->attr[i].bus_width) {
+			sprintf(value_str,"%d",
+				page_28_cur->attr[i].bus_width);
+			ipr_save_bus_attr(ioa, page_28_cur->attr[i].res_addr.bus,
+					  IPR_BUS_WIDTH, value_str,
+					  page_28_ipr->attr[i].bus_width);
+		}
 
-            ipr_config_file_entry(file_name, category, IPR_QAS_CAPABILITY,
-                                  value_str, update_entry);
-        }
+		if (page_28_chg->attr[i].max_xfer_rate) {
+			sprintf(value_str,"%d",
+				(ntohl(page_28_cur->attr[i].max_xfer_rate) *
+				 (page_28_cur->attr[i].bus_width / 8))/10);
+			ipr_save_bus_attr(ioa, page_28_cur->attr[i].res_addr.bus,
+					  IPR_MAX_XFER_RATE, value_str,
+					  page_28_ipr->attr[i].max_xfer_rate);
+		}
 
-        if (page_28_chg->attr[i].scsi_id) {
-            sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-                    page_28_cur->attr[i].res_addr.bus);
-            sprintf(value_str,"%d",
-                    page_28_cur->attr[i].scsi_id);
-
-            if (page_28_ipr->attr[i].scsi_id)
-                update_entry = 1;
-            else
-                update_entry = 0;
-
-            ipr_config_file_entry(file_name, category, IPR_HOST_SCSI_ID,
-                                  value_str, update_entry);
-        }
-
-        if (page_28_chg->attr[i].bus_width) {
-            sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-                    page_28_cur->attr[i].res_addr.bus);
-            sprintf(value_str,"%d",
-                    page_28_cur->attr[i].bus_width);
-
-            if (page_28_ipr->attr[i].bus_width)
-                update_entry = 1;
-            else
-                update_entry = 0;
-
-            ipr_config_file_entry(file_name, category, IPR_BUS_WIDTH,
-                                  value_str, update_entry);
-        }
-
-        if (page_28_chg->attr[i].max_xfer_rate) {
-            sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-                    page_28_cur->attr[i].res_addr.bus);
-            sprintf(value_str,"%d",
-                    (ntohl(page_28_cur->attr[i].max_xfer_rate) *
-                     (page_28_cur->attr[i].bus_width / 8))/10);
-
-            if (page_28_ipr->attr[i].max_xfer_rate)
-                update_entry = 1;
-            else
-                update_entry = 0;
-
-            ipr_config_file_entry(file_name, category, IPR_MAX_XFER_RATE,
-                                  value_str, update_entry);
-        }
-
-        if (page_28_chg->attr[i].min_time_delay) {
-            sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-                    page_28_cur->attr[i].res_addr.bus);
-            sprintf(value_str,"%d",
-                    page_28_cur->attr[i].min_time_delay);
-
-            ipr_config_file_entry(file_name, category,
-                                  IPR_MIN_TIME_DELAY, value_str, 0);
-        }
-    }
+		if (page_28_chg->attr[i].min_time_delay) {
+			sprintf(value_str,"%d",
+				page_28_cur->attr[i].min_time_delay);
+			ipr_save_bus_attr(ioa, page_28_cur->attr[i].res_addr.bus,
+					  IPR_MIN_TIME_DELAY, value_str, 0);
+		}
+	}
 }
 
-void ipr_set_page_28(struct ipr_ioa *cur_ioa,
-                     int limited_config,
-                     int reset_scheduled)
+void ipr_set_page_28(struct ipr_ioa *ioa,
+		     int limited_config, int reset_scheduled)
+{
+	int rc, i, length, new_value;
+	char current_mode_settings[255];
+	struct ipr_mode_parm_hdr *mode_parm_hdr;
+	struct ipr_page_28 *page_28;
+	int is_reset_req = 0;
+	char value_str[64];
+	u32 max_xfer_rate;
+
+	memset(current_mode_settings,0,sizeof(current_mode_settings));
+	mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
+	rc = ipr_mode_sense(ioa->ioa.gen_name, 0x28, mode_parm_hdr);
+
+	if (rc != 0)
+		return;
+
+	page_28 = (struct ipr_page_28 *)
+		(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
+
+	for (i = 0; i < page_28->page_hdr.num_dev_entries; i++) {
+		rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+					    IPR_QAS_CAPABILITY, value_str);
+		if (rc == RC_SUCCESS) {
+			sscanf(value_str,"%d", &new_value);
+			page_28->attr[i].qas_capability = new_value;
+		}
+
+		if (ioa->scsi_id_changeable) {
+			rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+						    IPR_HOST_SCSI_ID, value_str)
+				if (rc == RC_SUCCESS) {
+					sscanf(value_str,"%d", &new_value);
+					if (page_28->attr[i].scsi_id != new_value) {
+						is_reset_req = 1;
+						page_28->attr[i].scsi_id = new_value;
+					}
+				}
+		}
+
+		rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+					    IPR_BUS_WIDTH, value_str)
+
+			if (rc == RC_SUCCESS) {
+				sscanf(value_str,"%d", &new_value);
+				page_28->attr[i].bus_width = new_value;
+			}
+
+		if (1) { /* xxx FIXME - build backplane table */
+			if (limited_config & (1 << page_28->attr[i].res_addr.bus)) {
+				max_xfer_rate = ((ntohl(page_28->attr[i].max_xfer_rate)) *
+						 page_28->attr[i].bus_width)/(10 * 8);
+
+				if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate) {
+					page_28->attr[i].max_xfer_rate =
+						htonl(IPR_LIMITED_MAX_XFER_RATE * 10 /
+						      (page_28->attr[i].bus_width / 8));
+				}
+
+				if (limited_config & IPR_SAVE_LIMITED_CONFIG) {
+					sprintf(value_str,"%d",
+						(ntohl(page_28->attr[i].max_xfer_rate) *
+						 (page_28->attr[i].bus_width / 8))/10);
+					ipr_save_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+							  IPR_MAX_XFER_RATE, value_str, 1);
+				}
+			} else {
+				max_xfer_rate = get_max_bus_speed(ioa,
+								  page_28->attr[i].res_addr.bus);
+
+				rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+							    IPR_MAX_XFER_RATE, value_str)
+
+					if (rc == RC_SUCCESS) {
+						sscanf(value_str,"%d", &new_value);
+
+						if (new_value <= max_xfer_rate) {
+							page_28->attr[i].max_xfer_rate =
+								htonl(new_value * 10 /
+								      (page_28->attr[i].bus_width / 8));
+						} else {
+							page_28->attr[i].max_xfer_rate =
+								htonl(max_xfer_rate * 10 /
+								      (page_28->attr[i].bus_width / 8));
+							sprintf(value_str,"%d",
+								(ntohl(page_28->attr[i].max_xfer_rate) *
+								 (page_28->attr[i].bus_width / 8))/10);
+							ipr_save_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+									  IPR_MAX_XFER_RATE, value_str, 1);
+						}
+					} else {
+						page_28->attr[i].max_xfer_rate =
+							htonl(max_xfer_rate * 10 /
+							      (page_28->attr[i].bus_width / 8));
+					}
+			}
+		}
+
+		if (0) { /* xxx FIXME? */
+			rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+						    IPR_MIN_TIME_DELAY, value_str)
+
+				if (rc == RC_SUCCESS) {
+					sscanf(value_str,"%d", &new_value);
+					page_28->attr[i].min_time_delay = new_value;
+				} else {
+					page_28->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
+				}
+		}
+	}
+
+	/* issue mode select and reset if necessary */
+	length = mode_parm_hdr->length + 1;
+	mode_parm_hdr->length = 0;
+
+	rc = ipr_mode_select(ioa->ioa.gen_name, page_28_sense, length);
+
+	if (rc != 0)
+		return;
+
+	if (is_reset_req && !reset_scheduled)
+		ipr_reset_adapter(ioa);
+}
+
+void ipr_set_page_28_init(struct ipr_ioa *ioa,
+                          int limited_config)
 {
 	int rc, i;
 	char current_mode_settings[255];
+	char changeable_mode_settings[255];
 	char default_mode_settings[255];
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
+	int issue_mode_select = 0;
 	struct ipr_pagewh_28 *page_28_sense;
-	struct ipr_page_28 *page_28_cur, *page_28_dflt;
-	int is_reset_req = 0;
-	char value_str[64];
-	char file_name[64];
-	char category[16];
-	int new_value;
+	struct ipr_page_28 *page_28_cur, *page_28_chg, *page_28_dflt;
+	struct ipr_page_28 page_28_ipr;
 	u32 max_xfer_rate;
 	int length;
 
 	memset(current_mode_settings,0,sizeof(current_mode_settings));
+	memset(changeable_mode_settings,0,sizeof(changeable_mode_settings));
 	memset(default_mode_settings,0,sizeof(default_mode_settings));
 
-	/* mode sense page28 to get current parms */
+	/* Mode sense page28 to get current parms */
 	mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
-	rc = ipr_mode_sense(cur_ioa->ioa.gen_name, 0x28, mode_parm_hdr);
+	rc = ipr_mode_sense(ioa->ioa.gen_name, 0x28, mode_parm_hdr);
 
 	if (rc != 0)
 		return;
 
 	page_28_sense = (struct ipr_pagewh_28 *)mode_parm_hdr;
 	page_28_cur = (struct ipr_page_28 *)
+		(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
+
+	/* Now issue mode sense to get changeable parms */
+	mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
+	page_28_chg = (struct ipr_page_28 *)
 		(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
 	/* Now issue mode sense to get default parms */
@@ -1975,368 +2130,148 @@ void ipr_set_page_28(struct ipr_ioa *cur_ioa,
 
 	/* determine changable and default values */
 	for (i = 0; i < page_28_cur->page_hdr.num_dev_entries; i++) {
+		page_28_chg->attr[i].qas_capability = 0;
+		page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
+										 // vend/prod & subsystem id)
+			page_28_chg->attr[i].bus_width = 1;
+		page_28_chg->attr[i].max_xfer_rate = 1;
+
 		page_28_dflt->attr[i].qas_capability = 0;
 		page_28_dflt->attr[i].scsi_id = page_28_cur->attr[i].scsi_id;
 		page_28_dflt->attr[i].bus_width = 16;
-		page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME!!!  create backplane table check
+		page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME  check backplane table
 	}
-
-	/* extract data from saved file to send in mode select */
-	sprintf(file_name,"%x_%s",
-		cur_ioa->ccin, cur_ioa->pci_address);
 
 	for (i = 0; i < page_28_cur->page_hdr.num_dev_entries; i++) {
-		if (0) {
-			sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-				page_28_cur->attr[i].res_addr.bus);
+		if ((limited_config & (1 << page_28_cur->attr[i].res_addr.bus))) {
+			max_xfer_rate = ((ntohl(page_28_cur->attr[i].max_xfer_rate)) *
+					 page_28_cur->attr[i].bus_width)/(10 * 8);
 
-			rc = ipr_config_file_read(file_name, category,
-						  IPR_QAS_CAPABILITY, value_str);
-			if (rc == RC_SUCCESS) {
-				sscanf(value_str,"%d", &new_value);
-				page_28_cur->attr[i].qas_capability = new_value;
+			if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate) {
+				page_28_cur->attr[i].max_xfer_rate =
+					htonl(IPR_LIMITED_MAX_XFER_RATE * 10 /
+					      (page_28_cur->attr[i].bus_width / 8));
 			}
+		} else {
+			page_28_cur->attr[i].max_xfer_rate =
+				page_28_dflt->attr[i].max_xfer_rate;
 		}
 
-		if (cur_ioa->ccin == 0x5702) { /* xxx FIXME */
-			sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-				page_28_cur->attr[i].res_addr.bus);
-
-			rc = ipr_config_file_read(file_name, category,
-						  IPR_HOST_SCSI_ID, value_str);
-			if (rc == RC_SUCCESS) {
-				sscanf(value_str,"%d", &new_value);
-				if (page_28_cur->attr[i].scsi_id != new_value) {
-					is_reset_req = 1;
-					page_28_cur->attr[i].scsi_id = new_value;
-				}
-			}
-		}
-
-		sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-			page_28_cur->attr[i].res_addr.bus);
-
-		rc = ipr_config_file_read(file_name, category,
-					  IPR_BUS_WIDTH, value_str);
-		if (rc == RC_SUCCESS) {
-			sscanf(value_str,"%d", &new_value);
-			page_28_cur->attr[i].bus_width = new_value;
-		}
-
-		if (1) { /* xxx FIXME - build backplane table */
-			if (limited_config & (1 << page_28_cur->attr[i].res_addr.bus)) {
-				max_xfer_rate = ((ntohl(page_28_cur->attr[i].max_xfer_rate)) *
-						 page_28_cur->attr[i].bus_width)/(10 * 8);
-
-				if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate) {
-					page_28_cur->attr[i].max_xfer_rate =
-						htonl(IPR_LIMITED_MAX_XFER_RATE * 10 /
-						      (page_28_cur->attr[i].bus_width / 8));
-				}
-
-				if (limited_config & IPR_SAVE_LIMITED_CONFIG) {
-					/* update config file to indicate present restriction */
-					sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-						page_28_cur->attr[i].res_addr.bus);
-					sprintf(value_str,"%d",
-						(ntohl(page_28_cur->attr[i].max_xfer_rate) *
-						 (page_28_cur->attr[i].bus_width / 8))/10);
-
-					ipr_config_file_entry(file_name, category,
-							      IPR_MAX_XFER_RATE, value_str, 1);
-				}
-			} else {
-				sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-					page_28_cur->attr[i].res_addr.bus);
-
-				rc = ipr_config_file_read(file_name, category,
-							  IPR_MAX_XFER_RATE, value_str);
-
-				if (rc == RC_SUCCESS) {
-					sscanf(value_str,"%d", &new_value);
-
-					max_xfer_rate = ((ntohl(page_28_dflt->attr[i].max_xfer_rate)) *
-							 page_28_cur->attr[i].bus_width)/(10 * 8);
-
-					if (new_value <= max_xfer_rate) {
-						page_28_cur->attr[i].max_xfer_rate =
-							htonl(new_value * 10 /
-							      (page_28_cur->attr[i].bus_width / 8));
-					} else {
-						page_28_cur->attr[i].max_xfer_rate =
-							page_28_dflt->attr[i].max_xfer_rate;
-
-						/* update config file to indicate present restriction */
-						sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-							page_28_cur->attr[i].res_addr.bus);
-						sprintf(value_str,"%d",
-							(ntohl(page_28_cur->attr[i].max_xfer_rate) *
-							 (page_28_cur->attr[i].bus_width / 8))/10);
-
-						ipr_config_file_entry(file_name, category,
-								      IPR_MAX_XFER_RATE, value_str, 1);
-					}
-				} else {
-					page_28_cur->attr[i].max_xfer_rate =
-						page_28_dflt->attr[i].max_xfer_rate;
-				}
-			}
-		}
-
-		if (0) { /* xxx FIXME? */
-			sprintf(category,"[%s%d]", IPR_CATEGORY_BUS,
-				page_28_cur->attr[i].res_addr.bus);
-
-			rc = ipr_config_file_read(file_name, category,
-						  IPR_MIN_TIME_DELAY, value_str);
-			if (rc == RC_SUCCESS) {
-				sscanf(value_str,"%d", &new_value);
-				page_28_cur->attr[i].min_time_delay = new_value;
-			} else {
-				page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
-			}
-		}
+		issue_mode_select++;
 	}
 
-	/* issue mode sense and reset if necessary */
-	mode_parm_hdr = (struct ipr_mode_parm_hdr *)page_28_sense; 
-	length = mode_parm_hdr->length + 1;
-	mode_parm_hdr->length = 0;
+	/* Issue mode select */
+	if (issue_mode_select) {
+		mode_parm_hdr = (struct ipr_mode_parm_hdr *)page_28_sense; 
+		length = mode_parm_hdr->length + 1;
+		mode_parm_hdr->length = 0;
 
-	rc = ipr_mode_select(cur_ioa->ioa.gen_name, page_28_sense, length);
+		rc = ipr_mode_select(ioa->ioa.gen_name, page_28_sense, length);
 
-	if (rc != 0)
-		return;
+		/* Zero out user page 28 page, this data is used to indicate
+		 that no values are being changed, this routine is called
+		 to create and initialize the file if it does not already
+		 exist */
+		memset(&page_28_ipr, 0, sizeof(struct ipr_pagewh_28));
 
-	if (is_reset_req && !reset_scheduled)
-		ipr_reset_adapter(cur_ioa);
-}
-
-void ipr_set_page_28_init(struct ipr_ioa *cur_ioa,
-                          int limited_config)
-{
-    int rc, i;
-    char current_mode_settings[255];
-    char changeable_mode_settings[255];
-    char default_mode_settings[255];
-    struct ipr_mode_parm_hdr *mode_parm_hdr;
-    int issue_mode_select = 0;
-    struct ipr_pagewh_28 *page_28_sense;
-    struct ipr_page_28 *page_28_cur, *page_28_chg, *page_28_dflt;
-    struct ipr_page_28 page_28_ipr;
-    u32 max_xfer_rate;
-    int length;
-
-    memset(current_mode_settings,0,sizeof(current_mode_settings));
-    memset(changeable_mode_settings,0,sizeof(changeable_mode_settings));
-    memset(default_mode_settings,0,sizeof(default_mode_settings));
-
-    /* Mode sense page28 to get current parms */
-    mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
-    rc = ipr_mode_sense(cur_ioa->ioa.gen_name, 0x28, mode_parm_hdr);
-
-    if (rc != 0)
-        return;
-
-    page_28_sense = (struct ipr_pagewh_28 *)mode_parm_hdr;
-    page_28_cur = (struct ipr_page_28 *)
-        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-    /* Now issue mode sense to get changeable parms */
-    mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
-    page_28_chg = (struct ipr_page_28 *)
-        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-    /* Now issue mode sense to get default parms */
-    mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
-    page_28_dflt = (struct ipr_page_28 *)
-        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-    /* determine changable and default values */
-    for (i = 0; i < page_28_cur->page_hdr.num_dev_entries; i++) {
-        page_28_chg->attr[i].qas_capability = 0;
-        page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
-                                            // vend/prod & subsystem id)
-        page_28_chg->attr[i].bus_width = 1;
-        page_28_chg->attr[i].max_xfer_rate = 1;
-
-        page_28_dflt->attr[i].qas_capability = 0;
-        page_28_dflt->attr[i].scsi_id = page_28_cur->attr[i].scsi_id;
-        page_28_dflt->attr[i].bus_width = 16;
-        page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME  check backplane table
-    }
-
-    for (i = 0; i < page_28_cur->page_hdr.num_dev_entries; i++) {
-        if (page_28_chg->attr[i].min_time_delay)
-            page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
-
-        if ((limited_config & (1 << page_28_cur->attr[i].res_addr.bus))) {
-            max_xfer_rate = ((ntohl(page_28_cur->attr[i].max_xfer_rate)) *
-                             page_28_cur->attr[i].bus_width)/(10 * 8);
-
-            if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate) {
-                page_28_cur->attr[i].max_xfer_rate =
-                    htonl(IPR_LIMITED_MAX_XFER_RATE * 10 /
-                             (page_28_cur->attr[i].bus_width / 8));
-            }
-        } else {
-            page_28_cur->attr[i].max_xfer_rate =
-                page_28_dflt->attr[i].max_xfer_rate;
-        }
-
-        issue_mode_select++;
-    }
-
-    /* Issue mode select */
-    if (issue_mode_select) {
-        mode_parm_hdr = (struct ipr_mode_parm_hdr *)page_28_sense; 
-        length = mode_parm_hdr->length + 1;
-        mode_parm_hdr->length = 0;
-
-        rc = ipr_mode_select(cur_ioa->ioa.gen_name, page_28_sense, length);
-
-        /* Zero out user page 28 page, this data is used to indicate
-         that no values are being changed, this routine is called
-         to create and initialize the file if it does not already
-         exist */
-        memset(&page_28_ipr, 0, sizeof(struct ipr_pagewh_28));
-
-        ipr_save_page_28(cur_ioa, page_28_cur, page_28_chg,
-                         &page_28_ipr);
-    }
+		ipr_save_page_28(ioa, page_28_cur, page_28_chg,
+				 &page_28_ipr);
+	}
 }
 
 void iprlog_location(struct ipr_ioa *ioa)
 {
-  syslog(LOG_ERR, 
-	 "  PCI Address: %s, Host num: %d",
-	 ioa->pci_address, ioa->host_num); /* FIXME */
+	syslog(LOG_ERR, 
+	       "  PCI Address: %s, Host num: %d",
+	       ioa->pci_address, ioa->host_num); /* FIXME */
 }
 
 bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 {
-    int i, j, rc;
-    struct ipr_std_inq_data std_inq_data;
-    struct ipr_dasd_inquiry_page3 dasd_page3_inq;
-    u32 ros_rcv_ram_rsvd, min_ucode_level;
+	int i, j, rc;
+	struct ipr_std_inq_data std_inq_data;
+	struct ipr_dasd_inquiry_page3 dasd_page3_inq;
+	u32 ros_rcv_ram_rsvd, min_ucode_level;
 
-    /* Zero out inquiry data */
-    memset(&std_inq_data, 0, sizeof(std_inq_data));
-    rc = ipr_inquiry(ipr_dev->gen_name, IPR_STD_INQUIRY,
-                     &std_inq_data, sizeof(std_inq_data));
+	/* Zero out inquiry data */
+	memset(&std_inq_data, 0, sizeof(std_inq_data));
+	rc = ipr_inquiry(ipr_dev->gen_name, IPR_STD_INQUIRY,
+			 &std_inq_data, sizeof(std_inq_data));
 
-    if (rc != 0)
-        return false;
+	if (rc != 0)
+		return false;
 
-    /* Issue page 3 inquiry */
-    memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
-    rc = ipr_inquiry(ipr_dev->gen_name, 0x03,
-                     &dasd_page3_inq, sizeof(dasd_page3_inq));
+	/* Issue page 3 inquiry */
+	memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
+	rc = ipr_inquiry(ipr_dev->gen_name, 0x03,
+			 &dasd_page3_inq, sizeof(dasd_page3_inq));
 
-    if (rc != 0)
-        return false;
+	if (rc != 0)
+		return false;
 
-    /* Is this device in the table? */
-    for (i=0;
-         i < sizeof(unsupported_af)/
-             sizeof(struct unsupported_af_dasd);
-         i++)
-    {
-        /* check vendor id */
-        for (j = 0; j < IPR_VENDOR_ID_LEN; j++)
-        {
-            if (unsupported_af[i].compare_vendor_id_byte[j])
-            {
-                if (unsupported_af[i].vendor_id[j] !=
-                    std_inq_data.vpids.vendor_id[j])
-                {
-                    /* not a match */
-                    break;
-                }
-            }
-        }
+	for (i=0; i < ARRAY_SIZE(unsupported_af); i++) {
+		for (j = 0; j < IPR_VENDOR_ID_LEN; j++) {
+			if (unsupported_af[i].compare_vendor_id_byte[j] &&
+			    unsupported_af[i].vendor_id[j] != std_inq_data.vpids.vendor_id[j])
+				break;
+		}
 
-        if (j != IPR_VENDOR_ID_LEN)
-            continue;
+		if (j != IPR_VENDOR_ID_LEN)
+			continue;
 
-        /* check product ID */
-        for (j = 0; j < IPR_PROD_ID_LEN; j++)
-        {
-            if (unsupported_af[i].compare_product_id_byte[j])
-            {
-                if (unsupported_af[i].product_id[j] !=
-                    std_inq_data.vpids.product_id[j])
-                {
-                    /* not a match */
-                    break;
-                }
-            }
-        }
+		for (j = 0; j < IPR_PROD_ID_LEN; j++) {
+			if (unsupported_af[i].compare_product_id_byte[j] &&
+			    unsupported_af[i].product_id[j] != std_inq_data.vpids.product_id[j])
+				break;
+		}
 
-        if (j != IPR_PROD_ID_LEN)
-            continue;
+		if (j != IPR_PROD_ID_LEN)
+			continue;
 
-        /* Compare LID Level */
-        for (j = 0; j < 4; j++)
-        {
-            if (unsupported_af[i].lid_mask[j])
-            {
-                if (unsupported_af[i].lid[j] !=
-                    dasd_page3_inq.load_id[j])
-                {
-                    /* not a match */
-                    break;
-                }
-            }
-        }
+		for (j = 0; j < 4; j++) {
+			if (unsupported_af[i].lid_mask[j] &&
+			    unsupported_af[i].lid[j] != dasd_page3_inq.load_id[j])
+				break;
+		}
 
-        if (j != 4)
-            continue;
+		if (j != 4)
+			continue;
 
-        /* If we make it this far, we have a match into the table.  Now,
-         determine if we need a certain level of microcode or if this
-         disk is not supported all together. */
-        if (unsupported_af[i].supported_with_min_ucode_level)
-        {
-            /* Check microcode level in std inquiry data */
-            /* If it's less than the minimum required level, we will
-             tell the user to upgrade microcode. */
-            min_ucode_level = 0;
-            ros_rcv_ram_rsvd = 0;
+		/* If we make it this far, we have a match into the table.  Now,
+		 determine if we need a certain level of microcode or if this
+		 disk is not supported all together. */
+		if (unsupported_af[i].supported_with_min_ucode_level) {
+			/* Check microcode level in std inquiry data */
+			/* If it's less than the minimum required level, we will
+			 tell the user to upgrade microcode. */
+			min_ucode_level = 0;
+			ros_rcv_ram_rsvd = 0;
 
-            for (j = 0; j < 4; j++)
-            {
-                if (unsupported_af[i].min_ucode_mask[j])
-                {
-                    min_ucode_level = (min_ucode_level << 8) |
-                        unsupported_af[i].min_ucode_level[j];
-                    ros_rcv_ram_rsvd = (ros_rcv_ram_rsvd << 8) |
-                        std_inq_data.ros_rsvd_ram_rsvd[j];
-                }
-            }
+			for (j = 0; j < 4; j++) {
+				if (unsupported_af[i].min_ucode_mask[j]) {
+					min_ucode_level = (min_ucode_level << 8) |
+						unsupported_af[i].min_ucode_level[j];
+					ros_rcv_ram_rsvd = (ros_rcv_ram_rsvd << 8) |
+						std_inq_data.ros_rsvd_ram_rsvd[j];
+				}
+			}
 
-            if (min_ucode_level > ros_rcv_ram_rsvd)
-            {
-                if (!silent)
-                    syslog(LOG_ERR,"Disk %s needs updated microcode "
-                           "before transitioning to 522 bytes/sector "
-                           "format.", ipr_dev->gen_name);
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        else /* disk is not supported at all */
-        {
-            if (!silent)
-                syslog(LOG_ERR,"Disk %s not supported for transition "
-                       "to 522 bytes/sector format.", ipr_dev->gen_name);
-            return true;
-        }
-    }   
-    return false;
+			if (min_ucode_level > ros_rcv_ram_rsvd) {
+				if (!silent)
+					syslog(LOG_ERR,"Disk %s needs updated microcode "
+					       "before transitioning to 522 bytes/sector "
+					       "format.", ipr_dev->gen_name);
+				return true;
+			} else
+				return false;
+		} else {/* disk is not supported at all */
+			if (!silent)
+				syslog(LOG_ERR,"Disk %s canot be formatted to "
+				       "522 bytes/sector.", ipr_dev->gen_name);
+			return true;
+		}
+	}   
+	return false;
 }
 
 int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)

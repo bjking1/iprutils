@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.14 2004/02/04 23:44:40 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.15 2004/02/17 16:15:56 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -744,8 +744,9 @@ struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
 	u8 prot_level_str[8];
+	u32 is_start_cand:1;
 	u32 is_reclaim_cand:1;
-	u32 reserved:31;
+	u32 reserved:30;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_common_record *qac_entry;
 	struct ipr_ioa *ioa;
@@ -767,7 +768,6 @@ struct ipr_ioa {
 	char host_name[16];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
 	struct ipr_array_query_data *qac_data;
-      struct ipr_array_record *start_array_qac_entry;
 	struct ipr_supported_arrays *supported_arrays;
 	struct ipr_reclaim_query_data *reclaim_data;
 	struct ipr_ioa *next;
@@ -1058,20 +1058,24 @@ int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
  *---------------------------------------------------------------------------*/
 static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
-    if ((device->qac_entry != NULL) &&
-        (device->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD))
-        return 1;
-    else
-        return 0;
+	if ((device->qac_entry != NULL) &&
+	    (strlen(device->dev_name) == 0) &&
+	    (device->scsi_dev_data) &&
+	    (device->scsi_dev_data->type == IPR_TYPE_AF_DISK))
+		return 1;
+	else
+		return 0;
 }
 
 static inline int ipr_is_volume_set(struct ipr_dev *device)
-{       
-    if ((device->qac_entry != NULL) &&
-        (device->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD))
-        return 1;
-    else
-        return 0;
+{
+	if ((device->qac_entry != NULL) &&
+	    (strlen(device->dev_name) != 0) &&
+	    (device->scsi_dev_data) &&
+	    (device->scsi_dev_data->type == TYPE_DISK))
+		return 1;
+	else
+		return 0;
 }
 
 static inline int ipr_is_hidden(struct ipr_dev *device)
