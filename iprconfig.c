@@ -3713,6 +3713,8 @@ int configure_raid_include(i_container *i_con)
 					device_record->known_zeroed = 1;
 				}
 			} else {
+				cur_raid_cmd->do_cmd = 0;
+
 				device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
 				if (device_record->issue_cmd) {
 
@@ -4358,11 +4360,9 @@ int hot_spare(i_container *i_con, int action)
 
 				found = 1;
 
-				if (!cur_raid_cmd->do_cmd)
-					cur_raid_cmd->do_cmd = 1;
+				cur_raid_cmd->do_cmd = 1;
 			} else {
-				if (cur_raid_cmd->do_cmd)
-					cur_raid_cmd->do_cmd = 0;
+				cur_raid_cmd->do_cmd = 0;
 			}
 		}
 	}
@@ -5302,6 +5302,9 @@ int confirm_init_device(i_container *i_con)
 
 			if (ipr_is_gscsi(dev))
 				post_attention++;
+		} else {
+			cur_dev_init = (struct devs_to_init_t *)(temp_i_con->data);
+			cur_dev_init->do_init = 0;
 		}
 	}
 
