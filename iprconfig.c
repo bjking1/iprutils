@@ -7542,7 +7542,10 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 	char *body;
 	int header_lines, status, time = 0;
 	int percent = 0;
-	pid_t pid, rc;
+	pid_t pid, done;
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	u32 fw_version;
+	int rc = 0;
 
 	body = body_init(n_download_ucode_in_progress.header, &header_lines);
 	n_download_ucode_in_progress.body = body;
@@ -7552,14 +7555,14 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 
 	if (pid) {
 		do {
-			rc = waitpid(pid, &status, WNOHANG);
+			done = waitpid(pid, &status, WNOHANG);
 			sleep(1);
 			time++;
 			percent = (time * 100) / 60;
 			if (percent > 99)
 				percent = 99;
 			complete_screen_driver(&n_download_ucode_in_progress, percent, 0);
-		} while (rc == 0);			
+		} while (done == 0);			
 	} else {
 		if (dev->scsi_dev_data && dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
 			ipr_update_ioa_fw(dev->ioa, fw_image, 1);
@@ -7571,9 +7574,20 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 	complete_screen_driver(&n_download_ucode_in_progress, 100, 0);
 	sleep(1);
 
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+
+	fw_version = page3_inq.release_level[0] << 24 |
+		page3_inq.release_level[1] << 16 |
+		page3_inq.release_level[2] << 8 |
+		page3_inq.release_level[3];
+
+	if (fw_version != fw_image->version)
+		rc = 67 | EXIT_FLAG;
+
 	free(n_download_ucode_in_progress.body);
 	n_download_ucode_in_progress.body = NULL;
-	return 0; /* xxx check version to make sure download worked */
+	return rc; /* xxx check version to make sure download worked */
 }
 
 int process_choose_ucode(struct ipr_dev *ipr_dev)
@@ -7670,17 +7684,8 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	n_confirm_download_ucode.body = NULL;
 
 
-	if (!s_out->rc) {
-		update_ucode(ipr_dev, fw_image);
-/* xxx delete
-		if ((ipr_dev->scsi_dev_data) &&
-		    (ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)) 
-
-			ipr_update_ioa_fw(ipr_dev->ioa, fw_image, 1);
-		else
-			ipr_update_disk_fw(ipr_dev, fw_image, 1);
-*/
-	}
+	if (!s_out->rc)
+		rc = update_ucode(ipr_dev, fw_image);
 
 	leave:
 		free(list);

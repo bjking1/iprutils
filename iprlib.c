@@ -8,12 +8,14 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.32 2004/03/10 22:25:53 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.33 2004/03/11 02:37:43 bjking1 Exp $
  */
 
 #ifndef iprlib_h
 #include "iprlib.h"
 #endif
+
+#define IPR_HOTPLUG_FW_PATH "/usr/lib/hotplug/firmware/"
 
 struct ipr_array_query_data *ipr_qac_data;
 struct scsi_dev_data *scsi_dev_table;
@@ -2784,7 +2786,8 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	u32 fw_version;
 	int fd, rc;
 	char *tmp;
-	char ucode_file[100];
+	char ucode_file[200];
+	DIR *dir;
 
 	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 	attr = sysfs_get_classdev_attr(class_device, "fw_version");
@@ -2823,11 +2826,23 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 
 		tmp = strrchr(image->file, '/');
 		tmp++;
+		dir = opendir(IPR_HOTPLUG_FW_PATH);
+		if (!dir) {
+			syslog(LOG_ERR, "Failed to open %s\n", IPR_HOTPLUG_FW_PATH);
+			munmap(image_hdr, ucode_stats.st_size);
+			close(fd);
+			return;
+		}
+		closedir(dir);
+		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH"%s", tmp);
+		symlink(image->file, ucode_file);
 		sprintf(ucode_file, "%s\n", tmp);
 		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 		attr = sysfs_get_classdev_attr(class_device, "update_fw");
 		rc = sysfs_write_attribute(attr, ucode_file, strlen(ucode_file));
 		sysfs_close_class_device(class_device);
+		sprintf(ucode_file, IPR_HOTPLUG_FW_PATH"%s", tmp);
+		unlink(ucode_file);
 
 		if (rc != 0)
 			ioa_err(ioa, "Microcode update failed. rc=%d\n", rc);
@@ -2839,6 +2854,9 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 			check_current_config(false);
 		}
 	}
+
+	munmap(image_hdr, ucode_stats.st_size);
+	close(fd);
 }
 
 void ipr_update_disk_fw(struct ipr_dev *dev,

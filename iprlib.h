@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.25 2004/03/10 02:56:16 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.26 2004/03/11 02:37:43 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -795,6 +795,8 @@ struct ipr_dasd_inquiry_page3 {
 	u8 reserved2[3];
 	u8 load_id[4];
 	u8 release_level[4];
+	u8 ptf_number[4];
+	u8 patch_number[4];
 };
 
 struct ipr_array_query_data {
