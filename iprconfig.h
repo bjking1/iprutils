@@ -268,18 +268,18 @@ s_node n_raid_stop_fail = {
 	.title    = __("Delete a Disk Array Failed"),
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
 	.header   = {
-		__("There are no disk units eligible for the selected operation "
+		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
 		__("o There are no disk arrays in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
 		   "correct the problem, if necessary.\n"),
-		__("o Not all disk units attached to an advanced function IOA have "
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
-		__("o The disk units are missing.\n"),
-		__("o The disk unit/s are currently in use.\n"), /* xxx? */
+		__("o The disks are missing.\n"),
+		__("o The disks are currently in use.\n"), /* xxx? */
 		"" }
 };
 
@@ -321,7 +321,7 @@ s_node n_raid_start_fail = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
 	.title    = __("Create a Disk Array Failed"),
 	.header   = {
-		__("There are no disk units eligible for the selected operation due "
+		__("There are no disks eligible for the selected operation due "
 		   "to one or more of the following reasons:\n\n"),
 		__("o There are not enough advanced function disks in the system.\n"),
 		__("o An IOA is in a condition that makes the disks attached to "
@@ -387,7 +387,7 @@ s_node n_raid_include_fail = {
 		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
 		__("o There are no disk arrays in the system.\n"),
-		__("o An IOA is in a condition that makes the disk units attached to "
+		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference code to "
@@ -418,7 +418,7 @@ s_node n_configure_raid_include_fail = {
 		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
 		__("o There are not enough disks available to be included.\n"),
-		__("o Not all disk units attached to an IOA have reported to the "
+		__("o Not all disks attached to an IOA have reported to the "
 		   "system. Retry the operation.\n"),
 		__("o The disk to be included must be the same or greater "
 		   "capacity than the smallest device in the disk array and "
@@ -604,8 +604,8 @@ s_node n_confirm_remove_hot_spare = {
 
 struct screen_opts disk_unit_recovery_opt[] = {
 	{concurrent_add_device,    "1", __("Concurrent add device")},
-	{concurrent_remove_device, "2", __("Concurrent remove/replace device")},
-	{init_device,              "3", __("Initialize and format disk unit")},
+	{concurrent_remove_device, "2", __("Concurrent remove device")},
+	{init_device,              "3", __("Initialize and format disk")},
 	{reclaim_cache,            "4", __("Reclaim IOA cache storage")},
 	{raid_rebuild,             "5", __("Rebuild disk unit data")},
 	{battery_maint,            "6", __("Work with resources containing cache battery packs")}
@@ -754,7 +754,7 @@ s_node n_confirm_init_device = {
 
 s_node n_dev_init_complete = {
 	.title    = __("Initialize and Format Status"),
-	.body     = __("You selected to initialize and format a disk unit")
+	.body     = __("You selected to initialize and format a disk")
 };
 
 struct screen_opts reclaim_cache_opts[] = {
@@ -885,7 +885,8 @@ s_node n_battery_maint = {
 	.header   = {
 		__("Type options, press Enter\n"),
 		__("  1=Display battery information\n"),
-		__("  2=Force battery pack into error state\n\n"),
+		__("  2=Force battery pack into error state\n"),
+		__("  3=Enable IOA cache after concurrently replacing battery pack\n\n"),
 		"" }
 };
 
@@ -987,7 +988,7 @@ s_node n_driver_config = {
 	.options  = &driver_config_opt[0],
 	.title    = __("Adapter Driver Configuration"),
 	.header   = {
-		__("Select subsystem to change driver configuration\n\n"),
+		__("Select adapter to change driver configuration\n\n"),
 		__("Type choice, press Enter\n"),
 		__("  1=change driver configuration\n\n"),
 		"" }
@@ -1050,7 +1051,7 @@ s_node n_download_ucode = {
 	.options  = &download_ucode_opt[0],
 	.title    = __("Download Microcode"),
 	.header   = {
-		__("Select the subsystem(s) to download microcode\n\n"),
+		__("Select the adapter(s) to download microcode\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=device to download microcode\n\n"),
 		"" }
@@ -1248,6 +1249,7 @@ const char *screen_status[] = {
 	/* 65 */ __("Editor returned %d. Try setting the default editor."),
       /* 66 */ __("Failed to change disk configuration."),
       /* 67 */ __("Microcode Download failed."),
+	/* 68 */ __("Failed to enable IOA cache."),
       /* NOTE:  127 maximum limit */
 };
 

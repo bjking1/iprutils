@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.39 2004/03/12 21:08:19 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.40 2004/03/12 21:26:43 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -406,7 +406,7 @@ static const struct ioa_parms ioa_parms [] = {
 	{.ccin = 0x570B, .scsi_id_changeable = 0,
 	.msl = 0x020A004E, .fw_name = "44415255" },
 	{.ccin = 0x2780, .scsi_id_changeable = 0,
-	.msl = 0x030E0039, .fw_name = "unknown" },
+	.msl = 0x030E0039, .fw_name = "5349530E" },
 };
 
 static void setup_ioa_parms(struct ipr_ioa *ioa)
@@ -1036,7 +1036,7 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0) {
-		if (errno != EINVAL)
+		if (sense_data.sense_key != ILLEGAL_REQUEST)
 			ioa_cmd_err(ioa, &sense_data, "Reclaim Cache", rc);
 	}
 	else if ((action & IPR_RECLAIM_ACTION) == IPR_RECLAIM_PERFORM)
@@ -3252,6 +3252,8 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 	struct ipr_disk_attr attr;
 
 	if (runtime && page0x0a_setup(dev))
+		return;
+	if (enable_af(dev))
 		return;
 	if (setup_page0x0a(dev)) {
 		syslog_dbg(LOG_DEBUG, "Failed to enable TCQing for %s.\n",

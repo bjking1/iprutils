@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.30 2004/03/12 21:08:19 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.31 2004/03/12 21:26:44 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -127,6 +127,7 @@
 #define IPR_RECLAIM_CACHE_STORE              0xF8
 #define  IPR_RECLAIM_ACTION                  0x60
 #define  IPR_RECLAIM_PERFORM                 0x00
+#define  IPR_RECLAIM_RESET_BATTERY_ERROR     0x08
 #define  IPR_RECLAIM_EXTENDED_INFO           0x10
 #define  IPR_RECLAIM_QUERY                   0x20
 #define  IPR_RECLAIM_RESET                   0x40
@@ -338,14 +339,24 @@ struct ipr_reclaim_query_data {
 #define IPR_BATTERY_WARNING_STATE            1
 #define IPR_BATTERY_ERROR_STATE              2
 
-	u8 reserved4[2];
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 conc_maint_battery:1;
+	u8 battery_replace_allowed:1;
+	u8 reserved4:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved4:6;
+	u8 battery_replace_allowed:1;
+	u8 conc_maint_battery:1;
+#endif
+
+	u8 reserved5;
 
 	u16 raw_power_on_time;
 	u16 adjusted_power_on_time;
 	u16 estimated_time_to_battery_warning;
 	u16 estimated_time_to_battery_failure;
 
-	u8 reserved5[240];
+	u8 reserved6[240];
 };
 
 struct ipr_sdt_entry {

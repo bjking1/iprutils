@@ -84,7 +84,7 @@ nl_catd                catd;
 #define DEFAULT_EDITOR "vi -R"
 #define FAILSAFE_EDITOR "vi -R -"
 
-#define IS_CANCEL_KEY(c) ((c == KEY_F(4)) || (c == 'q') || (c == 'Q'))
+#define IS_CANCEL_KEY(c) ((c == KEY_F(12)) || (c == 'q') || (c == 'Q'))
 #define CANCEL_KEY_LABEL "q=Cancel   "
 #define IS_EXIT_KEY(c) ((c == KEY_F(3)) || (c == 'e') || (c == 'E'))
 #define EXIT_KEY_LABEL "e=Exit   "
@@ -205,12 +205,10 @@ int main(int argc, char *argv[])
 			       sending to system logger */
 		LOG_USER);
 
-	if (argc > 1)
-	{
+	if (argc > 1) {
 		next_editor = 0;
 		next_dir = 0;
-		for (i = 1; i < argc; i++)
-		{
+		for (i = 1; i < argc; i++) {
 			if (strcmp(argv[i], "-e") == 0)
 				next_editor = 1;
 			else if (strcmp(argv[i], "-k") == 0)
@@ -1203,6 +1201,7 @@ char *add_string_to_body(char *body, char *new_text, char *line_fill, int *line_
  left of the screen and ". . . :" to the data field for the descriptor.
  NOTE:  This routine expect the language conversion to be done before
  entering this routine */
+#define DETAILS_DESCR_LEN 40
 char *add_line_to_body(char *body, char *new_text, char *field_data)
 {
 	int cur_len = 0, start_len = 0;
@@ -1220,10 +1219,10 @@ char *add_line_to_body(char *body, char *new_text, char *field_data)
 	} else {
 		field_data_len = strlen(field_data);
 
-		if (str_len < 30) {
-			body = ipr_realloc(body, cur_len + field_data_len + 38);
+		if (str_len < DETAILS_DESCR_LEN) {
+			body = ipr_realloc(body, cur_len + field_data_len + DETAILS_DESCR_LEN + 8);
 			cur_len += sprintf(body + cur_len, "%s", new_text);
-			for (i = cur_len; i < 30 + start_len; i++) {
+			for (i = cur_len; i < DETAILS_DESCR_LEN + start_len; i++) {
 				if ((cur_len + start_len)%2)
 					cur_len += sprintf(body + cur_len, ".");
 				else
@@ -2211,7 +2210,6 @@ int do_confirm_raid_stop(i_container *i_con)
 
 	cur_raid_cmd = raid_cmd_head;
 	for (cur_raid_cmd = raid_cmd_head; cur_raid_cmd; cur_raid_cmd = cur_raid_cmd->next) {
-
 		if (!cur_raid_cmd->do_cmd)
 			continue;
 
@@ -2287,7 +2285,6 @@ int raid_stop_complete()
 			status_record = cmd_status.record;
 
 			for (j=0; j < cmd_status.num_records; j++, status_record++) {
-
 				if ((status_record->command_code == IPR_STOP_ARRAY_PROTECTION) &&
 				    (cur_raid_cmd->array_id == status_record->array_id)) {
 
@@ -2310,7 +2307,6 @@ int raid_stop_complete()
 			for (cur_raid_cmd = raid_cmd_head;
 			     cur_raid_cmd != NULL; 
 			     cur_raid_cmd = cur_raid_cmd->next) {
-
 				common_record = cur_raid_cmd->ipr_dev->qac_entry;
 				if ((common_record != NULL) &&
 				    (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
@@ -2351,7 +2347,6 @@ int raid_start(i_container *i_con)
 		buffer[k] = body_init_status(n_raid_start.header, &header_lines, k);
 
 	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
-
 		array_record = cur_ioa->start_array_qac_entry;
 
 		if (array_record == NULL)
@@ -2650,16 +2645,12 @@ int configure_raid_parameters(i_container *i_con)
 
 	/* determine number of devices selected for this parity set */
 	for (i=0; i<cur_ioa->num_devices; i++) {
+		device_record = (struct ipr_dev_record *) cur_ioa->dev[i].qac_entry;
 
-		device_record = (struct ipr_dev_record *)
-			cur_ioa->dev[i].qac_entry;
-
-		if ((device_record != NULL) &&
-		    (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-		    (device_record->issue_cmd)) {
-
+		if (device_record &&
+		    device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+		    device_record->issue_cmd)
 			selected_count++;
-		}
 	}
 
 	/* set up raid lists */
@@ -2668,18 +2659,15 @@ int configure_raid_parameters(i_container *i_con)
 	prot_level_list = malloc(sizeof(struct prot_level));
 	prot_level_list[raid_index].is_valid_entry = 0;
 
-	for (i=0; i<ntohs(supported_arrays->num_entries); i++)
-	{
-		if ((selected_count <= cur_array_cap_entry->max_num_array_devices) &&
-		    (selected_count >= cur_array_cap_entry->min_num_array_devices) &&
-		    ((selected_count % cur_array_cap_entry->min_mult_array_devices) == 0))
-		{
+	for (i=0; i<ntohs(supported_arrays->num_entries); i++) {
+		if (selected_count <= cur_array_cap_entry->max_num_array_devices &&
+		    selected_count >= cur_array_cap_entry->min_num_array_devices &&
+		    ((selected_count % cur_array_cap_entry->min_mult_array_devices) == 0)) {
 			prot_level_list[raid_index].array_cap_entry = cur_array_cap_entry;
 			prot_level_list[raid_index].is_valid_entry = 1;
-			if (0 == strcmp(cur_array_cap_entry->prot_level_str,IPR_DEFAULT_RAID_LVL))
-			{
+			if (!strcmp(cur_array_cap_entry->prot_level_str,IPR_DEFAULT_RAID_LVL))
 				raid_index_default = raid_index;
-			}
+
 			raid_index++;
 			prot_level_list = realloc(prot_level_list, sizeof(struct prot_level) * (raid_index + 1));
 			prot_level_list[raid_index].is_valid_entry = 0;
@@ -2728,9 +2716,7 @@ int configure_raid_parameters(i_container *i_con)
 	form_driver(form,               /* form to pass input to */
 		    REQ_FIRST_FIELD );     /* form request code */
 
-	while (1)
-	{
-
+	while (1) {
 		sprintf(raid_str,"RAID %s",cur_array_cap_entry->prot_level_str);
 		set_field_buffer(input_fields[1],        /* field to alter */
 				 0,                       /* number of buffer to alter */
@@ -2748,29 +2734,21 @@ int configure_raid_parameters(i_container *i_con)
 		refresh();
 		ch = getch();
 
-		if (IS_EXIT_KEY(ch))
-		{
+		if (IS_EXIT_KEY(ch)) {
 			rc = EXIT_FLAG;
 			goto leave;
-		}
-		else if (IS_CANCEL_KEY(ch))
-		{
+		} else if (IS_CANCEL_KEY(ch)) {
 			rc = CANCEL_FLAG;
 			goto leave;
-		}
-		else if (ch == 'c')
-		{
+		} else if (ch == 'c') {
 			cur_field = current_field(form);
 			cur_field_index = field_index(cur_field);
 
-			if (cur_field_index == 1)
-			{
+			if (cur_field_index == 1) {
 				/* count the number of valid entries */
 				index = 0;
 				while (prot_level_list[index].is_valid_entry)
-				{
 					index++;
-				}
 
 				/* get appropriate memory, the text portion needs to be
 				 done up front as the new_item() function uses the
@@ -2781,8 +2759,7 @@ int configure_raid_parameters(i_container *i_con)
 
 				/* set up protection level menu */
 				index = 0;
-				while (prot_level_list[index].is_valid_entry)
-				{
+				while (prot_level_list[index].is_valid_entry) {
 					raid_item[index] = (ITEM *)NULL;
 					sprintf(raid_menu_str[index].line,"RAID %s",prot_level_list[index].array_cap_entry->prot_level_str);
 					raid_item[index] = new_item(raid_menu_str[index].line,"");
@@ -2794,25 +2771,20 @@ int configure_raid_parameters(i_container *i_con)
 				raid_item[index] = (ITEM *)NULL;
 				start_row = 8;
 				rc = display_menu(raid_item, start_row, index, &retptr);
-				if (rc == RC_SUCCESS)
-				{
+				if (rc == RC_SUCCESS) {
 					raid_index = *retptr;
 
 					/* find recommended stripe size */
 					cur_array_cap_entry = prot_level_list[raid_index].array_cap_entry;
 					stripe_sz = ntohs(cur_array_cap_entry->recommended_stripe_size);
 				}
-			}
-			else if (cur_field_index == 2)
-			{
+			} else if (cur_field_index == 2) {
 				/* count the number of valid entries */
 				index = 0;
-				for (i=0; i<16; i++)
-				{
+				for (i=0; i<16; i++) {
 					stripe_sz_mask = 1 << i;
 					if ((stripe_sz_mask & ntohs(cur_array_cap_entry->supported_stripe_sizes))
-					    == stripe_sz_mask)
-					{
+					    == stripe_sz_mask) {
 						index++;
 					}
 				}
@@ -2826,26 +2798,21 @@ int configure_raid_parameters(i_container *i_con)
 
 				/* set up stripe size menu */
 				index = 0;
-				for (i=0; i<16; i++)
-				{
+				for (i=0; i<16; i++) {
 					stripe_sz_mask = 1 << i;
 					raid_item[index] = (ITEM *)NULL;
 					if ((stripe_sz_mask & ntohs(cur_array_cap_entry->supported_stripe_sizes))
-					    == stripe_sz_mask)
-					{
+					    == stripe_sz_mask) {
 						stripe_sz_list[index] = stripe_sz_mask;
 						if (stripe_sz_mask > 1024)
 							sprintf(stripe_menu_str[index].line,"%d M",stripe_sz_mask/1024);
 						else
 							sprintf(stripe_menu_str[index].line,"%d k",stripe_sz_mask);
 
-						if (stripe_sz_mask == ntohs(cur_array_cap_entry->recommended_stripe_size))
-						{
+						if (stripe_sz_mask == ntohs(cur_array_cap_entry->recommended_stripe_size)) {
 							sprintf(buffer,_("%s - recommend"),stripe_menu_str[index].line);
 							raid_item[index] = new_item(buffer, "");
-						}
-						else
-						{
+						} else {
 							raid_item[index] = new_item(stripe_menu_str[index].line, "");
 						}
 						userptr[index] = index;
@@ -2858,9 +2825,7 @@ int configure_raid_parameters(i_container *i_con)
 				start_row = 9;
 				rc = display_menu(raid_item, start_row, index, &retptr);
 				if (rc == RC_SUCCESS)
-				{
 					stripe_sz = stripe_sz_list[*retptr];
-				}
 			}
 			else
 				continue;
@@ -2873,15 +2838,12 @@ int configure_raid_parameters(i_container *i_con)
 
 			if (rc == EXIT_FLAG)
 				goto leave;
-		}
-		else if (IS_ENTER_KEY(ch))
-		{
+		} else if (IS_ENTER_KEY(ch)) {
 			/* set protection level and stripe size appropriately */
 			cur_raid_cmd->prot_level = cur_array_cap_entry->prot_level;
 			cur_raid_cmd->stripe_size = stripe_sz;
 			goto leave;
-		}
-		else if (ch == KEY_RIGHT)
+		} else if (ch == KEY_RIGHT)
 			form_driver(form, REQ_NEXT_CHAR);
 		else if (ch == KEY_LEFT)
 			form_driver(form, REQ_PREV_CHAR);
@@ -2936,7 +2898,6 @@ int confirm_raid_start(i_container *i_con)
 
 	while(cur_raid_cmd) {
 		if (cur_raid_cmd->do_cmd) {
-
 			cur_ioa = cur_raid_cmd->ipr_ioa;
 			ipr_dev = cur_raid_cmd->ipr_dev;
 
@@ -3148,8 +3109,9 @@ int raid_rebuild(i_container *i_con)
 
 			i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[i],buffer[k],"%1",cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[i], buffer[k], "%1", cur_ioa, k);
 
+			enable_af(&cur_ioa->dev[i]);
 			found++;
 			cur_ioa->num_raid_cmds++;
 		}
@@ -5975,6 +5937,18 @@ int show_battery_info(struct ipr_ioa *ioa)
 	sprintf(buffer,"%d",reclaim_data->estimated_time_to_battery_failure);
 	body = add_line_to_body(body,_("Estimated time to error (days)"), buffer);
 
+	if (reclaim_data->conc_maint_battery)
+		sprintf(buffer, "%s", _("Yes"));
+	else
+		sprintf(buffer, "%s", _("No"));
+	body = add_line_to_body(body,_("Concurrently maintainable battery pack"), buffer);
+
+	if (reclaim_data->battery_replace_allowed)
+		sprintf(buffer, "%s", _("Yes"));
+	else
+		sprintf(buffer, "%s", _("No"));
+	body = add_line_to_body(body,_("Battery pack can be safely replaced"), buffer);
+
 	n_show_battery_info.body = body;
 	s_out = screen_driver(&n_show_battery_info,0,NULL);
 
@@ -6025,6 +5999,20 @@ int confirm_force_battery_error(void)
 	return rc;
 }
 
+static int enable_battery(struct ipr_ioa *ioa)
+{
+	int rc;
+
+	rc = ipr_reclaim_cache_store(ioa,
+				     IPR_RECLAIM_RESET_BATTERY_ERROR | IPR_RECLAIM_EXTENDED_INFO,
+				     ioa->reclaim_data);
+
+	if (rc != 0)
+		return 68 | EXIT_FLAG;
+
+	return show_battery_info(ioa);
+}
+
 int battery_fork(i_container *i_con)
 {
 	int rc = 0;
@@ -6041,7 +6029,9 @@ int battery_fork(i_container *i_con)
 
 		input = temp_i_con->field_data;
 
-		if (strcmp(input, "2") == 0) {
+		if (strcmp(input, "3") == 0) {
+			return enable_battery(cur_ioa);
+		} else if (strcmp(input, "2") == 0) {
 			force_error++;
 			cur_ioa->ioa.is_reclaim_cand = 1;
 		} else if (strcmp(input, "1") == 0)	{
@@ -8378,9 +8368,9 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	    (scsi_dev_data->type == IPR_TYPE_ADAPTER)) {
 		if (type&1) {
 			if (ipr_dev->ioa->qac_data->num_records)
-				len += sprintf(body + len,"            %-25s ","SCSI RAID Adapter");
+				len += sprintf(body + len,"            %-25s ","PCI-X SCSI RAID Adapter");
 			else
-				len += sprintf(body + len,"            %-25s ","SCSI Adapter");
+				len += sprintf(body + len,"            %-25s ","PCI-X SCSI Adapter");
 		} else
 			len += sprintf(body + len,"            %-8s %-16s ",
 				       scsi_dev_data->vendor_id,
@@ -8469,9 +8459,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 					for (i=0; i < cmd_status.num_records; i++, status_record++) {
 
-						if ((status_record->command_code == IPR_START_ARRAY_PROTECTION) &&
-						    (array_record->array_id == status_record->array_id)) {
-
+						if (array_record->array_id == status_record->array_id) {
 							if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
 								percent_cmplt = status_record->percent_complete;
 						}
