@@ -4042,7 +4042,7 @@ int configure_af_device(i_container *i_con, int action_code)
 	int rc, j, k;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev_record *device_record;
-	int can_init;
+	int can_init, max_y, max_x;
 	int dev_type;
 	int change_size;
 	char *buffer[2];
@@ -4053,6 +4053,11 @@ int configure_af_device(i_container *i_con, int action_code)
 	int header_lines;
 	s_node *n_screen;
 	struct screen_output *s_out;
+
+	getmaxyx(stdscr,max_y,max_x);
+	move(max_y-1,0);
+	printw(_("Processing"));
+	refresh();
 
 	i_con = free_i_con(i_con);
 
@@ -4231,7 +4236,7 @@ int remove_hot_spare(i_container *i_con)
 
 int hot_spare(i_container *i_con, int action)
 {
-	int rc, i, k;
+	int rc, i, k, max_y, max_x;
 	struct ipr_common_record *common_record;
 	struct ipr_array_record *array_record;
 	struct ipr_dev_record *device_record;
@@ -4245,6 +4250,11 @@ int hot_spare(i_container *i_con, int action)
 	struct screen_output *s_out;
 	s_node *n_screen;
 	int header_lines;
+
+	getmaxyx(stdscr,max_y,max_x);
+	move(max_y-1,0);
+	printw(_("Processing"));
+	refresh();
 
 	i_con = free_i_con(i_con);
 
@@ -6229,18 +6239,74 @@ int confirm_force_battery_error(void)
 	return rc;
 }
 
-static int enable_battery(struct ipr_ioa *ioa)
+int enable_battery(i_container *i_con)
 {
-	int rc;
+	int rc, reclaim_rc;
+	struct ipr_ioa *cur_ioa;
 
-	rc = ipr_reclaim_cache_store(ioa,
-				     IPR_RECLAIM_RESET_BATTERY_ERROR | IPR_RECLAIM_EXTENDED_INFO,
-				     ioa->reclaim_data);
+	reclaim_rc = rc = RC_SUCCESS;
 
-	if (rc != 0)
-		return 68 | EXIT_FLAG;
+	for (cur_ioa = ipr_ioa_head; cur_ioa; cur_ioa = cur_ioa->next) {
+		if (!cur_ioa->reclaim_data || !cur_ioa->ioa.is_reclaim_cand)
+			continue;
 
-	return show_battery_info(ioa);
+		rc = ipr_reclaim_cache_store(cur_ioa,
+					     IPR_RECLAIM_RESET_BATTERY_ERROR | IPR_RECLAIM_EXTENDED_INFO,
+					     cur_ioa->reclaim_data);
+
+		if (rc != 0)
+			reclaim_rc = 70;
+
+		if (cur_ioa->reclaim_data->action_status != IPR_ACTION_SUCCESSFUL) {
+			ioa_err(cur_ioa, "Start IOA cache failed.\n");
+			reclaim_rc = 70; 
+		}
+	}
+
+	if (reclaim_rc != RC_SUCCESS)
+		return reclaim_rc | EXIT_FLAG;
+
+	return 71 | EXIT_FLAG;
+}
+
+int confirm_enable_battery(void)
+{
+	int rc,k;
+	struct ipr_ioa *cur_ioa;
+	char *buffer[2];
+	struct screen_output *s_out;
+	int header_lines;
+	int toggle=1;
+
+	rc = RC_SUCCESS;
+
+	for (k=0; k<2; k++)
+		buffer[k] = body_init_status(n_confirm_start_cache.header,&header_lines,k);
+
+	for (cur_ioa = ipr_ioa_head; cur_ioa; cur_ioa = cur_ioa->next) {
+		if (!cur_ioa->reclaim_data || !cur_ioa->ioa.is_reclaim_cand)
+			continue;
+
+		for (k=0; k<2; k++)
+			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"3",cur_ioa, k);
+	}
+
+	do {
+		n_confirm_start_cache.body = buffer[toggle&1];
+		s_out = screen_driver(&n_confirm_start_cache,header_lines,NULL);
+		toggle++;
+	} while (s_out->rc == TOGGLE_SCREEN);
+
+	rc = s_out->rc;
+	free(s_out);
+
+	for (k=0; k<2; k++) {
+		ipr_free(buffer[k]);
+		buffer[k] = NULL;
+	}
+	n_confirm_start_cache.body = NULL;
+
+	return rc;
 }
 
 int battery_fork(i_container *i_con)
@@ -6260,7 +6326,8 @@ int battery_fork(i_container *i_con)
 		input = temp_i_con->field_data;
 
 		if (strcmp(input, "3") == 0) {
-			return enable_battery(cur_ioa);
+			cur_ioa->ioa.is_reclaim_cand = 1;
+			return confirm_enable_battery();
 		} else if (strcmp(input, "2") == 0) {
 			force_error++;
 			cur_ioa->ioa.is_reclaim_cand = 1;
@@ -6288,8 +6355,7 @@ int force_battery_error(i_container *i_con)
 	reclaim_rc = rc = RC_SUCCESS;
 
 	for (cur_ioa = ipr_ioa_head; cur_ioa; cur_ioa = cur_ioa->next) {
-		if ((!cur_ioa->reclaim_data) ||
-		    (!cur_ioa->ioa.is_reclaim_cand))
+		if (!cur_ioa->reclaim_data || !cur_ioa->ioa.is_reclaim_cand)
 			continue;
 
 		rc = ipr_reclaim_cache_store(cur_ioa,
@@ -6297,24 +6363,18 @@ int force_battery_error(i_container *i_con)
 					     &reclaim_buffer);
 
 		if (rc != 0)
-			/* "Attempting to force the selected battery packs into an
-			 error state failed." */
 			reclaim_rc = 43;
 
 		if (reclaim_buffer.action_status != IPR_ACTION_SUCCESSFUL) {
-			
-			/* "Attempting to force the selected battery packs into an
-			 error state failed." */
-			syslog(LOG_ERR,"Battery Force Error to %s failed. %m\n",
-			       cur_ioa->ioa.gen_name);
+			ioa_err(cur_ioa, "Battery Force Error failed.\n");
 			reclaim_rc = 43; 
 		}
 	}
 
 	if (reclaim_rc != RC_SUCCESS)
-		return reclaim_rc;
+		return reclaim_rc | EXIT_FLAG;
 
-	return rc;
+	return 72 | EXIT_FLAG;
 }
 
 int bus_config(i_container *i_con)
@@ -7658,12 +7718,17 @@ int download_ucode(i_container * i_con)
 	struct scsi_dev_data *scsi_dev_data;
 	struct screen_output *s_out;
 	int header_lines;
-	int array_id;
+	int array_id, max_y, max_x;
 	char *buffer[2];
 	int toggle = 0;
 	struct ipr_dev_record *dev_record;
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
+
+	getmaxyx(stdscr,max_y,max_x);
+	move(max_y-1,0);
+	printw(_("Processing"));
+	refresh();
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -7850,10 +7915,10 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	char *version;
 	struct screen_output *s_out;
 	struct ipr_dasd_inquiry_page3 page3_inq;
+	struct ipr_res_addr res_addr;
 
-	if ((ipr_dev->scsi_dev_data) &&
-	    (ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER))
-
+	if (ipr_dev->scsi_dev_data &&
+	    ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
 		rc = get_ioa_firmware_image_list(ipr_dev->ioa, &list);
 	else
 		rc = get_dasd_firmware_image_list(ipr_dev, &list);
@@ -7865,6 +7930,28 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 
 	memset(&page3_inq, 0, sizeof(page3_inq));
 	ipr_inquiry(ipr_dev, 3, &page3_inq, sizeof(page3_inq));
+
+	if (ipr_dev->scsi_dev_data &&
+	    ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER) {
+		sprintf(buffer, _("Adapter to download: %-8s %-16s\n"),
+			ipr_dev->scsi_dev_data->vendor_id,
+			ipr_dev->scsi_dev_data->product_id);
+		body = add_string_to_body(NULL, buffer, "", &header_lines);
+		sprintf(buffer, _("Adapter Location: %s.%d/\n"),
+			ipr_dev->ioa->pci_address, ipr_dev->ioa->host_num);
+
+	} else {
+		get_res_addr(ipr_dev, &res_addr);
+		sprintf(buffer, _("Device to download: %-8s %-16s Location: %d:%d:%d\n"),
+			ipr_dev->scsi_dev_data->vendor_id,
+			ipr_dev->scsi_dev_data->product_id,
+			res_addr.bus, res_addr.target, res_addr.lun);
+		body = add_string_to_body(NULL, buffer, "", &header_lines);
+		sprintf(buffer, _("Device Location: %d:%d:%d\n"),
+			res_addr.bus, res_addr.target, res_addr.lun);
+	}
+
+	body = add_string_to_body(NULL, buffer, "", &header_lines);
 
 	if (isprint(page3_inq.release_level[0]) &&
 	    isprint(page3_inq.release_level[1]) &&
@@ -7888,7 +7975,7 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 			page3_inq.release_level[2],
 			page3_inq.release_level[3]);
 
-	body = add_string_to_body(NULL, buffer, "", &header_lines);
+	body = add_string_to_body(body, buffer, "", &header_lines);
 	body = __body_init(body, n_choose_ucode.header, &header_lines);
 
 	i_con_head_saved = i_con_head;
@@ -8582,8 +8669,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		       cur_ioa->pci_address,
 		       cur_ioa->host_num);
 
-	if ((scsi_dev_data) &&
-	    (scsi_dev_data->type == IPR_TYPE_ADAPTER)) {
+	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
 		if (type&1) {
 			if (ipr_dev->ioa->qac_data->num_records)
 				len += sprintf(body + len,"            %-25s ","PCI-X SCSI RAID Adapter");
@@ -8750,8 +8836,13 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 						/* check device with test unit ready */
 						rc = ipr_test_unit_ready(ipr_dev, &sense_data);
 
-						if ((rc < 0) || (rc == CHECK_CONDITION))
+						if (rc == CHECK_CONDITION &&
+						    sense_data.sense_key == 0x03 &&
+						    sense_data.add_sense_code == 0x31 &&
+						    sense_data.add_sense_code_qual == 0x00)
 							format_req = 1;
+						else if (rc)
+							res_state.not_oper = 1;
 					}
 				}
 			}

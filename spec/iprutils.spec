@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.5
+Version: 2.0.6
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -47,6 +47,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Apr 14 2004 Brian King <brking@us.ibm.com> 2.0.6
+- Battery maintenance fixes.
+- Fix to properly display failed status for pulled physical disks.
+* Tue Apr 6 2004 Brian King <brking@us.ibm.com> 2.0.5
+- Battery maintenance fixes.
+- Fix init.d scripts to work properly with yast runlevel editor.
+- Fix device details screen in iprconfig for Failed array members
+- Allow formatting devices even if qerr cannot be disabled 
 * Tue Mar 29 2004 Brian King <brking@us.ibm.com> 2.0.4
 - Fixed some sysfs calls that changed their calling interfaces
 * Tue Mar 17 2004 Brian King <brking@us.ibm.com> 2.0.2-3

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.48 2004/04/06 21:10:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.49 2004/04/14 22:22:52 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -429,7 +429,7 @@ static void setup_ioa_parms(struct ipr_ioa *ioa)
 		}
 	}
 
-	ioa->scsi_id_changeable = 0;
+	ioa->scsi_id_changeable = 1;
 }
 
 void tool_init(char *name)
@@ -1588,10 +1588,12 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 
 		rc = ioctl(fd, SG_IO, &io_hdr_t);
 
-		if ((rc == 0) && (io_hdr_t.masked_status == CHECK_CONDITION))
+		if (rc == 0 && io_hdr_t.masked_status == CHECK_CONDITION)
 			rc = CHECK_CONDITION;
+		else if (rc == 0 && (io_hdr_t.host_status || io_hdr_t.driver_status))
+			rc = -EIO;
 
-		if ((rc != CHECK_CONDITION) || (sense_data->sense_key != UNIT_ATTENTION))
+		if (rc == 0 || io_hdr_t.host_status == 1)
 			break;
 	}
 
@@ -2905,7 +2907,7 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	sscanf(attr->value, "%8X", &fw_version);
 	sysfs_close_class_device(class_device);
 
-	if (fw_version > ioa->msl && !force)
+	if (fw_version >= ioa->msl && !force)
 		return;
 
 	fd = open(image->file, O_RDONLY);

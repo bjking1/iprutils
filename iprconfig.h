@@ -110,6 +110,7 @@ int confirm_raid_rebuild(i_container * i_con);
 int battery_maint(i_container * i_con);
 int battery_fork(i_container * i_con);
 int force_battery_error(i_container *i_con);
+int enable_battery(i_container *i_con);
 int bus_config(i_container * i_con);
 int change_bus_attr(i_container * i_con);
 int confirm_change_bus_attr(i_container *i_con);
@@ -888,7 +889,7 @@ s_node n_battery_maint = {
 		__("Type options, press Enter\n"),
 		__("  1=Display battery information\n"),
 		__("  2=Force battery pack into error state\n"),
-		__("  3=Enable IOA cache after concurrently replacing battery pack\n\n"),
+		__("  3=Start IOA cache\n\n"),
 		"" }
 };
 
@@ -910,6 +911,23 @@ s_node n_confirm_force_battery_error = {
 		__("System performance could be significantly degraded until the cache "
 		   "battery packs are replaced on the selected IOAs.\n\n"),
 		__("  c=Continue to force the following battery packs into an error state\n\n"),
+		"" },
+};
+
+struct screen_opts confirm_start_cache_opt[] = {
+	{enable_battery, "c"}
+};
+
+s_node n_confirm_start_cache = {
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(confirm_start_cache_opt),
+	.options  = &confirm_start_cache_opt[0],
+	.title    = __("Start IOA cache after concurrently replacing battery pack"),
+	.header   = {
+		__("ATTENTION: This service function should be run only "
+		   "under the direction of the IBM Hardware Service Support\n\n"),
+		__("You have selected to start the IOA cache after concurrently replacing the battery pack\n\n"),
+		__("  c=Continue to start IOA cache\n\n"),
 		"" },
 };
 
@@ -1253,6 +1271,9 @@ const char *screen_status[] = {
       /* 67 */ __("Microcode Download failed."),
 	/* 68 */ __("Failed to enable IOA cache."),
 	/* 69 */ __("Invalid number of devices selected."),
+	/* 70 */ __("Failed to start IOA cache."),
+	/* 71 */ __("IOA cache started successfully."),
+	/* 72 */ __("Selected battery packs successfully forced into an error state."),
       /* NOTE:  127 maximum limit */
 };
 
