@@ -3,8 +3,9 @@
  *
  * (C) Copyright 2000, 2004
  * International Business Machines Corporation and others.
- * All Rights Reserved.
- *
+ * All Rights Reserved. This program and the accompanying
+ * materials are made available under the terms of the
+ * Common Public License v1.0 which accompanies this distribution.
  **/
 
 #ifndef iprlib_h
@@ -2144,16 +2145,9 @@ int confirm_raid_stop(i_container *i_con)
 		if (strcmp(input, "1") == 0) {
 			found = 1;
 			cur_raid_cmd->do_cmd = 1;
-
 			array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
 			if (!array_record->issue_cmd)
-			{
 				array_record->issue_cmd = 1;
-
-				/* known_zeroed means do not preserve
-				 user data on stop */
-				array_record->known_zeroed = 1;
-			}
 		} else {
 			cur_raid_cmd->do_cmd = 0;
 			array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
@@ -3593,11 +3587,8 @@ int configure_raid_include(i_container *i_con)
 		cur_raid_cmd->qac_data = qac_data;
 		common_record = (struct ipr_common_record *)qac_data->data;
 		for (k = 0; k < qac_data->num_records; k++) {
-
 			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
-
 				for (j = 0; j < cur_ioa->num_devices; j++) {
-
 					scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 					device_record = (struct ipr_dev_record *)common_record;
 
@@ -3623,12 +3614,10 @@ int configure_raid_include(i_container *i_con)
 
 			/* find minimum multiple for the raid level being used */
 			if (common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS) {
-
 				supported_arrays = (struct ipr_supported_arrays *)common_record;
 				cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
 
 				for (i=0; i<ntohs(supported_arrays->num_entries); i++) {
-
 					if (cur_array_cap_entry->prot_level == array_record->raid_level)
 						min_mult_array_devices = cur_array_cap_entry->min_mult_array_devices;
 
@@ -3642,7 +3631,6 @@ int configure_raid_include(i_container *i_con)
 	}
 
 	if (found <= min_mult_array_devices) {
-
 		/* Include Device Parity Protection Failed */
 		n_configure_raid_include_fail.body = body_init(n_configure_raid_include_fail.header, NULL);
 		s_out = screen_driver(&n_configure_raid_include_fail,0,i_con);
@@ -3699,16 +3687,13 @@ int configure_raid_include(i_container *i_con)
 		ipr_dev = (struct ipr_dev *)temp_i_con->data;
 
 		if (ipr_dev != NULL) {
-
 			input = temp_i_con->field_data;
 
 			if (strcmp(input, "1") == 0) {
-
 				cur_raid_cmd->do_cmd = 1;
 
 				device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
 				if (!device_record->issue_cmd) {
-
 					device_record->issue_cmd = 1;
 					device_record->known_zeroed = 1;
 				}
@@ -3717,7 +3702,6 @@ int configure_raid_include(i_container *i_con)
 
 				device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
 				if (device_record->issue_cmd) {
-
 					device_record->issue_cmd = 0;
 					device_record->known_zeroed = 0;
 				}
@@ -4089,7 +4073,6 @@ int configure_af_device(i_container *i_con, int action_code)
 
 			/* If Advanced Function DASD */
 			if (ipr_is_af_dasd_device(&cur_ioa->dev[j])) {
-
 				if (action_code == IPR_INCLUDE)
 					continue;
 
@@ -4103,7 +4086,6 @@ int configure_af_device(i_container *i_con, int action_code)
 
 				/* We allow the user to format the drive if nobody is using it */
 				if (cur_ioa->dev[j].scsi_dev_data->opens != 0) {
-
 					syslog(LOG_ERR, _("Format not allowed to %s, device in use\n"), cur_ioa->dev[j].gen_name); 
 					continue;
 				}
@@ -4137,14 +4119,12 @@ int configure_af_device(i_container *i_con, int action_code)
 				}
 
 				if (is_af_blocked(&cur_ioa->dev[j], 0)) {
-
 					/* error log is posted in is_af_blocked() routine */
 					continue;
 				}
 
 				can_init = is_format_allowed(&cur_ioa->dev[j]);
-			}
-			else
+			} else
 				continue;
 
 			if (can_init) {
@@ -4581,33 +4561,32 @@ int confirm_hot_spare(int action)
 int hot_spare_complete(int action)
 {
 	int rc;
-	struct ipr_ioa *cur_ioa;
-	struct array_cmd_data *cur_raid_cmd;
+	struct ipr_ioa *ioa;
+	struct array_cmd_data *cmd;
 
-	/* now issue the start array command with "known to be zero" */
-	for (cur_raid_cmd = raid_cmd_head; cur_raid_cmd != NULL; 
-	     cur_raid_cmd = cur_raid_cmd->next) {
+	for (ioa = ipr_ioa_head; ioa; ioa = ioa->next) {
+		for (cmd = raid_cmd_head; cmd; cmd = cmd->next) {
+			if (cmd->do_cmd == 0)
+				continue;
+			if (ioa != cmd->ipr_ioa)
+				continue;
 
-		if (cur_raid_cmd->do_cmd == 0)
-			continue;
+			flush_stdscr();
 
-		cur_ioa = cur_raid_cmd->ipr_ioa;
-
-		flush_stdscr();
-
-		if (action == IPR_ADD_HOT_SPARE)
-			rc = ipr_add_hot_spare(cur_ioa);
-		else
-			rc = ipr_remove_hot_spare(cur_ioa);
-
-		if (rc != 0) {
 			if (action == IPR_ADD_HOT_SPARE)
-				/* Enable Device as Hot Spare failed */
-				return 55 | EXIT_FLAG; 
+				rc = ipr_add_hot_spare(ioa);
 			else
-				/* Disable Device as Hot Spare failed */
-				return 56 | EXIT_FLAG;
-		} 
+				rc = ipr_remove_hot_spare(ioa);
+
+			if (rc != 0) {
+				if (action == IPR_ADD_HOT_SPARE)
+					/* Enable Device as Hot Spare failed */
+					return 55 | EXIT_FLAG; 
+				else
+					/* Disable Device as Hot Spare failed */
+					return 56 | EXIT_FLAG;
+			} 
+		}
 	}
 
 	flush_stdscr();
@@ -6643,7 +6622,7 @@ int change_bus_attr(i_container *i_con)
 int confirm_change_bus_attr(i_container *i_con)
 {
 	struct ipr_ioa *cur_ioa;
-	int rc, j, i;
+	int rc, j, i, max_y, max_x;
 	struct ipr_scsi_buses *page_28_cur;
 	struct ipr_scsi_buses page_28_chg;
 	struct scsi_dev_data *scsi_dev_data;
@@ -6730,6 +6709,11 @@ int confirm_change_bus_attr(i_container *i_con)
 
 	if (rc)
 		return rc;
+
+	getmaxyx(stdscr,max_y,max_x);
+	move(max_y-1,0);
+	printw(_("Processing"));
+	refresh();
 
 	rc = ipr_set_bus_attr(cur_ioa, page_28_cur, 1);
 	if (!rc)

@@ -1,3 +1,9 @@
+# (C) Copyright 2000, 2001
+# International Business Machines Corporation and others.
+# All Rights Reserved. This program and the accompanying
+# materials are made available under the terms of the
+# Common Public License v1.0 which accompanies this distribution.
+
 INCLUDEDIR = -I.
 CC = gcc
 

@@ -5,7 +5,9 @@
  *
  * (C) Copyright 2004
  * International Business Machines Corporation and others.
- * All Rights Reserved.
+ * All Rights Reserved. This program and the accompanying
+ * materials are made available under the terms of the
+ * Common Public License v1.0 which accompanies this distribution.
  *
  **/
 
@@ -1235,7 +1237,7 @@ const char *screen_status[] = {
 	/* 51 */ __("Initialize and format failed"),
 	/* 52 */ __("No devices available for the selected hot spare operation"),
 	/* 53 */ __("Hot spare successfully created"),
-	/* 54 */ __("Failed to delete hot spare"),
+	/* 54 */ __("Hot spare successfully deleted"),
 	/* 55 */ __("Failed to create hot spare"),
 	/* 56 */ __("Failed to delete hot spare"),
 	/* 57 */ __("Successfully changed device driver configuration"),

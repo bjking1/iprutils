@@ -3,12 +3,14 @@
   *
   * (C) Copyright 2003
   * International Business Machines Corporation and others.
-  * All Rights Reserved.
+  * All Rights Reserved. This program and the accompanying
+  * materials are made available under the terms of the
+  * Common Public License v1.0 which accompanies this distribution.
   *
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.10 2004/03/19 23:13:12 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.11 2004/03/24 20:02:33 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -226,7 +228,7 @@ int main(int argc, char *argv[])
 	closelog();
 	openlog("iprdbg", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
-	printf("\nATTENTION: This utility is for adapter developers only!"
+	printf("\nATTENTION: This utility is for adapter developers only! "
 	       "Use at your own risk!\n");
 	printf("\nUse \"quit\" to exit the program.\n\n");
 

@@ -2,13 +2,15 @@
   * IBM IPR adapter dump daemon
   *
   * (C) Copyright 2000, 2004
-  * International Business Machines Corporation and others
-  * All Rights Reserved.
+  * International Business Machines Corporation and others.
+  * All Rights Reserved. This program and the accompanying
+  * materials are made available under the terms of the
+  * Common Public License v1.0 which accompanies this distribution.
   *
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.8 2004/02/27 20:50:33 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.9 2004/03/24 20:02:34 bjking1 Exp $
  */
 
 #ifndef iprlib_h

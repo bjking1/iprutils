@@ -3,12 +3,14 @@
   *
   * (C) Copyright 2004
   * International Business Machines Corporation and others.
-  * All Rights Reserved.
+  * All Rights Reserved. This program and the accompanying
+  * materials are made available under the terms of the
+  * Common Public License v1.0 which accompanies this distribution.
   *
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.12 2004/03/04 22:52:06 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.13 2004/03/24 20:02:34 bjking1 Exp $
  */
 
 #include <unistd.h>

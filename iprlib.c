@@ -3,12 +3,14 @@
   *
   * (C) Copyright 2000, 2004
   * International Business Machines Corporation and others.
-  * All Rights Reserved.
+  * All Rights Reserved. This program and the accompanying
+  * materials are made available under the terms of the
+  * Common Public License v1.0 which accompanies this distribution.
   *
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.45 2004/03/19 23:13:12 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.46 2004/03/24 20:02:34 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -935,10 +937,10 @@ int ipr_re_read_partition(struct ipr_dev *dev)
 {
 	int fd, rc;
 
-	if (strlen(dev->gen_name) == 0)
+	if (strlen(dev->dev_name) == 0)
 		return -ENOENT;
 
-	fd = open(dev->gen_name, O_RDWR);
+	fd = open(dev->dev_name, O_RDWR);
 	if (fd <= 1) {
 		syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
@@ -2958,7 +2960,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 	struct ipr_std_inq_data std_inq_data;
 	struct unsupported_af_dasd *unsupp_af;
 	void *buffer;
-	char level[5];
+	u32 level;
 
 	memset(&std_inq_data, 0, sizeof(std_inq_data));
 	rc = ipr_inquiry(dev, IPR_STD_INQUIRY,
@@ -3012,7 +3014,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 		return;
 	}
 
-	if (memcmp(img_hdr->load_id, page3_inq.load_id, 4) &&
+	if (img_off && memcmp(img_hdr->load_id, page3_inq.load_id, 4) &&
 	    !memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8)) {
 		syslog(LOG_ERR, "Firmware file corrupt: %s.\n", image->file);
 		munmap(img_hdr, ucode_stats.st_size);
@@ -3020,12 +3022,14 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 		return;
 	}
 
+	level = htonl(image->version);
+
 	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
 		scsi_info(dev, "Updating disk microcode using %s "
-			  "from %c%c%c%c to %c%c%c%c\n", image->file,
+			  "from %02X%02X%02X%02X to %08X\n", image->file,
 			  page3_inq.release_level[0], page3_inq.release_level[1],
 			  page3_inq.release_level[2], page3_inq.release_level[3],
-			  level[0], level[1], level[2], level[3]);
+			  image->version);
 
 		buffer = (void *)img_hdr + img_off;
 		img_size = ucode_stats.st_size - img_off;
