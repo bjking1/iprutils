@@ -1238,7 +1238,7 @@ const char *screen_status[] = {
 	/* 62 */ __("Editor changed to %s"),
 	/* 63 */ __("Editor unchanged"),
 	/* 64 */ __("Default log values restored"),
-	/* 65 */ __("Editor returned %d. Try setting the default editor.")
+	/* 65 */ __("Editor returned %d. Try setting the default editor."),
       /* 66 */ __("Change Disk Configuration failed."),
       /* 67 */ __("Microcode Download failed.")
       /* NOTE:  127 maximum limit */
