@@ -983,7 +983,7 @@ int main_menu(i_container *i_con)
 						}
 					}
 				}
-			} else {
+			} else if (cur_ioa->dev[j].scsi_dev_data->type == TYPE_DISK) {
 				/* JBOD */
 				retries = 0;
 
@@ -2204,6 +2204,13 @@ int do_confirm_raid_stop(i_container *i_con)
 
 		if (rc != 0)
 			return (20 | EXIT_FLAG);
+		cur_ioa->num_raid_cmds++;
+	}
+
+	for (cur_ioa = ipr_ioa_head; cur_ioa; cur_ioa = cur_ioa->next) {
+		if (cur_ioa->num_raid_cmds == 0)
+			continue;
+		cur_ioa->num_raid_cmds = 0;
 
 		rc = ipr_stop_array_protection(cur_ioa);
 		if (rc != 0)
@@ -5351,11 +5358,8 @@ int dev_init_complete(u8 num_devs)
 	int rc;
 	struct devs_to_init_t *cur_dev_init;
 	u32 percent_cmplt = 0;
-	u8 ioctl_buffer[255];
 	struct sense_data_t sense_data;
 	struct ipr_ioa *ioa;
-	struct ipr_mode_parm_hdr *mode_parm_hdr;
-	struct ipr_block_desc *block_desc;
 
 	while(1) {
 		rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt,1);
@@ -5419,42 +5423,6 @@ int dev_init_complete(u8 num_devs)
 					continue;
 
 				ioa = cur_dev_init->ioa;
-
-				if (cur_dev_init->dev_type == IPR_AF_DASD_DEVICE) {
-					/* check if evaluate device is necessary */
-					/* issue mode sense */
-					rc = ipr_mode_sense(cur_dev_init->ipr_dev, 0, ioctl_buffer);
-
-					if (rc == 0) {
-						mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-						if (mode_parm_hdr->block_desc_len > 0) {
-							block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
-
-							if((block_desc->block_length[1] == 0x02) && 
-							   (block_desc->block_length[2] == 0x00))
-								cur_dev_init->change_size = IPR_512_BLOCK;
-						}
-					}
-				} else if (cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE) {
-					/* Check if evaluate device capabilities needs to be issued */
-					memset(ioctl_buffer, 0, 255);
-
-					/* Issue mode sense to get the block size */
-					rc = ipr_mode_sense(cur_dev_init->ipr_dev,
-							    0x00, mode_parm_hdr);
-
-					if (rc == 0) {
-						mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-						if (mode_parm_hdr->block_desc_len > 0) {
-							block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
-
-							if ((block_desc->block_length[1] != 0x02) ||
-							    (block_desc->block_length[2] != 0x00))
-								cur_dev_init->change_size = IPR_522_BLOCK;
-						}
-					}
-				}
 
 				if (cur_dev_init->change_size != 0)
 					/* send evaluate device down */
@@ -7810,11 +7778,10 @@ int ibm_storage_log_tail(i_container *i_con)
 	if (rc != 0) {
 		len = sprintf(cmnd, "cd %s; zcat -f messages", log_root_dir);
 
-		len += sprintf(cmnd + len," | grep ipr-err | ");
-		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr-err//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ localhost kernel: ipr-err//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ kernel: ipr-err//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ eldrad//g\" | "); /* xx */
+		len += sprintf(cmnd + len," | grep ipr | ");
+		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\" | ");
+		len += sprintf(cmnd + len, "sed \"s/ localhost kernel: ipr//g\" | ");
+		len += sprintf(cmnd + len, "sed \"s/ kernel: ipr//g\" | ");
 		len += sprintf(cmnd + len, "sed \"s/\\^M//g\" | ");
 		len += sprintf(cmnd + len, FAILSAFE_EDITOR);
 		closelog();
@@ -7825,11 +7792,10 @@ int ibm_storage_log_tail(i_container *i_con)
 		openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
 		sleep(3);
 	} else {
-		len = sprintf(cmnd,"cd %s; zcat -f messages | grep ipr-err |", log_root_dir);
-		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr-err//g\"");
-		len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr-err//g\"");
-		len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr-err//g\"");
-		len += sprintf(cmnd + len, "| sed \"s/ eldrad//g\""); /* xx */
+		len = sprintf(cmnd,"cd %s; zcat -f messages | grep ipr |", log_root_dir);
+		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\"");
+		len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr//g\"");
+		len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr//g\"");
 		len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
 		len += sprintf(cmnd + len, ">> /tmp/.ipr.err/errors");
 		system(cmnd);
@@ -7879,10 +7845,9 @@ int ibm_storage_log(i_container *i_con)
 		}
 
 		len += sprintf(cmnd + len," | grep ipr-err | ");
-		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr-err//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ localhost kernel: ipr-err//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ kernel: ipr-err//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ eldrad//g\" | "); /* xx */
+		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\" | ");
+		len += sprintf(cmnd + len, "sed \"s/ localhost kernel: ipr//g\" | ");
+		len += sprintf(cmnd + len, "sed \"s/ kernel: ipr//g\" | ");
 		len += sprintf(cmnd + len, "sed \"s/\\^M//g\" | ");
 		len += sprintf(cmnd + len, FAILSAFE_EDITOR);
 		closelog();
@@ -7897,11 +7862,10 @@ int ibm_storage_log(i_container *i_con)
 	{
 		for (i = 0; i < num_dir_entries; i++)
 		{
-			len = sprintf(cmnd,"cd %s; zcat -f %s | grep ipr-err |", log_root_dir, (*dirent)->d_name);
-			len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr-err//g\"");
-			len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr-err//g\"");
-			len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr-err//g\"");
-			len += sprintf(cmnd + len, "| sed \"s/ eldrad//g\""); /* xx */
+			len = sprintf(cmnd,"cd %s; zcat -f %s | grep ipr |", log_root_dir, (*dirent)->d_name);
+			len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\"");
+			len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr//g\"");
+			len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr//g\"");
 			len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
 			len += sprintf(cmnd + len, ">> /tmp/.ipr.err/errors");
 			system(cmnd);

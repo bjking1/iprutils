@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.31 2004/03/10 02:56:15 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.32 2004/03/10 22:25:53 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2606,6 +2606,8 @@ int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 	struct stat stats;
 	int i, rc, j = 0;
 
+	*list = NULL;
+
 	for (i = 0; i < ARRAY_SIZE(ioa_parms); i++) {
 		if (ioa_parms[i].ccin == ioa->ccin) {
 			parms = &ioa_parms[i];
@@ -2709,6 +2711,8 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 	struct ipr_dasd_inquiry_page3 page3_inq;
 	struct stat stats;
 	int i, rc, j = 0;
+
+	*list = NULL;
 
 	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
 

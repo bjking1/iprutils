@@ -165,12 +165,12 @@ struct screen_opts null_opt[] = {
 
 struct screen_opts main_menu_opt[] = {
 	{disk_status,        "1", __("Display hardware status")},
-	{raid_screen,        "2", __("Work with Disk Arrays")},
+	{raid_screen,        "2", __("Work with disk arrays")},
 	{disk_unit_recovery, "3", __("Work with disk unit recovery")},
 	{bus_config,         "4", __("Work with SCSI bus configuration")},
 	{driver_config,      "5", __("Work with driver configuration")},
 	{disk_config,        "6", __("Work with disk configuration")},
-	{download_ucode,     "7", __("Download Microcode")},
+	{download_ucode,     "7", __("Download microcode")},
 	{log_menu,           "8", __("Analyze log")}
 };
 
@@ -615,8 +615,8 @@ s_node n_confirm_remove_hot_spare = {
 };
 
 struct screen_opts disk_unit_recovery_opt[] = {
-	{concurrent_add_device,    "1", __("Concurrent Add Device")},
-	{concurrent_remove_device, "2", __("Concurrent Remove/Replace Device")},
+	{concurrent_add_device,    "1", __("Concurrent add device")},
+	{concurrent_remove_device, "2", __("Concurrent remove/replace device")},
 	{init_device,              "3", __("Initialize and format disk unit")},
 	{reclaim_cache,            "4", __("Reclaim IOA cache storage")},
 	{raid_rebuild,             "5", __("Rebuild disk unit data")},
@@ -1115,10 +1115,10 @@ s_node n_download_ucode_in_progress = {
 };
 
 struct screen_opts log_menu_opt[] = {
-	{ibm_storage_log_tail, "1", __("View most recent IBM Storage error messages")},
-	{ibm_storage_log,      "2", __("View IBM Storage error messages")},
+	{ibm_storage_log_tail, "1", __("View most recent ipr error messages")},
+	{ibm_storage_log,      "2", __("View ipr error messages")},
 	{kernel_log,           "3", __("View all kernel error messages")},
-	{iprconfig_log,        "4", __("View sisconfig error messages")},
+	{iprconfig_log,        "4", __("View iprconfig error messages")},
 	{kernel_root,          "5", __("Set root kernel message log directory")},
 	{set_default_editor,   "6", __("Set default editor")},
 	{restore_log_defaults, "7", __("Restore defaults")},
