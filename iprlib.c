@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.29 2004/03/04 22:52:07 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.30 2004/03/08 23:18:02 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -262,22 +262,23 @@ struct ses_table_entry {
 	char product_id[17];
 	char compare_product_id_byte[17];
 	u32 max_bus_speed_limit;
+	int block_15k_devices;
 };
 
 static const struct ses_table_entry ses_table[] = {
-	{"2104-DL1        ", "XXXXXXXXXXXXXXXX", 80},
-	{"2104-TL1        ", "XXXXXXXXXXXXXXXX", 80},
-	{"HSBP07M P U2SCSI", "XXXXXXXXXXXXXXXX", 80},
-	{"HSBP05M P U2SCSI", "XXXXXXXXXXXXXXXX", 80},
-	{"HSBP05M S U2SCSI", "XXXXXXXXXXXXXXXX", 80},
-	{"HSBP06E ASU2SCSI", "XXXXXXXXXXXXXXXX", 80},
-	{"2104-DU3        ", "XXXXXXXXXXXXXXXX", 160},
-	{"2104-TU3        ", "XXXXXXXXXXXXXXXX", 160},
-	{"HSBP04C RSU2SCSI", "XXXXXXX*XXXXXXXX", 160},
-	{"HSBP06E RSU2SCSI", "XXXXXXX*XXXXXXXX", 160},
-	{"St  V1S2        ", "XXXXXXXXXXXXXXXX", 160},
-	{"HSBPD4M  PU3SCSI", "XXXXXXX*XXXXXXXX", 160},
-	{"VSBPD1H   U3SCSI", "XXXXXXX*XXXXXXXX", 160}
+	{"2104-DL1        ", "XXXXXXXXXXXXXXXX", 80, 0},
+	{"2104-TL1        ", "XXXXXXXXXXXXXXXX", 80, 0},
+	{"HSBP07M P U2SCSI", "XXXXXXXXXXXXXXXX", 80, 1},
+	{"HSBP05M P U2SCSI", "XXXXXXXXXXXXXXXX", 80, 1},
+	{"HSBP05M S U2SCSI", "XXXXXXXXXXXXXXXX", 80, 1},
+	{"HSBP06E ASU2SCSI", "XXXXXXXXXXXXXXXX", 80, 1},
+	{"2104-DU3        ", "XXXXXXXXXXXXXXXX", 160, 0},
+	{"2104-TU3        ", "XXXXXXXXXXXXXXXX", 160, 0},
+	{"HSBP04C RSU2SCSI", "XXXXXXX*XXXXXXXX", 160, 0},
+	{"HSBP06E RSU2SCSI", "XXXXXXX*XXXXXXXX", 160, 0},
+	{"St  V1S2        ", "XXXXXXXXXXXXXXXX", 160, 0},
+	{"HSBPD4M  PU3SCSI", "XXXXXXX*XXXXXXXX", 160, 0},
+	{"VSBPD1H   U3SCSI", "XXXXXXX*XXXXXXXX", 160, 0}
 };
 
 int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
@@ -1051,7 +1052,7 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 		      length, SG_DXFER_FROM_DEV,
 		      sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
-	if (rc != 0)
+	if (rc != 0 && sense_data->sense_key != NOT_READY)
 		scsi_cmd_err(dev, sense_data, "Test Unit Ready", rc);
 
 	close(fd);
