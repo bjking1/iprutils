@@ -8,7 +8,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.2 2004/02/03 14:23:07 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.3 2004/02/04 23:11:19 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -69,7 +69,7 @@ static int set_dasd_timeouts(struct ipr_dev *dev)
 	struct ipr_dasd_timeouts timeouts;
 
 	/* xxx - customizable format timeout? */
-	fd = open(dev->ioa->ioa.gen_name, O_RDWR);
+	fd = open(dev->gen_name, O_RDWR);
 
 	if (fd <= 1) {
 		syslog(LOG_ERR, "Could not open %s. %m\n",
@@ -90,7 +90,8 @@ static int set_dasd_timeouts(struct ipr_dev *dev)
 		      &sense_data, SET_DASD_TIMEOUTS_TIMEOUT);
 
 	if (rc != 0)
-		syslog(LOG_ERR, "Set DASD timeouts failed.\n");
+		syslog(LOG_ERR, "Set DASD timeouts to %s failed.\n",
+		       dev->scsi_dev_data->sysfs_device_name);
 
 	close(fd);
 	return rc;
@@ -128,7 +129,8 @@ static int set_supported_devs(struct ipr_dev *dev,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0)
-		syslog(LOG_ERR, "Set supported devices failed.\n");
+		syslog(LOG_ERR, "Set supported devices to %s failed.\n",
+		       dev->scsi_dev_data->sysfs_device_name);
 
 	close(fd);
 	return rc;
@@ -171,9 +173,7 @@ static int mode_select(char *file, void *buff, int length)
                   length, SG_DXFER_TO_DEV,
                   &sense_data, IPR_INTERNAL_TIMEOUT);
 
-    if (rc != 0)
-        syslog(LOG_ERR, "Mode Select to %s failed. %m\n", file);
-
+    /* xxx additional parm to enable dumping sense data? */
     close(fd);
     return rc;
 }
@@ -202,8 +202,11 @@ static int setup_page0x01(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (mode_select(dev->gen_name, &mode_pages, len))
+	if (mode_select(dev->gen_name, &mode_pages, len)) {
+		syslog(LOG_ERR, "Failed to setup mode page 0x01 for %s.\n",
+		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
+	}
 	return 0;
 }
 
@@ -232,8 +235,11 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (mode_select(dev->gen_name, &mode_pages, len))
+	if (mode_select(dev->gen_name, &mode_pages, len)) {
+		syslog(LOG_ERR, "Failed to setup mode page 0x0A for %s.\n",
+		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
+	}
 	return 0;
 }
 
@@ -260,8 +266,11 @@ static int setup_page0x20(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (mode_select(dev->gen_name, &mode_pages, len))
+	if (mode_select(dev->gen_name, &mode_pages, len)) {
+		syslog(LOG_ERR, "Failed to setup mode page 0x20 for %s.\n",
+		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
+	}
 	return 0;
 }
 
@@ -295,8 +304,11 @@ static void init_vset_dev(struct ipr_dev *dev)
  */
 static void init_gpdd_dev(struct ipr_dev *dev)
 {
-	if (setup_page0x0a(dev))
+	if (setup_page0x0a(dev)) {
+		syslog(LOG_ERR, "Failed to enable TCQing for %s.\n",
+		       dev->scsi_dev_data->sysfs_device_name);
 		return;
+	}
 	if (ipr_write_dev_attr(dev, "tcq_enable", "1"))
 		return;
 	if (ipr_write_dev_attr(dev, "queue_depth", GPDD_TCQ_DEPTH))
@@ -329,10 +341,14 @@ static void init_af_dev(struct ipr_dev *dev)
  */
 static void init_ioa_dev(struct ipr_dev *dev)
 {
+	
 }
 
 static void init_dev(struct ipr_dev *dev)
 {
+	if (!dev->scsi_dev_data)
+		return;
+
 	switch (dev->scsi_dev_data->type) {
 	case TYPE_DISK:
 		if (ipr_is_volume_set(dev))
@@ -343,9 +359,6 @@ static void init_dev(struct ipr_dev *dev)
 	case IPR_TYPE_AF_DISK:
 		init_af_dev(dev);
 		break;
-	case IPR_TYPE_ADAPTER:
-		init_ioa_dev(dev);
-		break;
 	default:
 		break;
 	};
@@ -353,11 +366,12 @@ static void init_dev(struct ipr_dev *dev)
 
 static void init_ioa(struct ipr_ioa *ioa)
 {
-	struct ipr_dev *dev;
+	int i = 0;
 
-	for (dev = ioa->dev; ioa->num_devices; dev++)
-		init_dev(dev);
+	for (i = 0; i < ioa->num_devices; i++)
+		init_dev(&ioa->dev[i]);
 
+	init_ioa_dev(&ioa->ioa);
 
 	/*
 	 * 1. Initialize all devices
