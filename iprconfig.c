@@ -2259,8 +2259,6 @@ static int raid_stop_complete()
 	int rc, j;
 	struct ipr_ioa *ioa;
 	struct array_cmd_data *cur_raid_cmd;
-	struct ipr_common_record *common_record;
-	struct scsi_dev_data *scsi_dev_data;
 
 	while(1) {
 		done_bad = 0;
@@ -2296,13 +2294,6 @@ static int raid_stop_complete()
 			if (done_bad)
 				/* "Stop Parity Protection failed" */
 				return (20 | EXIT_FLAG); 
-
-			for_each_raid_cmd(cur_raid_cmd) {
-				common_record = cur_raid_cmd->dev->qac_entry;
-				if (common_record &&
-				    common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)
-					scsi_dev_data = cur_raid_cmd->dev->scsi_dev_data;
-			}
 
 			check_current_config(false);
 
