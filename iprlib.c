@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.20 2004/02/23 22:22:50 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.21 2004/02/24 17:23:33 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1526,23 +1526,6 @@ static void get_sg_names(int num_devs)
 				    sysfs_device_device->name)) {
 				sprintf(scsi_dev_table[i].gen_name, "/dev/%s",
 					class_device->name);
-#if 0 /* xxx add this later */
-				fd = open(scsi_dev_table[i].gen_name, O_RDONLY | O_NONBLOCK);
-				if (fd < 0 && errno == ENOENT) {
-					mknod(scsi_dev_table[i].gen_name, S_IFCHR|0660,
-					      makedev(21,sg_index));
-
-					/* change permissions and owner to be identical to
-					 /dev/sg0's */
-					stat("/dev/sg0", &sda_stat);
-					chown(sg_map_info[num_sg_devices].gen_name,
-					      sda_stat.st_uid,
-					      sda_stat.st_gid);
-					chmod(sg_map_info[num_sg_devices].gen_name,
-					      sda_stat.st_mode);
-
-				}
-#endif
 				break;
 			}
 		}
@@ -1570,7 +1553,6 @@ static void get_sd_names(int num_devs)
 				    sysfs_device_device->name)) {
 				sprintf(scsi_dev_table[i].dev_name, "/dev/%s",
 					class_device->name);
-/* xxx check if file exists and create if it doesn't */
 				break;
 			}
 		}
