@@ -24,7 +24,7 @@ iprdbg:iprdbg.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs
 
 iprlib.o: iprlib.c
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
 
 text:  text.msg
 	gencat text.cat text.msg

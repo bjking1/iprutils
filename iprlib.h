@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.12 2004/02/02 16:41:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.13 2004/02/03 14:23:07 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -72,6 +72,7 @@
 #define IPR_INTERNAL_TIMEOUT                 (30)         /* 30 seconds */
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (10 * 60)    /* 10 minutes */
+#define SET_DASD_TIMEOUTS_TIMEOUT			(2 * 60)
 
 #define IPR_IOA_DEBUG                        0xDDu
 #define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
@@ -98,6 +99,9 @@
 #define IPR_QUERY_IOA_CONFIG                 0xC5
 #define IPR_QUERY_COMMAND_STATUS             0xCB
 #define IPR_EVALUATE_DEVICE                  0xE4
+#define SKIP_READ					0xE8
+#define SKIP_WRITE				0xEA
+#define SET_DASD_TIMEOUTS			0xEC
 #define IPR_QUERY_ARRAY_CONFIG               0xF0
 #define IPR_START_ARRAY_PROTECTION           0xF1
 #define IPR_STOP_ARRAY_PROTECTION            0xF2
@@ -113,7 +117,8 @@
 #define  IPR_RECLAIM_RESET                   0x40
 #define  IPR_RECLAIM_FORCE_BATTERY_ERROR     0x60
 #define  IPR_RECLAIM_UNKNOWN_PERM            0x80
-#define IPR_DISCARD_CACHE_DATA               0xF9
+#define SET_SUPPORTED_DEVICES			0xFB
+#define IPR_DISCARD_CACHE_DATA               0xF9 /* xxx remove */
 #define  IPR_PROHIBIT_CORR_INFO_UPDATE       0x80
 #define IPR_STD_INQUIRY                      0xFF
 #ifndef REPORT_LUNS

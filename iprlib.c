@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.10 2004/02/02 16:41:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.11 2004/02/03 14:23:07 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -678,8 +678,7 @@ int ipr_mode_sense(char *file, u8 page, void *buff)
     char buffer[128];
 
     fd = open(file, O_RDWR);
-    if (fd <= 1)
-    {
+    if (fd <= 1) {
         syslog(LOG_ERR, "Could not open %s. %m\n",file);
         return errno;
     }

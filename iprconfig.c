@@ -64,7 +64,6 @@ struct devs_to_init_t *dev_init_tail;
 struct array_cmd_data *raid_cmd_head;
 struct array_cmd_data *raid_cmd_tail;
 static char            dev_field[] = "dev";
-static int             term_is_5250 = 0;
 char                   log_root_dir[200];
 char                   editor[200];
 FILE                  *errpath;
@@ -294,7 +293,6 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
     struct screen_opts   *temp;                 /* reference to another screen */
 
     char *title,*body,*footer,*body_text,more_footer[100]; /* screen text */
-    int options;
 
     s_out = ipr_malloc(sizeof(struct screen_output)); /* passes an i_con and an rc value back to the function */
 
@@ -1568,7 +1566,7 @@ int disk_status(i_container *i_con)
             rc = ipr_query_resource_state(cur_ioa->dev[j].gen_name,
                                           &res_state);
             strncpy(cur_ioa->dev[j].prot_level_str,
-                    res_state.dev.vset.prot_level_str, 8);
+                    res_state.vset.prot_level_str, 8);
 
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
@@ -1595,7 +1593,7 @@ int disk_status(i_container *i_con)
                 }
 
                 strncpy(cur_ioa->dev[i].prot_level_str,
-                        res_state.dev.vset.prot_level_str, 8);
+                        res_state.vset.prot_level_str, 8);
 
                 for (k=0; k<2; k++)
                     buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
@@ -1829,10 +1827,10 @@ int device_details(i_container *i_con)
     struct ipr_array_record *array_record;
     char *hex;
     int len;
-
-    buffer = ipr_malloc(100);
     struct screen_output *s_out;
     char *string_buf;
+
+    buffer = ipr_malloc(100);
     mvaddstr(0,0,"DEVICE DETAILS FUNCTION CALLED");
 
     rc = device_details_get_device(i_con, &device);
@@ -2336,7 +2334,7 @@ int raid_status(i_container *i_con)
             rc = ipr_query_resource_state(cur_ioa->dev[j].gen_name,
                                           &res_state);
             strncpy(cur_ioa->dev[j].prot_level_str,
-                    res_state.dev.vset.prot_level_str, 8);
+                    res_state.vset.prot_level_str, 8);
 
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
@@ -2363,7 +2361,7 @@ int raid_status(i_container *i_con)
                 }
 
                 strncpy(cur_ioa->dev[i].prot_level_str,
-                        res_state.dev.vset.prot_level_str, 8);
+                        res_state.vset.prot_level_str, 8);
 
                 for (k=0; k<2; k++)
                     buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
@@ -5747,10 +5745,10 @@ int reclaim_result(i_container *i_con)
     char* out_str;
     int max_y,max_x;
     struct screen_output *s_out;
-    fn_out *output = init_output();
-    mvaddstr(0,0,"RECLAIM RESULT FUNCTION CALLED");
     int action;
+    fn_out *output = init_output();
 
+    mvaddstr(0,0,"RECLAIM RESULT FUNCTION CALLED");
     out_str = calloc (13, sizeof(char));
     reclaim_ioa = (struct ipr_ioa *) i_con->data;
 
@@ -6879,9 +6877,9 @@ int show_battery_info(i_container *i_con)
     ioa->reclaim_data;
   char *buffer;
     
-  buffer = malloc(100);
   struct screen_output *s_out;
   fn_out *output = init_output();
+  buffer = malloc(100);
   mvaddstr(0,0,"SHOW BATTERY INFO FUNCTION CALLED");
 
   output->next = add_fn_out(output->next,1,ioa->ioa.gen_name);
@@ -7104,6 +7102,7 @@ int change_bus_attr(i_container *i_con)
     int found = 0;
     char *input;
     int length;
+    int max_x,max_y,start_y,start_x;
     int bus_attr_menu(struct ipr_ioa *cur_ioa,
                       struct ipr_page_28 *page_28_cur,
                       struct ipr_page_28 *page_28_chg,
@@ -7114,7 +7113,6 @@ int change_bus_attr(i_container *i_con)
 
     mvaddstr(0,0,"CHANGE BUS ATTR FUNCTION CALLED");
 
-    int max_x,max_y,start_y,start_x;
 
     getmaxyx(stdscr,max_y,max_x);
     getbegyx(stdscr,start_y,start_x);
@@ -8641,7 +8639,7 @@ int send_dev_inits(i_container *i_con) /*(u8 num_devs)*/
             mode_parm_hdr->length = 0;
             mode_parm_hdr->medium_type = 0;
             mode_parm_hdr->device_spec_parms = 0;
-            control_mode_page->header.parms_saveable = 0;
+            control_mode_page->hdr.parms_saveable = 0;
             rc = ipr_mode_select(cur_dev_init->ipr_dev->gen_name, ioctl_buffer, length);
 
             if (rc != 0)
@@ -8754,7 +8752,7 @@ int send_dev_inits(i_container *i_con) /*(u8 num_devs)*/
             length = mode_parm_hdr->length + 1;
 
             mode_parm_hdr->length = 0;
-            control_mode_page->header.parms_saveable = 0;
+            control_mode_page->hdr.parms_saveable = 0;
             mode_parm_hdr->medium_type = 0;
             mode_parm_hdr->device_spec_parms = 0;
 
@@ -9560,6 +9558,7 @@ int compare_log_file(const void *log_file1, const void *log_file2)
 
 int driver_config(i_container *i_con)
 {
+#if 0
     /*
      Change Driver Configuration
 
@@ -9583,7 +9582,6 @@ int driver_config(i_container *i_con)
     FIELD *input_fields[6], *cur_field;
     ITEM **menu_item;
     int cur_field_index;
-    struct ipr_driver_cfg driver_cfg;
     int  ch;
     int  i;
     int form_adjust = 0;
@@ -9759,6 +9757,8 @@ int driver_config(i_container *i_con)
 
     flush_stdscr();
     return rc;
+#endif
+    return RC_EXIT;
 }
 
 char *strip_trailing_whitespace(char *str)
@@ -9954,7 +9954,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
             sprintf(body + len, "Not Operational\n");
         else if (res_state.not_ready ||
                  (res_state.read_write_prot &&
-                  (ntohl(res_state.dev.dasd.failing_dev_ioasc) ==
+                  (ntohl(res_state.dasd.failing_dev_ioasc) ==
                    0x02040200u)))
             sprintf(body + len, "Not ready\n");
         else if ((res_state.read_write_prot) || (is_rw_protected(ipr_dev)))

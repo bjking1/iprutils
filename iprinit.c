@@ -8,7 +8,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.1 2004/02/02 16:41:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.2 2004/02/03 14:23:07 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -26,11 +26,6 @@
 
 #define GPDD_TCQ_DEPTH "64"
 #define AF_DISK_TCQ_DEPTH 64
-#define SET_SUPPORTED_DEVICES	0xFB
-#define SET_DASD_TIMEOUTS		0xEC
-#define SKIP_READ				0xE8
-#define SKIP_WRITE				0xEA
-#define SET_DASD_TIMEOUTS_TIMEOUT	(2 * 60)
 
 struct ipr_dasd_timeout_record {
 	u8 op_code;
@@ -39,26 +34,26 @@ struct ipr_dasd_timeout_record {
 };
 
 static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
-	{TEST_UNIT_READY, 0x00, ___constant_swab16(30)},
-	{REQUEST_SENSE, 0x00, ___constant_swab16(30)},
-	{INQUIRY, 0x00, ___constant_swab16(30)},
-	{MODE_SELECT, 0x00, ___constant_swab16(30)},
-	{MODE_SENSE, 0x00, ___constant_swab16(30)},
-	{READ_CAPACITY, 0x00, ___constant_swab16(30)},
-	{READ_10, 0x00, ___constant_swab16(30)},
-	{WRITE_10, 0x00, ___constant_swab16(30)},
-	{WRITE_VERIFY, 0x00, ___constant_swab16(30)},
-	{FORMAT_UNIT, 0x00, ___constant_swab16(2 * 60 * 60)},
-	{REASSIGN_BLOCKS, 0x00, ___constant_swab16(10 * 60)},
-	{START_STOP, 0x00, ___constant_swab16(2 * 60)},
-	{SEND_DIAGNOSTIC, 0x00, ___constant_swab16(5 * 60)},
-	{VERIFY, 0x00, ___constant_swab16(5 * 60)},
-	{WRITE_BUFFER, 0x00, ___constant_swab16(5 * 60)},
-	{WRITE_SAME, 0x00, ___constant_swab16(4 * 60 * 60)},
-	{LOG_SENSE, 0x00, ___constant_swab16(30)},
-	{REPORT_LUNS, 0x00, ___constant_swab16(30)},
-	{SKIP_READ, 0x00, ___constant_swab16(30)},
-	{SKIP_WRITE, 0x00, ___constant_swab16(30)}
+	{TEST_UNIT_READY, 0, __constant_cpu_to_be16(30)},
+	{REQUEST_SENSE, 0, __constant_cpu_to_be16(30)},
+	{INQUIRY, 0, __constant_cpu_to_be16(30)},
+	{MODE_SELECT, 0, __constant_cpu_to_be16(30)},
+	{MODE_SENSE, 0, __constant_cpu_to_be16(30)},
+	{READ_CAPACITY, 0, __constant_cpu_to_be16(30)},
+	{READ_10, 0, __constant_cpu_to_be16(30)},
+	{WRITE_10, 0, __constant_cpu_to_be16(30)},
+	{WRITE_VERIFY, 0, __constant_cpu_to_be16(30)},
+	{FORMAT_UNIT, 0, __constant_cpu_to_be16(2 * 60 * 60)},
+	{REASSIGN_BLOCKS, 0, __constant_cpu_to_be16(10 * 60)},
+	{START_STOP, 0, __constant_cpu_to_be16(2 * 60)},
+	{SEND_DIAGNOSTIC, 0, __constant_cpu_to_be16(5 * 60)},
+	{VERIFY, 0, __constant_cpu_to_be16(5 * 60)},
+	{WRITE_BUFFER, 0, __constant_cpu_to_be16(5 * 60)},
+	{WRITE_SAME, 0, __constant_cpu_to_be16(4 * 60 * 60)},
+	{LOG_SENSE, 0, __constant_cpu_to_be16(30)},
+	{REPORT_LUNS, 0, __constant_cpu_to_be16(30)},
+	{SKIP_READ, 0, __constant_cpu_to_be16(30)},
+	{SKIP_WRITE, 0, __constant_cpu_to_be16(30)}
 };
 
 struct ipr_dasd_timeouts {
@@ -82,7 +77,7 @@ static int set_dasd_timeouts(struct ipr_dev *dev)
 		return errno;
 	}
 
-	memcpy(&timeouts.record, ipr_dasd_timeouts, sizeof(ipr_dasd_timeouts));
+	memcpy(timeouts.record, ipr_dasd_timeouts, sizeof(ipr_dasd_timeouts));
 	timeouts.length = htonl(sizeof(timeouts));
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
