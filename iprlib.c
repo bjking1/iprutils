@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2.2.2 2003/11/07 22:07:19 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2.2.3 2003/11/25 20:03:33 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -426,9 +426,9 @@ int find_ioa_firmware_image(struct ipr_ioa *p_ioa, char *fname)
                     break;
                 }
             }
-        }
 
-        free(*pp_dirent);
+            free(*pp_dirent);
+        }
     }
 
     sprintf(etc_ucode_file, "/etc/microcode/ibmsis%X.img", p_ioa->ccin);

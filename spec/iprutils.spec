@@ -1,11 +1,11 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
 Version: 1.0.3
-Release: 1
+Release: 2
 License: IPL
 Group: Hardware/SCSI
 Vendor: IBM
-Source0: iprutils-%version-src.tgz
+Source0: iprutils-%version-%release-src.tgz
 
 %description
 Provides a suite of utilities to manage and configure SCSI devices
@@ -13,7 +13,7 @@ supported by the ipr SCSI storage device driver.
 
 %prep
 rm -rf $RPM_BUILD_DIR/iprutils
-tar -xvzf $RPM_SOURCE_DIR/iprutils-%version-src.tgz
+tar -xvzf $RPM_SOURCE_DIR/iprutils-%version-%release-src.tgz
 
 %build
 cd iprutils
@@ -50,3 +50,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man8/iprupdate.8.gz
 /etc/rc.d/init.d/iprupdate
 /etc/rc.d/init.d/iprdump
+
+%changelog
+* Tue Nov 25 2003 Brian King <brking@us.ibm.com> 1.0.3-2
+- Fixed segmentation fault in iprupdate
