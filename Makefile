@@ -53,7 +53,7 @@ pdfs: docs
 
 utils: ./*.c ./*.h
 	cd ..
-	tar -zcpf iprutils-$(UTILS_VER)-src.tgz --directory ../ --exclude CVS iprutils
+	tar -zcpf iprutils-$(UTILS_VER)-src.tgz --directory ../ --exclude CVS --exclude patches --exclude txt --exclude pc iprutils
 
 clean:
 	rm -f iprupdate iprconfig iprdump iprinit iprdbg iprupdate.ps iprupdate.pdf *.o
@@ -76,7 +76,7 @@ rpm: *.c *.h *.8
 	-make clean
 	cd ..
 	cp -f spec/iprutils.spec .
-	cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS iprutils
+	cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS --exclude patches --exclude txt --exclude pc iprutils
 	mv ../iprutils-$(UTILS_VER)-src.tgz .
 	rm -f iprutils.spec
 	rpmbuild --nodeps -ts iprutils-$(UTILS_VER)-src.tgz

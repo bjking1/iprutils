@@ -2568,7 +2568,7 @@ int configure_raid_start(i_container *i_con)
 		if (found != 0) {
 
 			/* Go to parameters screen */
-			rc = configure_raid_parameters(i_con_head_saved);
+			rc = configure_raid_parameters(i_con);
 
 			if ((rc &  EXIT_FLAG) ||
 			    !(rc & CANCEL_FLAG))
@@ -3608,7 +3608,7 @@ int configure_raid_include(i_container *i_con)
 	else  {
 		cur_raid_cmd->qac_data = qac_data;
 		common_record = (struct ipr_common_record *)qac_data->data;
-		for (k = 0; k < qac_data->num_records; k++) {
+		for (i = 0; i < qac_data->num_records; i++) {
 			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 				for (j = 0; j < cur_ioa->num_devices; j++) {
 					scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
@@ -3639,7 +3639,7 @@ int configure_raid_include(i_container *i_con)
 				supported_arrays = (struct ipr_supported_arrays *)common_record;
 				cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
 
-				for (i=0; i<ntohs(supported_arrays->num_entries); i++) {
+				for (k=0; k<ntohs(supported_arrays->num_entries); k++) {
 					if (cur_array_cap_entry->prot_level == array_record->raid_level)
 						min_mult_array_devices = cur_array_cap_entry->min_mult_array_devices;
 
@@ -3652,7 +3652,7 @@ int configure_raid_include(i_container *i_con)
 		}
 	}
 
-	if (found <= min_mult_array_devices) {
+	if (found < min_mult_array_devices) {
 		/* Include Device Parity Protection Failed */
 		n_configure_raid_include_fail.body = body_init(n_configure_raid_include_fail.header, NULL);
 		s_out = screen_driver(&n_configure_raid_include_fail,0,i_con);
@@ -3703,6 +3703,8 @@ int configure_raid_include(i_container *i_con)
 		return 25 | REFRESH_FLAG; 
 	}
 
+	cur_raid_cmd->do_cmd = 0;
+
 	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item)  {
 
@@ -3720,8 +3722,6 @@ int configure_raid_include(i_container *i_con)
 					device_record->known_zeroed = 1;
 				}
 			} else {
-				cur_raid_cmd->do_cmd = 0;
-
 				device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
 				if (device_record->issue_cmd) {
 					device_record->issue_cmd = 0;
@@ -3874,18 +3874,56 @@ int format_include_cand()
 	return num_devs;
 }
 
+static int update_include_qac_data(struct ipr_array_query_data *old_qac,
+				   struct ipr_array_query_data *new_qac)
+{
+	struct ipr_common_record *old_rcd, *new_rcd;
+	struct ipr_dev_record *old_dev_rcd, *new_dev_rcd;
+	int found, i, j;
+
+	for_each_qac_entry(old_rcd, i, old_qac) {
+		if (old_rcd->record_id != IPR_RECORD_ID_DEVICE_RECORD)
+			continue;
+
+		old_dev_rcd = (struct ipr_dev_record *)old_rcd;
+		if (!old_dev_rcd->issue_cmd)
+			continue;
+
+		found = 0;
+		for_each_qac_entry(new_rcd, j, new_qac) {
+			if (new_rcd->record_id != IPR_RECORD_ID_DEVICE_RECORD)
+				continue;
+			new_dev_rcd = (struct ipr_dev_record *)new_rcd;
+
+			if (new_dev_rcd->resource_handle != old_dev_rcd->resource_handle)
+				continue;
+
+			new_dev_rcd->issue_cmd = 1;
+			new_dev_rcd->known_zeroed = 1;
+			found = 1;
+			break;
+		}
+
+		if (!found)
+			return 26;
+	}
+
+	return 0;
+}
+
 int dev_include_complete(u8 num_devs)
 {
 	int done_bad;
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
 	int not_done = 0;
-	int rc, j;
+	int rc, j, fd;
 	struct devs_to_init_t *cur_dev_init;
 	u32 percent_cmplt = 0;
 	struct ipr_ioa *cur_ioa;
 	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_common_record *common_record;
+	struct ipr_array_query_data qac_data;
 
 	n_dev_include_complete.body = n_dev_include_complete.header[0];
 
@@ -3948,11 +3986,42 @@ int dev_include_complete(u8 num_devs)
 			continue;
 
 		cur_ioa = cur_raid_cmd->ipr_ioa;
+		memset(&qac_data, 0, sizeof(qac_data));
 
-		rc = ipr_add_array_device(cur_ioa, cur_raid_cmd->qac_data);
+		fd = open(cur_ioa->ioa.gen_name, O_RDWR);
+		if (fd <= 1) {
+			rc = 26;
+			continue;
+		}
+
+		rc = flock(fd, LOCK_EX);
+		if (rc) {
+			rc = 26;
+			close(fd);
+			continue;
+		}
+
+		rc = __ipr_query_array_config(cur_ioa, fd, 0, 1,
+					      cur_raid_cmd->array_id, &qac_data);
+
+		if (rc != 0) {
+			rc = 26;
+			close(fd);
+			continue;
+		}
+
+		rc = update_include_qac_data(cur_raid_cmd->qac_data, &qac_data);
+		if (rc != 0) {
+			close(fd);
+			continue;
+		}
+
+		rc = ipr_add_array_device(cur_ioa, fd, &qac_data);
 
 		if (rc != 0)
 			rc = 26;
+
+		close(fd);
 	}
 
 	not_done = 0;

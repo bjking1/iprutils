@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44.2.3 2004/11/12 19:05:47 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44.2.4 2004/12/02 23:07:56 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -572,6 +572,10 @@ struct ipr_dev_record {
 	u8 serial_num[IPR_SERIAL_NUM_LEN];
 	u32 reserved5;
 };
+
+#define for_each_qac_entry(rcd, i, qac) \
+      for (i = 0, rcd = (struct ipr_common_record *)qac->data; i < qac->num_records; \
+           i++, rcd = (struct ipr_common_record *)((unsigned long)rcd + ntohs(rcd->record_len)))
 
 struct ipr_std_inq_data {
 #if defined (__BIG_ENDIAN_BITFIELD)
@@ -1160,6 +1164,7 @@ void tool_init();
 void exit_on_error(char *, ...);
 bool is_af_blocked(struct ipr_dev *, int);
 int ipr_query_array_config(struct ipr_ioa *, bool, bool, int, void *);
+int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, int, void *);
 int ipr_query_command_status(struct ipr_dev *, void *);
 int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);
@@ -1177,7 +1182,7 @@ int ipr_add_hot_spare(struct ipr_ioa *);
 int ipr_rebuild_device_data(struct ipr_ioa *);
 int ipr_test_unit_ready(struct ipr_dev *, struct sense_data_t *);
 int ipr_format_unit(struct ipr_dev *);
-int ipr_add_array_device(struct ipr_ioa *, struct ipr_array_query_data *);
+int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);

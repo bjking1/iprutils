@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57.2.3 2004/11/12 19:05:46 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57.2.4 2004/12/02 23:07:56 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -631,29 +631,14 @@ void ipr_rescan(struct ipr_ioa *ioa, int bus, int id, int lun)
 	sysfs_close_class_device(class_device);
 }
 
-int ipr_query_array_config(struct ipr_ioa *ioa,
-			   bool allow_rebuild_refresh, bool set_array_id,
-			   int array_id, void *buff)
+int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
+			     bool allow_rebuild_refresh, bool set_array_id,
+			     int array_id, void *buff)
 {
-	int fd;
 	int length = sizeof(struct ipr_array_query_data);
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
-
-	ioa->nr_ioa_microcode = 0;
-
-	if (strlen(ioa->ioa.gen_name) == 0) {
-		scsi_err((&ioa->ioa), "Adapter sg device does not exist\n");
-		return -ENOENT;
-	}
-
-	fd = open(ioa->ioa.gen_name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
-		return errno;
-	}
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -682,6 +667,40 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 			 sense_data.add_sense_code_qual == 0x85)
 			ioa->nr_ioa_microcode = 1;
 	}
+
+	return rc;
+}
+
+int ipr_query_array_config(struct ipr_ioa *ioa,
+			   bool allow_rebuild_refresh, bool set_array_id,
+			   int array_id, void *buff)
+{
+	int fd, rc;
+
+	ioa->nr_ioa_microcode = 0;
+
+	if (strlen(ioa->ioa.gen_name) == 0) {
+		scsi_err((&ioa->ioa), "Adapter sg device does not exist\n");
+		return -ENOENT;
+	}
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
+		return errno;
+	}
+
+	rc = flock(fd, LOCK_EX);
+	if (rc) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not lock %s. %m\n", ioa->ioa.gen_name);
+		close(fd);
+		return errno;
+	}
+
+	rc = __ipr_query_array_config(ioa, fd, allow_rebuild_refresh,
+				      set_array_id, array_id, buff);
 
 	close(fd);
 	return rc;
@@ -823,24 +842,13 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 	return rc;
 }
 
-int ipr_add_array_device(struct ipr_ioa *ioa,
+int ipr_add_array_device(struct ipr_ioa *ioa, int fd,
 			 struct ipr_array_query_data *qac_data)
 {
-	int fd;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
 	int length = ntohs(qac_data->resp_len);
-
-	if (strlen(ioa->ioa.gen_name) == 0)
-		return -ENOENT;
-
-	fd = open(ioa->ioa.gen_name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
-		return errno;
-	}
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -855,7 +863,6 @@ int ipr_add_array_device(struct ipr_ioa *ioa,
 	if (rc != 0)
 		ioa_cmd_err(ioa, &sense_data, "Add Array Device", rc);
 
-	close(fd);
 	return rc;
 }
 
