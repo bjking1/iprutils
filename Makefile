@@ -74,4 +74,4 @@ rpm: *.c *.h *.8
 	mv ../iprutils-$(UTILS_VER)-src.tgz .
 	rm -f iprutils.spec
 	rpmbuild --nodeps -ts iprutils-$(UTILS_VER)-src.tgz
-	cp /home/$(USER)/rpm/SRPMS/iprutils-$(UTILS_VER)-1.src.rpm .
+	cp /home/$(USER)/rpm/SRPMS/iprutils-$(UTILS_VER)-$(IPR_RELEASE).src.rpm .

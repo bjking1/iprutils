@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.35 2004/03/17 21:56:49 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.36 2004/03/17 23:56:10 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -125,7 +125,7 @@
 #define IPR_REMOVE_ARRAY_DEVICE              0xF5
 #define IPR_REBUILD_DEVICE_DATA              0xF6
 #define IPR_RECLAIM_CACHE_STORE              0xF8
-#define  IPR_RECLAIM_ACTION                  0x60
+#define  IPR_RECLAIM_ACTION                  0x68
 #define  IPR_RECLAIM_PERFORM                 0x00
 #define  IPR_RECLAIM_RESET_BATTERY_ERROR     0x08
 #define  IPR_RECLAIM_EXTENDED_INFO           0x10
