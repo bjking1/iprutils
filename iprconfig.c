@@ -7587,7 +7587,7 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 
 	free(n_download_ucode_in_progress.body);
 	n_download_ucode_in_progress.body = NULL;
-	return rc; /* xxx check version to make sure download worked */
+	return rc;
 }
 
 int process_choose_ucode(struct ipr_dev *ipr_dev)
@@ -7636,7 +7636,7 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 
 	if (list_count) {
 		for (i=0; i<list_count; i++) {
-			sprintf(buffer," %%1   %.8X %s\n",list[i].version,list[i].file);
+			sprintf(buffer," %%1   %.8X %s",list[i].version,list[i].file);
 			body = add_line_to_body(body, buffer, NULL);
 			i_con = add_i_con(i_con, "\0", &list[i]);
 		}
