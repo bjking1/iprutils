@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.52 2004/05/02 21:24:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.53 2004/05/03 01:15:27 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -598,7 +598,7 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
 		return errno;
 	}
@@ -649,7 +649,7 @@ static int ipr_start_array(struct ipr_ioa *ioa, char *cmd,
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
 		return errno;
 	}
@@ -702,7 +702,7 @@ static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
 		return errno;
 	}
@@ -750,7 +750,7 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
 		return errno;
 	}
@@ -785,7 +785,7 @@ int ipr_add_array_device(struct ipr_ioa *ioa,
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
 		return errno;
 	}
@@ -819,7 +819,7 @@ int ipr_query_command_status(struct ipr_dev *dev, void *buff)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -853,7 +853,7 @@ int ipr_query_resource_state(struct ipr_dev *dev, void *buff)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -887,7 +887,7 @@ int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -927,7 +927,7 @@ int ipr_mode_select(struct ipr_dev *dev, void *buff, int length)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -958,7 +958,7 @@ int ipr_reset_device(struct ipr_dev *dev)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -982,7 +982,7 @@ int ipr_re_read_partition(struct ipr_dev *dev)
 
 	fd = open(dev->dev_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1009,7 +1009,7 @@ int ipr_read_capacity(struct ipr_dev *dev, void *buff)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1041,7 +1041,7 @@ int ipr_read_capacity_16(struct ipr_dev *dev, void *buff)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1076,7 +1076,7 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 
 	fd = open(file, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n",file);
 		return errno;
 	}
@@ -1116,7 +1116,7 @@ int ipr_start_stop_start(struct ipr_dev *dev)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1149,7 +1149,7 @@ int ipr_start_stop_stop(struct ipr_dev *dev)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1182,7 +1182,7 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1215,7 +1215,7 @@ int ipr_format_unit(struct ipr_dev *dev)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1256,7 +1256,7 @@ int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1293,7 +1293,7 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1329,7 +1329,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s.\n",dev->gen_name);
 		return errno;
 	}
@@ -1367,7 +1367,7 @@ int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
 		return errno;
 	}
@@ -1402,7 +1402,7 @@ int ipr_receive_diagnostics(struct ipr_dev *dev,
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1438,7 +1438,7 @@ int ipr_send_diagnostics(struct ipr_dev *dev, void *buff, int length)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -1472,7 +1472,7 @@ static int set_supported_devs(struct ipr_dev *dev,
 	fd = open(dev->ioa->ioa.gen_name, O_RDWR);
 
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n",
 			       dev->ioa->ioa.gen_name);
 		return errno;
@@ -2305,7 +2305,7 @@ int ipr_set_dasd_timeouts(struct ipr_dev *dev)
 	fd = open(dev->gen_name, O_RDWR);
 
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n",
 			       dev->ioa->ioa.gen_name);
 		return errno;
@@ -3148,7 +3148,7 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
-		if (strcmp(tool_name, "iprinit"))
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
 			syslog(LOG_ERR, "Could not open %s. %m\n", dev->gen_name);
 		return errno;
 	}
@@ -3375,7 +3375,9 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
 
-	if (runtime && page0x0a_setup(dev))
+	if (ipr_get_dev_attr(dev, &attr))
+		return;
+	if (runtime && page0x0a_setup(dev) && attr.queue_depth == GPDD_TCQ_DEPTH)
 		return;
 	if (enable_af(dev))
 		return;
@@ -3384,8 +3386,6 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 			   dev->scsi_dev_data->sysfs_device_name);
 		return;
 	}
-	if (ipr_get_dev_attr(dev, &attr))
-		return;
 
 	attr.queue_depth = GPDD_TCQ_DEPTH;
 	attr.tcq_enabled = 1;
