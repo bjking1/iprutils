@@ -6,7 +6,7 @@ include version.mk
 CFLAGS = -g -Wall $(IPR_DEFINES) -DIPR_IPRUTILS
 UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
 
-all: iprconfig iprupdate iprdump iprtrace iprdbg docs
+all: iprconfig iprupdate iprdump iprtrace iprdbg docs text
 
 iprconfig: iprconfig.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu
@@ -25,6 +25,9 @@ iprdbg:iprdbg.c iprlib.o
 
 iprlib.o: iprlib.c
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
+
+text:  text.msg
+	gencat text.cat text.msg
 
 docs: iprconfig.8 iprupdate.8 iprdump.8
 	mkdir -p docs
@@ -53,6 +56,7 @@ clean:
 	rm -f iprupdate iprconfig iprdump iprtrace iprdbg iprupdate.ps iprupdate.pdf iprlib.o
 	rm -f iprconfig.ps iprconfig.pdf iprdump.pdf iprdump.ps *.tgz *.rpm
 	rm -rf docs
+	rm -f text.cat
 
 install: all
 	install -d $(INSTALL_MOD_PATH)/sbin
