@@ -1,7 +1,7 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.1
-Release: 2
+Version: 2.0.2
+Release: 1
 License: CPL
 Group: Hardware/SCSI
 Vendor: IBM
