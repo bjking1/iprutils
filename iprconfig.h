@@ -304,8 +304,6 @@ s_node n_raid_stop_fail = {
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"), /* xxx? */
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -358,8 +356,6 @@ s_node n_raid_start_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -423,8 +419,6 @@ s_node n_raid_include_fail = {
 		__("o Not all disks attached to an advanced function IOA have"
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -454,8 +448,6 @@ s_node n_configure_raid_include_fail = {
 		   "capacity than the smallest device in the disk array and "
 		   "be formatted correctly\n"),
 		__("o The disk is not supported for the requested operation\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -500,8 +492,6 @@ s_node n_af_include_fail = {
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"), /* xxx */
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -521,8 +511,6 @@ s_node n_af_remove_fail = {
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -541,8 +529,6 @@ s_node n_add_hot_spare_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -562,8 +548,6 @@ s_node n_remove_hot_spare_fail = {
 		   "reported to the system.  Retry the operation.\n"),
 		__("o The disks are missing.\n"),
 		__("o The disks are currently in use.\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 
@@ -891,8 +875,6 @@ s_node n_raid_rebuild_fail = {
 		__("o Not all disks attached to an IOA have reported to the "
 		   "system. Retry the operation.\n"),
 		__("o The disk is not supported for the requested operation.\n"),
-		__("o You attempting to perform this operation on a secondary IOA. "
-		   "Retry the operation on the primary IOA.\n"),
 		"" }
 };
 

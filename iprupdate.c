@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.20 2005/03/08 16:25:59 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.21 2005/03/25 22:21:02 brking Exp $
  */
 
 #include <unistd.h>
@@ -81,7 +81,8 @@ static void update_ioa_fw(struct ipr_ioa *ioa, int force)
 	rc = get_ioa_firmware_image_list(ioa, &list);
 
 	if (rc < 1) {
-		ipr_log_ucode_error(ioa);
+		if (ioa->should_init)
+			ipr_log_ucode_error(ioa);
 		return;
 	}
 

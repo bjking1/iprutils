@@ -1853,15 +1853,18 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	rc = ipr_query_resource_state(dev, &res_state);
 
 	if (!rc) {
-		if (ntohl(res_state.gscsi.data_path_width) == 16)
-			body = add_line_to_body(body, _("Wide Enabled"), _("Yes"));
-		else
-			body = add_line_to_body(body, _("Wide Enabled"), _("No"));
-		sprintf(buffer, "%d MB/s",
-			(ntohl(res_state.gscsi.data_xfer_rate) *
-			 ntohl(res_state.gscsi.data_path_width))/(10 * 8));
-		if (res_state.gscsi.data_xfer_rate != 0xffffffff)
-			body = add_line_to_body(body, _("Current Bus Throughput"), buffer);
+		if (is_spi(dev->ioa)) {
+			if (ntohl(res_state.gscsi.data_path_width) == 16)
+				body = add_line_to_body(body, _("Wide Enabled"), _("Yes"));
+			else
+				body = add_line_to_body(body, _("Wide Enabled"), _("No"));
+
+			sprintf(buffer, "%d MB/s",
+				(ntohl(res_state.gscsi.data_xfer_rate) *
+				 ntohl(res_state.gscsi.data_path_width))/(10 * 8));
+			if (res_state.gscsi.data_xfer_rate != 0xffffffff)
+				body = add_line_to_body(body, _("Current Bus Throughput"), buffer);
+		}
 	}
 
 	body = add_line_to_body(body, "", NULL);
@@ -3108,7 +3111,7 @@ int raid_start_complete()
 					ipr_dev = get_dev_from_handle(status_record->resource_handle);
 					if ((ipr_dev)  &&  (ipr_dev->scsi_dev_data)) {
 						device_available = 1;
-						ipr_init_dev(ipr_dev);
+						ipr_init_new_dev(ipr_dev);
 						if (ipr_get_dev_attr(ipr_dev, &attr)) {
 							syslog(LOG_ERR, _("Unable to read queue_depth"));
 						} else {
@@ -4666,30 +4669,34 @@ int process_conc_maint(i_container *i_con, int action)
 	if (!rc) {
 		if (action == IPR_VERIFY_CONC_REMOVE) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_REMOVE);
-			dev_rcd = ipr_dev->dev_rcd;
-			getmaxyx(stdscr,max_y,max_x);
-			move(max_y-1,0);
-			printw(_("Operation in progress - please wait"));
-			refresh();
+			if (!rc) {
+				dev_rcd = ipr_dev->dev_rcd;
+				getmaxyx(stdscr,max_y,max_x);
+				move(max_y-1,0);
+				printw(_("Operation in progress - please wait"));
+				refresh();
 
-			ipr_write_dev_attr(ipr_dev, "delete", "1");
-			evaluate_device(ipr_dev, ipr_dev->ioa, 0);
-			ipr_del_zeroed_dev(ipr_dev);
+				ipr_write_dev_attr(ipr_dev, "delete", "1");
+				evaluate_device(ipr_dev, ipr_dev->ioa, 0);
+				ipr_del_zeroed_dev(ipr_dev);
+			}
 		} else if (action == IPR_VERIFY_CONC_ADD) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_ADD);
-			getmaxyx(stdscr,max_y,max_x);
-			move(max_y-1,0);
-			printw(_("Operation in progress - please wait"));
-			refresh();
-			ipr_scan(ioa, res_addr.bus, res_addr.target, res_addr.lun);
+			if (!rc) {
+				getmaxyx(stdscr,max_y,max_x);
+				move(max_y-1,0);
+				printw(_("Operation in progress - please wait"));
+				refresh();
+				ipr_scan(ioa, res_addr.bus, res_addr.target, res_addr.lun);
 
-			while (time--) {
-				check_current_config(false);
-				if ((ipr_dev = get_dev_from_addr(&res_addr))) {
-					ipr_init_dev(ipr_dev);
-					break;
+				while (time--) {
+					check_current_config(false);
+					if ((ipr_dev = get_dev_from_addr(&res_addr))) {
+						ipr_init_new_dev(ipr_dev);
+						break;
+					}
+					sleep(5);
 				}
-				sleep(5);
 			}
 		}
 	}
@@ -5189,8 +5196,7 @@ static int dev_init_complete(u8 num_devs)
 				if (!dev->do_init)
 					continue;
 
-				ioa = dev->ioa
-;
+				ioa = dev->ioa;
 				if (dev->new_block_size != ioa->af_block_size && ipr_is_gscsi(dev->dev)) {
 					ipr_write_dev_attr(dev->dev, "rescan", "1");
 					ipr_init_dev(dev->dev);

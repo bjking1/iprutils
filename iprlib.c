@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.66 2005/03/08 16:25:59 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.67 2005/03/25 22:21:02 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2738,10 +2738,30 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 	return num_devs;
 }
 
+static int wait_for_dev(char *name)
+{
+	int fd, delay;
+
+	for (delay = 3, fd = 0; delay; delay--) {
+		fd = open(name, O_RDWR);
+		if (fd != -1) {
+			close(fd);
+			break;
+		}
+
+		syslog_dbg("Waiting for %s to show up\n", name);
+		sleep(1);
+	}
+
+	if (fd == -1)
+		syslog_dbg("Failed to open %s.\n", name);
+
+	return -ETIMEDOUT;
+}
+
 static void get_sg_names(int num_devs)
 {
-	int i, fd;
-	int sg_delay = 3;
+	int i;
 	struct sysfs_class *sysfs_device_class;
 	struct dlist *class_devices;
 	struct sysfs_class_device *class_device;
@@ -2770,21 +2790,8 @@ static void get_sg_names(int num_devs)
 				    sysfs_device_device->name)) {
 				sprintf(scsi_dev_table[i].gen_name, _PATH_DEV"%s",
 					class_device->name);
-				for (sg_delay = 3, fd = 0; sg_delay && ipr_sg_required; sg_delay--) {
-					fd = open(scsi_dev_table[i].gen_name, O_RDWR);
-					if (fd != -1) {
-						close(fd);
-						break;
-					}
-
-					syslog_dbg("Waiting for %s to show up\n",
-						   scsi_dev_table[i].gen_name);
-					sleep(1);
-				}
-
-				if (fd == -1)
-					syslog_dbg("Failed to open %s. %d %d\n", scsi_dev_table[i].gen_name,
-						   sg_delay, ipr_sg_required);
+				if (ipr_sg_required)
+					wait_for_dev(scsi_dev_table[i].gen_name);
 				break;
 			}
 		}
@@ -4839,6 +4846,28 @@ void ipr_init_dev(struct ipr_dev *dev)
 	default:
 		break;
 	};
+}
+
+void ipr_init_new_dev(struct ipr_dev *dev)
+{
+	if (!dev->scsi_dev_data)
+		return;
+
+	switch (dev->scsi_dev_data->type) {
+	case TYPE_DISK:
+		wait_for_dev(dev->dev_name);
+		break;
+	case IPR_TYPE_ADAPTER:
+		if (&dev->ioa->ioa != dev)
+			break;
+	case IPR_TYPE_AF_DISK:
+		wait_for_dev(dev->gen_name);
+		break;
+	default:
+		break;
+	};
+
+	ipr_init_dev(dev);
 }
 
 void ipr_init_ioa(struct ipr_ioa *ioa)

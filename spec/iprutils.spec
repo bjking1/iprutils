@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.14
+Version: 2.0.14.1
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,21 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1
+- Removed mention of primary/secondary adapters in some error
+  screens since multi-initiator RAID is not supported and the
+  messages will just cause confusion.
+* Mon Mar 24 2005 Brian King <brking@us.ibm.com>
+- iprconfig: During disk hotplug, wait for sd devices to show
+  up. Fixes errors getting logged by iprconfig during hotplug.
+* Mon Mar 23 2005 Brian King <brking@us.ibm.com>
+- iprconfig: Fix cancel path on concurrent add/remove of disks
+- Don't display current bus width and speed for SAS disks
+* Mon Mar 21 2005 Brian King <brking@us.ibm.com>
+- Fix scoping bug caught by gcc 4.0.
+* Fri Mar 18 2005 Brian King <brking@us.ibm.com>
+- Stop iprupdate from continually logging errors for adapters with
+  backlevel adapter firmware.
 * Mon Mar 7 2005 Brian King <brking@us.ibm.com> 2.0.14
 - Add support for non-interactive array creation and deletion through
   iprconfig.

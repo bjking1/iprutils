@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.51 2005/03/08 16:25:59 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.52 2005/03/25 22:21:02 brking Exp $
  */
 
 #include <stdarg.h>
@@ -49,7 +49,6 @@
 #include <paths.h>
 #include <bits/sockaddr.h>
 #include <linux/netlink.h>
-#include <sys/capability.h>
 
 #define IPR_DASD_UCODE_USRLIB 0
 #define IPR_DASD_UCODE_ETC 1
@@ -186,7 +185,6 @@ extern int ipr_debug;
 extern int ipr_force;
 extern int ipr_sg_required;
 extern int polling_mode;
-extern char *hotplug_dir;
 extern char *tool_name;
 extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
@@ -1370,6 +1368,7 @@ int get_ses_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
 void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 void ipr_init_dev(struct ipr_dev *);
+void ipr_init_new_dev(struct ipr_dev *);
 void ipr_init_ioa(struct ipr_ioa *);
 int device_supported(struct ipr_dev *);
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr);
