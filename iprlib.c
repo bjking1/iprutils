@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.35 2004/03/11 23:25:36 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.36 2004/03/12 00:15:13 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -1022,6 +1022,8 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 
 	cdb[0] = IPR_RECLAIM_CACHE_STORE;
 	cdb[1] = (u8)action;
+	cdb[7] = (length & 0xff00) >> 8;
+	cdb[8] = length & 0xff;
 
 	rc = sg_ioctl(fd, cdb, buff,
 		      length, SG_DXFER_FROM_DEV,
@@ -1031,7 +1033,7 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 		if (errno != EINVAL)
 			ioa_cmd_err(ioa, &sense_data, "Reclaim Cache", rc);
 	}
-	else if ((action & IPR_RECLAIM_PERFORM) == IPR_RECLAIM_PERFORM)
+	else if ((action & IPR_RECLAIM_ACTION) == IPR_RECLAIM_PERFORM)
 		ipr_reset_adapter(ioa);
 
 	close(fd);
