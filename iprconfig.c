@@ -51,6 +51,7 @@ struct array_cmd_data {
 	u8                           array_id;
 	u8                           prot_level;
 	u16                          stripe_size;
+	int                          qdepth;
 	u32                          do_cmd;
 	struct ipr_ioa              *ipr_ioa;
 	struct ipr_dev              *ipr_dev;
@@ -2583,9 +2584,70 @@ int configure_raid_start(i_container *i_con)
 	return rc;
 }
 
+int display_input(int field_start_row, int *userptr)
+{
+	FIELD *input_fields[3];
+	FORM *form;
+	WINDOW *box1_win, *field_win;
+	int field_rows = 2;
+	int field_cols = 16;
+	char *input;
+	int ch;
+	int rc = RC_SUCCESS;
+
+	input_fields[0] = new_field(1, 16, 0, 0, 0, 0);
+	input_fields[1] = new_field(1, 3, 1, 0, 0, 0);
+	input_fields[2] = NULL;
+
+	set_field_buffer(input_fields[0],0, "Enter new value");
+	field_opts_off(input_fields[0], O_ACTIVE);
+	field_opts_off(input_fields[0], O_EDIT);
+	box1_win = newwin(field_rows + 2, field_cols + 2, field_start_row - 1, 54);
+	field_win = newwin(field_rows, field_cols, field_start_row, 55);
+	box(box1_win,ACS_VLINE,ACS_HLINE);
+
+	form = new_form(input_fields);
+	set_current_field(form, input_fields[1]);
+
+	set_form_win(form,field_win);
+	set_form_sub(form,field_win);
+	post_form(form);
+
+	form_driver(form, REQ_FIRST_FIELD);
+	wnoutrefresh(box1_win);
+
+	while (1) {
+		wnoutrefresh(field_win);
+		doupdate();
+		ch = getch();
+		if (IS_ENTER_KEY(ch)) {
+			form_driver(form,REQ_VALIDATION);
+			input = field_buffer(input_fields[1],0);
+			sscanf(input, "%d",userptr);
+			break;
+		} else if (IS_EXIT_KEY(ch)) {
+			rc = EXIT_FLAG;
+			break;
+		} else if (IS_CANCEL_KEY(ch)) {
+			rc = CANCEL_FLAG;
+			break;
+		} else if (isascii(ch))
+			form_driver(form, ch);
+	}
+
+	wclear(field_win);
+	wrefresh(field_win);
+	delwin(field_win);
+	wclear(box1_win);
+	wrefresh(box1_win);
+	delwin(box1_win);
+
+	return rc;
+}
+
 int configure_raid_parameters(i_container *i_con)
 {
-	FIELD *input_fields[4];
+	FIELD *input_fields[5];
 	FIELD *cur_field;
 	FORM *form;
 	ITEM **raid_item = NULL;
@@ -2603,7 +2665,7 @@ int configure_raid_parameters(i_container *i_con)
 	{
 		char line[16];
 	} *raid_menu_str = NULL, *stripe_menu_str = NULL;
-	char raid_str[16], stripe_str[16];
+	char raid_str[16], stripe_str[16], qdepth_str[4];
 	int ch, start_row;
 	int cur_field_index;
 	int selected_count = 0;
@@ -2612,6 +2674,7 @@ int configure_raid_parameters(i_container *i_con)
 	int *userptr = NULL;
 	int *retptr;
 	int max_x,max_y,start_y,start_x;
+	int qdepth, new_qdepth;
 
 	getmaxyx(stdscr,max_y,max_x);
 	getbegyx(stdscr,start_y,start_x);
@@ -2636,7 +2699,13 @@ int configure_raid_parameters(i_container *i_con)
 				    0,           /* number of offscreen rows */
 				    0);          /* number of working buffers */
 
-	input_fields[3] = NULL;
+	/* Queue depth */
+	input_fields[3] = new_field(1, 3,   /* new field size */ 
+				    10, 44,       /*  */
+				    0,           /* number of offscreen rows */
+				    0);          /* number of working buffers */
+
+	input_fields[4] = NULL;
 
 
 	cur_ioa = cur_raid_cmd->ipr_ioa;
@@ -2652,6 +2721,8 @@ int configure_raid_parameters(i_container *i_con)
 		    device_record->issue_cmd)
 			selected_count++;
 	}
+	qdepth = selected_count * 4;
+	cur_raid_cmd->qdepth = qdepth;
 
 	/* set up raid lists */
 	raid_index = 0;
@@ -2685,10 +2756,12 @@ int configure_raid_parameters(i_container *i_con)
 	set_current_field(form, input_fields[1]);
 
 	set_field_just(input_fields[0], JUSTIFY_CENTER);
+	set_field_just(input_fields[3], JUSTIFY_LEFT);
 
 	field_opts_off(input_fields[0], O_ACTIVE);
 	field_opts_off(input_fields[1], O_EDIT);
 	field_opts_off(input_fields[2], O_EDIT);
+	field_opts_off(input_fields[3], O_EDIT);
 
 	set_field_buffer(input_fields[0],        /* field to alter */
 			 0,          /* number of buffer to alter */
@@ -2708,8 +2781,9 @@ int configure_raid_parameters(i_container *i_con)
 	mvaddstr(3, 1, _("setting hit \"c\" for options menu.  Highlight desired"));
 	mvaddstr(4, 1, _("option then hit Enter"));
 	mvaddstr(6, 1, _("c=Change Setting"));
-	mvaddstr(8, 0, "Protection Level . . . . . . . . . . . . :");
-	mvaddstr(9, 0, "Stripe Size  . . . . . . . . . . . . . . :");
+	mvaddstr(8, 0,  "Protection Level . . . . . . . . . . . . :");
+	mvaddstr(9, 0,  "Stripe Size  . . . . . . . . . . . . . . :");
+	mvprintw(10, 0, "Queue Depth (default = %3d). . . . . . . :", qdepth);
 	mvaddstr(max_y - 4, 0, _("Press Enter to Continue"));
 	mvaddstr(max_y - 2, 0, EXIT_KEY_LABEL CANCEL_KEY_LABEL);
 
@@ -2730,6 +2804,12 @@ int configure_raid_parameters(i_container *i_con)
 		set_field_buffer(input_fields[2],     /* field to alter */
 				 0,                    /* number of buffer to alter */
 				 stripe_str);          /* string value to set */
+
+		sprintf(qdepth_str,"%3d",qdepth);
+
+		set_field_buffer(input_fields[3],     /* field to alter */
+				 0,                    /* number of buffer to alter */
+				 qdepth_str);          /* string value to set */
 
 		refresh();
 		ch = getch();
@@ -2826,8 +2906,20 @@ int configure_raid_parameters(i_container *i_con)
 				rc = display_menu(raid_item, start_row, index, &retptr);
 				if (rc == RC_SUCCESS)
 					stripe_sz = stripe_sz_list[*retptr];
-			}
-			else
+			} else if (cur_field_index == 3) {
+				start_row = 10;
+				rc = display_input(start_row, &new_qdepth);
+				if (rc == EXIT_FLAG)
+					goto leave;
+				if (rc == CANCEL_FLAG)
+					continue;
+
+				if (new_qdepth > 128)
+					qdepth = 128;
+				else
+					qdepth = new_qdepth;
+				continue;
+			} else
 				continue;
 
 			i=0;
@@ -2842,6 +2934,7 @@ int configure_raid_parameters(i_container *i_con)
 			/* set protection level and stripe size appropriately */
 			cur_raid_cmd->prot_level = cur_array_cap_entry->prot_level;
 			cur_raid_cmd->stripe_size = stripe_sz;
+			cur_raid_cmd->qdepth = qdepth;
 			goto leave;
 		} else if (ch == KEY_RIGHT)
 			form_driver(form, REQ_NEXT_CHAR);
@@ -2986,15 +3079,24 @@ int raid_start_complete()
 	int not_done = 0;
 	int rc, j;
 	u32 percent_cmplt = 0;
+	int device_available = 0;
+	int wait_device = 0;
+	int exit_now = 0;
 	struct ipr_ioa *cur_ioa;
 	struct array_cmd_data *cur_raid_cmd;
+	struct ipr_dev *ipr_dev;
+	struct ipr_disk_attr attr;
 
 	while (1) {
 
 		rc = complete_screen_driver(&n_raid_start_complete,percent_cmplt,1);
 
-		if (rc & EXIT_FLAG)
-			return rc;
+		if ((rc & EXIT_FLAG) || exit_now) {
+			exit_now = 1;
+
+			if (device_available)
+				return EXIT_FLAG;
+		}
 
 		percent_cmplt = 100;
 		done_bad = 0;
@@ -3019,25 +3121,51 @@ int raid_start_complete()
 
 			for (j=0; j < cmd_status.num_records; j++, status_record++) {
 
-				if ((status_record->command_code == IPR_START_ARRAY_PROTECTION) &&
-				    (cur_raid_cmd->array_id == status_record->array_id)) {
+				if ((status_record->command_code != IPR_START_ARRAY_PROTECTION) ||
+				    (cur_raid_cmd->array_id != status_record->array_id))
+					continue;
 
-					if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS) {
+				if (!(device_available) &&
+				    (status_record->resource_handle != IPR_IOA_RESOURCE_HANDLE)) {
 
-						if (status_record->percent_complete < percent_cmplt)
-							percent_cmplt = status_record->percent_complete;
-						not_done = 1;
-					} else if (status_record->status !=
-						   IPR_CMD_STATUS_SUCCESSFUL) {
-
-						done_bad = 1;
-						syslog(LOG_ERR, _("Start parity protect to %s failed.  "
-						       "Check device configuration for proper format.\n"),
-						       cur_ioa->ioa.gen_name);
-						rc = RC_FAILED;
+					check_current_config(false);
+					ipr_dev = get_dev_from_handle(status_record->resource_handle);
+					if ((ipr_dev)  &&  (ipr_dev->scsi_dev_data)) {
+						device_available = 1;
+						ipr_init_dev(ipr_dev);
+						if (ipr_get_dev_attr(ipr_dev, &attr)) {
+							syslog(LOG_ERR, _("Unable to read queue_depth"));
+						} else {
+							attr.queue_depth = cur_raid_cmd->qdepth;
+							if (ipr_set_dev_attr(ipr_dev, &attr, 1))
+								syslog(LOG_ERR, _("Unable to set queue_depth"));
+						}
 					}
-					break;
 				}
+
+				if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS) {
+
+					if (status_record->percent_complete < percent_cmplt)
+						percent_cmplt = status_record->percent_complete;
+					not_done = 1;
+				} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL) {
+
+					done_bad = 1;
+					syslog(LOG_ERR, _("Start parity protect to %s failed.  "
+							  "Check device configuration for proper format.\n"),
+					       cur_ioa->ioa.gen_name);
+					rc = RC_FAILED;
+				} else if (!(device_available)) {
+					wait_device++;
+
+					/* if device did not show up after
+					  parity set created, allow exit */
+					if (wait_device == 20)
+						syslog(LOG_ERR, _("Unable to set queue_depth"));
+					else
+						not_done = 1;
+				}
+				break;
 			}
 		}
 
@@ -4660,7 +4788,7 @@ int process_conc_maint(i_container *i_con, int action)
 
 			while (time--) {
 				check_current_config(false);
-				if ((ipr_dev = get_dev(&res_addr))) {
+				if ((ipr_dev = get_dev_from_addr(&res_addr))) {
 					ipr_init_dev(ipr_dev);
 					break;
 				}
@@ -7187,33 +7315,9 @@ int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_conf
 	start_row += 2; /* for title */  /* FIXME */
 
 	if (disk_config_attr->option == 1) { /* queue depth*/
-
-		num_menu_items = ARRAY_SIZE(queue_depth_opt);
-		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
-		userptr = malloc(sizeof(int) * num_menu_items);
-
-		menu_index = 0;
-		for (i=0; strlen(queue_depth_opt[i]) != 0; i++) {
-
-			menu_item[menu_index] = new_item(queue_depth_opt[i],"");
-			userptr[menu_index] = i;
-			set_item_userptr(menu_item[menu_index],
-					 (char *)&userptr[menu_index]);
-			menu_index++;
-		}
-
-		menu_item[menu_index] = (ITEM *)NULL;
-		rc = display_menu(menu_item, start_row, menu_index, &retptr);
-
-		if (rc == RC_SUCCESS)
-			sscanf(queue_depth_opt[*retptr], "%d", &disk_config_attr->queue_depth);
-
-		i=0;
-		while (menu_item[i] != NULL)
-			free_item(menu_item[i++]);
-		free(menu_item);
-		free(userptr);
-		menu_item = NULL;
+		rc = display_input(start_row, &disk_config_attr->queue_depth);
+		if (disk_config_attr->queue_depth > 128)
+			disk_config_attr->queue_depth = 128;
 	} else if (disk_config_attr->option == 3) {  /* tag command queue.*/
 
 		num_menu_items = 2;

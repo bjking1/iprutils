@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.31 2004/03/12 21:26:44 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.32 2004/03/15 22:09:48 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -1198,7 +1198,8 @@ void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 void ipr_init_dev(struct ipr_dev *);
 void ipr_init_ioa(struct ipr_ioa *);
 int device_supported(struct ipr_dev *);
-struct ipr_dev *get_dev(struct ipr_res_addr *res_addr);
+struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr);
+struct ipr_dev *get_dev_from_handle(u32 res_handle);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

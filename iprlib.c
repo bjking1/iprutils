@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.40 2004/03/12 21:26:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.41 2004/03/15 22:09:48 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -3350,7 +3350,7 @@ void ipr_init_ioa(struct ipr_ioa *ioa)
 	init_ioa_dev(&ioa->ioa);
 }
 
-struct ipr_dev *get_dev(struct ipr_res_addr *res_addr)
+struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 {
 	struct ipr_ioa *cur_ioa;
 	int j;
@@ -3370,6 +3370,37 @@ struct ipr_dev *get_dev(struct ipr_res_addr *res_addr)
 			    (scsi_dev_data->id = res_addr->target) &&
 			    (scsi_dev_data->lun = res_addr->lun))
 				return &cur_ioa->dev[j];
+		}
+	}
+
+	return NULL;
+}
+
+struct ipr_dev *get_dev_from_handle(u32 res_handle)
+{
+	struct ipr_ioa *cur_ioa;
+	int j;
+	struct ipr_dev_record *device_record;
+	struct ipr_array_record *array_record;
+
+	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
+
+		for (j = 0; j < cur_ioa->num_devices; j++) {
+
+			device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
+			array_record = (struct ipr_array_record *)cur_ioa->dev[j].qac_entry;
+
+			if (device_record == NULL)
+				continue;
+
+			if ((device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+			    (device_record->resource_handle == res_handle))
+				return &cur_ioa->dev[j];
+
+			if ((array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD) &&
+			    (array_record->resource_handle == res_handle))
+				return &cur_ioa->dev[j];
+
 		}
 	}
 
