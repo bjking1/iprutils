@@ -1,22 +1,22 @@
 #!/bin/bash
 #
-#       /etc/rc.d/init.d/sisupdated
+#       /etc/rc.d/init.d/iprupdated
 #
-# Runs the sisupdate utility for ibmsis supported devices
+# Runs the iprupdate utility for ipr supported devices
 #
 # chkconfig:  2345 30 90
-# description: Runs the sisupdate utility to update firmware images \
-#   for adapters and devices under the ibmsis device driver.
-# processname: sisupdate
+# description: Runs the iprupdate utility to update firmware images \
+#   for adapters and devices under the ipr device driver.
+# processname: iprupdate
 . /etc/init.d/functions
 
-prog="sisupdate"
+prog="iprupdate"
 
 start() {
         echo -n $"Starting $prog: "
         $prog
         RETVAL=$?
-        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/sisupdate
+        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/iprupdate
         echo
         return $RETVAL
 }
@@ -55,7 +55,7 @@ case "$1" in
         rhstatus
         ;;
   condrestart)
-        [ -f /var/lock/subsys/sisupdate ] && restart || :
+        [ -f /var/lock/subsys/iprupdate ] && restart || :
         ;;
   *)
         echo "Usage: $0 {start|stop|status|restart|condrestart}"

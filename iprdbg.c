@@ -1,6 +1,6 @@
 /******************************************************************/
-/* Linux IBM SIS IOA debug utility                                */
-/* Description: IBM Storage IOA Interface Specification (SIS)     */
+/* Linux IBM IPR IOA debug utility                                */
+/* Description: IBM Storage IOA Interface Specification (IPR)     */
 /*              Linux debug utility                               */
 /*                                                                */
 /* (C) Copyright 2003                                             */
@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.1 2003/10/22 22:21:02 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -24,24 +24,24 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define IBMSIS_MAX_FLIT_ENTRIES 59
-#define IBMSIS_FLIT_TIMESTAMP_LEN 12
-#define IBMSIS_FLIT_FILENAME_LEN 184
+#define IPR_MAX_FLIT_ENTRIES 59
+#define IPR_FLIT_TIMESTAMP_LEN 12
+#define IPR_FLIT_FILENAME_LEN 184
 
-enum sisdbg_cmd
+enum iprdbg_cmd
 {
-    SISDBG_READ = IBMSIS_IOA_DEBUG_READ_IOA_MEM,
-    SISDBG_WRITE = IBMSIS_IOA_DEBUG_WRITE_IOA_MEM,
-    SISDBG_FLIT = IBMSIS_IOA_DEBUG_READ_FLIT
+    IPRDBG_READ = IPR_IOA_DEBUG_READ_IOA_MEM,
+    IPRDBG_WRITE = IPR_IOA_DEBUG_WRITE_IOA_MEM,
+    IPRDBG_FLIT = IPR_IOA_DEBUG_READ_FLIT
 };
 
-struct ibmsis_bus_speeds
+struct ipr_bus_speeds
 {
     u8 speed;
     char *description;
 };
 
-struct ibmsis_bus_speeds bus_speeds[] =
+struct ipr_bus_speeds bus_speeds[] =
 {
     {0, "Async"},
     {1, "10MB/s"},
@@ -53,7 +53,7 @@ struct ibmsis_bus_speeds bus_speeds[] =
     {14, "320MB/s (packetized)"}
 };
 
-struct ibmsis_flit_entry
+struct ipr_flit_entry
 {
     u32 flags;
     u32 load_name;
@@ -66,25 +66,25 @@ struct ibmsis_flit_entry
     u32 bss_len;
     u32 prg_parms;
     u32 lid_flags;
-    u8 timestamp[IBMSIS_FLIT_TIMESTAMP_LEN];
-    u8 filename[IBMSIS_FLIT_FILENAME_LEN];
+    u8 timestamp[IPR_FLIT_TIMESTAMP_LEN];
+    u8 filename[IPR_FLIT_FILENAME_LEN];
 };
 
-struct ibmsis_flit
+struct ipr_flit
 {
     u32 ioa_ucode_img_rel_lvl;
     u32 num_entries;
-    struct ibmsis_flit_entry flit_entry[IBMSIS_MAX_FLIT_ENTRIES];
+    struct ipr_flit_entry flit_entry[IPR_MAX_FLIT_ENTRIES];
 };              
 
-int debug_ioctl(int fd, enum sisdbg_cmd cmd, int ioa_adx, int mask,
+int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
                 int *buffer, int len);
 
-int format_flit(struct ibmsis_flit *p_flit);
+int format_flit(struct ipr_flit *p_flit);
 
 #define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
-#define sisprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
-#define sisloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
+#define iprprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
+#define iprloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 
 FILE *outfile;
 
@@ -97,11 +97,11 @@ int main(int argc, char *argv[])
     int arg[16], write_buf[16], bus_speed;
     int *buffer;
     char cmd[100], prev_cmd[100], cmd_line[1000];
-    struct sis_ioa *p_cur_ioa;
+    struct ipr_ioa *p_cur_ioa;
     char ascii_buffer[17];
-    struct ibmsis_flit flit;
+    struct ipr_flit flit;
 
-    openlog("sisdbg",
+    openlog("iprdbg",
             LOG_PERROR | /* Print error to stderr as well */
             LOG_PID |    /* Include the PID with each error */
             LOG_CONS,    /* Write to system console if there is an error
@@ -110,15 +110,15 @@ int main(int argc, char *argv[])
 
     if (argc != 2)
     {
-        syslog(LOG_ERR, "Usage: sisdbg /dev/ibmsis0\n");
+        syslog(LOG_ERR, "Usage: iprdbg /dev/ipr0\n");
         return -EINVAL;
     }
 
-    outfile = fopen(".sisdbglog", "a");
+    outfile = fopen(".iprdbglog", "a");
 
-    tool_init("sisdbg");
+    tool_init("iprdbg");
 
-    for (p_cur_ioa = p_head_sis_ioa, ioa_num = 0;
+    for (p_cur_ioa = p_head_ipr_ioa, ioa_num = 0;
          ioa_num < num_ioas;
          p_cur_ioa = p_cur_ioa->p_next, ioa_num++)
     {
@@ -141,10 +141,10 @@ int main(int argc, char *argv[])
     }
 
     closelog();
-    openlog("sisdbg", LOG_PID, LOG_USER);
-    sisloginfo("sisdbg on %s started\n", argv[1]);
+    openlog("iprdbg", LOG_PID, LOG_USER);
+    iprloginfo("iprdbg on %s started\n", argv[1]);
     closelog();
-    openlog("sisdbg", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
+    openlog("iprdbg", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
     printf("\nATTENTION: This utility is for adapter developers only! Use at your own risk!\n");
     printf("\nUse \"quit\" to exit the program.\n\n");
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 
     while(1)
     {
-        printf("SISDB(%X)> ", p_cur_ioa->ccin);
+        printf("IPRDB(%X)> ", p_cur_ioa->ccin);
 
         memset(cmd, 0, sizeof(cmd));
         memset(cmd_line, 0, sizeof(cmd_line));
@@ -207,22 +207,22 @@ int main(int argc, char *argv[])
                  bus < num_buses;
                  bus++)
             {
-                rc = debug_ioctl(fd, SISDBG_READ, address, 0,
+                rc = debug_ioctl(fd, IPRDBG_READ, address, 0,
                                  buffer, length);
 
                 if (!rc)
                 {
-                    sisprint("\nBus %d speeds:\n", bus);
+                    iprprint("\nBus %d speeds:\n", bus);
 
                     for (i = 0; i < 16; i++)
                     {
-                        bus_speed = sistoh32(buffer[i]) & 0x0000000f;
+                        bus_speed = iprtoh32(buffer[i]) & 0x0000000f;
 
-                        for (j = 0; j < sizeof(bus_speeds)/sizeof(struct ibmsis_bus_speeds); j++)
+                        for (j = 0; j < sizeof(bus_speeds)/sizeof(struct ipr_bus_speeds); j++)
                         {
                             if (bus_speed == bus_speeds[j].speed)
                             {
-                                sisprint("Target %d: %s\n", i, bus_speeds[j].description);
+                                iprprint("Target %d: %s\n", i, bus_speeds[j].description);
                             }
                         }
                     }
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
         {
             if (num_args < 2)
             {
-                sisprint("Invalid syntax\n");
+                iprprint("Invalid syntax\n");
                 continue;
             }
             else if (num_args == 2)
@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
             }
             else if ((length % 4) != 0)
             {
-                sisprint("Length must be 4 byte multiple\n");
+                iprprint("Length must be 4 byte multiple\n");
                 continue;
             }
             else
@@ -271,12 +271,12 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            rc = debug_ioctl(fd, SISDBG_READ, address, 0,
+            rc = debug_ioctl(fd, IPRDBG_READ, address, 0,
                              buffer, length);
 
             for (i = 0; (rc == 0) && (i < (length / 4));)
             {
-                sisprint("%08X: ", address+(i*4));
+                iprprint("%08X: ", address+(i*4));
 
                 memset(ascii_buffer, '\0', sizeof(ascii_buffer));
 
@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
                      (i < (length / 4)) && (j < 4);
                      j++, i++)
                 {
-                    sisprint("%08X ", sistoh32(buffer[i]));
+                    iprprint("%08X ", iprtoh32(buffer[i]));
                     memcpy(&ascii_buffer[j*4], &buffer[i], 4);
                     for (k = 0; k < 4; k++)
                     {
@@ -295,11 +295,11 @@ int main(int argc, char *argv[])
 
                 for (;j < 4; j++)
                 {
-                    sisprint("         ");
+                    iprprint("         ");
                     strncat(ascii_buffer, "....", sizeof(ascii_buffer)-1);
                 }
 
-                sisprint("   |%s|\n", ascii_buffer);
+                iprprint("   |%s|\n", ascii_buffer);
             }
 
             free(buffer);
@@ -311,34 +311,34 @@ int main(int argc, char *argv[])
         {
             if (num_args < 3)
             {
-                sisprint("Invalid syntax\n");
+                iprprint("Invalid syntax\n");
                 continue;
             }
 
             /* Byte swap everything */
             for (i = 0; i < num_args-2; i++)
-                write_buf[i] = htosis32(arg[i]);
+                write_buf[i] = htoipr32(arg[i]);
 
-            debug_ioctl(fd, SISDBG_WRITE, address, 0,
+            debug_ioctl(fd, IPRDBG_WRITE, address, 0,
                         write_buf, (num_args-2)*4);
         }
         else if (!strcmp(cmd, "bm4"))
         {
             if (num_args < 3)
             {
-                sisprint("Invalid syntax\n");
+                iprprint("Invalid syntax\n");
                 continue;
             }
 
             /* Byte swap the data */
-            write_buf[0] = htosis32(arg[0]);
+            write_buf[0] = htoipr32(arg[0]);
 
-            debug_ioctl(fd, SISDBG_WRITE, address, arg[1],
+            debug_ioctl(fd, IPRDBG_WRITE, address, arg[1],
                         write_buf, 4);
         }
         else if (!strcmp(cmd, "flit"))
         {
-            rc = debug_ioctl(fd, SISDBG_FLIT, 0, 0,
+            rc = debug_ioctl(fd, IPRDBG_FLIT, 0, 0,
                              (int *)&flit, sizeof(flit));
 
             if (rc != 0)
@@ -367,14 +367,14 @@ int main(int argc, char *argv[])
                  !strcmp(cmd, "q") || !strcmp(cmd, "x"))
         {
             closelog();
-            openlog("sisdbg", LOG_PID, LOG_USER);
-            sisloginfo("sisdbg on %s exited\n", argv[1]);
+            openlog("iprdbg", LOG_PID, LOG_USER);
+            iprloginfo("iprdbg on %s exited\n", argv[1]);
             closelog();
             return 0;
         }
         else
         {
-            sisprint("Invalid command %s. Use \"help\" for a list "
+            iprprint("Invalid command %s. Use \"help\" for a list "
                    "of valid commands\n", cmd);
             continue;
         }
@@ -385,17 +385,17 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int debug_ioctl(int fd, enum sisdbg_cmd cmd, int ioa_adx, int mask,
+int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
                 int *buffer, int len)
 {
-    struct ibmsis_ioctl_cmd_internal ioa_cmd;
+    struct ipr_ioctl_cmd_internal ioa_cmd;
     int rc;
 
-    memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
+    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
 
     ioa_cmd.buffer = buffer;
     ioa_cmd.buffer_len = len;
-    ioa_cmd.cdb[0] = IBMSIS_IOA_DEBUG;
+    ioa_cmd.cdb[0] = IPR_IOA_DEBUG;
     ioa_cmd.cdb[1] = cmd;
     ioa_cmd.cdb[2] = (ioa_adx >> 24) & 0xff;
     ioa_cmd.cdb[3] = (ioa_adx >> 16) & 0xff;
@@ -410,10 +410,10 @@ int debug_ioctl(int fd, enum sisdbg_cmd cmd, int ioa_adx, int mask,
     ioa_cmd.cdb[12] = (len >> 8) & 0xff;
     ioa_cmd.cdb[13] = len & 0xff;
 
-    if (cmd != SISDBG_WRITE)
+    if (cmd != IPRDBG_WRITE)
         ioa_cmd.read_not_write = 1;
 
-    rc = sis_ioctl(fd, IBMSIS_IOA_DEBUG, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_IOA_DEBUG, &ioa_cmd);
 
     if (rc != 0)
         fprintf(stderr, "Debug IOCTL failed. %d\n", errno);
@@ -421,29 +421,29 @@ int debug_ioctl(int fd, enum sisdbg_cmd cmd, int ioa_adx, int mask,
     return rc;
 }
 
-int format_flit(struct ibmsis_flit *p_flit)
+int format_flit(struct ipr_flit *p_flit)
 {
-    int num_entries = sistoh32(p_flit->num_entries) - 1;
-    struct ibmsis_flit_entry *p_flit_entry;
+    int num_entries = iprtoh32(p_flit->num_entries) - 1;
+    struct ipr_flit_entry *p_flit_entry;
 
     signed int path_length;
-    u8 filename[IBMSIS_FLIT_FILENAME_LEN+1];
-    u8 time[IBMSIS_FLIT_TIMESTAMP_LEN+1];
-    u8 buf1[IBMSIS_FLIT_FILENAME_LEN+1];
-    u8 buf2[IBMSIS_FLIT_FILENAME_LEN+1];
-    u8 lid_name[IBMSIS_FLIT_FILENAME_LEN+1];
-    u8 path[IBMSIS_FLIT_FILENAME_LEN+1];
+    u8 filename[IPR_FLIT_FILENAME_LEN+1];
+    u8 time[IPR_FLIT_TIMESTAMP_LEN+1];
+    u8 buf1[IPR_FLIT_FILENAME_LEN+1];
+    u8 buf2[IPR_FLIT_FILENAME_LEN+1];
+    u8 lid_name[IPR_FLIT_FILENAME_LEN+1];
+    u8 path[IPR_FLIT_FILENAME_LEN+1];
     int num_args, i;
 
     for (i = 0, p_flit_entry = p_flit->flit_entry;
          (i < num_entries) && (*p_flit_entry->timestamp);
          p_flit_entry++, i++)
     {
-        snprintf(time, IBMSIS_FLIT_TIMESTAMP_LEN, p_flit_entry->timestamp);
-        time[IBMSIS_FLIT_TIMESTAMP_LEN] = '\0';
+        snprintf(time, IPR_FLIT_TIMESTAMP_LEN, p_flit_entry->timestamp);
+        time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
 
-        snprintf(filename, IBMSIS_FLIT_FILENAME_LEN, p_flit_entry->filename);
-        filename[IBMSIS_FLIT_FILENAME_LEN] = '\0';
+        snprintf(filename, IPR_FLIT_FILENAME_LEN, p_flit_entry->filename);
+        filename[IPR_FLIT_FILENAME_LEN] = '\0';
 
         num_args = sscanf(filename, "%184s "
                           "%184s "
@@ -459,16 +459,16 @@ int format_flit(struct ibmsis_flit *p_flit)
 
         path_length = strlen(path);
 
-        sisprint("LID Name:   %s  (%8X)\n", lid_name, sistoh32(p_flit_entry->load_name));
-        sisprint("Time Stamp: %s\n", time);
-        sisprint("LID Path:   %s\n", lid_name);
-        sisprint("Text Segment:  Address %08X,  Length %8X\n",
-               sistoh32(p_flit_entry->text_ptr), sistoh32(p_flit_entry->text_len));
-        sisprint("Data Segment:  Address %08X,  Length %8X\n",
-               sistoh32(p_flit_entry->data_ptr), sistoh32(p_flit_entry->data_len));
-        sisprint("BSS Segment:   Address %08X,  Length %8X\n",
-               sistoh32(p_flit_entry->bss_ptr), sistoh32(p_flit_entry->bss_len));
-        sisprint("\n");
+        iprprint("LID Name:   %s  (%8X)\n", lid_name, iprtoh32(p_flit_entry->load_name));
+        iprprint("Time Stamp: %s\n", time);
+        iprprint("LID Path:   %s\n", lid_name);
+        iprprint("Text Segment:  Address %08X,  Length %8X\n",
+               iprtoh32(p_flit_entry->text_ptr), iprtoh32(p_flit_entry->text_len));
+        iprprint("Data Segment:  Address %08X,  Length %8X\n",
+               iprtoh32(p_flit_entry->data_ptr), iprtoh32(p_flit_entry->data_len));
+        iprprint("BSS Segment:   Address %08X,  Length %8X\n",
+               iprtoh32(p_flit_entry->bss_ptr), iprtoh32(p_flit_entry->bss_len));
+        iprprint("\n");
     }
 
     return 0;

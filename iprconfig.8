@@ -1,17 +1,17 @@
-.TH SISCONFIG 8 "March 2003"
+.TH IPRCONFIG 8 "March 2003"
 .SH NAME
-sisconfig \- IBM storage adapter configuration/recovery utility
-.SH SYNOPSIS
-.BI "sisconfig [-e editor] [-k dir] [-p mode]"
+iprconfig \- IBM storage adapter configuration/recovery utility
+.SH SYNOPIPR
+.BI "iprconfig [-e editor] [-k dir] [-p mode]"
 .sp
-.BI "sisconfig --version"
+.BI "iprconfig --version"
 .SH DESCRIPTION
-.B sisconfig
+.B iprconfig
 is used to configure IBM storage adapters, display information
 about them, and to perform IOA and disk unit recovery scenarios. It was originally
 designed to emulate IBM iSeries DST/SST green screens and should have similar
 behavior. The interface is completely menu driven. The various screens will
-look slightly different depending on the hardware platform sisconfig is
+look slightly different depending on the hardware platform iprconfig is
 being run on. The various menu options are: 
 .PP
 .B 1. Display disk hardware status.
@@ -70,7 +70,7 @@ is used to stop device parity protection and delete disk arrays.
 Selecting this option will provide you with a candidate list of disk arrays 
 which can be stopped. If you have devices which are in disk arrays and they 
 are not available as candidates to stop, you may need to format the 
-devices using sisconfig.
+devices using iprconfig.
 .PP
 .B Include unit in device parity protection
 is used to allow compatible devices to be included into an existing
@@ -136,10 +136,10 @@ This can be changed by using option 6 on the
 .B Kernel Messages Log 
 menu. Selecting
 option 1 on the Kernel Messages Log menu will display only the most recent 
-errors logged by the ibmsis device driver and may be useful to filter out 
+errors logged by the ipr device driver and may be useful to filter out 
 some of the clutter. Option 2 will display all recorded errors logged by the
-ibmsis device driver. Option 3 will display all kernel messages. Option 4 will
-display errors logged by the sisconfig utility. This may be useful for
+ipr device driver. Option 3 will display all kernel messages. Option 4 will
+display errors logged by the iprconfig utility. This may be useful for
 debugging problems. Option 5 can be used to change where the tool looks
 to find the kernel messages files. The default is to look in /var/log.
 .SH OPTIONS
@@ -161,14 +161,9 @@ generic.
 .TP
 .B \-\-version
 Print version number of 
-.B sisconfig
+.B iprconfig
 .SH AUTHOR
 Brian King (bjking1@us.ibm.com)
-.SH AVAILABILITY
-The ibmsis device driver and all associated user space utilities are available
-for download at
-.nf
-.B http://www.ibm.com/servers/eserver/iseries/linux/
 .SH NOTES
 .TP
 .B Notes on using under iSeries 5250 telnet

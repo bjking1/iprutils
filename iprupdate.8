@@ -1,13 +1,13 @@
-.TH SISUPDATE 8 "May 2001"
+.TH IPRUPDATE 8 "May 2001"
 .SH NAME
-sisupdate - IBM storage adapter/disk unit microcode/configuration update utility
-.SH SYNOPSIS
-.B sisupdate
+iprupdate - IBM storage adapter/disk unit microcode/configuration update utility
+.SH SYNOPIPR
+.B iprupdate
 .SH DESCRIPTION
-.B sisupdate
+.B iprupdate
 is used to update the firmware on IBM storage adapters and the disk units
 attached to them and to update the configuration to use the saved configuration. 
-It can be run at any time while the ibmsis device driver is loaded. The 
+It can be run at any time while the ipr device driver is loaded. The 
 utility will check the firmware revision level of each storage adapter/disk unit on
 the system and compare it to the firmware revision level that is installed
 in /etc/microcode. If the firmware levels do not 
@@ -15,16 +15,11 @@ match, the firmware will be updated. Only adapters/disk units needing an update
 will be updated. Additionally, this utility will configure SCSI bus attributes 
 such as maximum bus speed, initiator SCSI ID, etc. This utility MUST be run in order
 to enable bus speeds > 80 MB/s. It is desired that this be called in early boot 
-shortly after the ibmsis device driver is loaded.  
+shortly after the ipr device driver is loaded.  
 .SH OPTIONS
 .TP
 .B \-\-version
 Print the version number of
-.B sisupdate
+.B iprupdate
 .SH AUTHOR
 Brian King (bjking1@us.ibm.com)
-.SH AVAILABILITY
-The ibmsis device driver and all associated userspace utilities are available
-for download at
-.nf
-.B http://www.ibm.com/servers/eserver/iseries/linux/

@@ -1,16 +1,16 @@
 #!/bin/bash
 #
-#       /etc/rc.d/init.d/sisdumpd
+#       /etc/rc.d/init.d/iprdumpd
 #
-# Runs the sisdump utility for the ibmsis device driver
+# Runs the iprdump utility for the ipr device driver
 #
 # chkconfig:  2345 20 90
-# description: Starts the sisdump daemon which is used to gather \
+# description: Starts the iprdump daemon which is used to gather \
 #   data for failure analysis in  the event of a severe failure  \
-#   of the ibmsis driver and its supported hardware.
-# processname: sisdump
+#   of the ipr driver and its supported hardware.
+# processname: iprdump
 
-prog="sisdump"
+prog="iprdump"
 RETVAL=0
 
 . /etc/init.d/functions
@@ -19,7 +19,7 @@ start() {
         echo -n $"Starting $prog: "
         daemon $prog
         RETVAL=$?
-        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/sisdump
+        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/iprdump
         echo
         return $RETVAL
 }
@@ -28,7 +28,7 @@ stop() {
        echo -n $"Stopping $prog: "
        killproc $prog
        RETVAL=$?
-       [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/sisdump
+       [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/iprdump
        echo
        return $RETVAL
 }
@@ -67,7 +67,7 @@ case "$1" in
         rhstatus
         ;;
   condrestart)
-        [ -f /var/lock/subsys/sisdump ] && restart || :
+        [ -f /var/lock/subsys/iprdump ] && restart || :
         ;;
   *)
         echo "Usage: $0 {start|stop|status|restart|condrestart}"

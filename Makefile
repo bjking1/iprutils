@@ -51,7 +51,7 @@ utils: ./*.c ./*.h
 
 clean:
 	rm -f iprupdate iprconfig iprdump iprtrace iprdbg iprupdate.ps iprupdate.pdf iprlib.o
-	rm -f iprconfig.ps iprconfig.pdf iprdump.pdf iprdump.ps
+	rm -f iprconfig.ps iprconfig.pdf iprdump.pdf iprdump.ps *.tgz *.rpm
 	rm -rf docs
 
 install: all
@@ -65,3 +65,13 @@ install: all
 	install docs/iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz
 	install docs/iprupdate.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprupdate.8.gz
 	install docs/iprdump.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprdump.8.gz
+
+rpm: *.c *.h *.8
+	-make clean
+	cd ..
+	cp -f spec/iprutils.spec .
+	cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS iprutils
+	mv ../iprutils-$(UTILS_VER)-src.tgz .
+	rm -f iprutils.spec
+	rpmbuild --nodeps -ts iprutils-$(UTILS_VER)-src.tgz
+	cp /home/$(USER)/rpm/SRPMS/iprutils-$(UTILS_VER)-1.src.rpm .

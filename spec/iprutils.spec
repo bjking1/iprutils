@@ -1,52 +1,51 @@
-Summary: Utilities for the IBM iSeries/pSeries SCSI storage adapter
-Name: ibmsisutils
-Version: 1.19.12
+Summary: Utilities for the IBM Power Linux RAID adapters
+Name: iprutils
+Version: 1.0.0
 Release: 1
 License: IPL
 Group: Hardware/SCSI
-Source0: ibmsisutils-%version-src.tgz
-BuildRequires: ibmsis-devel
+Source0: iprutils-%version-src.tgz
 
 %description
 Provides a suite of utilities to manage and configure SCSI devices
-supported by the ibmsis SCSI storage device driver.
+supported by the ipr SCSI storage device driver.
 
 %prep
-rm -rf $RPM_BUILD_DIR/sisutils
-tar -xvzf $RPM_SOURCE_DIR/ibmsisutils-%version-src.tgz
+rm -rf $RPM_BUILD_DIR/iprutils
+tar -xvzf $RPM_SOURCE_DIR/iprutils-%version-src.tgz
 
 %build
-cd sisutils
+cd iprutils
 make
 
 %install
-cd sisutils
+cd iprutils
 make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
 install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
-install init.d/sisdump $RPM_BUILD_ROOT/etc/rc.d/init.d/sisdump
-install init.d/sisupdate $RPM_BUILD_ROOT/etc/rc.d/init.d/sisupdate
+install init.d/iprdump $RPM_BUILD_ROOT/etc/rc.d/init.d/iprdump
+install init.d/iprupdate $RPM_BUILD_ROOT/etc/rc.d/init.d/iprupdate
 
 %post
-/sbin/chkconfig --add sisdump
-/sbin/chkconfig --add sisupdate
+/sbin/chkconfig --add iprdump
+/sbin/chkconfig --add iprupdate
 
 %postun
-/sbin/chkconfig --del sisdump
-/sbin/chkconfig --del sisupdate
+/sbin/chkconfig --del iprdump
+/sbin/chkconfig --del iprupdate
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
-%doc sisutils/README
-/sbin/sisconfig
-/sbin/sisupdate
-/sbin/sisdump
-/sbin/sistrace
-/sbin/sisdbg
-%{_mandir}/man8/sisdump.8.gz
-%{_mandir}/man8/sisconfig.8.gz
-%{_mandir}/man8/sisupdate.8.gz
-/etc/rc.d/init.d/sisupdate
-/etc/rc.d/init.d/sisdump
+%doc iprutils/README
+/sbin/iprconfig
+/sbin/iprupdate
+/sbin/iprdump
+/sbin/iprtrace
+/sbin/iprdbg
+%{_mandir}/man8/iprdump.8.gz
+%{_mandir}/man8/iprconfig.8.gz
+%{_mandir}/man8/iprupdate.8.gz
+/etc/rc.d/init.d/iprupdate
+/etc/rc.d/init.d/iprdump

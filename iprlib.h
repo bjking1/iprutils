@@ -1,8 +1,8 @@
 #ifndef iprlib_h
 #define iprlib_h
 /******************************************************************/
-/* Linux IBM SIS utility library                                  */
-/* Description: IBM Storage IOA Interface Specification (SIS)     */
+/* Linux IBM IPR utility library                                  */
+/* Description: IBM Storage IOA Interface Specification (IPR)     */
 /*              Linux utility library                             */
 /*                                                                */
 /* (C) Copyright 2000, 2001                                       */
@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.2 2003/10/22 22:44:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.3 2003/10/23 01:50:54 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -41,87 +41,87 @@
 #include <netinet/in.h>
 
 #define IOCTL_BUFFER_SIZE 512
-#define IBMSIS_MAX_NUM_BUSES               4
-#define IBMSIS_VENDOR_ID_LEN            8
-#define IBMSIS_PROD_ID_LEN              16
-#define IBMSIS_SERIAL_NUM_LEN           8
-#define IBMSIS_CCB_CDB_LEN      16
-#define IBMSIS_EOL                              "\n"
-#define IBMSIS_IOCTL_SEND_COMMAND          0xf1f1
-#define IBMSIS_MAX_PSERIES_LOCATION_LEN    24
-#define IBMSIS_MAX_PHYSICAL_DEVS           192
-#define IBMSIS_QAC_BUFFER_SIZE             16000
-#define IBMSIS_VSET_MODEL_NUMBER        200
-#define IBMSIS_INVALID_ARRAY_ID                 0xFFu
-#define IBMSIS_RECLAIM_NUM_BLOCKS_MULTIPLIER    256
-#define  IBMSIS_SDB_CHECK_AND_QUIESCE           0x00u
-#define  IBMSIS_SDB_CHECK_ONLY                  0x40u
-#define IBMSIS_MAX_NUM_SUPP_INQ_PAGES   8
-#define IBMSIS_DUMP_TRACE_ENTRY_SIZE            8192
+#define IPR_MAX_NUM_BUSES               4
+#define IPR_VENDOR_ID_LEN            8
+#define IPR_PROD_ID_LEN              16
+#define IPR_SERIAL_NUM_LEN           8
+#define IPR_CCB_CDB_LEN      16
+#define IPR_EOL                              "\n"
+#define IPR_IOCTL_SEND_COMMAND          0xf1f1
+#define IPR_MAX_PSERIES_LOCATION_LEN    24
+#define IPR_MAX_PHYSICAL_DEVS           192
+#define IPR_QAC_BUFFER_SIZE             16000
+#define IPR_VSET_MODEL_NUMBER        200
+#define IPR_INVALID_ARRAY_ID                 0xFFu
+#define IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER    256
+#define  IPR_SDB_CHECK_AND_QUIESCE           0x00u
+#define  IPR_SDB_CHECK_ONLY                  0x40u
+#define IPR_MAX_NUM_SUPP_INQ_PAGES   8
+#define IPR_DUMP_TRACE_ENTRY_SIZE            8192
 
-#define IBMSIS_IOA_DEBUG                        0xDDu
-#define   IBMSIS_IOA_DEBUG_READ_IOA_MEM         0x00u
-#define   IBMSIS_IOA_DEBUG_WRITE_IOA_MEM        0x01u
-#define   IBMSIS_IOA_DEBUG_READ_FLIT            0x03u
+#define IPR_IOA_DEBUG                        0xDDu
+#define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
+#define   IPR_IOA_DEBUG_WRITE_IOA_MEM        0x01u
+#define   IPR_IOA_DEBUG_READ_FLIT            0x03u
 
-#define IBMSIS_STD_INQ_Z0_TERM_LEN      8
-#define IBMSIS_STD_INQ_Z1_TERM_LEN      12
-#define IBMSIS_STD_INQ_Z2_TERM_LEN      4
-#define IBMSIS_STD_INQ_Z3_TERM_LEN      5
-#define IBMSIS_STD_INQ_Z4_TERM_LEN      4
-#define IBMSIS_STD_INQ_Z5_TERM_LEN      2
-#define IBMSIS_STD_INQ_Z6_TERM_LEN      10
-#define IBMSIS_STD_INQ_PART_NUM_LEN     12
-#define IBMSIS_STD_INQ_EC_LEVEL_LEN     10
-#define IBMSIS_STD_INQ_FRU_NUM_LEN      12
+#define IPR_STD_INQ_Z0_TERM_LEN      8
+#define IPR_STD_INQ_Z1_TERM_LEN      12
+#define IPR_STD_INQ_Z2_TERM_LEN      4
+#define IPR_STD_INQ_Z3_TERM_LEN      5
+#define IPR_STD_INQ_Z4_TERM_LEN      4
+#define IPR_STD_INQ_Z5_TERM_LEN      2
+#define IPR_STD_INQ_Z6_TERM_LEN      10
+#define IPR_STD_INQ_PART_NUM_LEN     12
+#define IPR_STD_INQ_EC_LEVEL_LEN     10
+#define IPR_STD_INQ_FRU_NUM_LEN      12
 
-#define  IBMSIS_START_STOP_STOP                 0x00u
-#define  IBMSIS_START_STOP_START                0x01u
-#define  IBMSIS_READ_CAPACITY_16                0x10u
-#define IBMSIS_SERVICE_ACTION_IN                0x9Eu
-#define IBMSIS_QUERY_RESOURCE_STATE             0xC2u
-#define IBMSIS_QUERY_IOA_CONFIG                 0xC5u
-#define IBMSIS_QUERY_COMMAND_STATUS             0xCBu
-#define IBMSIS_EVALUATE_DEVICE                  0xE4u
-#define IBMSIS_QUERY_ARRAY_CONFIG               0xF0u
-#define IBMSIS_START_ARRAY_PROTECTION           0xF1u
-#define IBMSIS_STOP_ARRAY_PROTECTION            0xF2u
-#define IBMSIS_RESYNC_ARRAY_PROTECTION          0xF3u
-#define IBMSIS_ADD_ARRAY_DEVICE                 0xF4u
-#define IBMSIS_REMOVE_ARRAY_DEVICE              0xF5u
-#define IBMSIS_REBUILD_DEVICE_DATA              0xF6u
-#define IBMSIS_RECLAIM_CACHE_STORE              0xF8u
-#define  IBMSIS_RECLAIM_ACTION                  0x60u
-#define  IBMSIS_RECLAIM_PERFORM                 0x00u
-#define  IBMSIS_RECLAIM_EXTENDED_INFO           0x10u
-#define  IBMSIS_RECLAIM_QUERY                   0x20u
-#define  IBMSIS_RECLAIM_RESET                   0x40u
-#define  IBMSIS_RECLAIM_FORCE_BATTERY_ERROR     0x60u
-#define  IBMSIS_RECLAIM_UNKNOWN_PERM            0x80u
-#define IBMSIS_DISCARD_CACHE_DATA               0xF9u
-#define  IBMSIS_PROHIBIT_CORR_INFO_UPDATE       0x80u
+#define  IPR_START_STOP_STOP                 0x00u
+#define  IPR_START_STOP_START                0x01u
+#define  IPR_READ_CAPACITY_16                0x10u
+#define IPR_SERVICE_ACTION_IN                0x9Eu
+#define IPR_QUERY_RESOURCE_STATE             0xC2u
+#define IPR_QUERY_IOA_CONFIG                 0xC5u
+#define IPR_QUERY_COMMAND_STATUS             0xCBu
+#define IPR_EVALUATE_DEVICE                  0xE4u
+#define IPR_QUERY_ARRAY_CONFIG               0xF0u
+#define IPR_START_ARRAY_PROTECTION           0xF1u
+#define IPR_STOP_ARRAY_PROTECTION            0xF2u
+#define IPR_RESYNC_ARRAY_PROTECTION          0xF3u
+#define IPR_ADD_ARRAY_DEVICE                 0xF4u
+#define IPR_REMOVE_ARRAY_DEVICE              0xF5u
+#define IPR_REBUILD_DEVICE_DATA              0xF6u
+#define IPR_RECLAIM_CACHE_STORE              0xF8u
+#define  IPR_RECLAIM_ACTION                  0x60u
+#define  IPR_RECLAIM_PERFORM                 0x00u
+#define  IPR_RECLAIM_EXTENDED_INFO           0x10u
+#define  IPR_RECLAIM_QUERY                   0x20u
+#define  IPR_RECLAIM_RESET                   0x40u
+#define  IPR_RECLAIM_FORCE_BATTERY_ERROR     0x60u
+#define  IPR_RECLAIM_UNKNOWN_PERM            0x80u
+#define IPR_DISCARD_CACHE_DATA               0xF9u
+#define  IPR_PROHIBIT_CORR_INFO_UPDATE       0x80u
 
-#define IBMSIS_NO_REDUCTION             0
-#define IBMSIS_HALF_REDUCTION           1
-#define IBMSIS_QUARTER_REDUCTION        2
-#define IBMSIS_EIGHTH_REDUCTION         4
-#define IBMSIS_SIXTEENTH_REDUCTION      6
-#define IBMSIS_UNKNOWN_REDUCTION        7
+#define IPR_NO_REDUCTION             0
+#define IPR_HALF_REDUCTION           1
+#define IPR_QUARTER_REDUCTION        2
+#define IPR_EIGHTH_REDUCTION         4
+#define IPR_SIXTEENTH_REDUCTION      6
+#define IPR_UNKNOWN_REDUCTION        7
 
-#define IBMSIS_SUBTYPE_AF_DASD          0x0
-#define IBMSIS_SUBTYPE_GENERIC_SCSI     0x1
-#define IBMSIS_SUBTYPE_VOLUME_SET       0x2
+#define IPR_SUBTYPE_AF_DASD          0x0
+#define IPR_SUBTYPE_GENERIC_SCSI     0x1
+#define IPR_SUBTYPE_VOLUME_SET       0x2
 
-#define  IBMSIS_IS_DASD_DEVICE(std_inq_data) \
-    ((((std_inq_data).peri_dev_type) == IBMSIS_PERI_TYPE_DISK) && !((std_inq_data).removeable_medium))
+#define  IPR_IS_DASD_DEVICE(std_inq_data) \
+    ((((std_inq_data).peri_dev_type) == IPR_PERI_TYPE_DISK) && !((std_inq_data).removeable_medium))
 
-#define IBMSIS_GET_CAP_REDUCTION(res_flags) \
+#define IPR_GET_CAP_REDUCTION(res_flags) \
 (((res_flags).capacity_reduction_hi << 1) | (res_flags).capacity_reduction_lo)
 
-#define ibmsis_memory_copy memcpy
-#define ibmsis_memory_set memset
+#define ipr_memory_copy memcpy
+#define ipr_memory_set memset
 
-#define IBMSIS_SET_MODE(change_mask, cur_val, new_val)  \
+#define IPR_SET_MODE(change_mask, cur_val, new_val)  \
 {                                                       \
 int mod_bits = (cur_val ^ new_val);                     \
 if ((change_mask & mod_bits) == mod_bits)               \
@@ -130,83 +130,83 @@ cur_val = new_val;                                      \
 }                                                       \
 }
 
-#define IBMSIS_CONC_MAINT                       0xC8u
-#define  IBMSIS_CONC_MAINT_CHECK_AND_QUIESCE    IBMSIS_SDB_CHECK_AND_QUIESCE
-#define  IBMSIS_CONC_MAINT_CHECK_ONLY           IBMSIS_SDB_CHECK_ONLY
-#define  IBMSIS_CONC_MAINT_QUIESE_ONLY          IBMSIS_SDB_QUIESE_ONLY
+#define IPR_CONC_MAINT                       0xC8u
+#define  IPR_CONC_MAINT_CHECK_AND_QUIESCE    IPR_SDB_CHECK_AND_QUIESCE
+#define  IPR_CONC_MAINT_CHECK_ONLY           IPR_SDB_CHECK_ONLY
+#define  IPR_CONC_MAINT_QUIESE_ONLY          IPR_SDB_QUIESE_ONLY
 
-#define  IBMSIS_CONC_MAINT_FMT_MASK             0x0Fu
-#define  IBMSIS_CONC_MAINT_FMT_SHIFT            0
-#define  IBMSIS_CONC_MAINT_GET_FMT(fmt) \
-((fmt & IBMSIS_CONC_MAINT_FMT_MASK) >> IBMSIS_CONC_MAINT_FMT_SHIFT)
-#define  IBMSIS_CONC_MAINT_DSA_FMT              0x00u
-#define  IBMSIS_CONC_MAINT_FRAME_ID_FMT         0x01u
-#define  IBMSIS_CONC_MAINT_PSERIES_FMT          0x02u
-#define  IBMSIS_CONC_MAINT_XSERIES_FMT          0x03u
+#define  IPR_CONC_MAINT_FMT_MASK             0x0Fu
+#define  IPR_CONC_MAINT_FMT_SHIFT            0
+#define  IPR_CONC_MAINT_GET_FMT(fmt) \
+((fmt & IPR_CONC_MAINT_FMT_MASK) >> IPR_CONC_MAINT_FMT_SHIFT)
+#define  IPR_CONC_MAINT_DSA_FMT              0x00u
+#define  IPR_CONC_MAINT_FRAME_ID_FMT         0x01u
+#define  IPR_CONC_MAINT_PSERIES_FMT          0x02u
+#define  IPR_CONC_MAINT_XSERIES_FMT          0x03u
 
-#define  IBMSIS_CONC_MAINT_TYPE_MASK            0x30u
-#define  IBMSIS_CONC_MAINT_TYPE_SHIFT           4
-#define  IBMSIS_CONC_MAINT_GET_TYPE(type) \
-((type & IBMSIS_CONC_MAINT_TYPE_MASK) >> IBMSIS_CONC_MAINT_TYPE_SHIFT)
-#define  IBMSIS_CONC_MAINT_INSERT               0x0u
-#define  IBMSIS_CONC_MAINT_REMOVE               0x1u
+#define  IPR_CONC_MAINT_TYPE_MASK            0x30u
+#define  IPR_CONC_MAINT_TYPE_SHIFT           4
+#define  IPR_CONC_MAINT_GET_TYPE(type) \
+((type & IPR_CONC_MAINT_TYPE_MASK) >> IPR_CONC_MAINT_TYPE_SHIFT)
+#define  IPR_CONC_MAINT_INSERT               0x0u
+#define  IPR_CONC_MAINT_REMOVE               0x1u
 
-#define IBMSIS_RECORD_ID_SUPPORTED_ARRAYS       _i16((u16)0)
-#define IBMSIS_RECORD_ID_ARRAY_RECORD           _i16((u16)1)
-#define IBMSIS_RECORD_ID_DEVICE_RECORD          _i16((u16)2)
-#define IBMSIS_RECORD_ID_COMP_RECORD            _i16((u16)3)
-#define IBMSIS_RECORD_ID_ARRAY2_RECORD          _i16((u16)4)
-#define IBMSIS_RECORD_ID_DEVICE2_RECORD         _i16((u16)5)
+#define IPR_RECORD_ID_SUPPORTED_ARRAYS       _i16((u16)0)
+#define IPR_RECORD_ID_ARRAY_RECORD           _i16((u16)1)
+#define IPR_RECORD_ID_DEVICE_RECORD          _i16((u16)2)
+#define IPR_RECORD_ID_COMP_RECORD            _i16((u16)3)
+#define IPR_RECORD_ID_ARRAY2_RECORD          _i16((u16)4)
+#define IPR_RECORD_ID_DEVICE2_RECORD         _i16((u16)5)
 
 /******************************************************************/
 /* Driver Commands                                                */
 /******************************************************************/
-#define IBMSIS_GET_TRACE                        0xE1u
-#define IBMSIS_RESET_DEV_CHANGED                0xE8u
-#define IBMSIS_DUMP_IOA                         0xD7u
-#define IBMSIS_MODE_SENSE_PAGE_28               0xD8u
-#define IBMSIS_MODE_SELECT_PAGE_28              0xD9u
-#define IBMSIS_RESET_HOST_ADAPTER               0xDAu
-#define IBMSIS_READ_DRIVER_CFG                  0xDBu
-#define IBMSIS_WRITE_DRIVER_CFG                 0xDCu
+#define IPR_GET_TRACE                        0xE1u
+#define IPR_RESET_DEV_CHANGED                0xE8u
+#define IPR_DUMP_IOA                         0xD7u
+#define IPR_MODE_SENSE_PAGE_28               0xD8u
+#define IPR_MODE_SELECT_PAGE_28              0xD9u
+#define IPR_RESET_HOST_ADAPTER               0xDAu
+#define IPR_READ_DRIVER_CFG                  0xDBu
+#define IPR_WRITE_DRIVER_CFG                 0xDCu
 
 
-#define  IBMSIS_PERI_TYPE_DISK            0x00u
+#define  IPR_PERI_TYPE_DISK            0x00u
 
-enum sis_platform
+enum ipr_platform
 {
-    SIS_ISERIES,
-    SIS_PSERIES,
-    SIS_GENERIC,
-    SIS_UNKNOWN_PLATFORM
+    IPR_ISERIES,
+    IPR_PSERIES,
+    IPR_GENERIC,
+    IPR_UNKNOWN_PLATFORM
 };
 
-extern struct ibmsis_array_query_data *p_sis_array_query_data;
-extern struct ibmsis_resource_table *p_res_table;
+extern struct ipr_array_query_data *p_ipr_array_query_data;
+extern struct ipr_resource_table *p_res_table;
 extern u32 num_ioas;
-extern struct sis_ioa *p_head_sis_ioa;
-extern struct sis_ioa *p_last_sis_ioa;
+extern struct ipr_ioa *p_head_ipr_ioa;
+extern struct ipr_ioa *p_last_ipr_ioa;
 extern int driver_major;
 extern int driver_minor;
-extern enum sis_platform platform;
+extern enum ipr_platform platform;
 
-struct ibmsis_res_addr
+struct ipr_res_addr
 {
     u8 reserved;
     u8 bus;
     u8 target;
     u8 lun;
-#define IBMSIS_GET_PHYSICAL_LOCATOR(res_addr) \
+#define IPR_GET_PHYSICAL_LOCATOR(res_addr) \
 (((res_addr).bus << 16) | ((res_addr).target << 8) | (res_addr).lun)
 };
 
-struct ibmsis_std_inq_vpids
+struct ipr_std_inq_vpids
 {
-    u8 vendor_id[IBMSIS_VENDOR_ID_LEN];          /* Vendor ID */
-    u8 product_id[IBMSIS_PROD_ID_LEN];           /* Product ID */
+    u8 vendor_id[IPR_VENDOR_ID_LEN];          /* Vendor ID */
+    u8 product_id[IPR_PROD_ID_LEN];           /* Product ID */
 };
 
-struct ibmsis_record_common
+struct ipr_record_common
 {
     u16 record_id;
     u16 record_len;
@@ -214,18 +214,18 @@ struct ibmsis_record_common
 
 #if (defined(__KERNEL__) && defined(__LITTLE_ENDIAN)) || \
 (!defined(__KERNEL__) && (__BYTE_ORDER == __LITTLE_ENDIAN))
-#define htosis16(x) htons(x)
-#define htosis32(x) htonl(x)
-#define sistoh16(x) ntohs(x)
-#define sistoh32(x) ntohl(x)
+#define htoipr16(x) htons(x)
+#define htoipr32(x) htonl(x)
+#define iprtoh16(x) ntohs(x)
+#define iprtoh32(x) ntohl(x)
 
 #define _i16(x) htons(x)
 #define _i32(x) htonl(x)
 
-#define IBMSIS_BIG_ENDIAN       0
-#define IBMSIS_LITTLE_ENDIAN    1
+#define IPR_BIG_ENDIAN       0
+#define IPR_LITTLE_ENDIAN    1
 
-struct ibmsis_mode_page_hdr
+struct ipr_mode_page_hdr
 {
     u8 parms_saveable:1;
     u8 reserved1:1;
@@ -233,10 +233,10 @@ struct ibmsis_mode_page_hdr
     u8 page_length;
 };
 
-struct ibmsis_control_mode_page
+struct ipr_control_mode_page
 {
     /* Mode page 0x0A */
-    struct ibmsis_mode_page_hdr header;
+    struct ipr_mode_page_hdr header;
     u8 rlec:1;
     u8 gltsd:1;
     u8 reserved1:3;
@@ -259,12 +259,12 @@ struct ibmsis_control_mode_page
     u16 reserved6;
 };
 
-struct ibmsis_reclaim_query_data
+struct ipr_reclaim_query_data
 {
     u8 action_status;
-#define IBMSIS_ACTION_SUCCESSFUL               0
-#define IBMSIS_ACTION_NOT_REQUIRED             1
-#define IBMSIS_ACTION_NOT_PERFORMED            2
+#define IPR_ACTION_SUCCESSFUL               0
+#define IPR_ACTION_NOT_REQUIRED             1
+#define IPR_ACTION_NOT_PERFORMED            2
     u8 num_blocks_needs_multiplier:1;
     u8 reserved3:1;
     u8 reclaim_unknown_performed:1;
@@ -276,15 +276,15 @@ struct ibmsis_reclaim_query_data
     u16 num_blocks;
 
     u8 rechargeable_battery_type;
-#define IBMSIS_BATTERY_TYPE_NO_BATTERY          0
-#define IBMSIS_BATTERY_TYPE_NICD                1
-#define IBMSIS_BATTERY_TYPE_NIMH                2
-#define IBMSIS_BATTERY_TYPE_LIION               3
+#define IPR_BATTERY_TYPE_NO_BATTERY          0
+#define IPR_BATTERY_TYPE_NICD                1
+#define IPR_BATTERY_TYPE_NIMH                2
+#define IPR_BATTERY_TYPE_LIION               3
 
     u8 rechargeable_battery_error_state;
-#define IBMSIS_BATTERY_NO_ERROR_STATE           0
-#define IBMSIS_BATTERY_WARNING_STATE            1
-#define IBMSIS_BATTERY_ERROR_STATE              2
+#define IPR_BATTERY_NO_ERROR_STATE           0
+#define IPR_BATTERY_WARNING_STATE            1
+#define IPR_BATTERY_ERROR_STATE              2
 
     u8 reserved4[2];
 
@@ -296,8 +296,8 @@ struct ibmsis_reclaim_query_data
     u8 reserved5[240];
 };
 
-/* IBM's SIS smart dump table structures */
-struct ibmsis_sdt_entry
+/* IBM's IPR smart dump table structures */
+struct ipr_sdt_entry
 {
     u32 bar_str_offset;
     u32 end_offset;
@@ -311,7 +311,7 @@ struct ibmsis_sdt_entry
     u16 priority;
 };
 
-struct ibmsis_vset_res_state
+struct ipr_vset_res_state
 {
     u16 stripe_size;
     u8 prot_level;
@@ -319,13 +319,13 @@ struct ibmsis_vset_res_state
     u32 reserved6;
 };
 
-struct ibmsis_dasd_res_state
+struct ipr_dasd_res_state
 {
     u32 data_path_width;  /* bits */
     u32 data_xfer_rate;   /* 100 KBytes/second */
 };
 
-struct ibmsis_query_res_state
+struct ipr_query_res_state
 {
     u8 reserved2:4;
     u8 not_func:1;
@@ -347,21 +347,21 @@ struct ibmsis_query_res_state
 
     union
     {
-        struct ibmsis_vset_res_state vset;
-        struct ibmsis_dasd_res_state dasd;
+        struct ipr_vset_res_state vset;
+        struct ipr_dasd_res_state dasd;
     }dev;
 
     u32 ilid;
     u32 failing_dev_ioasc;
-    struct ibmsis_res_addr failing_dev_res_addr;
+    struct ipr_res_addr failing_dev_res_addr;
     u32 failing_dev_res_handle;
     u8 protection_level_str[8];
 };
 
-struct ibmsis_array_cap_entry
+struct ipr_array_cap_entry
 {
     u8                          prot_level;
-#define IBMSIS_DEFAULT_RAID_LVL "5"
+#define IPR_DEFAULT_RAID_LVL "5"
     u8                          reserved:7;
     u8                          include_allowed:1;
     u16                         reserved2;
@@ -376,9 +376,9 @@ struct ibmsis_array_cap_entry
     u8                          prot_level_str[8];
 };
 
-struct ibmsis_array_record
+struct ipr_array_record
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
     u8  reserved:6;
     u8  known_zeroed:1;
     u8  issue_cmd:1;
@@ -399,9 +399,9 @@ struct ibmsis_array_record
     u32 reserved5;
 };
 
-struct ibmsis_array2_record
+struct ipr_array2_record
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
 
     u8  reserved1:6;
     u8  known_zeroed:1;
@@ -427,14 +427,14 @@ struct ibmsis_array2_record
     u8  array_id;
     u32 resource_handle;
     u32 resource_address;
-    struct ibmsis_res_addr last_resource_address;
+    struct ipr_res_addr last_resource_address;
     u8  vendor_id[8];
     u8  product_id[16];
     u8  serial_number[8];
     u32 reserved;
 };
 
-struct ibmsis_resource_flags
+struct ipr_resource_flags
 {
     u8 capacity_reduction_hi:2;
     u8 reserved2:1;
@@ -448,9 +448,9 @@ struct ibmsis_resource_flags
     u8 capacity_reduction_lo:1;
 };
 
-struct ibmsis_device_record
+struct ipr_device_record
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
     u8  reserved:6;
     u8  known_zeroed:1;
     u8  issue_cmd:1;
@@ -482,12 +482,12 @@ struct ibmsis_device_record
     u8  array_id;
     u32 resource_handle;
     u16 reserved5;
-    struct ibmsis_resource_flags resource_flags_to_become;
+    struct ipr_resource_flags resource_flags_to_become;
     u32 user_area_size_to_become;  
 };
 
 /* 44 bytes */
-struct ibmsis_std_inq_data{
+struct ipr_std_inq_data{
     u8 peri_dev_type:5;
     u8 peri_qual:3;
 
@@ -525,38 +525,38 @@ struct ibmsis_std_inq_data{
     u8 rel_adr:1;
 
     /* Vendor and Product ID */
-    struct ibmsis_std_inq_vpids vpids;
+    struct ipr_std_inq_vpids vpids;
 
     /* ROS and RAM levels */
     u8 ros_rsvd_ram_rsvd[4];
 
     /* Serial Number */
-    u8 serial_num[IBMSIS_SERIAL_NUM_LEN];
+    u8 serial_num[IPR_SERIAL_NUM_LEN];
 };
 
-struct ibmsis_std_inq_data_long
+struct ipr_std_inq_data_long
 {
-    struct ibmsis_std_inq_data std_inq_data;
-    u8 z1_term[IBMSIS_STD_INQ_Z1_TERM_LEN];
+    struct ipr_std_inq_data std_inq_data;
+    u8 z1_term[IPR_STD_INQ_Z1_TERM_LEN];
     u8 ius:1;
     u8 qas:1;
     u8 clocking:2;
     u8 reserved:4;
     u8 reserved1[41];
-    u8 z2_term[IBMSIS_STD_INQ_Z2_TERM_LEN];
-    u8 z3_term[IBMSIS_STD_INQ_Z3_TERM_LEN];
+    u8 z2_term[IPR_STD_INQ_Z2_TERM_LEN];
+    u8 z3_term[IPR_STD_INQ_Z3_TERM_LEN];
     u8 reserved2;
-    u8 z4_term[IBMSIS_STD_INQ_Z4_TERM_LEN];
-    u8 z5_term[IBMSIS_STD_INQ_Z5_TERM_LEN];
-    u8 part_number[IBMSIS_STD_INQ_PART_NUM_LEN];
-    u8 ec_level[IBMSIS_STD_INQ_EC_LEVEL_LEN];
-    u8 fru_number[IBMSIS_STD_INQ_FRU_NUM_LEN];
-    u8 z6_term[IBMSIS_STD_INQ_Z6_TERM_LEN];
+    u8 z4_term[IPR_STD_INQ_Z4_TERM_LEN];
+    u8 z5_term[IPR_STD_INQ_Z5_TERM_LEN];
+    u8 part_number[IPR_STD_INQ_PART_NUM_LEN];
+    u8 ec_level[IPR_STD_INQ_EC_LEVEL_LEN];
+    u8 fru_number[IPR_STD_INQ_FRU_NUM_LEN];
+    u8 z6_term[IPR_STD_INQ_Z6_TERM_LEN];
 };
 
-struct ibmsis_mode_page_28_scsi_dev_bus_attr
+struct ipr_mode_page_28_scsi_dev_bus_attr
 {
-    struct ibmsis_res_addr res_addr;
+    struct ipr_res_addr res_addr;
 
     u8 reserved2:2;
     u8 lvd_to_se_transition_not_allowed:1;
@@ -564,46 +564,46 @@ struct ibmsis_mode_page_28_scsi_dev_bus_attr
     u8 term_power_absent:1;
     u8 enable_target_mode:1;
     u8 qas_capability:2;
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_NO_CHANGE      0  
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL    1        
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_ENABLE_ALL     2
+#define IPR_MODEPAGE28_QAS_CAPABILITY_NO_CHANGE      0  
+#define IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL    1        
+#define IPR_MODEPAGE28_QAS_CAPABILITY_ENABLE_ALL     2
 /* NOTE:   Due to current operation conditions QAS should
  never be enabled so the change mask will be set to 0 */
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_CHANGE_MASK    0
+#define IPR_MODEPAGE28_QAS_CAPABILITY_CHANGE_MASK    0
 
     u8 scsi_id;
-#define IBMSIS_MODEPAGE28_SCSI_ID_NO_CHANGE             0x80u
-#define IBMSIS_MODEPAGE28_SCSI_ID_NO_ID                 0xFFu
+#define IPR_MODEPAGE28_SCSI_ID_NO_CHANGE             0x80u
+#define IPR_MODEPAGE28_SCSI_ID_NO_ID                 0xFFu
 
     u8 bus_width;
-#define IBMSIS_MODEPAGE28_BUS_WIDTH_NO_CHANGE           0
+#define IPR_MODEPAGE28_BUS_WIDTH_NO_CHANGE           0
 
     u8 extended_reset_delay;
-#define IBMSIS_EXTENDED_RESET_DELAY                     7
+#define IPR_EXTENDED_RESET_DELAY                     7
 
     u32 max_xfer_rate;
-#define IBMSIS_MODEPAGE28_MAX_XFR_RATE_NO_CHANGE        0
+#define IPR_MODEPAGE28_MAX_XFR_RATE_NO_CHANGE        0
 
     u8  min_time_delay;
-#define IBMSIS_DEFAULT_SPINUP_DELAY                     0xFFu
-#define IBMSIS_INIT_SPINUP_DELAY                        5
+#define IPR_DEFAULT_SPINUP_DELAY                     0xFFu
+#define IPR_INIT_SPINUP_DELAY                        5
     u8  reserved3;
     u16 reserved4;
 };
 
 #elif (defined(__KERNEL__) && defined(__BIG_ENDIAN)) || \
 (!defined(__KERNEL__) && (__BYTE_ORDER == __BIG_ENDIAN))
-#define htosis16(x) (x)
-#define htosis32(x) (x)
-#define sistoh16(x) (x)
-#define sistoh32(x) (x)
+#define htoipr16(x) (x)
+#define htoipr32(x) (x)
+#define iprtoh16(x) (x)
+#define iprtoh32(x) (x)
 #define _i16(x) (x)
 #define _i32(x) (x)
 
-#define IBMSIS_BIG_ENDIAN       1
-#define IBMSIS_LITTLE_ENDIAN    0
+#define IPR_BIG_ENDIAN       1
+#define IPR_LITTLE_ENDIAN    0
 
-struct ibmsis_mode_page_hdr
+struct ipr_mode_page_hdr
 {
     u8 page_code:6;
     u8 reserved1:1;
@@ -611,10 +611,10 @@ struct ibmsis_mode_page_hdr
     u8 page_length;
 };
 
-struct ibmsis_control_mode_page
+struct ipr_control_mode_page
 {
     /* Mode page 0x0A */
-    struct ibmsis_mode_page_hdr header;
+    struct ipr_mode_page_hdr header;
     u8 tst:3;
     u8 reserved1:3;
     u8 gltsd:1;
@@ -636,12 +636,12 @@ struct ibmsis_control_mode_page
     u16 reserved6;
 };
 
-struct ibmsis_reclaim_query_data
+struct ipr_reclaim_query_data
 {
     u8 action_status;
-#define IBMSIS_ACTION_SUCCESSFUL               0
-#define IBMSIS_ACTION_NOT_REQUIRED             1
-#define IBMSIS_ACTION_NOT_PERFORMED            2
+#define IPR_ACTION_SUCCESSFUL               0
+#define IPR_ACTION_NOT_REQUIRED             1
+#define IPR_ACTION_NOT_PERFORMED            2
     u8 reclaim_known_needed:1;
     u8 reclaim_unknown_needed:1;
     u8 reserved2:2;
@@ -653,15 +653,15 @@ struct ibmsis_reclaim_query_data
     u16 num_blocks;
 
     u8 rechargeable_battery_type;
-#define IBMSIS_BATTERY_TYPE_NO_BATTERY          0
-#define IBMSIS_BATTERY_TYPE_NICD                1
-#define IBMSIS_BATTERY_TYPE_NIMH                2
-#define IBMSIS_BATTERY_TYPE_LIION               3
+#define IPR_BATTERY_TYPE_NO_BATTERY          0
+#define IPR_BATTERY_TYPE_NICD                1
+#define IPR_BATTERY_TYPE_NIMH                2
+#define IPR_BATTERY_TYPE_LIION               3
 
     u8 rechargeable_battery_error_state;
-#define IBMSIS_BATTERY_NO_ERROR_STATE           0
-#define IBMSIS_BATTERY_WARNING_STATE            1
-#define IBMSIS_BATTERY_ERROR_STATE              2
+#define IPR_BATTERY_NO_ERROR_STATE           0
+#define IPR_BATTERY_WARNING_STATE            1
+#define IPR_BATTERY_ERROR_STATE              2
 
     u8 reserved4[2];
 
@@ -673,8 +673,8 @@ struct ibmsis_reclaim_query_data
     u8 reserved5[240];
 };
 
-/* IBM's SIS smart dump table structures */
-struct ibmsis_sdt_entry
+/* IBM's IPR smart dump table structures */
+struct ipr_sdt_entry
 {
     u32 bar_str_offset;
     u32 end_offset;
@@ -688,7 +688,7 @@ struct ibmsis_sdt_entry
     u16 priority;
 };
 
-struct ibmsis_vset_res_state
+struct ipr_vset_res_state
 {
     u16 stripe_size;
     u8 prot_level;
@@ -696,13 +696,13 @@ struct ibmsis_vset_res_state
     u32 reserved6;
 };
 
-struct ibmsis_dasd_res_state
+struct ipr_dasd_res_state
 {
     u32 data_path_width;  /* bits */
     u32 data_xfer_rate;   /* 100 KBytes/second */
 };
 
-struct ibmsis_query_res_state
+struct ipr_query_res_state
 {
     u8 reserved1:1;
     u8 not_oper:1;
@@ -724,21 +724,21 @@ struct ibmsis_query_res_state
 
     union
     {
-        struct ibmsis_vset_res_state vset;
-        struct ibmsis_dasd_res_state dasd;
+        struct ipr_vset_res_state vset;
+        struct ipr_dasd_res_state dasd;
     }dev;
 
     u32 ilid;
     u32 failing_dev_ioasc;
-    struct ibmsis_res_addr failing_dev_res_addr;
+    struct ipr_res_addr failing_dev_res_addr;
     u32 failing_dev_res_handle;
     u8 protection_level_str[8];
 };
 
-struct ibmsis_array_cap_entry
+struct ipr_array_cap_entry
 {
     u8                          prot_level;
-#define IBMSIS_DEFAULT_RAID_LVL "5"
+#define IPR_DEFAULT_RAID_LVL "5"
     u8                          include_allowed:1;
     u8                          reserved:7;
     u16                         reserved2;
@@ -753,9 +753,9 @@ struct ibmsis_array_cap_entry
     u8                          prot_level_str[8];
 };
 
-struct ibmsis_array_record
+struct ipr_array_record
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
     u8  issue_cmd:1;
     u8  known_zeroed:1;
     u8  reserved:6;
@@ -773,9 +773,9 @@ struct ibmsis_array_record
     u32 reserved5;
 };
 
-struct ibmsis_array2_record
+struct ipr_array2_record
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
 
     u8  issue_cmd:1;
     u8  known_zeroed:1;
@@ -801,14 +801,14 @@ struct ibmsis_array2_record
     u8  array_id;
     u32 resource_handle;
     u32 resource_address;
-    struct ibmsis_res_addr last_resource_address;
+    struct ipr_res_addr last_resource_address;
     u8  vendor_id[8];
     u8  product_id[16];
     u8  serial_number[8];
     u32 reserved;
 };
 
-struct ibmsis_resource_flags
+struct ipr_resource_flags
 {
     u8 is_ioa_resource:1;
     u8 is_compressed:1;
@@ -822,9 +822,9 @@ struct ibmsis_resource_flags
     u8 reserved3:7;
 };
 
-struct ibmsis_device_record
+struct ipr_device_record
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
     u8  issue_cmd:1;
     u8  known_zeroed:1;
     u8  reserved:6;
@@ -856,12 +856,12 @@ struct ibmsis_device_record
     u8  array_id;
     u32 resource_handle;
     u16 reserved5;
-    struct ibmsis_resource_flags resource_flags_to_become;
+    struct ipr_resource_flags resource_flags_to_become;
     u32 user_area_size_to_become;  
 };
 
 /* 44 bytes */
-struct ibmsis_std_inq_data{
+struct ipr_std_inq_data{
     u8 peri_qual:3;
     u8 peri_dev_type:5;
 
@@ -899,45 +899,45 @@ struct ibmsis_std_inq_data{
     u8 vs2:1;
 
     /* Vendor and Product ID */
-    struct ibmsis_std_inq_vpids vpids;
+    struct ipr_std_inq_vpids vpids;
 
     /* ROS and RAM levels */
     u8 ros_rsvd_ram_rsvd[4];
 
     /* Serial Number */
-    u8 serial_num[IBMSIS_SERIAL_NUM_LEN];
+    u8 serial_num[IPR_SERIAL_NUM_LEN];
 };
 
-struct ibmsis_std_inq_data_long
+struct ipr_std_inq_data_long
 {
-    struct ibmsis_std_inq_data std_inq_data;
-    u8 z1_term[IBMSIS_STD_INQ_Z1_TERM_LEN];
+    struct ipr_std_inq_data std_inq_data;
+    u8 z1_term[IPR_STD_INQ_Z1_TERM_LEN];
     u8 reserved:4;
     u8 clocking:2;
     u8 qas:1;
     u8 ius:1;
     u8 reserved1[41];
-    u8 z2_term[IBMSIS_STD_INQ_Z2_TERM_LEN];
-    u8 z3_term[IBMSIS_STD_INQ_Z3_TERM_LEN];
+    u8 z2_term[IPR_STD_INQ_Z2_TERM_LEN];
+    u8 z3_term[IPR_STD_INQ_Z3_TERM_LEN];
     u8 reserved2;
-    u8 z4_term[IBMSIS_STD_INQ_Z4_TERM_LEN];
-    u8 z5_term[IBMSIS_STD_INQ_Z5_TERM_LEN];
-    u8 part_number[IBMSIS_STD_INQ_PART_NUM_LEN];
-    u8 ec_level[IBMSIS_STD_INQ_EC_LEVEL_LEN];
-    u8 fru_number[IBMSIS_STD_INQ_FRU_NUM_LEN];
-    u8 z6_term[IBMSIS_STD_INQ_Z6_TERM_LEN];
+    u8 z4_term[IPR_STD_INQ_Z4_TERM_LEN];
+    u8 z5_term[IPR_STD_INQ_Z5_TERM_LEN];
+    u8 part_number[IPR_STD_INQ_PART_NUM_LEN];
+    u8 ec_level[IPR_STD_INQ_EC_LEVEL_LEN];
+    u8 fru_number[IPR_STD_INQ_FRU_NUM_LEN];
+    u8 z6_term[IPR_STD_INQ_Z6_TERM_LEN];
 };
 
-struct ibmsis_mode_page_28_scsi_dev_bus_attr
+struct ipr_mode_page_28_scsi_dev_bus_attr
 {
-    struct ibmsis_res_addr res_addr;
+    struct ipr_res_addr res_addr;
     u8 qas_capability:2;
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_NO_CHANGE      0  
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL    1        
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_ENABLE_ALL     2
+#define IPR_MODEPAGE28_QAS_CAPABILITY_NO_CHANGE      0  
+#define IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL    1        
+#define IPR_MODEPAGE28_QAS_CAPABILITY_ENABLE_ALL     2
 /* NOTE:   Due to current operation conditions QAS should
  never be enabled so the change mask will be set to 0 */
-#define IBMSIS_MODEPAGE28_QAS_CAPABILITY_CHANGE_MASK    0
+#define IPR_MODEPAGE28_QAS_CAPABILITY_CHANGE_MASK    0
 
     u8 enable_target_mode:1;
     u8 term_power_absent:1;
@@ -946,21 +946,21 @@ struct ibmsis_mode_page_28_scsi_dev_bus_attr
     u8 reserved2:2;
 
     u8 scsi_id;
-#define IBMSIS_MODEPAGE28_SCSI_ID_NO_CHANGE             0x80u
-#define IBMSIS_MODEPAGE28_SCSI_ID_NO_ID                 0xFFu
+#define IPR_MODEPAGE28_SCSI_ID_NO_CHANGE             0x80u
+#define IPR_MODEPAGE28_SCSI_ID_NO_ID                 0xFFu
 
     u8 bus_width;
-#define IBMSIS_MODEPAGE28_BUS_WIDTH_NO_CHANGE           0
+#define IPR_MODEPAGE28_BUS_WIDTH_NO_CHANGE           0
 
     u8 extended_reset_delay;
-#define IBMSIS_EXTENDED_RESET_DELAY                     7
+#define IPR_EXTENDED_RESET_DELAY                     7
 
     u32 max_xfer_rate;
-#define IBMSIS_MODEPAGE28_MAX_XFR_RATE_NO_CHANGE        0
+#define IPR_MODEPAGE28_MAX_XFR_RATE_NO_CHANGE        0
 
     u8  min_time_delay;
-#define IBMSIS_DEFAULT_SPINUP_DELAY                     0xFFu
-#define IBMSIS_INIT_SPINUP_DELAY                        5
+#define IPR_DEFAULT_SPINUP_DELAY                     0xFFu
+#define IPR_INIT_SPINUP_DELAY                        5
     u8  reserved3;
     u16 reserved4;
 };
@@ -968,23 +968,23 @@ struct ibmsis_mode_page_28_scsi_dev_bus_attr
 #error "Neither __LITTLE_ENDIAN nor __BIG_ENDIAN defined"
 #endif
 
-#define SIS_CONFIG_DIR "/etc/ibmsis/"
-#define SIS_QAS_CAPABILITY "QAS_CAPABILITY"
-#define SIS_HOST_SCSI_ID "HOST_SCSI_ID"
-#define SIS_BUS_WIDTH "BUS_WIDTH"
-#define SIS_MAX_XFER_RATE "MAX_BUS_SPEED"
-#define SIS_MIN_TIME_DELAY "MIN_TIME_DELAY"
-#define SIS_CATEGORY_BUS "Bus"
-#define SIS_LIMITED_MAX_XFER_RATE 80
-/* SIS_LIMITED_CONFIG is used to compensate for
+#define IPR_CONFIG_DIR "/etc/ipr/"
+#define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
+#define IPR_HOST_SCSI_ID "HOST_SCSI_ID"
+#define IPR_BUS_WIDTH "BUS_WIDTH"
+#define IPR_MAX_XFER_RATE "MAX_BUS_SPEED"
+#define IPR_MIN_TIME_DELAY "MIN_TIME_DELAY"
+#define IPR_CATEGORY_BUS "Bus"
+#define IPR_LIMITED_MAX_XFER_RATE 80
+/* IPR_LIMITED_CONFIG is used to compensate for
  a set of devices which will not allow firmware
  udpates when operating at high max transfer rates.
  Selecting the LIMITED_CONFIG adjusts the max
  transfer rate allowing successfull firmware update
  operations to be performed */
-#define SIS_LIMITED_CONFIG 0x7FFF
-#define SIS_SAVE_LIMITED_CONFIG 0x8000
-#define SIS_NORMAL_CONFIG 0
+#define IPR_LIMITED_CONFIG 0x7FFF
+#define IPR_SAVE_LIMITED_CONFIG 0x8000
+#define IPR_NORMAL_CONFIG 0
 
 /* Internal return codes */
 #define RC_SUCCESS          0
@@ -996,19 +996,19 @@ struct ibmsis_mode_page_28_scsi_dev_bus_attr
 #define RC_REFRESH          1
 #define RC_EXIT             3
 
-struct sis_device{
+struct ipr_device{
     char                              dev_name[64];
     char                              gen_name[64];
     int                               opens;
     u32                               is_start_cand:1;
     u32                               is_reclaim_cand:1;
     u32                               reserved:30;
-    struct ibmsis_resource_entry     *p_resource_entry;
-    struct ibmsis_record_common      *p_qac_entry;
+    struct ipr_resource_entry     *p_resource_entry;
+    struct ipr_record_common      *p_qac_entry;
 };
 
-struct sis_ioa{
-    struct sis_device                 ioa;
+struct ipr_ioa{
+    struct ipr_device                 ioa;
     u16                               ccin;
     u32                               host_num;
     u32                               host_addr;
@@ -1018,13 +1018,13 @@ struct sis_ioa{
     char                              firmware_version[40];
     char                              part_num[20];
     u16                               num_devices;
-    struct sis_device                *dev;
-    struct ibmsis_resource_table     *p_resource_table;
-    struct ibmsis_array_query_data   *p_qac_data;
-    struct ibmsis_supported_arrays   *p_supported_arrays;
-    struct ibmsis_reclaim_query_data *p_reclaim_data;
-    struct sis_ioa                   *p_next;
-    struct sis_ioa                   *p_cmd_next;
+    struct ipr_device                *dev;
+    struct ipr_resource_table     *p_resource_table;
+    struct ipr_array_query_data   *p_qac_data;
+    struct ipr_supported_arrays   *p_supported_arrays;
+    struct ipr_reclaim_query_data *p_reclaim_data;
+    struct ipr_ioa                   *p_next;
+    struct ipr_ioa                   *p_cmd_next;
 };
 
 struct sg_proc_info
@@ -1047,7 +1047,7 @@ struct sg_map_info
     struct sg_scsi_id sg_dat;
 };
 
-struct ibmsis_dasd_inquiry_page3
+struct ipr_dasd_inquiry_page3
 {
     u8 peri_qual_dev_type;
     u8 page_code;
@@ -1059,21 +1059,21 @@ struct ibmsis_dasd_inquiry_page3
     u8 release_level[4];
 };
 
-struct ibmsis_array_query_data
+struct ipr_array_query_data
 {
     u16 resp_len;
     u8  reserved;
     u8  num_records;
-    u8 data[IBMSIS_QAC_BUFFER_SIZE];
+    u8 data[IPR_QAC_BUFFER_SIZE];
 };
 
-struct ibmsis_block_desc {
+struct ipr_block_desc {
     u8 num_blocks[4];
     u8 density_code;
     u8 block_length[3];
 };
 
-struct ibmsis_mode_parm_hdr
+struct ipr_mode_parm_hdr
 {
     u8 length;
     u8 medium_type;
@@ -1095,7 +1095,7 @@ struct sense_data_t {
     u8                   add_sense_bytes[0];
 };
 
-struct ibmsis_resource_entry
+struct ipr_resource_entry
 {
     u8 is_ioa_resource:1;
     u8 is_compressed:1;
@@ -1110,7 +1110,7 @@ struct ibmsis_resource_entry
     u8 array_id;
     u8 subtype;
 
-    struct ibmsis_res_addr resource_address;
+    struct ipr_res_addr resource_address;
 
     u16 type;
 
@@ -1121,7 +1121,7 @@ struct ibmsis_resource_entry
 
     u32 sw_release_level;
 
-    char serial_num[IBMSIS_SERIAL_NUM_LEN+1]; /* Null terminated ascii */
+    char serial_num[IPR_SERIAL_NUM_LEN+1]; /* Null terminated ascii */
 
     u8 is_hidden:1;
     u8 is_af:1;
@@ -1139,94 +1139,94 @@ struct ibmsis_resource_entry
     /*       In other architectures, DSA/UA will be set to zero and         */
     /*       frame_id/slot_label will be initialized to ASCII spaces        */
     u32 dsa;
-#define IBMSIS_SYS_IBMSIS_BUS_MASK              0xffff0000
-#define IBMSIS_SYS_CARD_MASK                    0x0000ff00
-#define IBMSIS_IO_ADAPTER_MASK                  0x000000ff
-#define IBMSIS_GET_SYS_BUS(dsa)                                        \
-    ((dsa & IBMSIS_SYS_IBMSIS_BUS_MASK) >> 16)
-#define IBMSIS_GET_SYS_CARD(dsa)                                       \
-    ((dsa & IBMSIS_SYS_CARD_MASK) >> 8)
-#define IBMSIS_GET_IO_ADAPTER(dsa)                                     \
-    (dsa & IBMSIS_IO_ADAPTER_MASK)
+#define IPR_SYS_IPR_BUS_MASK              0xffff0000
+#define IPR_SYS_CARD_MASK                    0x0000ff00
+#define IPR_IO_ADAPTER_MASK                  0x000000ff
+#define IPR_GET_SYS_BUS(dsa)                                        \
+    ((dsa & IPR_SYS_IPR_BUS_MASK) >> 16)
+#define IPR_GET_SYS_CARD(dsa)                                       \
+    ((dsa & IPR_SYS_CARD_MASK) >> 8)
+#define IPR_GET_IO_ADAPTER(dsa)                                     \
+    (dsa & IPR_IO_ADAPTER_MASK)
 
     u32 unit_address;
-#define IBMSIS_IO_BUS_MASK                     0x0f000000
-#define IBMSIS_CTL_MASK                        0x00ff0000
-#define IBMSIS_DEV_MASK                        0x0000ff00
-#define IBMSIS_GET_IO_BUS(ua)                                          \
-    ((ua & IBMSIS_IO_BUS_MASK) >> 24)
-#define IBMSIS_GET_CTL(ua)                                             \
-    ((ua & IBMSIS_CTL_MASK) >> 16)
-#define IBMSIS_GET_DEV(ua)                                             \
-    ((ua & IBMSIS_DEV_MASK) >> 8)
+#define IPR_IO_BUS_MASK                     0x0f000000
+#define IPR_CTL_MASK                        0x00ff0000
+#define IPR_DEV_MASK                        0x0000ff00
+#define IPR_GET_IO_BUS(ua)                                          \
+    ((ua & IPR_IO_BUS_MASK) >> 24)
+#define IPR_GET_CTL(ua)                                             \
+    ((ua & IPR_CTL_MASK) >> 16)
+#define IPR_GET_DEV(ua)                                             \
+    ((ua & IPR_DEV_MASK) >> 8)
 
     u32 pci_bus_number;
     u32 pci_slot;
 
     u8 frame_id[3];
     u8 slot_label[4];
-    u8 pseries_location[IBMSIS_MAX_PSERIES_LOCATION_LEN+1];
+    u8 pseries_location[IPR_MAX_PSERIES_LOCATION_LEN+1];
 
-    u8 part_number[IBMSIS_STD_INQ_PART_NUM_LEN+1];
-    u8 ec_level[IBMSIS_STD_INQ_EC_LEVEL_LEN+1];
-    u8 fru_number[IBMSIS_STD_INQ_FRU_NUM_LEN+1];
-    u8 z1_term[IBMSIS_STD_INQ_Z1_TERM_LEN+1];
-    u8 z2_term[IBMSIS_STD_INQ_Z2_TERM_LEN+1];
-    u8 z3_term[IBMSIS_STD_INQ_Z3_TERM_LEN+1];
-    u8 z4_term[IBMSIS_STD_INQ_Z4_TERM_LEN+1];
-    u8 z5_term[IBMSIS_STD_INQ_Z5_TERM_LEN+1];
-    u8 z6_term[IBMSIS_STD_INQ_Z6_TERM_LEN+1];
+    u8 part_number[IPR_STD_INQ_PART_NUM_LEN+1];
+    u8 ec_level[IPR_STD_INQ_EC_LEVEL_LEN+1];
+    u8 fru_number[IPR_STD_INQ_FRU_NUM_LEN+1];
+    u8 z1_term[IPR_STD_INQ_Z1_TERM_LEN+1];
+    u8 z2_term[IPR_STD_INQ_Z2_TERM_LEN+1];
+    u8 z3_term[IPR_STD_INQ_Z3_TERM_LEN+1];
+    u8 z4_term[IPR_STD_INQ_Z4_TERM_LEN+1];
+    u8 z5_term[IPR_STD_INQ_Z5_TERM_LEN+1];
+    u8 z6_term[IPR_STD_INQ_Z6_TERM_LEN+1];
 
-    struct ibmsis_std_inq_data std_inq_data;
+    struct ipr_std_inq_data std_inq_data;
 };
 
-struct ibmsis_resource_hdr
+struct ipr_resource_hdr
 {
     u16 num_entries;
     u16 reserved;
 };
 
-struct ibmsis_resource_table
+struct ipr_resource_table
 {
-    struct ibmsis_resource_hdr   hdr;
-    struct ibmsis_resource_entry dev[IBMSIS_MAX_PHYSICAL_DEVS];
+    struct ipr_resource_hdr   hdr;
+    struct ipr_resource_entry dev[IPR_MAX_PHYSICAL_DEVS];
 };
 
-struct ibmsis_mode_page_28_header
+struct ipr_mode_page_28_header
 {
-    struct ibmsis_mode_page_hdr header;
+    struct ipr_mode_page_hdr header;
     u8 num_dev_entries;
     u8 dev_entry_length;
 };
 
-struct sis_page_28
+struct ipr_page_28
 {
-    struct ibmsis_mode_page_28_header page_hdr;
-    struct ibmsis_mode_page_28_scsi_dev_bus_attr attr[IBMSIS_MAX_NUM_BUSES];
+    struct ipr_mode_page_28_header page_hdr;
+    struct ipr_mode_page_28_scsi_dev_bus_attr attr[IPR_MAX_NUM_BUSES];
 };
 
-struct ibmsis_page_28
+struct ipr_pagewh_28
 {
-    struct ibmsis_mode_parm_hdr parm_hdr;
-    struct ibmsis_mode_page_28_header page_hdr;
-    struct ibmsis_mode_page_28_scsi_dev_bus_attr attr[IBMSIS_MAX_NUM_BUSES];
+    struct ipr_mode_parm_hdr parm_hdr;
+    struct ipr_mode_page_28_header page_hdr;
+    struct ipr_mode_page_28_scsi_dev_bus_attr attr[IPR_MAX_NUM_BUSES];
 };
 
-struct ibmsis_supported_arrays
+struct ipr_supported_arrays
 {
-    struct ibmsis_record_common common;
+    struct ipr_record_common common;
     u16                         num_entries;
     u16                         entry_length;
     u8                          data[0];
 };
 
-struct ibmsis_read_cap
+struct ipr_read_cap
 {
     u32 max_user_lba;
     u32 block_length;
 };
 
-struct ibmsis_read_cap16
+struct ipr_read_cap16
 {
     u32 max_user_lba_hi;
     u32 max_user_lba_lo;
@@ -1237,12 +1237,12 @@ struct ibmsis_read_cap16
  level prior to formatting to 522-byte sectors. */
 struct unsupported_af_dasd
 {
-    char vendor_id[IBMSIS_VENDOR_ID_LEN + 1];
-    char compare_vendor_id_byte[IBMSIS_VENDOR_ID_LEN];
-    char product_id[IBMSIS_PROD_ID_LEN + 1];
-    char compare_product_id_byte[IBMSIS_PROD_ID_LEN];
-    struct ibmsis_std_inq_vpids vpid;   /* vpid - meaningful bits */
-    struct ibmsis_std_inq_vpids vpid_mask;  /* mask don't cares in the vpid */
+    char vendor_id[IPR_VENDOR_ID_LEN + 1];
+    char compare_vendor_id_byte[IPR_VENDOR_ID_LEN];
+    char product_id[IPR_PROD_ID_LEN + 1];
+    char compare_product_id_byte[IPR_PROD_ID_LEN];
+    struct ipr_std_inq_vpids vpid;   /* vpid - meaningful bits */
+    struct ipr_std_inq_vpids vpid_mask;  /* mask don't cares in the vpid */
     char lid[5];       /* Load ID - Bytes 8-11 of Inquiry Page 3 */
     char lid_mask[4];  /* Mask for certain bytes of the LID */
     uint supported_with_min_ucode_level;
@@ -1250,66 +1250,66 @@ struct unsupported_af_dasd
     char min_ucode_mask[4];    /* used to mask don't cares in the ucode level */
 };
 
-struct ibmsis_cmd_status_record
+struct ipr_cmd_status_record
 {
     u16 reserved1;
     u16 length;
     u8 array_id;
     u8 command_code;
     u8 status;
-#define IBMSIS_CMD_STATUS_SUCCESSFUL            0
-#define IBMSIS_CMD_STATUS_IN_PROGRESS           2
-#define IBMSIS_CMD_STATUS_ATTRIB_CHANGE         3
-#define IBMSIS_CMD_STATUS_FAILED                4
-#define IBMSIS_CMD_STATUS_INSUFF_DATA_MOVED     5
+#define IPR_CMD_STATUS_SUCCESSFUL            0
+#define IPR_CMD_STATUS_IN_PROGRESS           2
+#define IPR_CMD_STATUS_ATTRIB_CHANGE         3
+#define IPR_CMD_STATUS_FAILED                4
+#define IPR_CMD_STATUS_INSUFF_DATA_MOVED     5
 
     u8 percent_complete;
-    struct ibmsis_res_addr failing_dev_res_addr;
+    struct ipr_res_addr failing_dev_res_addr;
     u32 failing_dev_res_handle;
     u32 failing_dev_ioasc;
     u32 ilid;
     u32 resource_handle;
 };
 
-struct ibmsis_cmd_status
+struct ipr_cmd_status
 {
     u16 resp_len;
     u8  reserved;
     u8  num_records;
-    struct ibmsis_cmd_status_record record[100];
+    struct ipr_cmd_status_record record[100];
 };
 
-struct ibmsis_std_inq_vpids_sn
+struct ipr_std_inq_vpids_sn
 {
-    struct ibmsis_std_inq_vpids vpids;
-    u8 serial_num[IBMSIS_SERIAL_NUM_LEN];
+    struct ipr_std_inq_vpids vpids;
+    u8 serial_num[IPR_SERIAL_NUM_LEN];
 };
 
-struct ibmsis_discard_cache_data
+struct ipr_discard_cache_data
 {
     u32 length;
     union { 
-        struct ibmsis_std_inq_vpids_sn vpids_sn;
+        struct ipr_std_inq_vpids_sn vpids_sn;
         u32 add_cmd_parms[10];
     }data;
 };
 
-struct ibmsis_software_inq_lid_info
+struct ipr_software_inq_lid_info
 {
     u32  load_id;
     u32  timestamp[3];
 };
 
-struct ibmsis_inquiry_page0  /* Supported Vital Product Data Pages */
+struct ipr_inquiry_page0  /* Supported Vital Product Data Pages */
 {
     u8 peri_qual_dev_type;
     u8 page_code;
     u8 reserved1;
     u8 page_length;
-    u8 supported_page_codes[IBMSIS_MAX_NUM_SUPP_INQ_PAGES];
+    u8 supported_page_codes[IPR_MAX_NUM_SUPP_INQ_PAGES];
 };
 
-struct ibmsis_inquiry_page3
+struct ipr_inquiry_page3
 {
     u8 peri_qual_dev_type;
     u8 page_code;
@@ -1325,7 +1325,7 @@ struct ibmsis_inquiry_page3
     u8 patch_number[4];
 };
 
-struct ibmsis_dasd_ucode_header
+struct ipr_dasd_ucode_header
 {
     u8 length[3];
     u8 load_id[4];
@@ -1334,7 +1334,7 @@ struct ibmsis_dasd_ucode_header
     u8 patch_number[4];
 };
 
-struct ibmsis_inquiry_page_cx  /* Extended Software Inquiry  */
+struct ipr_inquiry_page_cx  /* Extended Software Inquiry  */
 {
     u8 peri_qual_dev_type;
     u8 page_code;
@@ -1343,10 +1343,10 @@ struct ibmsis_inquiry_page_cx  /* Extended Software Inquiry  */
     u8 ascii_length;
     u8 reserved2[3];
 
-    struct ibmsis_software_inq_lid_info lidinfo[15];
+    struct ipr_software_inq_lid_info lidinfo[15];
 };
 
-struct ibmsis_driver_cfg
+struct ipr_driver_cfg
 {
     u16 debug_level;
     u16 trace_level;
@@ -1357,41 +1357,41 @@ struct ibmsis_driver_cfg
 /* NOTE: The structure below is a shared structure with user-land tools */
 /* We need to make sure we don't put pointers in here as the
  utilities could be running in 32 bit mode on a 64 bit kernel. */
-struct ibmsis_ioctl_cmd_type2
+struct ipr_ioctl_cmd_type2
 {
     u32 type:8;  /* type is used to distinguish between ioctl_cmd structure formats */
-#define IBMSIS_IOCTL_TYPE_2     0x03
+#define IPR_IOCTL_TYPE_2     0x03
     u32 reserved:21;
     u32 read_not_write:1; /* data direction */
     u32 device_cmd:1; /* used to pass commands to specific devices identified by resource address */
     u32 driver_cmd:1; /* used exclusively to pass commands to the device driver, 0 otherwise */
-    struct ibmsis_res_addr resource_address;
-#define IBMSIS_CDB_LEN          16
-    u8 cdb[IBMSIS_CDB_LEN];
+    struct ipr_res_addr resource_address;
+#define IPR_CDB_LEN          16
+    u8 cdb[IPR_CDB_LEN];
     u32 buffer_len;
     u8 buffer[0];
 };
 
 /* The structures below are deprecated and should not be used. Use the
  structure above to send ioctls instead */
-struct ibmsis_ioctl_cmd_internal
+struct ipr_ioctl_cmd_internal
 {
     u32 read_not_write:1;
     u32 device_cmd:1;
     u32 driver_cmd:1;
     u32 reserved:29;
-    struct ibmsis_res_addr resource_address;
-#define IBMSIS_CDB_LEN     16
-    u8 cdb[IBMSIS_CDB_LEN];
+    struct ipr_res_addr resource_address;
+#define IPR_CDB_LEN     16
+    u8 cdb[IPR_CDB_LEN];
     void *buffer;
     u32 buffer_len;
 };
 
 int get_proc_string(char *proc_file_name, char *label, char *buffer);
-int scan_device(struct ibmsis_res_addr resource_addr, u32 host_num);
-int remove_device(struct ibmsis_res_addr resource_addr, struct sis_ioa *p_ioa);
-int sis_ioctl(int fd, u32 cmd, struct ibmsis_ioctl_cmd_internal *p_ioctl_cmd);
-int sg_ioctl(int fd, u8 cdb[IBMSIS_CCB_CDB_LEN],
+int scan_device(struct ipr_res_addr resource_addr, u32 host_num);
+int remove_device(struct ipr_res_addr resource_addr, struct ipr_ioa *p_ioa);
+int ipr_ioctl(int fd, u32 cmd, struct ipr_ioctl_cmd_internal *p_ioctl_cmd);
+int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
              void *p_data, u32 xfer_len, u32 data_direction,
              struct sense_data_t *p_sense_data,
              u32 timeout_in_sec);
@@ -1403,27 +1403,27 @@ int get_sg_proc_data(struct sg_proc_info *p_sg_proc_info);
 int num_device_opens(int host_num, int channel, int id, int lun);
 void tool_init();
 void exit_on_error(char *, ...);
-int sis_config_file_valid(char *usr_file_name);
-int  sis_config_file_read(char *usr_file_name,
+int ipr_config_file_valid(char *usr_file_name);
+int  ipr_config_file_read(char *usr_file_name,
                           char *category,
                           char *field,
                           char *value);
-void  sis_config_file_entry(char *usr_file_name,
+void  ipr_config_file_entry(char *usr_file_name,
                             char *category,
                             char *field,
                             char *value,
                             int update);
-void sis_save_page_28(struct sis_ioa *p_ioa,
-                      struct sis_page_28 *p_page_28_cur,
-                      struct sis_page_28 *p_page_28_chg,
-                      struct sis_page_28 *p_page_28_sis);
-void sis_set_page_28(struct sis_ioa *p_cur_ioa,
+void ipr_save_page_28(struct ipr_ioa *p_ioa,
+                      struct ipr_page_28 *p_page_28_cur,
+                      struct ipr_page_28 *p_page_28_chg,
+                      struct ipr_page_28 *p_page_28_ipr);
+void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
                      int limited_config,
                      int reset_scheduled);
-void sis_set_page_28_init(struct sis_ioa *p_cur_ioa,
+void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
                           int limited_config);
-void sislog_location(struct ibmsis_resource_entry *);
-bool is_af_blocked(struct sis_device *p_sis_device, int silent);
+void iprlog_location(struct ipr_resource_entry *);
+bool is_af_blocked(struct ipr_device *p_ipr_device, int silent);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1431,17 +1431,17 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent);
  * Returns: 0 if not AF DASD
  *          1 if AF DASD
  *---------------------------------------------------------------------------*/
-static inline int ibmsis_is_af_dasd_device(struct ibmsis_resource_entry *p_resource_entry)
+static inline int ipr_is_af_dasd_device(struct ipr_resource_entry *p_resource_entry)
 {
-    if (IBMSIS_IS_DASD_DEVICE(p_resource_entry->std_inq_data) &&
+    if (IPR_IS_DASD_DEVICE(p_resource_entry->std_inq_data) &&
         (!p_resource_entry->is_ioa_resource) &&
-        (p_resource_entry->subtype == IBMSIS_SUBTYPE_AF_DASD))
+        (p_resource_entry->subtype == IPR_SUBTYPE_AF_DASD))
         return 1;
     else
         return 0;
 }
 
-#if (IBMSIS_DEBUG > 0)
+#if (IPR_DEBUG > 0)
 #define syslog_dbg(...) syslog(__VA_ARGS__)
 #else
 #define syslog_dbg(...)

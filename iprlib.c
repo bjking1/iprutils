@@ -1,6 +1,6 @@
 /******************************************************************/
-/* Linux IBM SIS utility library                                  */
-/* Description: IBM Storage IOA Interface Specification (SIS)     */
+/* Linux IBM IPR utility library                                  */
+/* Description: IBM Storage IOA Interface Specification (IPR)     */
 /*              Linux utility	library                             */
 /*                                                                */
 /* (C) Copyright 2000, 2001                                       */
@@ -9,21 +9,21 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.1 2003/10/22 22:21:02 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
  */
 
 #ifndef iprlib_h
 #include "iprlib.h"
 #endif
 
-struct ibmsis_array_query_data *p_sis_array_query_data = NULL;
-struct ibmsis_resource_table *p_res_table = NULL;
+struct ipr_array_query_data *p_ipr_array_query_data = NULL;
+struct ipr_resource_table *p_res_table = NULL;
 u32 num_ioas = 0;
-struct sis_ioa *p_head_sis_ioa = NULL;
-struct sis_ioa *p_last_sis_ioa = NULL;
+struct ipr_ioa *p_head_ipr_ioa = NULL;
+struct ipr_ioa *p_last_ipr_ioa = NULL;
 int driver_major = 0;
 int driver_minor = 0;
-enum sis_platform platform = SIS_UNKNOWN_PLATFORM;
+enum ipr_platform platform = IPR_UNKNOWN_PLATFORM;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -267,14 +267,14 @@ void tool_init(char *tool_name)
     struct dirent *dir_entry;
     char line[100], temp[100], proc_fname[100], *p_char, *p_temp, *p_temp2;
     int ccin;
-    struct sis_ioa *p_sis_ioa;
+    struct ipr_ioa *p_ipr_ioa;
     int main_menu();
     int rc, minor_num, major_num;
     dev_t major_minor;
     struct stat file_stat;
     char platform_str[100];
 
-    /* Find all the SIS IOAs attached and save away vital info about them */
+    /* Find all the IPR IOAs attached and save away vital info about them */
     proc_dir = opendir("/proc/scsi/ipr");
 
     if (proc_dir != NULL)
@@ -291,56 +291,56 @@ void tool_init(char *tool_name)
             /* Driver Version */
             if (get_proc_string(proc_fname, "Driver Version:", line) == 0)
             {
-                exit_on_error("%s incompatible with current driver"IBMSIS_EOL,tool_name);
+                exit_on_error("%s incompatible with current driver"IPR_EOL,tool_name);
             }
 
-            p_sis_ioa = (struct sis_ioa*)malloc(sizeof(struct sis_ioa));
-            memset(p_sis_ioa,0,sizeof(struct sis_ioa));
+            p_ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
+            memset(p_ipr_ioa,0,sizeof(struct ipr_ioa));
 
             p_temp = &line[16];
 
             p_temp2 = strchr(p_temp, '\n');
             if (p_temp2)
                 *p_temp2 = '\0';
-            strcpy(p_sis_ioa->driver_version, p_temp);
+            strcpy(p_ipr_ioa->driver_version, p_temp);
 
             if ((driver_major = get_major_version(proc_fname)) == -1)
             {
-                exit_on_error("%s incompatible with current driver"IBMSIS_EOL,tool_name);
+                exit_on_error("%s incompatible with current driver"IPR_EOL,tool_name);
             }
 
             if ((driver_minor = get_minor_version(proc_fname)) == -1)
             {
-                exit_on_error("%s incompatible with current driver"IBMSIS_EOL,tool_name);
+                exit_on_error("%s incompatible with current driver"IPR_EOL,tool_name);
             }
 
             if (driver_major != IPR_MAJOR_RELEASE)
             {
-                sprintf(temp,"%s incompatible with current driver"IBMSIS_EOL,tool_name);
-                exit_on_error("%sDriver Supported Version: %d, %s version: %d"IBMSIS_EOL,
+                sprintf(temp,"%s incompatible with current driver"IPR_EOL,tool_name);
+                exit_on_error("%sDriver Supported Version: %d, %s version: %d"IPR_EOL,
                               temp, driver_major, tool_name, IPR_MAJOR_RELEASE);
             }
 
             /* Get the CCIN */
             if (get_proc_string(proc_fname, "IBM", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             rc = sscanf(line, "IBM %x", &ccin);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Firmware Version */
             if (get_proc_string(proc_fname, "Firmware Version:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             p_temp = &line[18];
@@ -348,36 +348,36 @@ void tool_init(char *tool_name)
             p_temp2 = strchr(p_temp, '\n');
             if (p_temp2)
                 *p_temp2 = '\0';
-            strcpy(p_sis_ioa->firmware_version, p_temp);
+            strcpy(p_ipr_ioa->firmware_version, p_temp);
 
             /* Get the resource name */
             if (get_proc_string(proc_fname, "Resource Name:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            rc = sscanf(line, "Resource Name: %s", p_sis_ioa->ioa.dev_name);
+            rc = sscanf(line, "Resource Name: %s", p_ipr_ioa->ioa.dev_name);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            strcpy(p_sis_ioa->ioa.gen_name, p_sis_ioa->ioa.dev_name);
-            p_sis_ioa->ccin = ccin;
+            strcpy(p_ipr_ioa->ioa.gen_name, p_ipr_ioa->ioa.dev_name);
+            p_ipr_ioa->ccin = ccin;
 
-            p_sis_ioa->p_next = NULL;
-            p_sis_ioa->num_raid_cmds = 0;
+            p_ipr_ioa->p_next = NULL;
+            p_ipr_ioa->num_raid_cmds = 0;
 
-            p_sis_ioa->host_num = strtoul(dir_entry->d_name, NULL, 10);
+            p_ipr_ioa->host_num = strtoul(dir_entry->d_name, NULL, 10);
 
             /* get major number here */
             if (get_proc_string(proc_fname, "Major Number:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
             else
             {
@@ -385,107 +385,107 @@ void tool_init(char *tool_name)
 
                 if (rc < 1)
                 {
-                    exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                                  tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                    exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                                  tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
                 }
             }
 
             /* if /dev file exists verify major number */
-            rc = stat(p_sis_ioa->ioa.dev_name, &file_stat);
+            rc = stat(p_ipr_ioa->ioa.dev_name, &file_stat);
             if (rc || (MAJOR(file_stat.st_rdev) != major_num))
             {
                 if (!rc)
                 {
-                    /* remove all ibmsis* files with old major number */
-                    sprintf(temp,"rm %s",p_sis_ioa->ioa.dev_name);
+                    /* remove all ipr* files with old major number */
+                    sprintf(temp,"rm %s",p_ipr_ioa->ioa.dev_name);
                     p_char = strstr(temp, "ipr");
                     p_char[6] = '*';
                     p_char[7] = '\0';
                     system(temp);
                 }
-                p_char = strstr(p_sis_ioa->ioa.dev_name, "ipr");
+                p_char = strstr(p_ipr_ioa->ioa.dev_name, "ipr");
                 p_char += 6;
                 minor_num = strtoul(p_char, NULL, 10);
                 major_minor = MKDEV( major_num, minor_num);
 
-                mknod(p_sis_ioa->ioa.dev_name, S_IFCHR|S_IRUSR|S_IWUSR, major_minor);
+                mknod(p_ipr_ioa->ioa.dev_name, S_IFCHR|S_IRUSR|S_IWUSR, major_minor);
             }
 
             /* Host address */
             if (get_proc_string(proc_fname, "Host Address:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            rc = sscanf(line, "Host Address: %X", &p_sis_ioa->host_addr);
+            rc = sscanf(line, "Host Address: %X", &p_ipr_ioa->host_addr);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Get the serial number */
             if (get_proc_string(proc_fname, "Serial Number:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            rc = sscanf(line, "Serial Number: %s", p_sis_ioa->serial_num);
+            rc = sscanf(line, "Serial Number: %s", p_ipr_ioa->serial_num);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Part Number */
             if (get_proc_string(proc_fname, "Card Part Number:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            rc = sscanf(line, "Card Part Number: %s", p_sis_ioa->part_num);
+            rc = sscanf(line, "Card Part Number: %s", p_ipr_ioa->part_num);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             /* Platform */
             if (get_proc_string(proc_fname, "Platform:", line) == 0)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             rc = sscanf(line, "Platform: %s", platform_str);
 
             if (rc < 1)
             {
-                exit_on_error("%s: %s incompatible with driver %s"IBMSIS_EOL,
-                              tool_name, IPR_VERSION_STR, p_sis_ioa->driver_version);
+                exit_on_error("%s: %s incompatible with driver %s"IPR_EOL,
+                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             if (strcmp(platform_str, "iSeries") == 0)
-                platform = SIS_ISERIES;
+                platform = IPR_ISERIES;
             else if (strcmp(platform_str, "pSeries") == 0)
-                platform = SIS_PSERIES;
+                platform = IPR_PSERIES;
             else
-                platform = SIS_GENERIC;
+                platform = IPR_GENERIC;
 
-            if (p_last_sis_ioa)
+            if (p_last_ipr_ioa)
             {
-                p_last_sis_ioa->p_next = p_sis_ioa;
-                p_last_sis_ioa = p_sis_ioa;
+                p_last_ipr_ioa->p_next = p_ipr_ioa;
+                p_last_ipr_ioa = p_ipr_ioa;
             }
             else
             {
-                p_last_sis_ioa = p_head_sis_ioa = p_sis_ioa;
+                p_last_ipr_ioa = p_head_ipr_ioa = p_ipr_ioa;
             }
             num_ioas++;
         }
@@ -509,7 +509,7 @@ int get_proc_string(char *proc_file_name, char *label, char *buffer)
 
 	if (proc_file == NULL)
 	{
-            exit_on_error("Fatal Error! /proc entry unreadable"IBMSIS_EOL);
+            exit_on_error("Fatal Error! /proc entry unreadable"IPR_EOL);
 	}
 
 	do
@@ -526,7 +526,7 @@ int get_proc_string(char *proc_file_name, char *label, char *buffer)
 }
 
 /* Try to dynamically add this device */
-int scan_device(struct ibmsis_res_addr resource_addr, u32 host_num)
+int scan_device(struct ipr_res_addr resource_addr, u32 host_num)
 {
     char cmd[200];
 
@@ -540,7 +540,7 @@ int scan_device(struct ibmsis_res_addr resource_addr, u32 host_num)
 }
 
 /* Try to dynamically remove this device */
-int remove_device(struct ibmsis_res_addr resource_addr, struct sis_ioa *p_ioa)
+int remove_device(struct ipr_res_addr resource_addr, struct ipr_ioa *p_ioa)
 {
     char cmd[200];
 
@@ -553,13 +553,13 @@ int remove_device(struct ibmsis_res_addr resource_addr, struct sis_ioa *p_ioa)
     return 0;
 }
 
-int sis_ioctl(int fd, u32 cmd, struct ibmsis_ioctl_cmd_internal *p_ioctl_cmd)
+int ipr_ioctl(int fd, u32 cmd, struct ipr_ioctl_cmd_internal *p_ioctl_cmd)
 {
-    struct ibmsis_ioctl_cmd_type2 *p_cmd;
+    struct ipr_ioctl_cmd_type2 *p_cmd;
     int rc;
 
-    p_cmd = malloc(sizeof(struct ibmsis_ioctl_cmd_type2) + p_ioctl_cmd->buffer_len);
-    memset(p_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_type2) + p_ioctl_cmd->buffer_len);
+    p_cmd = malloc(sizeof(struct ipr_ioctl_cmd_type2) + p_ioctl_cmd->buffer_len);
+    memset(p_cmd, 0, sizeof(struct ipr_ioctl_cmd_type2) + p_ioctl_cmd->buffer_len);
 
     if (!p_ioctl_cmd->read_not_write)
         memcpy(p_cmd->buffer, p_ioctl_cmd->buffer, p_ioctl_cmd->buffer_len);
@@ -570,13 +570,13 @@ int sis_ioctl(int fd, u32 cmd, struct ibmsis_ioctl_cmd_internal *p_ioctl_cmd)
     p_cmd->buffer_len = p_ioctl_cmd->buffer_len;
     p_cmd->read_not_write = p_ioctl_cmd->read_not_write;
 
-    memcpy(p_cmd->cdb, p_ioctl_cmd->cdb, IBMSIS_CDB_LEN);
+    memcpy(p_cmd->cdb, p_ioctl_cmd->cdb, IPR_CDB_LEN);
     p_cmd->cdb[0] = cmd;
 
-    p_cmd->type = IBMSIS_IOCTL_TYPE_2;
+    p_cmd->type = IPR_IOCTL_TYPE_2;
     p_cmd->reserved = 0;
 
-    rc = ioctl(fd, IBMSIS_IOCTL_SEND_COMMAND, p_cmd);
+    rc = ioctl(fd, IPR_IOCTL_SEND_COMMAND, p_cmd);
 
     if (p_ioctl_cmd->read_not_write)
         memcpy(p_ioctl_cmd->buffer, p_cmd->buffer, p_ioctl_cmd->buffer_len);
@@ -586,8 +586,8 @@ int sis_ioctl(int fd, u32 cmd, struct ibmsis_ioctl_cmd_internal *p_ioctl_cmd)
     return rc;
 };
 
-#define SIS_MAX_XFER 0x8000
-int sg_ioctl(int fd, u8 cdb[IBMSIS_CCB_CDB_LEN],
+#define IPR_MAX_XFER 0x8000
+int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
              void *p_data, u32 xfer_len, u32 data_direction,
              struct sense_data_t *p_sense_data,
              u32 timeout_in_sec)
@@ -601,19 +601,19 @@ int sg_ioctl(int fd, u8 cdb[IBMSIS_CCB_CDB_LEN],
     void *dxferp;
 
     /* check if scatter gather should be used */
-    if (xfer_len > SIS_MAX_XFER)
+    if (xfer_len > IPR_MAX_XFER)
     {
-        iovec_count = xfer_len/SIS_MAX_XFER + 1;
+        iovec_count = xfer_len/IPR_MAX_XFER + 1;
         p_iovec = malloc(iovec_count * sizeof(sg_iovec_t));
 
         buff_len = xfer_len;
-        segment_size = SIS_MAX_XFER;
+        segment_size = IPR_MAX_XFER;
 
         for (i = 0; (i < iovec_count) && (buff_len != 0); i++)
         {
             
-            p_iovec[i].iov_base = malloc(SIS_MAX_XFER);
-            memcpy(p_iovec[i].iov_base, p_data + SIS_MAX_XFER * i, SIS_MAX_XFER);
+            p_iovec[i].iov_base = malloc(IPR_MAX_XFER);
+            memcpy(p_iovec[i].iov_base, p_data + IPR_MAX_XFER * i, IPR_MAX_XFER);
             p_iovec[i].iov_len = segment_size;
 
             buff_len -= segment_size;
@@ -971,31 +971,31 @@ void check_current_config(bool allow_rebuild_refresh)
     struct sg_map_info *p_sg_map_info;
     struct sg_proc_info *p_sg_proc_info;
     int  num_sg_devices, fd, rc, device_count, j, k;
-    struct sis_ioa *p_cur_ioa;
-    struct ibmsis_ioctl_cmd_internal ioa_cmd;
-    struct ibmsis_array_query_data  *p_cur_array_query_data;
-    struct ibmsis_resource_table *p_cur_res_table;
-    struct ibmsis_resource_entry res_entry;
-    struct ibmsis_record_common *p_common_record;
-    struct ibmsis_device_record *p_device_record;
-    struct ibmsis_array_record *p_array_record;
+    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioctl_cmd_internal ioa_cmd;
+    struct ipr_array_query_data  *p_cur_array_query_data;
+    struct ipr_resource_table *p_cur_res_table;
+    struct ipr_resource_entry res_entry;
+    struct ipr_record_common *p_common_record;
+    struct ipr_device_record *p_device_record;
+    struct ipr_array_record *p_array_record;
     int found, tried_scsi_add, tried_everything;
 
     /* Allocate memory on init */
     if (p_res_table == NULL)
     {
         p_res_table =
-            (struct ibmsis_resource_table *)
-            malloc((sizeof(struct ibmsis_resource_table) +
-                    sizeof(struct ibmsis_resource_entry) *
-                    IBMSIS_MAX_PHYSICAL_DEVS) * num_ioas);
+            (struct ipr_resource_table *)
+            malloc((sizeof(struct ipr_resource_table) +
+                    sizeof(struct ipr_resource_entry) *
+                    IPR_MAX_PHYSICAL_DEVS) * num_ioas);
     }
 
-    if (p_sis_array_query_data == NULL)
+    if (p_ipr_array_query_data == NULL)
     {
-        p_sis_array_query_data =
-            (struct ibmsis_array_query_data *)
-            malloc(sizeof(struct ibmsis_array_query_data) * num_ioas);
+        p_ipr_array_query_data =
+            (struct ipr_array_query_data *)
+            malloc(sizeof(struct ipr_array_query_data) * num_ioas);
     }
 
     p_sg_map_info = (struct sg_map_info *)malloc(sizeof(struct sg_map_info) * MAX_SG_DEVS);
@@ -1005,9 +1005,9 @@ void check_current_config(bool allow_rebuild_refresh)
     num_sg_devices = get_sg_proc_data(p_sg_proc_info);
     get_sg_ioctl_data(p_sg_map_info, num_sg_devices);
 
-    for(p_cur_ioa = p_head_sis_ioa,
+    for(p_cur_ioa = p_head_ipr_ioa,
         p_cur_res_table = p_res_table,
-        p_cur_array_query_data = p_sis_array_query_data;
+        p_cur_array_query_data = p_ipr_array_query_data;
         p_cur_ioa != NULL;
         p_cur_ioa = p_cur_ioa->p_next,
         p_cur_res_table++,
@@ -1018,29 +1018,29 @@ void check_current_config(bool allow_rebuild_refresh)
         fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
         if (fd <= 1)
         {
-            syslog(LOG_ERR, "Could not open %s. %m"IBMSIS_EOL,
+            syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL,
                    p_cur_ioa->ioa.dev_name);
             p_cur_ioa->num_devices = 0;
             continue;
         }
 
         /* Get Query Array Config Data */
-        memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
+        memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
 
         ioa_cmd.buffer = p_cur_array_query_data;
-        ioa_cmd.buffer_len = sizeof(struct ibmsis_array_query_data);
+        ioa_cmd.buffer_len = sizeof(struct ipr_array_query_data);
         if (allow_rebuild_refresh)
             ioa_cmd.cdb[1] = 0;
         else
             ioa_cmd.cdb[1] = 0x80; /* Prohibit Rebuild Candidate Refresh */
         ioa_cmd.read_not_write = 1;
 
-        rc = sis_ioctl(fd, IBMSIS_QUERY_ARRAY_CONFIG, &ioa_cmd);
+        rc = ipr_ioctl(fd, IPR_QUERY_ARRAY_CONFIG, &ioa_cmd);
 
         if (rc != 0)
         {
             if (errno != EINVAL)
-                syslog(LOG_ERR,"Query Array Config to %s failed. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+                syslog(LOG_ERR,"Query Array Config to %s failed. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
 
             p_cur_array_query_data->num_records = 0;
         }
@@ -1048,17 +1048,17 @@ void check_current_config(bool allow_rebuild_refresh)
         p_cur_ioa->p_qac_data = p_cur_array_query_data;
 
         /* Get Query IOA Config Data */
-        memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
+        memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
 
         ioa_cmd.buffer = p_cur_res_table;
-        ioa_cmd.buffer_len = sizeof(struct ibmsis_resource_table);
+        ioa_cmd.buffer_len = sizeof(struct ipr_resource_table);
         ioa_cmd.read_not_write = 1;
 
-        rc = sis_ioctl(fd, IBMSIS_QUERY_IOA_CONFIG, &ioa_cmd);
+        rc = ipr_ioctl(fd, IPR_QUERY_IOA_CONFIG, &ioa_cmd);
 
         if (rc != 0)
         {
-            syslog(LOG_ERR, "Query IOA Config to %s failed. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+            syslog(LOG_ERR, "Query IOA Config to %s failed. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
             close(fd);
             continue;
         }
@@ -1066,15 +1066,15 @@ void check_current_config(bool allow_rebuild_refresh)
         close(fd);
 
         device_count = 0;
-        p_cur_ioa->dev = (struct sis_device *)
+        p_cur_ioa->dev = (struct ipr_device *)
             realloc(p_cur_ioa->dev,
-                    p_cur_res_table->hdr.num_entries * sizeof(struct sis_device));
-        memset(p_cur_ioa->dev, 0, p_cur_res_table->hdr.num_entries * sizeof(struct sis_device));
+                    p_cur_res_table->hdr.num_entries * sizeof(struct ipr_device));
+        memset(p_cur_ioa->dev, 0, p_cur_res_table->hdr.num_entries * sizeof(struct ipr_device));
 
         /* now assemble data pertaining to each individual device */
         for (j = 0; j < p_cur_res_table->hdr.num_entries; j++)
         {
-            if ((IBMSIS_IS_DASD_DEVICE(p_cur_res_table->dev[j].std_inq_data))
+            if ((IPR_IS_DASD_DEVICE(p_cur_res_table->dev[j].std_inq_data))
                 && !p_cur_res_table->dev[j].is_ioa_resource)
             {
                 p_cur_ioa->dev[device_count].p_resource_entry = &p_cur_res_table->dev[j];
@@ -1086,18 +1086,18 @@ void check_current_config(bool allow_rebuild_refresh)
                 res_entry = p_cur_res_table->dev[j];
 
                 /* find array config data matching resource entry */
-                p_common_record = (struct ibmsis_record_common *)p_cur_array_query_data->data;
+                p_common_record = (struct ipr_record_common *)p_cur_array_query_data->data;
                 for (k = 0; k < p_cur_array_query_data->num_records; k++)
                 {
-                    p_device_record = (struct ibmsis_device_record *)p_common_record;
+                    p_device_record = (struct ipr_device_record *)p_common_record;
                     if (p_device_record->resource_handle == res_entry.resource_handle)
                     {
                         p_cur_ioa->dev[device_count].p_qac_entry = p_common_record;
                         break;
                     }
 
-                    p_common_record = (struct ibmsis_record_common *)
-                        ((unsigned long)p_common_record + sistoh16(p_common_record->record_len));
+                    p_common_record = (struct ipr_record_common *)
+                        ((unsigned long)p_common_record + iprtoh16(p_common_record->record_len));
                 }
 
                 /* find sg_map_info matching resource entry */
@@ -1175,27 +1175,27 @@ void check_current_config(bool allow_rebuild_refresh)
 
         /* now go through query array data inserting Array Record Type 1 and 2
          data putting the IOA as the resource owner */
-        p_array_record = (struct ibmsis_array_record *)p_cur_array_query_data->data;
+        p_array_record = (struct ipr_array_record *)p_cur_array_query_data->data;
         for (k = 0; k < p_cur_array_query_data->num_records; k++)
         {
-            if ((p_array_record->common.record_id == IBMSIS_RECORD_ID_ARRAY_RECORD) ||
-                ((p_array_record->common.record_id == IBMSIS_RECORD_ID_ARRAY2_RECORD) &&
+            if ((p_array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
+                ((p_array_record->common.record_id == IPR_RECORD_ID_ARRAY2_RECORD) &&
                  (p_array_record->start_cand)))
             {
                 strcpy(p_cur_ioa->dev[device_count].dev_name, p_cur_ioa->ioa.dev_name);
                 strcpy(p_cur_ioa->dev[device_count].gen_name, p_cur_ioa->ioa.gen_name);
                 p_cur_ioa->dev[device_count].p_resource_entry = p_cur_ioa->ioa.p_resource_entry;
-                p_cur_ioa->dev[device_count].p_qac_entry = (struct ibmsis_record_common *)p_array_record;
+                p_cur_ioa->dev[device_count].p_qac_entry = (struct ipr_record_common *)p_array_record;
                 p_cur_ioa->dev[device_count].opens = 0;
                 device_count++;
             }
-            else if (p_array_record->common.record_id == IBMSIS_RECORD_ID_SUPPORTED_ARRAYS)
+            else if (p_array_record->common.record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS)
             {
-                p_cur_ioa->p_supported_arrays = (struct ibmsis_supported_arrays *)p_array_record;
+                p_cur_ioa->p_supported_arrays = (struct ipr_supported_arrays *)p_array_record;
             }
 
-            p_array_record = (struct ibmsis_array_record *)
-                ((unsigned long)p_array_record + sistoh16(p_array_record->common.record_len));
+            p_array_record = (struct ipr_array_record *)
+                ((unsigned long)p_array_record + iprtoh16(p_array_record->common.record_len));
         }
 
         p_cur_ioa->num_devices = device_count;
@@ -1242,15 +1242,15 @@ void exit_on_error(char *s, ...)
     va_end(args);
 
     closelog();
-    openlog("sisconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
+    openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
     syslog(LOG_ERR,"%s",usr_str);
     closelog();
-    openlog("sisconfig", LOG_PID | LOG_CONS, LOG_USER);
+    openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
 
     exit(1);
 }
 
-void sis_config_file_hdr(char *file_name)
+void ipr_config_file_hdr(char *file_name)
 {
     FILE *fd;
     char cmd_str[64];
@@ -1264,26 +1264,26 @@ void sis_config_file_hdr(char *file_name)
     }
 
     /* be sure directory is present */
-    sprintf(cmd_str,"install -d %s",SIS_CONFIG_DIR);
+    sprintf(cmd_str,"install -d %s",IPR_CONFIG_DIR);
     system(cmd_str);
 
     /* otherwise, create new file */
     fd = fopen(file_name, "w");
     if (fd == NULL)
     {
-	syslog(LOG_ERR, "Could not open %s. %m"IBMSIS_EOL, file_name);
+	syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, file_name);
 	return;
     }
 
-    fprintf(fd,"# DO NOT EDIT! Software generated configuration file for"IBMSIS_EOL"# ipr SCSI device subsystem"IBMSIS_EOL);
-    fprintf(fd, IBMSIS_EOL);
-    fprintf(fd,"# Use sisconfig to configure"IBMSIS_EOL);
-    fprintf(fd,"# See \"man sisconfig\" for more information"IBMSIS_EOL);
-    fprintf(fd, IBMSIS_EOL);
+    fprintf(fd,"# DO NOT EDIT! Software generated configuration file for"IPR_EOL"# ipr SCSI device subsystem"IPR_EOL);
+    fprintf(fd, IPR_EOL);
+    fprintf(fd,"# Use iprconfig to configure"IPR_EOL);
+    fprintf(fd,"# See \"man iprconfig\" for more information"IPR_EOL);
+    fprintf(fd, IPR_EOL);
     fclose(fd);
 }
 
-void  sis_config_file_entry(char *usr_file_name,
+void  ipr_config_file_entry(char *usr_file_name,
                             char *category,
                             char *field,
                             char *value,
@@ -1296,10 +1296,10 @@ void  sis_config_file_entry(char *usr_file_name,
     int category_found = 0;
     int field_found = 0;
 
-    sprintf(file_name,"%s%s",SIS_CONFIG_DIR, usr_file_name);
+    sprintf(file_name,"%s%s",IPR_CONFIG_DIR, usr_file_name);
 
     /* verify common header comments */
-    sis_config_file_hdr(file_name);
+    ipr_config_file_hdr(file_name);
 
     fd = fopen(file_name, "r");
 
@@ -1310,7 +1310,7 @@ void  sis_config_file_entry(char *usr_file_name,
     temp_fd = fopen(temp_file_name, "w");
     if (temp_fd == NULL)
     {
-        syslog(LOG_ERR, "Could not open %s. %m"IBMSIS_EOL, temp_file_name);
+        syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, temp_file_name);
         return;
     }
 
@@ -1333,14 +1333,14 @@ void  sis_config_file_entry(char *usr_file_name,
                         if (!update)
                             fprintf(temp_fd, "# ");
 
-                        fprintf(temp_fd,"%s %s"IBMSIS_EOL,field,value);
+                        fprintf(temp_fd,"%s %s"IPR_EOL,field,value);
                     }
                 }
 
                 if (strstr(line, field))
                 {
                     if (update)
-                        sprintf(line,"%s %s"IBMSIS_EOL,field,value);
+                        sprintf(line,"%s %s"IPR_EOL,field,value);
 
                     field_found = 1;
                 }
@@ -1354,13 +1354,13 @@ void  sis_config_file_entry(char *usr_file_name,
     {
         if (!category_found)
         {
-            fprintf(temp_fd,IBMSIS_EOL"%s"IBMSIS_EOL, category);
+            fprintf(temp_fd,IPR_EOL"%s"IPR_EOL, category);
         }
 
         if (!update)
             fprintf(temp_fd, "# ");
 
-        fprintf(temp_fd,"%s %s"IBMSIS_EOL, field, value);
+        fprintf(temp_fd,"%s %s"IPR_EOL, field, value);
     }
 
     sprintf(line,"mv %s %s", temp_file_name, file_name);
@@ -1370,7 +1370,7 @@ void  sis_config_file_entry(char *usr_file_name,
     fclose(temp_fd);
 }
 
-int  sis_config_file_read(char *usr_file_name,
+int  ipr_config_file_read(char *usr_file_name,
                           char *category,
                           char *field,
                           char *value)
@@ -1382,7 +1382,7 @@ int  sis_config_file_read(char *usr_file_name,
     int category_found;
     int rc = RC_FAILED;
 
-    sprintf(file_name,"%s%s",SIS_CONFIG_DIR, usr_file_name);
+    sprintf(file_name,"%s%s",IPR_CONFIG_DIR, usr_file_name);
 
     fd = fopen(file_name, "r");
     if (fd == NULL)
@@ -1412,7 +1412,7 @@ int  sis_config_file_read(char *usr_file_name,
                         str_ptr += strlen(field);
                         while (str_ptr[0] == ' ')
                             str_ptr++;
-                        sprintf(value,"%s"IBMSIS_EOL,str_ptr);
+                        sprintf(value,"%s"IPR_EOL,str_ptr);
                         rc = RC_SUCCESS;
                         break;
                     }
@@ -1425,12 +1425,12 @@ int  sis_config_file_read(char *usr_file_name,
     return rc;
 }
 
-int sis_config_file_valid(char *usr_file_name)
+int ipr_config_file_valid(char *usr_file_name)
 {
     FILE *fd;
     char file_name[64];
 
-    sprintf(file_name,"%s%s",SIS_CONFIG_DIR, usr_file_name);
+    sprintf(file_name,"%s%s",IPR_CONFIG_DIR, usr_file_name);
 
     fd = fopen(file_name, "r");
     if (fd == NULL)
@@ -1442,15 +1442,15 @@ int sis_config_file_valid(char *usr_file_name)
     return RC_SUCCESS;
 }
 
-void sis_save_page_28(struct sis_ioa *p_ioa,
-                      struct sis_page_28 *p_page_28_cur,
-                      struct sis_page_28 *p_page_28_chg,
-                      struct sis_page_28 *p_page_28_sis)
+void ipr_save_page_28(struct ipr_ioa *p_ioa,
+                      struct ipr_page_28 *p_page_28_cur,
+                      struct ipr_page_28 *p_page_28_chg,
+                      struct ipr_page_28 *p_page_28_ipr)
 {
     char file_name[64];
     char category[16];
     char value_str[16];
-    void sis_config_file_hdr(char *file_name);
+    void ipr_config_file_hdr(char *file_name);
     int i;
     int update_entry;
 
@@ -1465,19 +1465,19 @@ void sis_save_page_28(struct sis_ioa *p_ioa,
         if (p_page_28_chg->attr[i].qas_capability)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
                     p_page_28_cur->attr[i].qas_capability);
 
-            if (p_page_28_sis->attr[i].qas_capability)
+            if (p_page_28_ipr->attr[i].qas_capability)
                 update_entry = 1;
             else
                 update_entry = 0;
 
-            sis_config_file_entry(file_name,
+            ipr_config_file_entry(file_name,
                                   category,
-                                  SIS_QAS_CAPABILITY,
+                                  IPR_QAS_CAPABILITY,
                                   value_str,
                                   update_entry);
         }
@@ -1485,19 +1485,19 @@ void sis_save_page_28(struct sis_ioa *p_ioa,
         if (p_page_28_chg->attr[i].scsi_id)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
                     p_page_28_cur->attr[i].scsi_id);
 
-            if (p_page_28_sis->attr[i].scsi_id)
+            if (p_page_28_ipr->attr[i].scsi_id)
                 update_entry = 1;
             else
                 update_entry = 0;
 
-            sis_config_file_entry(file_name,
+            ipr_config_file_entry(file_name,
                                   category,
-                                  SIS_HOST_SCSI_ID,
+                                  IPR_HOST_SCSI_ID,
                                   value_str,
                                   update_entry);
         }
@@ -1505,19 +1505,19 @@ void sis_save_page_28(struct sis_ioa *p_ioa,
         if (p_page_28_chg->attr[i].bus_width)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
                     p_page_28_cur->attr[i].bus_width);
 
-            if (p_page_28_sis->attr[i].bus_width)
+            if (p_page_28_ipr->attr[i].bus_width)
                 update_entry = 1;
             else
                 update_entry = 0;
 
-            sis_config_file_entry(file_name,
+            ipr_config_file_entry(file_name,
                                   category,
-                                  SIS_BUS_WIDTH,
+                                  IPR_BUS_WIDTH,
                                   value_str,
                                   update_entry);
         }
@@ -1525,20 +1525,20 @@ void sis_save_page_28(struct sis_ioa *p_ioa,
         if (p_page_28_chg->attr[i].max_xfer_rate)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    (sistoh32(p_page_28_cur->attr[i].max_xfer_rate) *
+                    (iprtoh32(p_page_28_cur->attr[i].max_xfer_rate) *
                      (p_page_28_cur->attr[i].bus_width / 8))/10);
 
-            if (p_page_28_sis->attr[i].max_xfer_rate)
+            if (p_page_28_ipr->attr[i].max_xfer_rate)
                 update_entry = 1;
             else
                 update_entry = 0;
 
-            sis_config_file_entry(file_name,
+            ipr_config_file_entry(file_name,
                                   category,
-                                  SIS_MAX_XFER_RATE,
+                                  IPR_MAX_XFER_RATE,
                                   value_str,
                                   update_entry);
         }
@@ -1546,33 +1546,33 @@ void sis_save_page_28(struct sis_ioa *p_ioa,
         if (p_page_28_chg->attr[i].min_time_delay)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
                     p_page_28_cur->attr[i].min_time_delay);
 
-            sis_config_file_entry(file_name,
+            ipr_config_file_entry(file_name,
                                   category,
-                                  SIS_MIN_TIME_DELAY,
+                                  IPR_MIN_TIME_DELAY,
                                   value_str,
                                   0);
         }
     }
 }
 
-void sis_set_page_28(struct sis_ioa *p_cur_ioa,
+void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
                      int limited_config,
                      int reset_scheduled)
 {
     int rc, i;
-    struct ibmsis_ioctl_cmd_internal ioa_cmd;
+    struct ipr_ioctl_cmd_internal ioa_cmd;
     char current_mode_settings[255];
     char changeable_mode_settings[255];
     char default_mode_settings[255];
-    struct ibmsis_mode_parm_hdr *p_mode_parm_hdr;
+    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
     int fd;
-    struct ibmsis_page_28 *p_page_28_sense;
-    struct sis_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
+    struct ipr_pagewh_28 *p_page_28_sense;
+    struct ipr_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
     int is_reset_req = 0;
     char value_str[64];
     char file_name[64];
@@ -1581,8 +1581,8 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
     u32 max_xfer_rate;
 
     /* mode sense page28 to get current parms */
-    memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
-    p_mode_parm_hdr = (struct ibmsis_mode_parm_hdr *)current_mode_settings;
+    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
 
     ioa_cmd.buffer = p_mode_parm_hdr;
     ioa_cmd.buffer_len = 255;
@@ -1593,62 +1593,62 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
     fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
     if (fd <= 1)
     {
-        syslog(LOG_ERR, "Could not open %s. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+        syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SENSE_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    p_page_28_sense = (struct ibmsis_page_28 *)p_mode_parm_hdr;
-    p_page_28_cur = (struct sis_page_28 *)
+    p_page_28_sense = (struct ipr_pagewh_28 *)p_mode_parm_hdr;
+    p_page_28_cur = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* now issue mode sense to get changeable parms */
-    p_mode_parm_hdr = (struct ibmsis_mode_parm_hdr *)changeable_mode_settings;
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
 
     ioa_cmd.buffer = p_mode_parm_hdr;
     ioa_cmd.buffer_len = 255;
     ioa_cmd.cdb[2] = 0x68;
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SENSE_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    p_page_28_chg = (struct sis_page_28 *)
+    p_page_28_chg = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get default parms */
-    p_mode_parm_hdr = (struct ibmsis_mode_parm_hdr *)default_mode_settings;
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
 
     ioa_cmd.buffer = p_mode_parm_hdr;
     ioa_cmd.buffer_len = 255;
     ioa_cmd.cdb[2] = 0xA8;
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SENSE_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    p_page_28_dflt = (struct sis_page_28 *)
+    p_page_28_dflt = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* extract data from saved file to send in mode select */
@@ -1662,12 +1662,12 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
         if (p_page_28_chg->attr[i].qas_capability)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
 
-            rc = sis_config_file_read(file_name,
+            rc = ipr_config_file_read(file_name,
                                       category,
-                                      SIS_QAS_CAPABILITY,
+                                      IPR_QAS_CAPABILITY,
                                       value_str);
             if (rc == RC_SUCCESS)
             {
@@ -1679,12 +1679,12 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
         if (p_page_28_chg->attr[i].scsi_id)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
 
-            rc = sis_config_file_read(file_name,
+            rc = ipr_config_file_read(file_name,
                                       category,
-                                      SIS_HOST_SCSI_ID,
+                                      IPR_HOST_SCSI_ID,
                                       value_str);
             if (rc == RC_SUCCESS)
             {
@@ -1700,12 +1700,12 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
         if (p_page_28_chg->attr[i].bus_width)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
 
-            rc = sis_config_file_read(file_name,
+            rc = ipr_config_file_read(file_name,
                                       category,
-                                      SIS_BUS_WIDTH,
+                                      IPR_BUS_WIDTH,
                                       value_str);
             if (rc == RC_SUCCESS)
             {
@@ -1718,29 +1718,29 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
         {
             if (limited_config & (1 << p_page_28_cur->attr[i].res_addr.bus))
             {
-                max_xfer_rate = ((sistoh32(p_page_28_cur->attr[i].max_xfer_rate)) *
+                max_xfer_rate = ((iprtoh32(p_page_28_cur->attr[i].max_xfer_rate)) *
                      p_page_28_cur->attr[i].bus_width)/(10 * 8);
 
-                if (SIS_LIMITED_MAX_XFER_RATE < max_xfer_rate)
+                if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate)
                 {
                     p_page_28_cur->attr[i].max_xfer_rate =
-                        htosis32(SIS_LIMITED_MAX_XFER_RATE * 10 /
+                        htoipr32(IPR_LIMITED_MAX_XFER_RATE * 10 /
                                  (p_page_28_cur->attr[i].bus_width / 8));
                 }
 
-                if (limited_config & SIS_SAVE_LIMITED_CONFIG)
+                if (limited_config & IPR_SAVE_LIMITED_CONFIG)
                 {
                     /* update config file to indicate present restriction */
                     sprintf(category,"[%s%d]",
-                            SIS_CATEGORY_BUS,
+                            IPR_CATEGORY_BUS,
                             p_page_28_cur->attr[i].res_addr.bus);
                     sprintf(value_str,"%d",
-                            (sistoh32(p_page_28_cur->attr[i].max_xfer_rate) *
+                            (iprtoh32(p_page_28_cur->attr[i].max_xfer_rate) *
                              (p_page_28_cur->attr[i].bus_width / 8))/10);
 
-                    sis_config_file_entry(file_name,
+                    ipr_config_file_entry(file_name,
                                           category,
-                                          SIS_MAX_XFER_RATE,
+                                          IPR_MAX_XFER_RATE,
                                           value_str,
                                           1);
                 }
@@ -1748,25 +1748,25 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
             else
             {
                 sprintf(category,"[%s%d]",
-                        SIS_CATEGORY_BUS,
+                        IPR_CATEGORY_BUS,
                         p_page_28_cur->attr[i].res_addr.bus);
 
-                rc = sis_config_file_read(file_name,
+                rc = ipr_config_file_read(file_name,
                                           category,
-                                          SIS_MAX_XFER_RATE,
+                                          IPR_MAX_XFER_RATE,
                                           value_str);
 
                 if (rc == RC_SUCCESS)
                 {
                     sscanf(value_str,"%d", &new_value);
 
-                    max_xfer_rate = ((sistoh32(p_page_28_dflt->attr[i].max_xfer_rate)) *
+                    max_xfer_rate = ((iprtoh32(p_page_28_dflt->attr[i].max_xfer_rate)) *
                                      p_page_28_cur->attr[i].bus_width)/(10 * 8);
 
                     if (new_value <= max_xfer_rate)
                     {
                         p_page_28_cur->attr[i].max_xfer_rate =
-                            htosis32(new_value * 10 /
+                            htoipr32(new_value * 10 /
                                      (p_page_28_cur->attr[i].bus_width / 8));
                     }
                     else
@@ -1776,15 +1776,15 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
 
                         /* update config file to indicate present restriction */
                         sprintf(category,"[%s%d]",
-                                SIS_CATEGORY_BUS,
+                                IPR_CATEGORY_BUS,
                                 p_page_28_cur->attr[i].res_addr.bus);
                         sprintf(value_str,"%d",
-                                (sistoh32(p_page_28_cur->attr[i].max_xfer_rate) *
+                                (iprtoh32(p_page_28_cur->attr[i].max_xfer_rate) *
                                  (p_page_28_cur->attr[i].bus_width / 8))/10);
 
-                        sis_config_file_entry(file_name,
+                        ipr_config_file_entry(file_name,
                                               category,
-                                              SIS_MAX_XFER_RATE,
+                                              IPR_MAX_XFER_RATE,
                                               value_str,
                                               1);
                     }
@@ -1800,12 +1800,12 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
         if (p_page_28_chg->attr[i].min_time_delay)
         {
             sprintf(category,"[%s%d]",
-                    SIS_CATEGORY_BUS,
+                    IPR_CATEGORY_BUS,
                     p_page_28_cur->attr[i].res_addr.bus);
 
-            rc = sis_config_file_read(file_name,
+            rc = ipr_config_file_read(file_name,
                                       category,
-                                      SIS_MIN_TIME_DELAY,
+                                      IPR_MIN_TIME_DELAY,
                                       value_str);
             if (rc == RC_SUCCESS)
             {
@@ -1814,24 +1814,24 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
             }
             else
             {
-                p_page_28_cur->attr[i].min_time_delay = IBMSIS_INIT_SPINUP_DELAY;
+                p_page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
             }
         }
     }
 
     /* issue mode sense and reset if necessary */
-    memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
+    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
     ioa_cmd.buffer = p_page_28_sense;
-    ioa_cmd.buffer_len = sizeof(struct ibmsis_page_28);
+    ioa_cmd.buffer_len = sizeof(struct ipr_pagewh_28);
     ioa_cmd.read_not_write = 0;
     ioa_cmd.driver_cmd = 1;
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SELECT_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SELECT_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Select to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Select to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
@@ -1839,31 +1839,31 @@ void sis_set_page_28(struct sis_ioa *p_cur_ioa,
     if ((is_reset_req) &&
         (!reset_scheduled))
     {
-        rc = sis_ioctl(fd, IBMSIS_RESET_HOST_ADAPTER, &ioa_cmd);
+        rc = ipr_ioctl(fd, IPR_RESET_HOST_ADAPTER, &ioa_cmd);
     }
 
     close(fd);
 }
 
-void sis_set_page_28_init(struct sis_ioa *p_cur_ioa,
+void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
                           int limited_config)
 {
     int rc, i;
-    struct ibmsis_ioctl_cmd_internal ioa_cmd;
+    struct ipr_ioctl_cmd_internal ioa_cmd;
     char current_mode_settings[255];
     char changeable_mode_settings[255];
     char default_mode_settings[255];
-    struct ibmsis_mode_parm_hdr *p_mode_parm_hdr;
+    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
     int fd;
     int issue_mode_select = 0;
-    struct ibmsis_page_28 *p_page_28_sense;
-    struct sis_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
-    struct sis_page_28 page_28_sis;
+    struct ipr_pagewh_28 *p_page_28_sense;
+    struct ipr_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
+    struct ipr_page_28 page_28_ipr;
     u32 max_xfer_rate;
 
     /* Mode sense page28 to get current parms */
-    memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
-    p_mode_parm_hdr = (struct ibmsis_mode_parm_hdr *)current_mode_settings;
+    memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
 
     ioa_cmd.buffer = p_mode_parm_hdr;
     ioa_cmd.buffer_len = 255;
@@ -1874,62 +1874,62 @@ void sis_set_page_28_init(struct sis_ioa *p_cur_ioa,
     fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
     if (fd <= 1)
     {
-        syslog(LOG_ERR, "Could not open %s. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+        syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SENSE_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    p_page_28_sense = (struct ibmsis_page_28 *)p_mode_parm_hdr;
-    p_page_28_cur = (struct sis_page_28 *)
+    p_page_28_sense = (struct ipr_pagewh_28 *)p_mode_parm_hdr;
+    p_page_28_cur = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get changeable parms */
-    p_mode_parm_hdr = (struct ibmsis_mode_parm_hdr *)changeable_mode_settings;
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
 
     ioa_cmd.buffer = p_mode_parm_hdr;
     ioa_cmd.buffer_len = 255;
     ioa_cmd.cdb[2] = 0x68;
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SENSE_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    p_page_28_chg = (struct sis_page_28 *)
+    p_page_28_chg = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get default parms */
-    p_mode_parm_hdr = (struct ibmsis_mode_parm_hdr *)default_mode_settings;
+    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
 
     ioa_cmd.buffer = p_mode_parm_hdr;
     ioa_cmd.buffer_len = 255;
     ioa_cmd.cdb[2] = 0xA8;
 
-    rc = sis_ioctl(fd, IBMSIS_MODE_SENSE_PAGE_28, &ioa_cmd);
+    rc = ipr_ioctl(fd, IPR_MODE_SENSE_PAGE_28, &ioa_cmd);
 
     if (rc != 0)
     {
         close(fd);
-        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IBMSIS_EOL,
+        syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
                p_cur_ioa->ioa.dev_name);
         return;
     }
 
-    p_page_28_dflt = (struct sis_page_28 *)
+    p_page_28_dflt = (struct ipr_page_28 *)
         (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
 
     for (i = 0;
@@ -1937,17 +1937,17 @@ void sis_set_page_28_init(struct sis_ioa *p_cur_ioa,
          i++)
     {
         if (p_page_28_chg->attr[i].min_time_delay)
-            p_page_28_cur->attr[i].min_time_delay = IBMSIS_INIT_SPINUP_DELAY;
+            p_page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
 
         if ((limited_config & (1 << p_page_28_cur->attr[i].res_addr.bus)))
         {
-            max_xfer_rate = ((sistoh32(p_page_28_cur->attr[i].max_xfer_rate)) *
+            max_xfer_rate = ((iprtoh32(p_page_28_cur->attr[i].max_xfer_rate)) *
                              p_page_28_cur->attr[i].bus_width)/(10 * 8);
 
-            if (SIS_LIMITED_MAX_XFER_RATE < max_xfer_rate)
+            if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate)
             {
                 p_page_28_cur->attr[i].max_xfer_rate =
-                    htosis32(SIS_LIMITED_MAX_XFER_RATE * 10 /
+                    htoipr32(IPR_LIMITED_MAX_XFER_RATE * 10 /
                              (p_page_28_cur->attr[i].bus_width / 8));
             }
         }
@@ -1963,17 +1963,17 @@ void sis_set_page_28_init(struct sis_ioa *p_cur_ioa,
     /* Issue mode select */
     if (issue_mode_select)
     {
-        memset(&ioa_cmd, 0, sizeof(struct ibmsis_ioctl_cmd_internal));
+        memset(&ioa_cmd, 0, sizeof(struct ipr_ioctl_cmd_internal));
         ioa_cmd.buffer = p_page_28_sense;
-        ioa_cmd.buffer_len = sizeof(struct ibmsis_page_28);
+        ioa_cmd.buffer_len = sizeof(struct ipr_pagewh_28);
         ioa_cmd.read_not_write = 0;
         ioa_cmd.driver_cmd = 1;
 
-        rc = sis_ioctl(fd, IBMSIS_MODE_SELECT_PAGE_28, &ioa_cmd);
+        rc = ipr_ioctl(fd, IPR_MODE_SELECT_PAGE_28, &ioa_cmd);
 
         if (rc != 0)
         {
-            syslog(LOG_ERR, "Mode Select to %s failed. %m"IBMSIS_EOL,
+            syslog(LOG_ERR, "Mode Select to %s failed. %m"IPR_EOL,
                    p_cur_ioa->ioa.dev_name);
         }
 
@@ -1981,25 +1981,25 @@ void sis_set_page_28_init(struct sis_ioa *p_cur_ioa,
          that no values are being changed, this routine is called
          to create and initialize the file if it does not already
          exist */
-        memset(&page_28_sis, 0, sizeof(struct ibmsis_page_28));
+        memset(&page_28_ipr, 0, sizeof(struct ipr_pagewh_28));
 
-        sis_save_page_28(p_cur_ioa, p_page_28_cur, p_page_28_chg,
-                         &page_28_sis);
+        ipr_save_page_28(p_cur_ioa, p_page_28_cur, p_page_28_chg,
+                         &page_28_ipr);
     }
 
     close(fd);
 }
 
-void sislog_location(struct ibmsis_resource_entry *p_resource)
+void iprlog_location(struct ipr_resource_entry *p_resource)
 {
-    if (platform == SIS_ISERIES)
+    if (platform == IPR_ISERIES)
     {
         syslog(LOG_ERR,"  Frame ID: %s, Card position: %s",
                p_resource->frame_id, p_resource->slot_label);
     }
     else
     {
-        if (platform == SIS_PSERIES)
+        if (platform == IPR_PSERIES)
             syslog(LOG_ERR, 
                    "  Location: %s, Bus: %d, Device: %d, Host num: %d",
                    p_resource->pseries_location, p_resource->pci_bus_number,
@@ -2012,22 +2012,22 @@ void sislog_location(struct ibmsis_resource_entry *p_resource)
     }
 }
 
-bool is_af_blocked(struct sis_device *p_sis_device, int silent)
+bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)
 {
     int i, j, rc, fd;
-    u8 cdb[IBMSIS_CCB_CDB_LEN];
+    u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
-    struct ibmsis_std_inq_data std_inq_data;
-    struct ibmsis_dasd_inquiry_page3 dasd_page3_inq;
+    struct ipr_std_inq_data std_inq_data;
+    struct ipr_dasd_inquiry_page3 dasd_page3_inq;
     u32 ros_rcv_ram_rsvd, min_ucode_level;
 
-    fd = open(p_sis_device->gen_name, O_RDWR);
+    fd = open(p_ipr_device->gen_name, O_RDWR);
 
     if (fd != -1)
     {
         /* Zero out inquiry data */
         memset(&std_inq_data, 0, sizeof(std_inq_data));
-        memset(cdb, 0, IBMSIS_CCB_CDB_LEN);
+        memset(cdb, 0, IPR_CCB_CDB_LEN);
 
         cdb[0] = INQUIRY;
         cdb[4] = sizeof(std_inq_data);
@@ -2040,13 +2040,13 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
         if (rc != 0)
         {
             syslog(LOG_ERR,"standard inquiry failed to %s.",
-                   p_sis_device->gen_name);
+                   p_ipr_device->gen_name);
             close(fd);
             return false;
         }
 
         memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
-        memset(cdb, 0, IBMSIS_CCB_CDB_LEN);
+        memset(cdb, 0, IPR_CCB_CDB_LEN);
 
         /* Issue page 3 inquiry */
         cdb[0] = INQUIRY;
@@ -2061,7 +2061,7 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
         close(fd);
         if (rc != 0)
         {
-            syslog(LOG_ERR,"Page 3 inquiry failed to %s.", p_sis_device->dev_name);
+            syslog(LOG_ERR,"Page 3 inquiry failed to %s.", p_ipr_device->dev_name);
             return false;
         }
 
@@ -2072,7 +2072,7 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
              i++)
         {
             /* check vendor id */
-            for (j = 0; j < IBMSIS_VENDOR_ID_LEN; j++)
+            for (j = 0; j < IPR_VENDOR_ID_LEN; j++)
             {
                 if (unsupported_af[i].compare_vendor_id_byte[j])
                 {
@@ -2085,11 +2085,11 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
                 }
             }
 
-            if (j != IBMSIS_VENDOR_ID_LEN)
+            if (j != IPR_VENDOR_ID_LEN)
                 continue;
 
             /* check product ID */
-            for (j = 0; j < IBMSIS_PROD_ID_LEN; j++)
+            for (j = 0; j < IPR_PROD_ID_LEN; j++)
             {
                 if (unsupported_af[i].compare_product_id_byte[j])
                 {
@@ -2102,7 +2102,7 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
                 }
             }
 
-            if (j != IBMSIS_PROD_ID_LEN)
+            if (j != IPR_PROD_ID_LEN)
                 continue;
 
             /* Compare LID Level */
@@ -2149,7 +2149,7 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
                     if (!silent)
                         syslog(LOG_ERR,"Disk %s needs updated microcode "
                                "before transitioning to 522 bytes/sector "
-                               "format.", p_sis_device->dev_name);
+                               "format.", p_ipr_device->dev_name);
                     return true;
                 }
                 else
@@ -2161,7 +2161,7 @@ bool is_af_blocked(struct sis_device *p_sis_device, int silent)
             {
                 if (!silent)
                     syslog(LOG_ERR,"Disk %s not supported for transition "
-                           "to 522 bytes/sector format.", p_sis_device->dev_name);
+                           "to 522 bytes/sector format.", p_ipr_device->dev_name);
                 return true;
             }
         }   

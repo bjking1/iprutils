@@ -1,20 +1,20 @@
-This directory contains user space tools required by the ibmsis device driver.
+This directory contains user space tools required by the ipr device driver.
 To install them, type 'make' and then 'make install'.  You will need pciutils-devel,
 ncurses and ncurses-devel packages installed to perform the 'make'.  If you have
-trouble compiling the utilities due to not finding ibmsislib.h, you also need to 
-download the ibmsis device driver source. 
+trouble compiling the utilities due to not finding iprlib.h, you also need to 
+download the ipr device driver source. 
 
-sisdump - A user program meant to be run in the background to gather debug
+iprdump - A user program meant to be run in the background to gather debug
 information should an IOA failure occur.  Ideally, this program should be
-started during IPL/boot time after file systems are loaded when the ibmsis
+started during IPL/boot time after file systems are loaded when the ipr
 SCSI driver is used.
 
-sisupdate - IOA/disk unit microcode update utility
+iprupdate - IOA/disk unit microcode update utility
 This tool requires no arguments and should be run after each time the device driver
 is loaded. It will query each adapter/disk unit for the microcode version and update 
 adapters/disk units that need to be updated. 
 
-sisconfig - IOA Configuration and Recovery tool
+iprconfig - IOA Configuration and Recovery tool
 This is an ncurses based utility made to look similar to the iSeries green screens.
 The basic functions of this tool are:
 
@@ -63,7 +63,7 @@ to natively attached disks. Proceed with caution when using this option.
 13. Work with Resources Containing Cache Battery Packs.  A set of displays are used to view
 the current status of the Cache Battery on resources containing battery packs and allow
 maintanence actions to be performed against those resources when necessary.
-14. Analyze Log. This allows you to view the error messages logged by the ibmsis device driver.
+14. Analyze Log. This allows you to view the error messages logged by the ipr device driver.
 
 
 Troubleshooting direct attach DASD:
@@ -71,11 +71,11 @@ Troubleshooting direct attach DASD:
 Q1. I just moved some DASD over to my linux partition and now they don't work. I get Data
 Protect sense data looking error logs. 
 A1. More than likely the DASD are being read/write protected by the adapter for some reason.
-Use the sisconfig utility, take option 5. Analyze Log, then option 1. Use vi to view 
+Use the iprconfig utility, take option 5. Analyze Log, then option 1. Use vi to view 
 IBM Storage error messages. If you wish to use an editor more familiar to
 you than vi, select option 5 first to change the editor. (If you get into vi and get stuck
 type Esc-q!-Enter. This should get you out.) This will display the errors logged by the
-ibmsis device driver. 
+ipr device driver. 
 Now look for "Configuration Error". If you have an error log that looks similar to this:
 
 Configuration Error. The following devices contain
@@ -86,11 +86,11 @@ Device                                  Serial #  COMP
 
 Then you have devices that are using compression. To make the devices usable under Linux,
 you will need to verify that the device is not part of a parity  protected array.  Use
-sisconfig, take option 2 from the main menu to Work with device parity protection, then
+iprconfig, take option 2 from the main menu to Work with device parity protection, then
 option 1 to display device parity status.  If you see the same device as an array member,
 then take option 3 from the Work with  Device Parity  Protection  screen  to stop  device
 parity  protection.  When the device is not parity protected, you will need to initialize
-the devices. To do this use sisconfig, take option 3, then option 2. Initialize and format
+the devices. To do this use iprconfig, take option 3, then option 2. Initialize and format
 disk unit and select the devices you wish to format. When the format is complete, the
 devices should now be usable to Linux. If the devices you are having difficulty getting
 to work are not listed as candidates for format or you are still having problems, contact

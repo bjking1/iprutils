@@ -1,6 +1,6 @@
 /******************************************************************/
-/* Linux IBM SIS microcode update utility                         */
-/* Description: IBM Storage IOA Interface Specification (SIS)     */
+/* Linux IBM IPR microcode update utility                         */
+/* Description: IBM Storage IOA Interface Specification (IPR)     */
 /*              Linux microcode update utility                    */
 /*                                                                */
 /* (C) Copyright 2000, 2001                                       */
@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.1 2003/10/22 22:21:02 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -34,35 +34,35 @@ struct image_header
     u8 reserved[LINUX_HEADER_RESERVED_BYTES];
     char eyecatcher[16];        /* IBMAS400 CCIN */
     u32 num_lids;
-    struct ibmsis_software_inq_lid_info lid[1];
+    struct ipr_software_inq_lid_info lid[1];
 };
 
-int open_dev(struct sis_ioa *p_ioa, struct sis_device *p_device);
+int open_dev(struct ipr_ioa *p_ioa, struct ipr_device *p_device);
 
 int main(int argc, char *argv[])
 {
     int rc = 0;
     struct stat ucode_stats;
-    struct ibmsis_ioctl_cmd_internal ioa_cmd;
-    struct ibmsis_inquiry_page0 page0_inq;
-    struct ibmsis_inquiry_page3 page3_inq;
-    struct ibmsis_inquiry_page_cx page_cx_inq;
+    struct ipr_ioctl_cmd_internal ioa_cmd;
+    struct ipr_inquiry_page0 page0_inq;
+    struct ipr_inquiry_page3 page3_inq;
+    struct ipr_inquiry_page_cx page_cx_inq;
     int num_ioa_lids = 0;
     int num_binary_lids = 0;
     char ucode_file[50];
     int do_download, ucode_fd, dasd_ucode_fd;
     struct image_header *p_image_hdr;
-    struct ibmsis_dasd_ucode_header *p_dasd_image_hdr;
+    struct ipr_dasd_ucode_header *p_dasd_image_hdr;
     u32 updated = 0;
     int fd, dev_fd, i, j, num_entries, ioa_num;
-    struct ibmsis_software_inq_lid_info *p_lid_info;
+    struct ipr_software_inq_lid_info *p_lid_info;
     u32 force_download, force_devs, force_ioas;
-    struct ibmsis_dasd_inquiry_page3 dasd_page3_inq;
-    struct sis_ioa *p_cur_ioa;
+    struct ipr_dasd_inquiry_page3 dasd_page3_inq;
+    struct ipr_ioa *p_cur_ioa;
     char *p_dev_name;
-    struct sis_device *p_device;
+    struct ipr_device *p_device;
     char config_file_name[64];
-    u8 cdb[IBMSIS_CCB_CDB_LEN];
+    u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int image_offset;
     void *p_dasd_image;
@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 
     struct software_inq_lid_info ioa_lid_info[50];
 
-    openlog("sisupdate",
+    openlog("iprupdate",
             LOG_PERROR | /* Print error to stderr as well */
             LOG_PID |    /* Include the PID with each error */
             LOG_CONS,    /* Write to system console if there is an error
@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
             force_download = 1;
         else if (strcmp(argv[1], "--version") == 0)
         {
-            printf("sisupdate: %s"IBMSIS_EOL, IPR_VERSION_STR);
+            printf("iprupdate: %s"IPR_EOL, IPR_VERSION_STR);
             exit(1);
         }
         else if (strcmp(argv[1], "--force-devs") == 0)
@@ -107,18 +107,18 @@ int main(int argc, char *argv[])
         }
         else
         {
-            printf("Usage: sisdate [options]"IBMSIS_EOL);
-            printf("  Options: --version    Print sisupdate version"IBMSIS_EOL);
+            printf("Usage: iprdate [options]"IPR_EOL);
+            printf("  Options: --version    Print iprupdate version"IPR_EOL);
             exit(1);
         }
     }
 
-    tool_init("sisupdate");
+    tool_init("iprupdate");
 
     check_current_config(false);
 
     /* Loop for all attached adapters */
-    for (p_cur_ioa = p_head_sis_ioa, ioa_num = 0;
+    for (p_cur_ioa = p_head_ipr_ioa, ioa_num = 0;
          ioa_num < num_ioas;
          p_cur_ioa = p_cur_ioa->p_next, ioa_num++)
     {
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 
         if (fd < 0)
         {
-            syslog(LOG_ERR, "Cannot open %s. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+            syslog(LOG_ERR, "Cannot open %s. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
             continue;
         }
 
@@ -135,16 +135,16 @@ int main(int argc, char *argv[])
         /* Do a page 0 inquiry to the adapter to get the supported page codes */
         memset(&ioa_cmd, 0, sizeof(ioa_cmd));
         ioa_cmd.buffer = &page0_inq;
-        ioa_cmd.buffer_len = sizeof(struct ibmsis_inquiry_page0);
+        ioa_cmd.buffer_len = sizeof(struct ipr_inquiry_page0);
         ioa_cmd.cdb[1] = 0x01;
         ioa_cmd.cdb[2] = 0x00;
         ioa_cmd.read_not_write = 1;
 
-        rc = sis_ioctl(fd, INQUIRY, &ioa_cmd);
+        rc = ipr_ioctl(fd, INQUIRY, &ioa_cmd);
 
         if (rc != 0)
         {
-            syslog(LOG_ERR, "Inquiry to controller %s failed. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+            syslog(LOG_ERR, "Inquiry to controller %s failed. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
             close(fd);
             continue;
         }
@@ -159,22 +159,22 @@ int main(int argc, char *argv[])
 
             memset(&ioa_cmd, 0, sizeof(ioa_cmd));
             ioa_cmd.buffer = &page_cx_inq;
-            ioa_cmd.buffer_len = sizeof(struct ibmsis_inquiry_page_cx);
+            ioa_cmd.buffer_len = sizeof(struct ipr_inquiry_page_cx);
             ioa_cmd.cdb[1] = 0x01;
             ioa_cmd.cdb[2] = page0_inq.supported_page_codes[i];
             ioa_cmd.read_not_write = 1;
 
-            rc = sis_ioctl(fd, INQUIRY, &ioa_cmd);
+            rc = ipr_ioctl(fd, INQUIRY, &ioa_cmd);
 
             if (rc != 0)
             {
-                syslog(LOG_ERR, "Inquiry to controller %s failed. %m"IBMSIS_EOL,
+                syslog(LOG_ERR, "Inquiry to controller %s failed. %m"IPR_EOL,
                        p_cur_ioa->ioa.dev_name);
                 continue;
             }
 
             num_entries = (page_cx_inq.page_length - 4) /
-                sizeof(struct ibmsis_software_inq_lid_info);
+                sizeof(struct ipr_software_inq_lid_info);
 
             /* Build up a data structure describing all the IOA LIDs
              the adapter currently has loaded */
@@ -199,16 +199,16 @@ int main(int argc, char *argv[])
         /* Issue a page 3 inquiry to get the versioning information */
         memset(&ioa_cmd, 0, sizeof(ioa_cmd));
         ioa_cmd.buffer = &page3_inq;
-        ioa_cmd.buffer_len = sizeof(struct ibmsis_inquiry_page3);
+        ioa_cmd.buffer_len = sizeof(struct ipr_inquiry_page3);
         ioa_cmd.cdb[1] = 0x01;
         ioa_cmd.cdb[2] = 0x03;
         ioa_cmd.read_not_write = 1;
 
-        rc = sis_ioctl(fd, INQUIRY, &ioa_cmd);
+        rc = ipr_ioctl(fd, INQUIRY, &ioa_cmd);
 
         if (rc != 0)
         {
-            syslog(LOG_ERR, "Inquiry to controller %s failed. %m"IBMSIS_EOL,
+            syslog(LOG_ERR, "Inquiry to controller %s failed. %m"IPR_EOL,
                    p_cur_ioa->ioa.dev_name);
             close(fd);
             continue;
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
 
         if (ucode_fd < 0)
         {
-            syslog(LOG_ERR, "Could not open firmware file %s. %m"IBMSIS_EOL, ucode_file);
+            syslog(LOG_ERR, "Could not open firmware file %s. %m"IPR_EOL, ucode_file);
             close(fd);
             continue;
         }
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
 
         if (rc != 0)
         {
-            syslog(LOG_ERR, "Error accessing IOA firmware file: %s. %m"IBMSIS_EOL, ucode_file);
+            syslog(LOG_ERR, "Error accessing IOA firmware file: %s. %m"IPR_EOL, ucode_file);
             close(fd);
             close(ucode_fd);
             continue;
@@ -244,15 +244,15 @@ int main(int argc, char *argv[])
 
         if (p_dasd_image_hdr == MAP_FAILED)
         {
-            syslog(LOG_ERR, "Error mapping IOA firmware file: %s. %m"IBMSIS_EOL, ucode_file);
+            syslog(LOG_ERR, "Error mapping IOA firmware file: %s. %m"IPR_EOL, ucode_file);
             close(fd);
             close(ucode_fd);
             continue;
         }
 
-        p_lid_info = (struct ibmsis_software_inq_lid_info *)
-            ((unsigned long)p_image_hdr + sistoh32(p_image_hdr->lid_table_offset) + 4);
-        num_binary_lids = sistoh32(*((u32*)p_lid_info - 1));
+        p_lid_info = (struct ipr_software_inq_lid_info *)
+            ((unsigned long)p_image_hdr + iprtoh32(p_image_hdr->lid_table_offset) + 4);
+        num_binary_lids = iprtoh32(*((u32*)p_lid_info - 1));
 
         /* Compare the two */
         for (i = 0; (i < num_binary_lids) && (do_download == 0); i++, p_lid_info++)
@@ -289,21 +289,21 @@ int main(int argc, char *argv[])
         
         /* check for mode page 28 changes before adapter reset */
         sprintf(config_file_name,"%x_%x", p_cur_ioa->ccin, p_cur_ioa->host_addr);
-        if (RC_SUCCESS == sis_config_file_valid(config_file_name))
+        if (RC_SUCCESS == ipr_config_file_valid(config_file_name))
         {
-            sis_set_page_28(p_cur_ioa, SIS_LIMITED_CONFIG,
+            ipr_set_page_28(p_cur_ioa, IPR_LIMITED_CONFIG,
                             do_download | force_download | force_ioas);
         }
         else
         {
-            sis_set_page_28_init(p_cur_ioa, SIS_LIMITED_CONFIG);
+            ipr_set_page_28_init(p_cur_ioa, IPR_LIMITED_CONFIG);
         }
 
         if ((do_download == 1) ||
             (force_download == 1) ||
             (force_ioas == 1))
         {
-            syslog(LOG_NOTICE, "Updating IOA firmware on %s"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+            syslog(LOG_NOTICE, "Updating IOA firmware on %s"IPR_EOL, p_cur_ioa->ioa.dev_name);
 
             /* Do the update if the two are different */
             /* Might want to fork off a process here so we can start
@@ -312,17 +312,17 @@ int main(int argc, char *argv[])
              greatly complicate the load source case */
 
             memset(&ioa_cmd, 0, sizeof(ioa_cmd));
-            ioa_cmd.buffer = (void *)((unsigned long)p_image_hdr + sistoh32(p_image_hdr->header_length));
-            ioa_cmd.buffer_len = ucode_stats.st_size - sistoh32(p_image_hdr->header_length);
+            ioa_cmd.buffer = (void *)((unsigned long)p_image_hdr + iprtoh32(p_image_hdr->header_length));
+            ioa_cmd.buffer_len = ucode_stats.st_size - iprtoh32(p_image_hdr->header_length);
             ioa_cmd.read_not_write = 0;
 
             /* The write buffer here takes care of both the IOA shutdown and the
              reset of the adapter */
 
-            rc = sis_ioctl(fd, WRITE_BUFFER, &ioa_cmd);
+            rc = ipr_ioctl(fd, WRITE_BUFFER, &ioa_cmd);
 
             if (rc != 0)
-                syslog(LOG_ERR, "Write buffer to %s failed. %m"IBMSIS_EOL, p_cur_ioa->ioa.dev_name);
+                syslog(LOG_ERR, "Write buffer to %s failed. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
             else
             {
                 /* Write buffer was successful. Now we need to see if all our devices
@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
                 for (j = 0; j < p_cur_ioa->num_devices; j++)
                 {
                     /* If not a DASD, ignore */
-                    if (!IBMSIS_IS_DASD_DEVICE(p_cur_ioa->dev[j].p_resource_entry->std_inq_data))
+                    if (!IPR_IS_DASD_DEVICE(p_cur_ioa->dev[j].p_resource_entry->std_inq_data))
                         continue;
 
                     /* See if we can open device */
@@ -359,12 +359,12 @@ int main(int argc, char *argv[])
             p_device = &p_cur_ioa->dev[i];
 
             /* If not a DASD, ignore */
-            if (!IBMSIS_IS_DASD_DEVICE(p_cur_ioa->dev[i].p_resource_entry->std_inq_data) ||
-                ((p_device->p_resource_entry->subtype != IBMSIS_SUBTYPE_AF_DASD) &&
-                 (p_device->p_resource_entry->subtype != IBMSIS_SUBTYPE_GENERIC_SCSI)))
+            if (!IPR_IS_DASD_DEVICE(p_cur_ioa->dev[i].p_resource_entry->std_inq_data) ||
+                ((p_device->p_resource_entry->subtype != IPR_SUBTYPE_AF_DASD) &&
+                 (p_device->p_resource_entry->subtype != IPR_SUBTYPE_GENERIC_SCSI)))
                 continue;
 
-            if (p_device->p_resource_entry->subtype == IBMSIS_SUBTYPE_GENERIC_SCSI)
+            if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI)
                 p_dev_name = p_device->gen_name;
             else
                 p_dev_name = p_cur_ioa->ioa.dev_name;
@@ -374,10 +374,10 @@ int main(int argc, char *argv[])
 
             if (dev_fd > 1)
             {
-                if (p_device->p_resource_entry->subtype == IBMSIS_SUBTYPE_GENERIC_SCSI) 
+                if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
                 {
                     memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
-                    memset(cdb, 0, IBMSIS_CCB_CDB_LEN);
+                    memset(cdb, 0, IPR_CCB_CDB_LEN);
 
                     /* Issue page 3 inquiry */
                     cdb[0] = INQUIRY;
@@ -391,7 +391,7 @@ int main(int argc, char *argv[])
 
                     if (rc == CHECK_CONDITION)
                     {
-                        syslog(LOG_ERR, "Page 3 inquiry to %02X%02X%02X%02X failed: %x %x %x"IBMSIS_EOL,
+                        syslog(LOG_ERR, "Page 3 inquiry to %02X%02X%02X%02X failed: %x %x %x"IPR_EOL,
                                p_device->p_resource_entry->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
@@ -415,12 +415,12 @@ int main(int argc, char *argv[])
                     ioa_cmd.device_cmd = 1;
                     ioa_cmd.resource_address = p_device->p_resource_entry->resource_address;
 
-                    rc = sis_ioctl(dev_fd, INQUIRY, &ioa_cmd);
+                    rc = ipr_ioctl(dev_fd, INQUIRY, &ioa_cmd);
                 }
 
                 if (rc != 0)
                 {
-                    syslog(LOG_ERR, "Inquiry to %02X%02X%02X%02X failed. %m"IBMSIS_EOL,
+                    syslog(LOG_ERR, "Inquiry to %02X%02X%02X%02X failed. %m"IPR_EOL,
                            p_device->p_resource_entry->host_no,
                            p_device->p_resource_entry->resource_address.bus,
                            p_device->p_resource_entry->resource_address.target,
@@ -452,9 +452,9 @@ int main(int argc, char *argv[])
                             dasd_page3_inq.load_id[0], dasd_page3_inq.load_id[1],
                             dasd_page3_inq.load_id[2],
                             dasd_page3_inq.load_id[3]);
-                    image_offset = sizeof(struct ibmsis_dasd_ucode_header);
+                    image_offset = sizeof(struct ipr_dasd_ucode_header);
                 }
-                else if ((platform == SIS_ISERIES) || (platform == SIS_PSERIES))
+                else if ((platform == IPR_ISERIES) || (platform == IPR_PSERIES))
                 {
                     close(dev_fd);
                     continue;
@@ -473,7 +473,7 @@ int main(int argc, char *argv[])
 
                 if (dasd_ucode_fd < 0)
                 {
-                    syslog_dbg(LOG_ERR, "Could not open firmware file %s. %m"IBMSIS_EOL, ucode_file);
+                    syslog_dbg(LOG_ERR, "Could not open firmware file %s. %m"IPR_EOL, ucode_file);
                     close(dev_fd);
                     continue;
                 }
@@ -483,7 +483,7 @@ int main(int argc, char *argv[])
 
                 if (rc != 0)
                 {
-                    syslog(LOG_ERR, "Error accessing firmware file: %s. %m"IBMSIS_EOL, ucode_file);
+                    syslog(LOG_ERR, "Error accessing firmware file: %s. %m"IPR_EOL, ucode_file);
                     close(dev_fd);
                     close(dasd_ucode_fd);
                     continue;
@@ -495,7 +495,7 @@ int main(int argc, char *argv[])
 
                 if (p_dasd_image_hdr == MAP_FAILED)
                 {
-                    syslog(LOG_ERR, "Error reading firmware file: %s. %m"IBMSIS_EOL, ucode_file);
+                    syslog(LOG_ERR, "Error reading firmware file: %s. %m"IPR_EOL, ucode_file);
                     close(dev_fd);
                     close(dasd_ucode_fd);
                     continue;
@@ -504,7 +504,7 @@ int main(int argc, char *argv[])
                 if ((memcmp(p_dasd_image_hdr->load_id, dasd_page3_inq.load_id, 4)) &&
                     (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
                 {
-                    syslog(LOG_ERR, "Firmware file corrupt: %s. %m"IBMSIS_EOL, ucode_file);
+                    syslog(LOG_ERR, "Firmware file corrupt: %s. %m"IPR_EOL, ucode_file);
                     close(dev_fd);
                     close(dasd_ucode_fd);
                     munmap(p_dasd_image_hdr, ucode_stats.st_size);
@@ -521,10 +521,10 @@ int main(int argc, char *argv[])
                         if (is_af_blocked(&p_cur_ioa->dev[j], 1))
                         {
                             u320_disabled |= (1 << p_device->p_resource_entry->resource_address.bus) |
-                                SIS_SAVE_LIMITED_CONFIG;
+                                IPR_SAVE_LIMITED_CONFIG;
                         }
 
-                        syslog(LOG_ERR,"Device update to %02X%02X%02X%02X blocked, device in use."IBMSIS_EOL,
+                        syslog(LOG_ERR,"Device update to %02X%02X%02X%02X blocked, device in use."IPR_EOL,
                                p_device->p_resource_entry->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
@@ -532,7 +532,7 @@ int main(int argc, char *argv[])
                         continue;
                     }
 
-                    if ((p_device->p_resource_entry->subtype == IBMSIS_SUBTYPE_GENERIC_SCSI) &&
+                    if ((p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) &&
                         (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
                     {
                         /* updating AS400 drives which are 512 formatted is not a supported operation */
@@ -548,7 +548,7 @@ int main(int argc, char *argv[])
                         isprint(dasd_page3_inq.release_level[2]) &&
                         isprint(dasd_page3_inq.release_level[3]))
                     {
-                        syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s from version %c%c%c%c to %c%c%c%c"IBMSIS_EOL,
+                        syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s from version %c%c%c%c to %c%c%c%c"IPR_EOL,
                                p_device->p_resource_entry->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
@@ -565,7 +565,7 @@ int main(int argc, char *argv[])
                     }
                     else
                     {
-                        syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s"IBMSIS_EOL,
+                        syslog(LOG_NOTICE, "Updating DASD firmware on %02X%02X%02X%02X, using file %s"IPR_EOL,
                                p_device->p_resource_entry->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
@@ -577,9 +577,9 @@ int main(int argc, char *argv[])
                     image_size = ucode_stats.st_size - image_offset;
 
                     /* Do the update if the firmware file is newer than the firmware loaded on the DASD */
-                    if (p_device->p_resource_entry->subtype == IBMSIS_SUBTYPE_GENERIC_SCSI) 
+                    if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI) 
                     {
-                        memset(cdb, 0, IBMSIS_CCB_CDB_LEN);
+                        memset(cdb, 0, IPR_CCB_CDB_LEN);
 
                         /* Issue mode sense to get the block size */
                         cdb[0] = WRITE_BUFFER;
@@ -601,11 +601,11 @@ int main(int argc, char *argv[])
                         ioa_cmd.device_cmd = 1;
                         ioa_cmd.resource_address = p_device->p_resource_entry->resource_address;
 
-                        rc = sis_ioctl(dev_fd, WRITE_BUFFER, &ioa_cmd);
+                        rc = ipr_ioctl(dev_fd, WRITE_BUFFER, &ioa_cmd);
                     }
 
                     if (rc != 0)
-                        syslog(LOG_ERR, "Write buffer to %02X%02X%02X%02X failed. %m"IBMSIS_EOL,
+                        syslog(LOG_ERR, "Write buffer to %02X%02X%02X%02X failed. %m"IPR_EOL,
                                p_device->p_resource_entry->host_no,
                                p_device->p_resource_entry->resource_address.bus,
                                p_device->p_resource_entry->resource_address.target,
@@ -616,11 +616,11 @@ int main(int argc, char *argv[])
                 close(dasd_ucode_fd);
 
                 if (munmap(p_dasd_image_hdr, ucode_stats.st_size))
-                    syslog(LOG_ERR, "munmap failed. %m"IBMSIS_EOL);
+                    syslog(LOG_ERR, "munmap failed. %m"IPR_EOL);
             }
             else
             {
-                syslog(LOG_ERR, "Cannot open device %s. Retry failed. %m"IBMSIS_EOL, p_dev_name);
+                syslog(LOG_ERR, "Cannot open device %s. Retry failed. %m"IPR_EOL, p_dev_name);
                 continue;
             }
         }
@@ -629,32 +629,32 @@ int main(int argc, char *argv[])
         close (ucode_fd);
         close (fd);
 
-        if (RC_SUCCESS == sis_config_file_valid(config_file_name))
+        if (RC_SUCCESS == ipr_config_file_valid(config_file_name))
         {
-            sis_set_page_28(p_cur_ioa, u320_disabled,
+            ipr_set_page_28(p_cur_ioa, u320_disabled,
                             do_download | force_download | force_ioas);
         }
         else
         {
-            sis_set_page_28_init(p_cur_ioa, u320_disabled);
+            ipr_set_page_28_init(p_cur_ioa, u320_disabled);
         }
     }
 
     return rc;
 }
 
-int open_dev(struct sis_ioa *p_ioa, struct sis_device *p_device)
+int open_dev(struct ipr_ioa *p_ioa, struct ipr_device *p_device)
 {
     int dev_fd;
 
-    if (p_device->p_resource_entry->subtype == IBMSIS_SUBTYPE_GENERIC_SCSI)
+    if (p_device->p_resource_entry->subtype == IPR_SUBTYPE_GENERIC_SCSI)
     {
         dev_fd = open(p_device->gen_name, O_RDWR);
 
         if ((dev_fd <= 1) && ((errno == ENOENT) || (errno == ENXIO)))
         {
-            syslog(LOG_ERR, "Cannot open device %s. %m"IBMSIS_EOL, p_device->gen_name);
-            syslog(LOG_ERR, "Rescanning SCSI bus for device"IBMSIS_EOL);
+            syslog(LOG_ERR, "Cannot open device %s. %m"IPR_EOL, p_device->gen_name);
+            syslog(LOG_ERR, "Rescanning SCSI bus for device"IPR_EOL);
             scan_device(p_device->p_resource_entry->resource_address, p_ioa->host_num);
 
             dev_fd = open(p_device->gen_name, O_RDWR);
