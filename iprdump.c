@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.14 2005/02/23 20:57:11 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.15 2005/03/07 17:20:16 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -243,7 +243,7 @@ static void handle_signal(int signal)
 {
 	struct ipr_ioa *ioa;
 
-	tool_init();
+	tool_init(0);
 	for_each_ioa(ioa)
 		disable_dump(ioa);
 	exit(0);
@@ -265,7 +265,7 @@ static void poll_for_dump()
 {
 	struct ipr_ioa *ioa;
 
-	tool_init();
+	tool_init(0);
 
 	for_each_ioa(ioa)
 		enable_dump(ioa);
@@ -283,7 +283,7 @@ static void kevent_handler(char *buf)
 
 	host = strtoul(&buf[28], NULL, 10);
 
-	tool_init();
+	tool_init(0);
 
 	ioa = find_ioa(host);
 
@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_signal);
 	signal(SIGTERM, handle_signal);
 
-	tool_init();
+	tool_init(0);
 	for_each_ioa(ioa)
 		enable_dump(ioa);
 

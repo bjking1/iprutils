@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.64 2005/03/01 21:04:14 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.65 2005/03/07 17:20:16 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -22,7 +22,7 @@ static void default_exit_func()
 }
 
 struct ipr_array_query_data *ipr_qac_data = NULL;
-u32 num_ioas = 0;
+int num_ioas = 0;
 struct ipr_ioa *ipr_ioa_head = NULL;
 struct ipr_ioa *ipr_ioa_tail = NULL;
 void (*exit_func) (void) = default_exit_func;
@@ -32,14 +32,8 @@ int ipr_force = 0;
 int ipr_sg_required = 0;
 int polling_mode = 0;
 
-struct zeroed_dev
-{
-	u8 sysfs_device_name[16];
-	struct zeroed_dev *next, *prev;
-};
-
-struct zeroed_dev *head_zdev = NULL;
-struct zeroed_dev *tail_zdev = NULL;
+struct sysfs_dev *head_zdev = NULL;
+struct sysfs_dev *tail_zdev = NULL;
 
 static int ipr_force_polling = 0;
 static int ipr_force_uevents = 0;
@@ -388,10 +382,27 @@ static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 }
 
 struct ipr_array_cap_entry *
+get_cap_entry(struct ipr_supported_arrays *supported_arrays, char *raid_level)
+{
+	int i;
+	struct ipr_array_cap_entry *cap;
+
+	for_each_cap_entry(i, cap, supported_arrays) {
+		if (!strcmp(cap->prot_level_str, raid_level))
+			return cap;
+	}
+
+	return NULL;
+}
+
+struct ipr_array_cap_entry *
 get_raid_cap_entry(struct ipr_supported_arrays *supported_arrays, u8 prot_level)
 {
 	int i;
 	struct ipr_array_cap_entry *cap;
+
+	if (!supported_arrays)
+		return NULL;
 
 	for_each_cap_entry(i, cap, supported_arrays) {
 		if (cap->prot_level == prot_level)
@@ -399,7 +410,6 @@ get_raid_cap_entry(struct ipr_supported_arrays *supported_arrays, u8 prot_level)
 	}
 
 	return NULL;
-
 }
 
 char *get_prot_level_str(struct ipr_supported_arrays *supported_arrays,
@@ -415,20 +425,43 @@ char *get_prot_level_str(struct ipr_supported_arrays *supported_arrays,
 	return NULL;
 }
 
-struct zeroed_dev * ipr_find_zeroed_dev(struct ipr_dev *dev)
+struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev *head)
 {
-	struct zeroed_dev *zdev;
+	struct sysfs_dev *sdev;
 
 	if (!dev->scsi_dev_data)
 		return NULL;
 
-	for (zdev = head_zdev; zdev; zdev = zdev->next) {
-		if (!strcmp(zdev->sysfs_device_name,
+	for (sdev = head; sdev; sdev = sdev->next) {
+		if (!strcmp(sdev->sysfs_device_name,
 			    dev->scsi_dev_data->sysfs_device_name))
 			break;
 	}
 
-	return zdev;
+	return sdev;
+}
+
+struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *sdev)
+{
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa) {
+		for_each_dev(ioa, dev) {
+			if (!dev->scsi_dev_data)
+				continue;
+			if (!strcmp(sdev->sysfs_device_name,
+				    dev->scsi_dev_data->sysfs_device_name))
+				return dev;
+		}
+	}
+
+	return NULL;
+}
+
+struct sysfs_dev * ipr_find_zeroed_dev(struct ipr_dev *dev)
+{
+	return ipr_find_sysfs_dev(dev, head_zdev);
 }
 
 int ipr_device_is_zeroed(struct ipr_dev *dev)
@@ -438,54 +471,66 @@ int ipr_device_is_zeroed(struct ipr_dev *dev)
 	return 0;
 }
 
-void ipr_add_zeroed_dev(struct ipr_dev *dev)
+void ipr_add_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
+		       struct sysfs_dev **tail)
 {
-	struct zeroed_dev *zdev = ipr_find_zeroed_dev(dev);
+	struct sysfs_dev *sdev = ipr_find_sysfs_dev(dev, *head);
 
 	if (!dev->scsi_dev_data)
 		return;
 
-	if (!zdev) {
-		zdev = calloc(1, sizeof(struct zeroed_dev));
-		strcpy(zdev->sysfs_device_name,
+	if (!sdev) {
+		sdev = calloc(1, sizeof(struct sysfs_dev));
+		strcpy(sdev->sysfs_device_name,
 		       dev->scsi_dev_data->sysfs_device_name);
 
-		if (!head_zdev) {
-			tail_zdev = head_zdev = zdev;
+		if (!(*head)) {
+			*tail = *head = sdev;
 		} else {
-			tail_zdev->next = zdev;
-			zdev->prev = tail_zdev;
-			tail_zdev = zdev;
+			(*tail)->next = sdev;
+			sdev->prev = *tail;
+			*tail = sdev;
 		}
+	}
+}
+
+void ipr_add_zeroed_dev(struct ipr_dev *dev)
+{
+	ipr_add_sysfs_dev(dev, &head_zdev, &tail_zdev);
+}
+
+void ipr_del_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
+		       struct sysfs_dev **tail)
+{
+	struct sysfs_dev *sdev = ipr_find_sysfs_dev(dev, *head);
+
+	if (!sdev || !dev->scsi_dev_data)
+		return;
+
+	if (sdev == *head) {
+		*head = (*head)->next;
+
+		if (!(*head))
+			*tail = NULL;
+		else
+			(*head)->prev = NULL;
+	} else if (sdev == *tail) {
+		*tail = (*tail)->prev;
+		(*tail)->next = NULL;
+	} else {
+		sdev->next->prev = sdev->prev;
+		sdev->prev->next = sdev->next;
 	}
 }
 
 void ipr_del_zeroed_dev(struct ipr_dev *dev)
 {
-	struct zeroed_dev *zdev = ipr_find_zeroed_dev(dev);
-
-	if (!zdev || !dev->scsi_dev_data)
-		return;
-
-	if (zdev == head_zdev) {
-		head_zdev = head_zdev->next;
-
-		if (!head_zdev)
-			tail_zdev = NULL;
-		else
-			head_zdev->prev = NULL;
-	} else if (zdev == tail_zdev) {
-		tail_zdev = tail_zdev->prev;
-		tail_zdev->next = NULL;
-	} else {
-		zdev->next->prev = zdev->prev;
-		zdev->prev->next = zdev->next;
-	}
+	ipr_del_sysfs_dev(dev, &head_zdev, &tail_zdev);
 }
 
 void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *ioa)
 {
-	struct zeroed_dev *zdev;
+	struct sysfs_dev *zdev;
 	struct ipr_dev_record *dev_rcd;
 	int i;
 
@@ -505,7 +550,7 @@ void ipr_cleanup_zeroed_devs()
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
-	struct zeroed_dev *zdev;
+	struct sysfs_dev *zdev;
 	struct ipr_dev_record *dev_rcd;
 	int i;
 
@@ -675,7 +720,10 @@ static struct ipr_dev *find_dev(char *blk, int (*compare) (struct ipr_dev *, cha
 	if (!name)
 		return NULL;
 
-	sprintf(name, _PATH_DEV"%s", blk);
+	if (strncmp(blk, _PATH_DEV, strlen(_PATH_DEV)))
+		sprintf(name, _PATH_DEV"%s", blk);
+	else
+		sprintf(name, "%s", blk);
 
 	for_each_ioa(ioa) {
 		for (i = 0, dev = ioa->dev; i < ioa->num_devices; i++, dev++)
@@ -839,7 +887,151 @@ static void get_pci_attrs(struct ipr_ioa *ioa,
 	ioa->pci_device = get_pci_attr(sysfs_pci_device, "device");
 }
 
-void tool_init()
+static struct ipr_ioa *old_ioa_head;
+static struct ipr_ioa *old_ioa_tail;
+static int old_num_ioas;
+static struct scsi_dev_data *old_scsi_dev_table;
+struct ipr_array_query_data *old_qac_data;
+
+static void save_old_config()
+{
+	old_ioa_head = ipr_ioa_head;
+	old_ioa_tail = ipr_ioa_tail;
+	old_num_ioas = num_ioas;
+	old_scsi_dev_table = scsi_dev_table;
+	old_qac_data = ipr_qac_data;
+
+	ipr_qac_data = NULL;
+	scsi_dev_table = NULL;
+	ipr_ioa_head = NULL;
+	ipr_ioa_tail = NULL;
+	num_ioas = 0;
+}
+
+static void free_old_config()
+{
+	struct ipr_ioa *ioa;
+
+	/* Free up all the old memory */
+	for (ioa = old_ioa_head; ioa;) {
+		ioa = ioa->next;
+		free(old_ioa_head);
+		old_ioa_head = ioa;
+	}
+
+	free(old_qac_data);
+	free(old_scsi_dev_table);
+
+	old_ioa_head = NULL;
+	old_ioa_tail = NULL;
+	old_num_ioas = 0;
+	old_scsi_dev_table = NULL;
+	old_qac_data = NULL;
+}
+
+static int same_ioa(struct ipr_ioa *first, struct ipr_ioa *second)
+{
+	if (strcmp(first->pci_address, second->pci_address))
+		return 0;
+	if (strcmp(first->host_name, second->host_name))
+		return 0;
+	if (first->ccin != second->ccin)
+		return 0;
+	if (first->host_num != second->host_num)
+		return 0;
+	if (first->pci_vendor != second->pci_vendor)
+		return 0;
+	if (first->pci_device != second->pci_device)
+		return 0;
+	if (first->subsystem_vendor != second->subsystem_vendor)
+		return 0;
+	if (first->subsystem_device != second->subsystem_device)
+		return 0;
+	return 1;
+}
+
+static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *second)
+{
+	if (first->host != second->host)
+		return 0;
+	if (first->channel != second->channel)
+		return 0;
+	if (first->id != second->id)
+		return 0;
+	if (first->lun != second->lun)
+		return 0;
+	if (first->type != second->type)
+		return 0;
+	if (first->online != second->online)
+		return 0;
+	if (first->handle != second->handle)
+		return 0;
+	if (strcmp(first->vendor_id, second->vendor_id))
+		return 0;
+	if (strcmp(first->product_id, second->product_id))
+		return 0;
+	if (strcmp(first->sysfs_device_name, second->sysfs_device_name))
+		return 0;
+	if (strcmp(first->dev_name, second->dev_name))
+		return 0;
+	if (strcmp(first->gen_name, second->gen_name))
+		return 0;
+	return 1;
+}
+
+static int same_dev(struct ipr_dev *first, struct ipr_dev *second)
+{
+	if (strcmp(first->dev_name, second->dev_name))
+		return 0;
+	if (strcmp(first->gen_name, second->gen_name))
+		return 0;
+	if (!first->scsi_dev_data || !second->scsi_dev_data)
+		return 0;
+	if (!same_scsi_dev(first->scsi_dev_data, second->scsi_dev_data))
+		return 0;
+	return 1;
+}
+
+static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
+{
+	struct ipr_dev *dev, *old_dev;
+
+	ioa->should_init = 0;
+
+	for_each_dev(ioa, dev) {
+		for_each_dev(old_ioa, old_dev) {
+			if (!same_dev(dev, old_dev))
+				continue;
+			dev->should_init = 0;
+			break;
+		}
+	}
+}
+
+static void resolve_old_config()
+{
+	struct ipr_ioa *ioa, *old_ioa;
+	struct ipr_dev *dev;
+
+	for_each_ioa(ioa) {
+		ioa->should_init = 1;
+		for_each_dev(ioa, dev)
+			dev->should_init = 1;
+	}
+
+	for_each_ioa(ioa) {
+		__for_each_ioa(old_ioa, old_ioa_head) {
+			if (!same_ioa(ioa, old_ioa))
+				continue;
+			resolve_ioa(ioa, old_ioa);
+			break;
+		}
+	}
+
+	free_old_config();
+}
+
+void tool_init(int save_state)
 {
 	int rc, temp;
 	struct ipr_ioa *ipr_ioa;
@@ -857,19 +1049,7 @@ void tool_init()
 
 	struct sysfs_attribute *sysfs_attr;
 
-	for (ipr_ioa = ipr_ioa_head; ipr_ioa;) {
-		ipr_ioa = ipr_ioa->next;
-		free(ipr_ioa_head);
-		ipr_ioa_head = ipr_ioa;
-	}
-
-	free(ipr_qac_data);
-	free(scsi_dev_table);
-	ipr_qac_data = NULL;
-	scsi_dev_table = NULL;
-	ipr_ioa_tail = NULL;
-	ipr_ioa_head = NULL;
-	num_ioas = 0;
+	save_old_config();
 
 	rc = sysfs_find_driver_bus("ipr", bus, 100);
 	if (rc) {
@@ -950,7 +1130,8 @@ void tool_init()
 	}
 
 	sysfs_close_driver(sysfs_ipr_driver);
-
+	if (!save_state)
+		free_old_config();
 	return;
 }
 
@@ -2258,6 +2439,49 @@ int enable_af(struct ipr_dev *dev)
 	return 0;
 }
 
+static int get_blk_size(struct ipr_dev *dev)
+{
+	struct ipr_mode_pages modes;
+	struct ipr_block_desc *block_desc;
+	int rc;
+
+	memset(&modes, 0, sizeof(modes));
+
+	rc = ipr_mode_sense(dev, 0x0a, &modes);
+
+	if (!rc) {
+		if (modes.hdr.block_desc_len > 0) {
+			block_desc = (struct ipr_block_desc *)(modes.data);
+			return ((block_desc->block_length[1] << 8) | block_desc->block_length[2]);
+		}
+	}
+
+	return -EIO;
+}
+
+int format_req(struct ipr_dev *dev)
+{
+	struct sense_data_t sense_data;
+	int rc;
+
+	rc = ipr_test_unit_ready(dev, &sense_data);
+
+	if (rc == CHECK_CONDITION &&
+	    sense_data.add_sense_code == 0x31 &&
+	    sense_data.add_sense_code_qual == 0x00)
+		return 1;
+
+	rc = get_blk_size(dev);
+
+	if (rc < 0)
+		return 0;
+
+	if (ipr_is_gscsi(dev) && rc != 512)
+		return 1;
+
+	return 0;
+}
+
 #define IPR_MAX_XFER 0x8000
 const int cdb_size[] ={6, 10, 10, 0, 16, 12, 16, 16};
 static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
@@ -2847,6 +3071,7 @@ void check_current_config(bool allow_rebuild_refresh)
 	}
 
 	ipr_cleanup_zeroed_devs();
+	resolve_old_config();
 }
 
 /* xxx delete */
@@ -4460,29 +4685,6 @@ static int dev_init_allowed(struct ipr_dev *dev)
 	return 0;
 }
 
-static int page0x20_setup(struct ipr_dev *dev)
-{
-	struct ipr_mode_pages mode_pages;
-	struct ipr_ioa_mode_page *page;
-	struct ipr_disk_attr attr;
-
-	memset(&mode_pages, 0, sizeof(mode_pages));
-
-	if (ipr_mode_sense(dev, 0x20, &mode_pages))
-		return 0;
-
-	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
-					     mode_pages.hdr.block_desc_len +
-					     sizeof(mode_pages.hdr));
-
-	if (!ipr_get_dev_attr(dev, &attr)) {
-		ipr_modify_dev_attr(dev, &attr);
-		return (page->max_tcq_depth == attr.queue_depth);
-	}
-
-	return 0;
-}
-
 /*
  * VSETs:
  * 1. Adjust queue depth based on number of devices
@@ -4497,7 +4699,10 @@ static void init_vset_dev(struct ipr_dev *dev)
 
 	memset(&res_state, 0, sizeof(res_state));
 
-	if (!polling_mode && !ipr_query_resource_state(dev, &res_state)) {
+	if (polling_mode && !dev->should_init)
+		return;
+
+	if (!ipr_query_resource_state(dev, &res_state)) {
 		depth = res_state.vset.num_devices_in_vset * 4;
 		snprintf(q_depth, sizeof(q_depth), "%d", depth);
 		q_depth[sizeof(q_depth)-1] = '\0';
@@ -4523,13 +4728,13 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 	struct sense_data_t sense_data;
 	int rc;
 
-	if (ipr_get_dev_attr(dev, &attr))
-		return;
-	if (polling_mode && attr.tcq_enabled)
+	if (polling_mode && !dev->should_init)
 		return;
 	if (ipr_test_unit_ready(dev, &sense_data))
 		return;
 	if (enable_af(dev))
+		return;
+	if (ipr_get_dev_attr(dev, &attr))
 		return;
 	if ((rc = setup_page0x0a(dev))) {
 		if (rc != -EINVAL) {
@@ -4560,7 +4765,7 @@ static void init_af_dev(struct ipr_dev *dev)
 
 	if (ipr_set_dasd_timeouts(dev))
 		return;
-	if (polling_mode && (!dev_init_allowed(dev) || page0x20_setup(dev)))
+	if (polling_mode && (!dev->should_init || !dev_init_allowed(dev)))
 		return;
 	if (setup_page0x01(dev))
 		return;
@@ -4593,6 +4798,8 @@ static void init_ioa_dev(struct ipr_dev *dev)
 	struct ipr_scsi_buses buses;
 
 	if (!dev->ioa)
+		return;
+	if (polling_mode && !dev->ioa->should_init)
 		return;
 	if (ipr_get_bus_attr(dev->ioa, &buses))
 		return;
@@ -4636,6 +4843,58 @@ void ipr_init_ioa(struct ipr_ioa *ioa)
 		ipr_init_dev(&ioa->dev[i]);
 
 	init_ioa_dev(&ioa->ioa);
+}
+
+void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_dev)(char *),
+		     void (*func)(struct ipr_dev *))
+{
+	struct ipr_dev *dev;
+	char *name;
+
+	name = strrchr(buf, '/');
+	if (!name) {
+		syslog_dbg("Failed to handle %s kevent\n", buf);
+		return;
+	}
+
+	name++;
+	tool_init(1);
+	check_current_config(false);
+	dev = find_dev(name);
+
+	if (!dev) {
+		syslog_dbg("Failed to find ipr dev %s\n", name);
+		return;
+	}
+
+	func(dev);
+}
+
+void scsi_host_kevent(char *buf, void (*func)(struct ipr_ioa *))
+{
+	struct ipr_ioa *ioa;
+	char *c;
+	int host;
+
+	c = strrchr(buf, '/');
+	if (!c) {
+		syslog_dbg("Failed to handle %s kevent\n", buf);
+		return;
+	}
+
+	c += strlen("/host");
+
+	host = strtoul(c, NULL, 10);
+	tool_init(1);
+	check_current_config(false);
+	ioa = find_ioa(host);
+
+	if (!ioa) {
+		syslog_dbg("Failed to find ipr ioa %d\n", host);
+		return;
+	}
+
+	func(ioa);
 }
 
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)

@@ -51,7 +51,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Wed Oct 26 2004 Brian King <brking@us.ibm.com> 2.0.14
+* Wed March 7 2005 Brian King <brking@us.ibm.com> 2.0.14
+- Add support for non-interactive array creation and deletion through
+  iprconfig.
 - Use kobject_uevent notifications instead of polling if the kernel
   supports it.
 - Fix iprconfig to set the actual queue depth for advanced function disks

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.49 2005/02/23 20:57:12 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.50 2005/03/07 17:20:19 brking Exp $
  */
 
 #include <stdarg.h>
@@ -176,7 +176,7 @@ cur_val = new_val;                                      \
 #define IPR_RECORD_ID_DEVICE_RECORD          __constant_be16_to_cpu((u16)5)
 
 extern struct ipr_array_query_data *ipr_array_query_data;
-extern u32 num_ioas;
+extern int num_ioas;
 extern struct ipr_ioa *ipr_ioa_head;
 extern struct ipr_ioa *ipr_ioa_tail;
 extern int runtime;
@@ -188,8 +188,14 @@ extern int ipr_sg_required;
 extern int polling_mode;
 extern char *hotplug_dir;
 extern char *tool_name;
-extern struct zeroed_dev *head_zdev;
-extern struct zeroed_dev *tail_zdev;
+extern struct sysfs_dev *head_zdev;
+extern struct sysfs_dev *tail_zdev;
+
+struct sysfs_dev
+{
+	u8 sysfs_device_name[16];
+	struct sysfs_dev *next, *prev;
+};
 
 struct ipr_res_addr {
 	u8 host;
@@ -875,7 +881,7 @@ struct ipr_dev {
 	char gen_name[64];
 	u8 prot_level_str[8];
 	u32 is_reclaim_cand:1;
-	u32 reserved:31;
+	u32 should_init:1;
 	struct scsi_dev_data *scsi_dev_data;
 	union {
 		struct ipr_common_record *qac_entry;
@@ -900,6 +906,7 @@ struct ipr_ioa {
 	u8 scsi_id_changeable:1;
 	u8 dual_raid_support:1;
 	u8 is_secondary:1;
+	u8 should_init:1;
 	u16 pci_vendor;
 	u16 pci_device;
 	u16 subsystem_vendor;
@@ -919,7 +926,9 @@ struct ipr_ioa {
 	struct ipr_ioa *cmd_next;
 };
 
-#define for_each_ioa(ioa) for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
+#define __for_each_ioa(ioa, head) for (ioa = head; ioa; ioa = ioa->next)
+#define for_each_ioa(ioa) __for_each_ioa(ioa, ipr_ioa_head)
+#define for_each_dev(i, d) for (d = i->dev; (d - i->dev) < i->num_devices; d++)
 
 struct ipr_dasd_inquiry_page3 {
 	u8 peri_qual_dev_type;
@@ -1309,7 +1318,7 @@ int ipr_set_preferred_primary(struct ipr_ioa *, int);
 int set_preferred_primary(char *, int);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
-void tool_init();
+void tool_init(int);
 void exit_on_error(char *, ...);
 bool is_af_blocked(struct ipr_dev *, int);
 int ipr_query_array_config(struct ipr_ioa *, bool, bool, int, void *);
@@ -1389,6 +1398,14 @@ int parse_option(char *);
 struct ipr_dev *find_blk_dev(char *);
 struct ipr_dev *find_gen_dev(char *);
 int ipr_cmds_per_lun(struct ipr_ioa *);
+void scsi_host_kevent(char *, void (*)(struct ipr_ioa *));
+void scsi_dev_kevent(char *, struct ipr_dev *(*)(char *), void (*)(struct ipr_dev *));
+int format_req(struct ipr_dev *);
+struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *, struct sysfs_dev *);
+void ipr_add_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
+void ipr_del_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
+struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *);
+struct ipr_array_cap_entry *get_cap_entry(struct ipr_supported_arrays *, char *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

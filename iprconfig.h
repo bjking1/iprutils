@@ -97,7 +97,6 @@ int reclaim_warning(i_container * i_con);
 int reclaim_result(i_container * i_con);
 int af_include(i_container * i_con);
 int af_remove(i_container * i_con);
-int configure_af_device(i_container * i_con, int action_code);
 int add_hot_spare(i_container * i_con);
 int remove_hot_spare(i_container * i_con);
 int hot_spare(i_container * i_con, int action);

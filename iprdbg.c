@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.15 2005/02/23 20:57:11 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.16 2005/03/07 17:20:16 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
 		LOG_USER);
 
 	outfile = fopen(".iprdbglog", "a");
-	tool_init();
+	tool_init(0);
 	check_current_config(false);
 
 	if (num_ioas == 0)

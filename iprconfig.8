@@ -7,7 +7,7 @@
 .SH NAME
 iprconfig \- IBM Power RAID storage adapter configuration/recovery utility
 .SH SYNOPSIS
-.BI "iprconfig [-e editor] [-k dir]"
+.BI "iprconfig [-e editor] [-k dir] [-c command]"
 .sp
 .BI "iprconfig --version --debug --force"
 .SH DESCRIPTION
@@ -134,6 +134,31 @@ changed with this parameter.
 .B -k directory
 Kernel messages root directory. Root directory to look for kernel messages.
 Default is /var/log.
+.TP
+.B -c command
+Command line, non-interactive commands. Currently supported commands include:
+.TP
+.B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
+Create a RAID array. RAID level can be any supported RAID level for the given
+adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
+include 16, 64, and 256. If raid_level is not specified, it will default to
+RAID 5. If stripe size is not specified, it will default to the recommended
+stripe size for the selected RAID level. Devices are specified with their full
+name, either the /dev/sd name or the /dev/sg name is acceptable. Example array
+creation:
+.br
+.B iprconfig -c raid-create -r 5 -s 64 /dev/sda /dev/sdb /dev/sdc
+.br
+This would create a RAID 5 array with a 64k stripe size using the specified
+devices.
+.TP
+.B raid-delete [RAID device]
+Delete the specified RAID array. Specify either the /dev/sd name or the /dev/sg
+name. Only 1 array can be deleted with a single command. Example:
+.br
+.B iprconfig -c raid-delete /dev/sda
+.br
+This would delete the disk array represented by /dev/sda
 .TP
 .B \-\-version
 Print version number of 

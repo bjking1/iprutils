@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.20 2005/03/01 21:04:14 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.21 2005/03/07 17:20:16 brking Exp $
  */
 
 #include <unistd.h>
@@ -31,61 +31,10 @@ static void init_all()
 {
 	struct ipr_ioa *ioa;
 
-	tool_init();
+	tool_init(1);
 	check_current_config(false);
 	for_each_ioa(ioa)
 		ipr_init_ioa(ioa);
-}
-
-static void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_dev)(char *))
-{
-	struct ipr_dev *dev;
-	char *name;
-
-	name = strrchr(buf, '/');
-	if (!name) {
-		syslog_dbg("Failed to handle %s kevent\n", buf);
-		return;
-	}
-
-	name++;
-	tool_init();
-	check_current_config(false);
-	dev = find_dev(name);
-
-	if (!dev) {
-		syslog_dbg("Failed to find ipr dev %s for iprinit\n", name);
-		return;
-	}
-
-	ipr_init_dev(dev);
-}
-
-static void scsi_host_kevent(char *buf)
-{
-	struct ipr_ioa *ioa;
-	char *c;
-	int host;
-
-	c = strrchr(buf, '/');
-	if (!c) {
-		syslog_dbg("Failed to handle %s kevent\n", buf);
-		return;
-	}
-
-	c += strlen("/host");
-
-	host = strtoul(c, NULL, 10);
-	tool_init();
-	check_current_config(false);
-	ioa = find_ioa(host);
-
-	if (!ioa) {
-		syslog_dbg("Failed to find ipr ioa %d for iprinit\n", host);
-		return;
-	}
-
-	ipr_init_ioa(ioa);
 }
 
 static void kevent_handler(char *buf)
@@ -93,17 +42,17 @@ static void kevent_handler(char *buf)
 	polling_mode = 0;
 
 	if (!strncmp(buf, "change@/class/scsi_host", 23))
-		scsi_host_kevent(buf);
+		scsi_host_kevent(buf, ipr_init_ioa);
 	else if (!strncmp(buf, "add@/class/scsi_generic", 23))
-		scsi_dev_kevent(buf, find_gen_dev);
+		scsi_dev_kevent(buf, find_gen_dev, ipr_init_dev);
 	else if (!strncmp(buf, "add@/block/sd", 13))
-		scsi_dev_kevent(buf, find_blk_dev);
+		scsi_dev_kevent(buf, find_blk_dev, ipr_init_dev);
 }
 
 static void poll_ioas()
 {
-	init_all();
 	polling_mode = 1;
+	init_all();
 }
 
 int main(int argc, char *argv[])

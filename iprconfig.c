@@ -228,6 +228,17 @@ static void add_raid_cmd_tail(struct ipr_ioa *ioa, struct ipr_dev *dev, u8 array
 	raid_cmd_tail->dev = dev;
 }
 
+static void free_devs_to_init()
+{
+	struct devs_to_init_t *dev = dev_init_head;
+
+	while (dev) {
+		dev = dev->next;
+		free(dev_init_head);
+		dev_init_head = dev;
+	}
+}
+
 static char *strip_trailing_whitespace(char *p_str)
 {
 	int len;
@@ -251,6 +262,11 @@ static void tool_exit_func()
 	clearenv();
 	clear();
 	refresh();
+	endwin();
+}
+
+static void cmdline_exit_func()
+{
 	endwin();
 }
 
@@ -3584,7 +3600,6 @@ int confirm_raid_include(i_container *i_con)
 	int num_devs = 0;
 	int dev_include_complete(u8 num_devs);
 	int format_include_cand();
-	struct devs_to_init_t *cur_dev_init;
 	int header_lines;
 	int toggle = 0;
 	int need_formats = 0;
@@ -3634,14 +3649,7 @@ int confirm_raid_include(i_container *i_con)
 		num_devs = format_include_cand();
 
 	rc = dev_include_complete(num_devs);
-
-	/* free up memory allocated for format */
-	cur_dev_init = dev_init_head;
-	while(cur_dev_init) {
-		cur_dev_init = cur_dev_init->next;
-		free(dev_init_head);
-		dev_init_head = cur_dev_init;
-	}
+	free_devs_to_init();
 
 	return rc;
 }
@@ -3906,21 +3914,27 @@ int dev_include_complete(u8 num_devs)
 	}
 }
 
-int af_include(i_container *i_con)
+static void add_format_device(struct ipr_dev *dev, int blk_size)
 {
-	int rc;
-	rc = configure_af_device(i_con, IPR_INCLUDE);
-	return rc;
+	if (dev_init_head) {
+		dev_init_tail->next = malloc(sizeof(struct devs_to_init_t));
+		dev_init_tail = dev_init_tail->next;
+	}
+	else
+		dev_init_head = dev_init_tail = malloc(sizeof(struct devs_to_init_t));
+
+	memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
+
+	dev_init_tail->ioa = dev->ioa;
+	if (ipr_is_af_dasd_device(dev))
+		dev_init_tail->dev_type = IPR_AF_DASD_DEVICE;
+	else
+		dev_init_tail->dev_type = IPR_JBOD_DASD_DEVICE;
+	dev_init_tail->new_block_size = blk_size;
+	dev_init_tail->dev = dev;
 }
 
-int af_remove(i_container *i_con)
-{
-	int rc;
-	rc = configure_af_device(i_con, IPR_REMOVE);
-	return rc;
-}
-
-int configure_af_device(i_container *i_con, int action_code)
+static int configure_af_device(i_container *i_con, int action_code)
 {
 	int rc, j, k;
 	struct scsi_dev_data *scsi_dev_data;
@@ -3930,14 +3944,10 @@ int configure_af_device(i_container *i_con, int action_code)
 	char *buffer[2];
 	int num_devs = 0;
 	struct ipr_ioa *ioa;
-	struct devs_to_init_t *cur_dev_init;
 	int toggle = 0;
 	int header_lines;
 	s_node *n_screen;
 	struct screen_output *s_out;
-	u8 ioctl_buffer[IPR_MODE_SENSE_LENGTH];
-	struct ipr_mode_parm_hdr *mode_parm_hdr;
-	struct ipr_block_desc *block_desc;
 
 	processing();
 
@@ -3997,26 +4007,13 @@ int configure_af_device(i_container *i_con, int action_code)
 				} else
 					can_init = is_format_allowed(&ioa->dev[j]);
 			} else if (scsi_dev_data->type == TYPE_DISK){
-
 				/* If on a JBOD adapter */
 				if (!ioa->qac_data->num_records) {
 					if (action_code != IPR_REMOVE)
 						continue;
-
-					if (!(rc = ipr_mode_sense(&ioa->dev[j], 0, ioctl_buffer))) {
-						mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-						if (mode_parm_hdr->block_desc_len > 0) {
-							block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
-
-							if (block_desc->block_length[1] != (ioa->af_block_size >> 8) ||
-							    block_desc->block_length[2] != (ioa->af_block_size & 0xff))
-								continue;
-						} else
-							continue;
-					} else
-						continue;
 				} else if (is_af_blocked(&ioa->dev[j], 0))
+					continue;
+				if (action_code == IPR_REMOVE && !format_req(&ioa->dev[j]))
 					continue;
 
 				if (action_code == IPR_REMOVE)
@@ -4041,23 +4038,9 @@ int configure_af_device(i_container *i_con, int action_code)
 				continue;
 
 			if (can_init) {
-				if (dev_init_head) {
-					dev_init_tail->next = malloc(sizeof(struct devs_to_init_t));
-					dev_init_tail = dev_init_tail->next;
-				}
-				else
-					dev_init_head = dev_init_tail = malloc(sizeof(struct devs_to_init_t));
-
-				memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
-
-				dev_init_tail->ioa = ioa;
-				dev_init_tail->dev_type = dev_type;
-				dev_init_tail->new_block_size = new_block_size;
-				dev_init_tail->dev = &ioa->dev[j];
-
+				add_format_device(&ioa->dev[j], new_block_size);
 				print_dev(k, &ioa->dev[j], buffer, "%1", ioa, k);
 				i_con = add_i_con(i_con,"\0",dev_init_tail);
-
 				num_devs++;
 			}
 		}
@@ -4086,12 +4069,7 @@ int configure_af_device(i_container *i_con, int action_code)
 			toggle++;
 		} while (s_out->rc == TOGGLE_SCREEN);
 
-		cur_dev_init = dev_init_head;
-		while (cur_dev_init) {
-			cur_dev_init = cur_dev_init->next;
-			free(dev_init_head);
-			dev_init_head = cur_dev_init;
-		}
+		free_devs_to_init();
 	}
 
 	rc = s_out->rc;
@@ -4103,6 +4081,20 @@ int configure_af_device(i_container *i_con, int action_code)
 	}
 	n_screen->body = NULL;
 
+	return rc;
+}
+
+int af_include(i_container *i_con)
+{
+	int rc;
+	rc = configure_af_device(i_con, IPR_INCLUDE);
+	return rc;
+}
+
+int af_remove(i_container *i_con)
+{
+	int rc;
+	rc = configure_af_device(i_con, IPR_REMOVE);
 	return rc;
 }
 
@@ -4956,7 +4948,6 @@ int init_device(i_container *i_con)
 	char *buffer[2];
 	int num_devs = 0;
 	struct ipr_ioa *ioa;
-	struct devs_to_init_t *cur_dev_init;
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
@@ -5062,14 +5053,7 @@ int init_device(i_container *i_con)
 	}
 
 	n_init_device.body = NULL;
-
-	cur_dev_init = dev_init_head;
-	while(cur_dev_init) {
-		cur_dev_init = cur_dev_init->next;
-		free(dev_init_head);
-		dev_init_head = cur_dev_init;
-	}
-
+	free_devs_to_init();
 	return rc;
 }
 
@@ -5150,6 +5134,112 @@ int confirm_init_device(i_container *i_con)
 	return rc;
 }
 
+static int dev_init_complete(u8 num_devs)
+{
+	int done_bad;
+	struct ipr_cmd_status cmd_status;
+	struct ipr_cmd_status_record *status_record;
+	int not_done = 0;
+	int rc;
+	struct devs_to_init_t *dev;
+	u32 percent_cmplt = 0;
+	struct sense_data_t sense_data;
+	struct ipr_ioa *ioa;
+	int pid = 1;
+
+	while(1) {
+		if (pid)
+			rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt,1);
+
+		if (rc & EXIT_FLAG) {
+			pid = fork();
+			if (pid)
+				return rc;
+			rc = 0;
+		}
+
+		percent_cmplt = 100;
+		done_bad = 0;
+
+		for_each_dev_to_init(dev) {
+			if (dev->do_init && dev->dev_type == IPR_AF_DASD_DEVICE) {
+				rc = ipr_query_command_status(dev->dev, &cmd_status);
+
+				if (rc || cmd_status.num_records == 0)
+					continue;
+
+				status_record = cmd_status.record;
+				if (status_record->status == IPR_CMD_STATUS_FAILED) {
+					done_bad = 1;
+				} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL) {
+					if (status_record->percent_complete < percent_cmplt)
+						percent_cmplt = status_record->percent_complete;
+					not_done = 1;
+				}
+			} else if (dev->do_init && dev->dev_type == IPR_JBOD_DASD_DEVICE) {
+				/* Send Test Unit Ready to find percent complete in sense data. */
+				rc = ipr_test_unit_ready(dev->dev,
+							 &sense_data);
+
+				if (rc < 0)
+					continue;
+
+				if (rc == CHECK_CONDITION &&
+				    (sense_data.error_code & 0x7F) == 0x70 &&
+				    (sense_data.sense_key & 0x0F) == 0x02) {
+					dev->cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
+					if (dev->cmplt < percent_cmplt)
+						percent_cmplt = dev->cmplt;
+					not_done = 1;
+				}
+			}
+		}
+
+		if (!not_done) {
+			for_each_dev_to_init(dev) {
+				if (!dev->do_init)
+					continue;
+
+				ioa = dev->ioa
+;
+				if (dev->new_block_size != ioa->af_block_size && ipr_is_gscsi(dev->dev)) {
+					ipr_write_dev_attr(dev->dev, "rescan", "1");
+					ipr_init_dev(dev->dev);
+				}
+
+				if (dev->new_block_size != 0) {
+					if (dev->new_block_size == ioa->af_block_size)
+						enable_af(dev->dev);
+
+					evaluate_device(dev->dev, ioa, dev->new_block_size);
+				}
+
+				if (dev->new_block_size == ioa->af_block_size || ipr_is_af_dasd_device(dev->dev))
+					ipr_add_zeroed_dev(dev->dev);
+			}
+
+			flush_stdscr();
+
+			if (done_bad) {
+				if (!pid)
+					exit(0);
+
+				/* Initialize and format failed */
+				return 51 | EXIT_FLAG;
+			}
+
+			if (!pid)
+				exit(0);
+
+			/* Initialize and format completed successfully */
+			return 50 | EXIT_FLAG; 
+		}
+
+		not_done = 0;
+		sleep(1);
+	}
+}
+
 int send_dev_inits(i_container *i_con)
 {
 	u8 num_devs = 0;
@@ -5166,8 +5256,6 @@ int send_dev_inits(i_container *i_con)
 	u8 failure = 0;
 	int max_y, max_x;
 	u8 length;
-
-	int dev_init_complete(u8 num_devs);
 
 	getmaxyx(stdscr,max_y,max_x);
 	mvaddstr(max_y-1,0,wait_for_next_screen);
@@ -5326,112 +5414,6 @@ int send_dev_inits(i_container *i_con)
 	else
 		/* "Initialize and format failed" */
 		return 51 | EXIT_FLAG; 
-}
-
-int dev_init_complete(u8 num_devs)
-{
-	int done_bad;
-	struct ipr_cmd_status cmd_status;
-	struct ipr_cmd_status_record *status_record;
-	int not_done = 0;
-	int rc;
-	struct devs_to_init_t *dev;
-	u32 percent_cmplt = 0;
-	struct sense_data_t sense_data;
-	struct ipr_ioa *ioa;
-	int pid = 1;
-
-	while(1) {
-		if (pid)
-			rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt,1);
-
-		if (rc & EXIT_FLAG) {
-			pid = fork();
-			if (pid)
-				return rc;
-			rc = 0;
-		}
-
-		percent_cmplt = 100;
-		done_bad = 0;
-
-		for_each_dev_to_init(dev) {
-			if (dev->do_init && dev->dev_type == IPR_AF_DASD_DEVICE) {
-				rc = ipr_query_command_status(dev->dev, &cmd_status);
-
-				if (rc || cmd_status.num_records == 0)
-					continue;
-
-				status_record = cmd_status.record;
-				if (status_record->status == IPR_CMD_STATUS_FAILED) {
-					done_bad = 1;
-				} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL) {
-					if (status_record->percent_complete < percent_cmplt)
-						percent_cmplt = status_record->percent_complete;
-					not_done = 1;
-				}
-			} else if (dev->do_init && dev->dev_type == IPR_JBOD_DASD_DEVICE) {
-				/* Send Test Unit Ready to find percent complete in sense data. */
-				rc = ipr_test_unit_ready(dev->dev,
-							 &sense_data);
-
-				if (rc < 0)
-					continue;
-
-				if (rc == CHECK_CONDITION &&
-				    (sense_data.error_code & 0x7F) == 0x70 &&
-				    (sense_data.sense_key & 0x0F) == 0x02) {
-					dev->cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
-					if (dev->cmplt < percent_cmplt)
-						percent_cmplt = dev->cmplt;
-					not_done = 1;
-				}
-			}
-		}
-
-		if (!not_done) {
-			for_each_dev_to_init(dev) {
-				if (!dev->do_init)
-					continue;
-
-				ioa = dev->ioa;
-
-				if (dev->new_block_size != ioa->af_block_size && ipr_is_gscsi(dev->dev)) {
-					ipr_write_dev_attr(dev->dev, "rescan", "1");
-					ipr_init_dev(dev->dev);
-				}
-
-				if (dev->new_block_size != 0) {
-					if (dev->new_block_size == ioa->af_block_size)
-						enable_af(dev->dev);
-
-					evaluate_device(dev->dev, ioa, dev->new_block_size);
-				}
-
-				if (dev->new_block_size == ioa->af_block_size || ipr_is_af_dasd_device(dev->dev))
-					ipr_add_zeroed_dev(dev->dev);
-			}
-
-			flush_stdscr();
-
-			if (done_bad) {
-				if (!pid)
-					exit(0);
-
-				/* Initialize and format failed */
-				return 51 | EXIT_FLAG;
-			}
-
-			if (!pid)
-				exit(0);
-
-			/* Initialize and format completed successfully */
-			return 50 | EXIT_FLAG; 
-		}
-
-		not_done = 0;
-		sleep(1);
-	}
 }
 
 int reclaim_cache(i_container* i_con)
@@ -8763,19 +8745,214 @@ static void usage()
 	printf(_("Usage: iprconfig [options]\n"));
 	printf(_("  Options: -e name    Default editor for viewing error logs\n"));
 	printf(_("           -k dir     Kernel messages root directory\n"));
+	printf(_("           -c command Command line configuration\n"));
+	printf(_("                      See man page for complete details\n"));
 	printf(_("           --version  Print iprconfig version\n"));
 	printf(_("           --debug    Enable additional error logging\n"));
 	printf(_("           --force    Disable safety checks. See man page for details.\n"));
 	printf(_("  Use quotes around parameters with spaces\n"));
 }
 
+static struct sysfs_dev *head_sdev;
+static struct sysfs_dev *tail_sdev;
+
+static struct ipr_dev *find_and_add_dev(char *name)
+{
+	struct ipr_dev *dev = find_blk_dev(name);
+
+	if (!dev)
+		dev = find_gen_dev(name);
+	if (!dev) {
+		syslog(LOG_ERR, _("Invalid device specified: %s\n"), name);
+		return NULL;
+	}
+
+	ipr_add_sysfs_dev(dev, &head_sdev, &tail_sdev);
+	return dev;
+}
+
+static int raid_create_add_dev(char *name)
+{
+	struct ipr_dev *dev = find_and_add_dev(name);
+
+	if (!dev)
+		return -EINVAL;
+
+	if (ipr_is_gscsi(dev)) {
+		if (is_af_blocked(dev, 0))
+			return -EINVAL;
+		if (!is_format_allowed(dev))
+			return -EIO;
+		add_format_device(dev, dev->ioa->af_block_size);
+		dev_init_tail->do_init = 1;
+	}
+
+	return 0;
+}
+
+static int raid_create_check_num_devs(struct ipr_array_cap_entry *cap,
+				      int num_devs)
+{
+	if (num_devs < cap->min_num_array_devices ||
+	    num_devs > cap->max_num_array_devices ||
+	    (num_devs % cap->min_mult_array_devices) != 0) {
+		syslog(LOG_ERR, _("Invalid number of devices selected for RAID %s array. %d. "
+				  "Must select minimum of %d devices, maximum of %d devices, "
+				  "and must be a multiple of %d devices\n"),
+		       cap->prot_level_str, num_devs, cap->min_num_array_devices,
+		       cap->max_num_array_devices, cap->min_mult_array_devices);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int raid_create(char **args, int num_args)
+{
+	int i, num_devs = 0, rc;
+	int next_raid_level, next_stripe_size, next_qdepth;
+	char *raid_level = IPR_DEFAULT_RAID_LVL;
+	int stripe_size, qdepth;
+	struct ipr_dev *dev;
+	struct sysfs_dev *sdev;
+	struct ipr_ioa *ioa = NULL;
+	struct ipr_array_cap_entry *cap;
+
+	next_raid_level = 0;
+	next_stripe_size = 0;
+	next_qdepth = 0;
+	stripe_size = 0;
+
+	for (i = 0; i < num_args; i++) {
+		if (strcmp(args[i], "-r") == 0)
+			next_raid_level = 1;
+		else if (strcmp(args[i], "-s") == 0)
+			next_stripe_size = 1;
+		else if (strcmp(args[i], "-q") == 0)
+			next_qdepth = 1;
+		else if (next_raid_level) {
+			next_raid_level = 0;
+			raid_level = args[i];
+		} else if (next_stripe_size) {
+			next_stripe_size = 0;
+			stripe_size = strtoul(args[i], NULL, 10);
+		} else if (next_qdepth) {
+			next_qdepth = 0;
+			qdepth = strtoul(args[i], NULL, 10);
+		} else if (strncmp(args[i], "/dev", 4) == 0) {
+			num_devs++;
+			if (raid_create_add_dev(args[i]))
+				return -EIO;
+		}
+	}
+
+	for (sdev = head_sdev; sdev; sdev = sdev->next) {
+		dev = ipr_sysfs_dev_to_dev(sdev);
+		if (!dev) {
+			syslog(LOG_ERR, _("Cannot find device\n"));
+			return -EINVAL;
+		}
+
+		if (!ioa)
+			ioa = dev->ioa;
+		else if (ioa != dev->ioa) {
+			syslog(LOG_ERR, _("All devices must be attached to the same adapter\n"));
+			return -EINVAL;
+		}
+	}
+
+	cap = get_cap_entry(ioa->supported_arrays, raid_level);
+
+	if (!cap) {
+		syslog(LOG_ERR, _("Invalid RAID level for selected adapter. %s\n"), raid_level);
+		return -EINVAL;
+	}
+
+	if (stripe_size && ((cap->supported_stripe_sizes & stripe_size) != stripe_size)) {
+		syslog(LOG_ERR, _("Unsupported stripe size for selected adapter. %d\n"),
+		       stripe_size);
+		return -EINVAL;
+	}
+
+	if ((rc = raid_create_check_num_devs(cap, num_devs)))
+		return rc;
+
+	if (!stripe_size)
+		stripe_size = cap->recommended_stripe_size;
+	if (!qdepth)
+		qdepth = num_devs * 4;
+
+	if (dev_init_head) {
+		send_dev_inits(NULL);
+		free_devs_to_init();
+	}
+
+	check_current_config(false);
+
+	for (sdev = head_sdev; sdev; sdev = sdev->next) {
+		dev = ipr_sysfs_dev_to_dev(sdev);
+		if (!dev) {
+			syslog(LOG_ERR, _("Cannot find device: %s\n"),
+			       sdev->sysfs_device_name);
+			return -EIO;
+		}
+
+		if (!ipr_is_af_dasd_device(dev)) {
+			scsi_err(dev, "Invalid device type\n");
+			return -EIO;
+		}
+
+		dev->dev_rcd->issue_cmd = 1;
+	}
+
+	add_raid_cmd_tail(ioa, &ioa->ioa, ioa->start_array_qac_entry->array_id);
+	raid_cmd_tail->qdepth = qdepth;
+	raid_cmd_tail->do_cmd = 1;
+
+	rc = ipr_start_array_protection(ioa, stripe_size, cap->prot_level);
+
+	if (rc)
+		return rc;
+
+	return raid_start_complete();
+}
+
+static int raid_delete(char **args, int num_args)
+{
+	int rc;
+	struct ipr_dev *dev;
+
+	if (num_args != 1) {
+		syslog(LOG_ERR, _("Specify one array at a time to delete\n"));
+		return -EINVAL;
+	}
+
+	if (strncmp(args[0], "/dev", 4)) {
+		syslog(LOG_ERR, _("Invalid argument: %s\n"), args[0]);
+		return -EINVAL;
+	}
+
+	dev = find_and_add_dev(args[0]);
+
+	if (!dev) {
+		syslog(LOG_ERR, _("Invalid device specified: %s\n"), args[0]);
+		return -EINVAL;
+	}
+
+	dev->array_rcd->issue_cmd = 1;
+	if (dev->scsi_dev_data)
+		rc = ipr_start_stop_stop(dev);
+	if ((rc = ipr_stop_array_protection(dev->ioa)))
+		return rc;
+
+	return rc;
+}
+
 int main(int argc, char *argv[])
 {
-	int  next_editor, next_dir, next_cmd, next_dev, i, rc;
-	char parm_editor[200], parm_dir[200], cmd[200], dev[200];
-	int non_interactive = 0;
-
-	ipr_ioa_head = ipr_ioa_tail = NULL;
+	int  next_editor, next_dir, next_cmd, next_dev, i, rc = 0;
+	char parm_editor[200], parm_dir[200], cmd[200];
+	char **dev = NULL;
+	int non_interactive = 0, num_devs = 0;
 
 	/* makes program compatible with all terminals -
 	 originally did not display text correctly when user was running xterm */
@@ -8817,8 +8994,10 @@ int main(int argc, char *argv[])
 				next_cmd = 0;
 				next_dev = 1;
 			} else if (next_dev) {
-				strcpy(dev, argv[i]);
-				next_dev = 0;
+				dev = realloc(dev, sizeof(*dev) * (num_devs + 1));
+				dev[num_devs] = malloc(strlen(argv[i]) + 1);
+				strcpy(dev[num_devs], argv[i]);
+				num_devs++;
 			} else {
 				usage();
 				exit(1);
@@ -8831,26 +9010,43 @@ int main(int argc, char *argv[])
 
 	system("modprobe sg");
 	exit_func = tool_exit_func;
-	tool_init();
+	tool_init(0);
+	initscr();
 
 	if (non_interactive) {
+		exit_func = cmdline_exit_func;
+		closelog();
+		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 		check_current_config(false);
-		if (strcmp(cmd, "primary") == 0)
-			return set_preferred_primary(dev, 1);
-		else if (strcmp(cmd, "secondary") == 0)
-			return set_preferred_primary(dev, 0);
 
-		usage();
-		exit(1);
+		if (num_devs == 0) {
+			exit_func();
+			usage();
+			return -EINVAL;
+		} else if (strcmp(cmd, "primary") == 0)
+			rc = set_preferred_primary(dev[0], 1);
+		else if (strcmp(cmd, "secondary") == 0)
+			rc = set_preferred_primary(dev[0], 0);
+		else if (strcmp(cmd, "raid-create") == 0)
+			rc = raid_create(dev, num_devs);
+		else if (strcmp(cmd, "raid-delete") == 0)
+			rc = raid_delete(dev, num_devs);
+		else {
+			exit_func();
+			usage();
+			return -EINVAL;
+		}
+		exit_func();
+		return rc;
 	}
 
-	initscr();
 	cbreak(); /* take input chars one at a time, no wait for \n */
 
 	keypad(stdscr,TRUE);
 	noecho();
 
 	s_status.index = 0;
+
 	main_menu(NULL);
 	if (head_zdev){
 		check_current_config(false);
