@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.34 2004/03/11 20:51:26 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.35 2004/03/11 23:25:36 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2648,9 +2648,25 @@ int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 				ret[j].has_header = 1;
 				j++;
 			}
-
 		}
+		if (rc > 0)
+			free(*dirent);
+	}
 
+	if (parms) {
+		rc = scandir(HOTPLUG_BASE_DIR, &dirent, NULL, alphasort);
+
+		for (i = 0; i < rc && rc > 0; i++) {
+			/* xxx fix this to look for IBM-eServer-xxx */
+			if (strstr(dirent[i]->d_name, parms->fw_name)) {
+				ret = realloc(ret, sizeof(*ret) * (j + 1));
+				sprintf(ret[j].file, HOTPLUG_BASE_DIR"/%s",
+					dirent[i]->d_name);
+				ret[j].version = get_ioa_ucode_version(ret[j].file);
+				ret[j].has_header = 1;
+				j++;
+			}
+		}
 		if (rc > 0)
 			free(*dirent);
 	}
@@ -2770,7 +2786,27 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 				break;
 			}
 		}
+		free(*dirent);
+	}
 
+	rc = scandir(HOTPLUG_BASE_DIR, &dirent, NULL, alphasort);
+
+	if (rc > 0) {
+		rc--;
+
+		for (i = rc ; i >= 0; i--) {
+			/* xxx fix this to look for IBM-eServer-xxx */
+			if (strstr(dirent[i]->d_name, prefix)) {
+				ret = realloc(ret, sizeof(*ret) * (j + 1));
+				sprintf(ret[j].file, HOTPLUG_BASE_DIR"/%s",
+					dirent[i]->d_name);
+				ret[j].version = get_dasd_ucode_version(ret[j].file,
+									IPR_DASD_UCODE_USRLIB);
+				ret[j].has_header = 0;
+				j++;
+				break;
+			}
+		}
 		free(*dirent);
 	}
 

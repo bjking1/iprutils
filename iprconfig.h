@@ -194,7 +194,7 @@ s_node n_disk_status = {
 	.title    = __("Display Hardware Status"),
 	.header   = {
 		__("Type option, press Enter.\n"),
-		__("  5=Display hardware resource information details\n\n"),
+		__("  1=Display hardware resource information details\n\n"),
 		"" }
 };
 
@@ -243,7 +243,7 @@ s_node n_raid_status = {
 	.title    = __("Display Disk Array Status"),
 	.header   = {
 		__("Type option, press Enter.\n"),
-		__("  5=Display hardware resource information details\n\n"),
+		__("  1=Display hardware resource information details\n\n"),
 		"" }
 };
 
@@ -258,7 +258,7 @@ s_node n_raid_stop = {
 	.options  = &raid_stop_opt[0],
 	.title    = __("Delete a Disk Array"),
 	.header   = {
-		__("Select the subsystems to delete a disk array.\n\n"),
+		__("Select the disk array(s) to delete.\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=delete a disk array\n\n"),
 		"" }
@@ -294,8 +294,7 @@ s_node n_confirm_raid_stop = {
 	.options  = &confirm_raid_stop_opt[0],
 	.title    = __("Confirm Delete a Disk Array"),
 	.header   = {
-		__("ATTENTION: Disk units connected to these subsystems"
-		   "will not be protected after you confirm your choice.\n\n"),
+		__("ATTENTION: Disk array will be deleted.\n\n"),
 		__("Press Enter to continue.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
 		"" }
@@ -312,7 +311,7 @@ s_node n_raid_start = {
 	.options  = &raid_start_opt[0],
 	.title    = __("Create a Disk Array"),
 	.header   = {
-		__("Select the subsystems to create a disk array.\n\n"),
+		__("Select the adapter.\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=create a disk array\n\n"),
 		"" }
@@ -354,8 +353,6 @@ s_node n_confirm_raid_start = {
 	.options  = &null_opt[0],
 	.title    = __("Confirm Create Disk Array"),
 	.header   = {
-		__("ATTENTION: Data will not be preserved and may be "
-		   "lost on selected disk units when parity protection is enabled.\n\n"),
 		__("Press Enter to continue.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
 		"" }
@@ -377,9 +374,9 @@ s_node n_raid_include = {
 	.options  = &raid_include_opt[0],
 	.title    = __("Add Devices to a Disk Array"),
 	.header   = {
-		__("Select the subsystem that the disk unit will be included.\n\n"),
+		__("Select the disk array.\n\n"),
 		__("Type choice, press Enter.\n"),
-		__("  1=Select Disk Array to Include Disk Unit\n\n"),
+		__("  1=Select disk array\n\n"),
 		"" }
 };
 
@@ -408,7 +405,7 @@ s_node n_configure_raid_include = {
 	.options = &null_opt[0],
 	.title   = __("Add Devices to a Disk Array"),
 	.header  = {
-		__("Select the units to be included in the disk array\n\n"),
+		__("Select the devices to be included in the disk array\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=Add a Device to a Disk Array\n\n"),
 		   "" }
@@ -887,8 +884,8 @@ s_node n_battery_maint = {
 	.title    = __("Work with Resources Containing Cache Battery Packs"),
 	.header   = {
 		__("Type options, press Enter\n"),
+		__("  1=Display battery information\n\n"),
 		__("  2=Force battery pack into error state\n"),
-		__("  5=Display battery information\n\n"),
 		"" }
 };
 

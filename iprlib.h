@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.27 2004/03/11 20:51:26 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.28 2004/03/11 23:25:36 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -51,6 +51,7 @@
 #define IPR_DASD_UCODE_HDR 2
 
 #define UCODE_BASE_DIR "/usr/lib/microcode"
+#define HOTPLUG_BASE_DIR "/usr/lib/hotplug/firmware"
 
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4

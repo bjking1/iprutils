@@ -1459,7 +1459,7 @@ int device_details_get_device(i_container *i_con,
 		if (input == NULL)
 			continue;
 
-		if (strcmp(input, "5") == 0) {
+		if (strcmp(input, "1") == 0) {
 
 			if (dev_num) {
 				dev_num++;
@@ -1502,7 +1502,7 @@ int device_details(i_container *i_con)
 	u8 vendor_id[IPR_VENDOR_ID_LEN+1];
 	u8 plant_code[IPR_VPD_PLANT_CODE_LEN+1];
 	u8 part_num[IPR_VPD_PART_NUM_LEN+1];
-	u8 firmware_version[5];
+	u8 firmware_version[20];
 	u8 serial_num[IPR_SERIAL_NUM_LEN+1];
 	int cache_size;
 	u8 dram_size[IPR_VPD_DRAM_SIZE_LEN+4];
@@ -3299,7 +3299,7 @@ int raid_include(i_container *i_con)
 	int rc = RC_SUCCESS;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle = 0;
+	int toggle = 1;
 	mvaddstr(0,0,"RAID INCLUDE FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
@@ -3439,7 +3439,7 @@ int configure_raid_include(i_container *i_con)
 	int rc = RC_SUCCESS;
 	int header_lines;
 	i_container *temp_i_con;
-	int toggle = 1;
+	int toggle = 0;
 	struct screen_output *s_out;
 	mvaddstr(0,0,"CONFIGURE RAID INCLUDE FUNCTION CALLED");
 
@@ -4862,7 +4862,7 @@ int init_device(i_container *i_con)
 	struct devs_to_init_t *cur_dev_init;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle=1;
+	int toggle = 0;
 	mvaddstr(0,0,"INIT DEVICE FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
@@ -5025,7 +5025,7 @@ int confirm_init_device(i_container *i_con)
 	int rc = RC_SUCCESS;
 	struct screen_output *s_out;
 	int header_lines;
-	int toggle=1;
+	int toggle = 0;
 	int k;
 	i_container *temp_i_con;
 	mvaddstr(0,0,"CONFIRM INIT DEVICE FUNCTION CALLED");
@@ -5979,7 +5979,7 @@ int battery_fork(i_container *i_con)
 		if (strcmp(input, "2") == 0) {
 			force_error++;
 			cur_ioa->ioa.is_reclaim_cand = 1;
-		} else if (strcmp(input, "5") == 0)	{
+		} else if (strcmp(input, "1") == 0)	{
 			rc = show_battery_info(cur_ioa);
 			return rc;
 		} else
@@ -6206,7 +6206,8 @@ int change_bus_attr(i_container *i_con)
 	}
 
 	body = body_init(n_change_bus_attr.header, &header_lines);
-	body = add_line_to_body(body, cur_ioa->pci_address, NULL);
+	sprintf(buffer, "Adapter Location: %s\n", cur_ioa->pci_address);
+	body = add_line_to_body(body, buffer, NULL);
 	header_lines++;
 
 	for (j = 0; j < page_28_cur.num_buses; j++) {
@@ -6907,7 +6908,7 @@ void set_log_level(struct ipr_ioa *ioa, char *log_level)
 
 int change_driver_config(i_container *i_con)
 {
-	int rc;
+	int rc, i, digits;
 	int found = 0;
 	i_container *temp_i_con;
 	struct ipr_ioa *ioa;
@@ -6941,21 +6942,30 @@ int change_driver_config(i_container *i_con)
 	i_con = add_i_con(i_con,"",NULL); 
 
 	body = body_init(n_change_driver_config.header, NULL);
-	body = add_line_to_body(body, ioa->pci_address, NULL);
+	sprintf(buffer,"Adapter Location: %s\n", ioa->pci_address);
+	body = add_line_to_body(body, buffer, NULL);
 	sprintf(buffer,"%d", get_log_level(ioa));
 	body = add_line_to_body(body,_("Current Log Level"), buffer);
 	body = add_line_to_body(body,_("New Log Level"), "%2");
 
 	n_change_driver_config.body = body;
-	s_out = screen_driver(&n_change_driver_config,0,i_con);
+	s_out = screen_driver(&n_change_driver_config, 0, i_con);
 
 	ipr_free(n_change_driver_config.body);
 	n_change_driver_config.body = NULL;
 	rc = s_out->rc;
 
 	if (!rc) {
-		if (strlen(i_con->field_data) != 0) {
-			set_log_level(ioa,i_con->field_data);
+		for (i = 0, digits = 0; i < strlen(i_con->field_data); i++) {
+			if (isdigit(i_con->field_data[i])) {
+				digits++;
+			} else if (!isspace(i_con->field_data[i])) {
+				rc = 48;
+				break;
+			}
+		}
+		if (!rc && digits) {
+			set_log_level(ioa, i_con->field_data);
 			rc = 57;
 		}
 	}
@@ -6995,11 +7005,6 @@ int disk_config(i_container * i_con)
 
 		if (cur_ioa->ioa.scsi_dev_data == NULL)
 			continue;
-
-		for (k=0; k<2; k++)
-			buffer[k] = print_device(&cur_ioa->ioa,buffer[k]," ", cur_ioa, k);
-
-		num_lines++;
 
 		/* print JBOD and non-member AF devices*/
 		for (j = 0; j < cur_ioa->num_devices; j++) {
@@ -7117,9 +7122,8 @@ struct disk_config_attr {
 };
 
 const char *queue_depth_opt[] = {
-	"1","4","8","12","16","20","24","28","32","36","40","44",
-	"48","52","56","60","64","68","72","76","80","84","88",
-	"92","96","100","104","108","112","116","120","124","128",""};
+	"1","2","4","6","8","12","16","24","32","48",
+	"64","80","96","112","128",""};
 
 int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_config_attr,
 		     int start_row, int header_lines)
@@ -7139,7 +7143,7 @@ int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_conf
 
 	if (disk_config_attr->option == 1) { /* queue depth*/
 
-		num_menu_items = 33;
+		num_menu_items = ARRAY_SIZE(queue_depth_opt);
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
 
@@ -7197,7 +7201,7 @@ int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_conf
 		free(userptr);
 		menu_item = NULL;
 	} else if (disk_config_attr->option == 2) { /* format t.o.*/
-		num_menu_items = 4;
+		num_menu_items = 5;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
 
@@ -7211,6 +7215,12 @@ int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_conf
 
 		menu_item[menu_index] = new_item("4 hr","");
 		userptr[menu_index] = 4;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+		menu_index++;
+
+		menu_item[menu_index] = new_item("3 hr","");
+		userptr[menu_index] = 3;
 		set_item_userptr(menu_item[menu_index],
 				 (char *)&userptr[menu_index]);
 		menu_index++;
@@ -7250,6 +7260,7 @@ int change_disk_config(i_container * i_con)
 	struct ipr_dev *ipr_dev;
 	char qdepth_str[4];
 	char format_timeout_str[5];
+	char buffer[128];
 	i_container *temp_i_con;
 	int found = 0;
 	char *input;
@@ -7289,8 +7300,10 @@ int change_disk_config(i_container * i_con)
 	i_con_head = i_con = NULL;
 
 	body = body_init(n_change_disk_config.header, &header_lines);
-	body = add_line_to_body(body, ipr_dev->gen_name, NULL);
-	header_lines++;
+	sprintf(buffer, "Device: %s   %s\n", ipr_dev->scsi_dev_data->sysfs_device_name,
+		ipr_dev->dev_name);
+	body = add_line_to_body(body, buffer, NULL);
+	header_lines += 2;
 
 	body = add_line_to_body(body,_("Queue Depth"), "%3");
 	disk_config_attr[0].option = 1;
@@ -7304,7 +7317,6 @@ int change_disk_config(i_container * i_con)
 	    (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
 
 		/* VSET, no further fields */
-		;
 	} else if (ipr_is_af_dasd_device(ipr_dev)) {
 
 		disk_config_attr[1].option = 2;
@@ -7325,7 +7337,7 @@ int change_disk_config(i_container * i_con)
 
 	n_change_disk_config.body = body;
 	while (1) {
-		s_out = screen_driver(&n_change_disk_config,header_lines,i_con);
+		s_out = screen_driver(&n_change_disk_config, header_lines, i_con);
 		rc = s_out->rc;
 
 		found = 0;
@@ -7387,7 +7399,7 @@ int download_ucode(i_container * i_con)
 	int header_lines;
 	int array_id;
 	char *buffer[2];
-	int toggle = 1;
+	int toggle = 0;
 	struct ipr_dev_record *dev_record;
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
@@ -8543,14 +8555,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		else if (format_req)
 			sprintf(body + len, "Format Required\n");
 		else
-		{
-			if (ipr_is_array_member(ipr_dev))
-				sprintf(body + len, "Optimal\n");
-			else if (ipr_is_hot_spare(ipr_dev))
-				sprintf(body + len, "Active\n");
-			else
-				sprintf(body + len, "Active\n");
-		}
+			sprintf(body + len, "Active\n");
 	}
 	return body;
 }
