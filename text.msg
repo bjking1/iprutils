@@ -138,15 +138,16 @@ $set 206 raid_stop_complete
 
 $set 207 raid_start_fail
 1 "Create a Disk Array Failed"
-2 "There are no disk units eligible for the selected operation due to one or more of the following reasons:"
+2 "There are no disk units eligible for the selected operation due\
+ to one or more of the following reasons:"
 3 "There are not enough device parity capable units in the system."
-4 "An IOA is in a condition that makes the disk units attached to \
-   it read/write protected.  Examine the kernel messages log \
-   for any errors that are logged for the IO subsystem \
-   and follow the appropriate procedure for the reference code to \
-   correct the problem, if necessary."
-5 "Not all disk units attached to an advanced function IOA have \
-   reported to the system.  Retry the operation."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected.  Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system.  Retry the operation."
 6 "The disk units are missing."
 7 "The disk unit/s are currently in use."
 

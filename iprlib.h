@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.10 2004/01/30 22:52:13 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.11 2004/01/30 23:41:21 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -1028,6 +1028,7 @@ struct scsi_dev_data
     u32    handle;
     u8     vendor_id[IPR_VENDOR_ID_LEN + 1];
     u8     product_id[IPR_PROD_ID_LEN + 1];
+    u8     sysfs_device_name[16];
 };
 
 struct sg_map_info

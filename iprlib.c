@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.8 2004/01/30 22:52:13 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.9 2004/01/30 23:41:21 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -1405,16 +1405,19 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
         scsi_dev_data = &scsi_dev_base[num_devs];
 
         sysfs_device_device = sysfs_get_classdev_device(class_device);
-        if (sysfs_device_device)
-            sscanf(sysfs_device_device->name,"%d:%d:%d:%d",
-                   &scsi_dev_data->host,
-                   &scsi_dev_data->channel,
-                   &scsi_dev_data->id,
-                   &scsi_dev_data->lun);
-        else {
+        if (!sysfs_device_device) {
             *scsi_dev_ref = scsi_dev_base;
             return -1;
         }
+
+        sscanf(sysfs_device_device->name,"%d:%d:%d:%d",
+               &scsi_dev_data->host,
+               &scsi_dev_data->channel,
+               &scsi_dev_data->id,
+               &scsi_dev_data->lun);
+
+        sprintf(scsi_dev_data->sysfs_device_name,
+                sysfs_device_device->name);
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "type");
         if (sysfs_attr)
