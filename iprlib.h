@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.5 2004/01/13 21:13:32 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.6 2004/01/16 16:25:18 manderso Exp $
  */
 
 #include <stdarg.h>

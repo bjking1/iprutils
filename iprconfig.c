@@ -116,7 +116,7 @@ struct screen_output *screen_driver(s_node *screen, fn_out *output, i_container 
 char *strip_trailing_whitespace(char *p_str);
 
 
-u16 print_device(struct ipr_device *p_ipr_dev, char *p_buf, struct ipr_ioa *p_cur_ioa);
+char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option, struct ipr_ioa *p_cur_ioa);
 int is_format_allowed(struct ipr_device *p_ipr_dev);
 int is_rw_protected(struct ipr_device *p_ipr_dev);
 
@@ -140,10 +140,10 @@ int display_menu(ITEM **menu_item,
                  int menu_index_max,
                  int **userptr);
 
-int print_parity_status(char *buffer,
-                        u8 array_id,
-                        struct ipr_query_res_state *p_res_state,
-                        struct ipr_cmd_status *p_cmd_status);
+char *print_parity_status(char *buffer,
+                          u8 array_id,
+                          struct ipr_query_res_state *p_res_state,
+                          struct ipr_cmd_status *p_cmd_status);
 
 void free_screen(struct panel_l *p_panel, struct window_l *p_win, FIELD **p_fields);
 void flush_stdscr();
@@ -151,6 +151,28 @@ int flush_line();
 
 nl_catd catd;
 
+void *ipr_realloc(void *buffer, int size)
+{
+    void *new_buffer = realloc(buffer, size);
+
+/*    syslog(LOG_ERR, "realloc from %lx to %lx of length %d\n", buffer, new_buffer, size);
+*/    return new_buffer;
+}
+
+void ipr_free(void *buffer)
+{
+    free(buffer);
+/*    syslog(LOG_ERR, "free %lx\n", buffer);
+*/}
+
+void *ipr_malloc(int size)
+{
+    void *new_buffer = malloc(size);
+
+/*    syslog(LOG_ERR, "malloc %lx of length %d\n", new_buffer, size);
+*/    return new_buffer;
+}
+    
 int main(int argc, char *argv[])
 {
   int next_editor, next_dir, next_platform, i;
@@ -222,6 +244,10 @@ int main(int argc, char *argv[])
   noecho();
 
   s_status.index = 0;
+
+  /* open the text catalog */
+  catd=catopen("./text.cat",NL_CAT_LOCALE);
+
   main_menu(NULL);
 
   clear();
@@ -231,796 +257,801 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-struct screen_output *screen_driver(s_node *screen, fn_out *output, i_container *i_con)
+struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int header_lines, i_container *i_con)
 {
-  /*     Screen Name   <- title
-	 
-  0  Header    bla      bla   <- pad_top = 0
-  1  heading  heading  heading   <- header_lines=2
-  2  output   out      out
-  3  output   out      out  <- body (represented by text, % signs for fields, and # signs for output)
-  4  output   out      out
-  5  output   out      out
-  6  output   out      out  <- pad_b = std_scr_max_y-pad_scr_t-pad_scr_b-1 = number dislayed lines - 1 = 6
+    /*     Screen Name   <- title
 
-  e=exit   q=quit  f=pagedn ...  <- footer
-  */
+     0  Header    bla      bla   <- pad_top = 0
+     1  heading  heading  heading   <- header_lines=2
+     2  output   out      out
+     3  output   out      out  <- body (represented by text, % signs for fields, and # signs for output)
+     4  output   out      out
+     5  output   out      out
+     6  output   out      out  <- pad_b = std_scr_max_y-pad_scr_t-pad_scr_b-1 = number dislayed lines - 1 = 6
 
-  WINDOW *w_pad,*w_page_header; /* windows to hold text */
-  FIELD **p_fields = NULL; /* field list for forms */
-  FORM *p_form = NULL; /* p_form for input fields */
+     e=exit   q=quit  f=pagedn ...  <- footer
+     */
 
-  fn_out *output_temp; /* help store function input */
-  int rc = 0; /* the status of the screen */
-  char *status; /* displays screen operations */
-  char buffer[100]; /* needed for special status strings */
-  bool invalid = false; /* invalid status display */
-  
-  bool e_on=false,q_on=false,r_on=false,f_on=false,enter_on=false,menus_on=false; /* control user input handling */
-  bool ground_cursor=false;
+    WINDOW *w_pad,*w_page_header; /* windows to hold text */
+    FIELD **p_fields = NULL; /* field list for forms */
+    FORM *p_form = NULL; /* p_form for input fields */
 
-  int stdscr_max_y,stdscr_max_x,w_pad_max_y=0,w_pad_max_x=0; /* limits of the windows */
-  int pad_l=0,pad_r,pad_t=0,pad_b,pad_scr_t=2,pad_scr_b=2,pad_scr_l=0; /* position of the pad */
-  int center,len=0,ch,i=0,j,k,row=0,col=0,bt_len=0; /* text positioning */
-  int field_width,num_fields=0; /*form positioning */
-  int h,w,t,l,o,b; /* form querying */
+    fn_out *output_temp; /* help store function input */
+    int rc = 0; /* the status of the screen */
+    char *status; /* displays screen operations */
+    char buffer[100]; /* needed for special status strings */
+    bool invalid = false; /* invalid status display */
 
-  int active_field=0; /* return to same active field after a quit */
+    bool e_on=false,q_on=false,r_on=false,f_on=false,enter_on=false,menus_on=false; /* control user input handling */
+    bool ground_cursor=false;
 
-  bool pages = false,is_bottom = false; /* control page up/down in multi-page screens */
-  bool form_adjust = false; /* correct cursor position in multi-page screens */
-  int header_lines=0,str_index,max_str_index=0; /* text positioning in multi-page screens */
-  bool refresh_stdscr = true;
-  bool x_offscr,y_offscr; /* scrolling windows */
+    int stdscr_max_y,stdscr_max_x,w_pad_max_y=0,w_pad_max_x=0; /* limits of the windows */
+    int pad_l=0,pad_r,pad_t=0,pad_b,pad_scr_t=2,pad_scr_b=2,pad_scr_l=0; /* position of the pad */
+    int center,len=0,ch,i=0,j,k,row=0,col=0,bt_len=0; /* text positioning */
+    int field_width,num_fields=0; /*form positioning */
+    int h,w,t,l,o,b; /* form querying */
 
-  struct screen_output *s_out;
+    int active_field=0; /* return to same active field after a quit */
 
-  struct screen_opts *temp; /* reference to another screen */
+    bool pages = false,is_bottom = false; /* control page up/down in multi-page screens */
+    bool form_adjust = false; /* correct cursor position in multi-page screens */
+    int str_index,max_str_index=0; /* text positioning in multi-page screens */
+    bool refresh_stdscr = true;
+    bool x_offscr,y_offscr; /* scrolling windows */
 
-  char *title,*body,*footer,*body_text,more_footer[100]; /* screen text */
+    struct screen_output *s_out;
 
-  s_out = malloc(sizeof(struct screen_output)); /* passes an i_con and an rc value back to the function */
+    struct screen_opts *temp; /* reference to another screen */
 
-  /* open the text catalog */
-  catd=catopen("./text.cat",NL_CAT_LOCALE);
+    char *title,*body,*footer,*body_text,more_footer[100]; /* screen text */
 
-  /* create text strings */
-  if (screen->title)
-      title = screen->title;
-  else
-      title = catgets(catd,screen->text_set,1+output->cat_offset,"BOOM");
-  if (screen->body)
-      body = screen->body;
-  else
-      body = catgets(catd,screen->text_set,2+output->cat_offset,"BANG");
-  if (screen->footer)
-      footer = screen->footer;
-  else
-      footer = catgets(catd,screen->text_set,3+output->cat_offset,"KAPLOWEE   %e");
-  
-  bt_len = strlen(body);
-  body_text = calloc(bt_len+1,sizeof(char));
-  
-  /* determine max size needed and find where to put form fields and device input in the text and add them
-   * '%' marks a field.  The number after '%' represents the field's width
-   * '#' marks device input.  The number after '#' represents the index of the input to display
-   */
-  while(body[i] != '\0')
+    s_out = ipr_malloc(sizeof(struct screen_output)); /* passes an i_con and an rc value back to the function */
+
+    /* create text strings */
+    if (screen->title)
+        title = screen->title;
+    else
+        title = catgets(catd,screen->text_set,1+output->cat_offset,"BOOM");
+    if (screen->body)
+        body = screen->body;
+    else
+        body = catgets(catd,screen->text_set,2+output->cat_offset,"BANG");
+    if (screen->footer)
+        footer = screen->footer;
+    else
+        footer = catgets(catd,screen->text_set,3+output->cat_offset,"KAPLOWEE   %e");
+
+    bt_len = strlen(body);
+    body_text = calloc(bt_len+1,sizeof(char));
+
+    /* determine max size needed and find where to put form fields and device input in the text and add them
+     * '%' marks a field.  The number after '%' represents the field's width
+     * '#' marks device input.  The number after '#' represents the index of the input to display
+     */
+    while(body[i] != '\0')
     {
-      if (body[i] == '\n')
-	{
-	  row++;
-	  header_lines++;
-	  col = -1;
-	  
-	  body_text[len] = body[i];
-	  len++;
-	}
-      else if (body[i] == '%')
-	{
-	  p_fields = realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
-	  i++;
+        if (body[i] == '\n')
+        {
+            row++;
+            if (output)
+                header_lines++;
+            col = -1;
 
-	  if (body[i] == 'm')
-	    {
-	      menus_on = true;
-	      field_width = 15;
-	      p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
-	      field_opts_off(p_fields[num_fields], O_EDIT);
-	    }
-	  else
-	    {
-	      field_width = 0;
-	      sscanf(&(body[i]),"%d",&field_width);
-	      
-	      p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
-	      
-	      if (field_width >= 30)
-		field_opts_off(p_fields[num_fields],O_AUTOSKIP);
+            body_text[len] = body[i];
+            len++;
+        }
+        else if (body[i] == '%')
+        {
+            p_fields = ipr_realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
+            i++;
 
-	      if (field_width > 9)
-		i++; /* skip second digit of field index */
-	    }
-	  set_field_userptr(p_fields[num_fields],NULL);
-	  num_fields++;
-	  col += field_width-1;
+            if (body[i] == 'm')
+            {
+                menus_on = true;
+                field_width = 15;
+                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
+                field_opts_off(p_fields[num_fields], O_EDIT);
+            }
+            else
+            {
+                field_width = 0;
+                sscanf(&(body[i]),"%d",&field_width);
 
-	  bt_len += field_width;
+                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
 
-	  body_text = realloc(body_text,bt_len);
-	  for(k=0;k<field_width;k++)
-	    body_text[len+k] = ' ';
-	  len += field_width;
-	}
+                if (field_width >= 30)
+                    field_opts_off(p_fields[num_fields],O_AUTOSKIP);
 
-      else if ((body[i] == '#') && output)
-	{
-	  i++;
-	  str_index = 0;
-	  sscanf(&(body[i]),"%d",&str_index);
+                if (field_width > 9)
+                    i++; /* skip second digit of field index */
+            }
+            set_field_userptr(p_fields[num_fields],NULL);
+            num_fields++;
+            col += field_width-1;
 
-	  max_str_index++;
-	  
-	  if (str_index > 9)
-	    i++; /* skip second digit of string index */
+            bt_len += field_width;
 
-	  output_temp = output;
+            body_text = ipr_realloc(body_text,bt_len);
+            for(k=0;k<field_width;k++)
+                body_text[len+k] = ' ';
+            len += field_width;
+        }
 
-	  while (output_temp->next != NULL)
-	    {
-	      output_temp = output_temp->next;
-	      
-	      if (output_temp->index == str_index)
-		break;
-	    }
+        else if ((body[i] == '#') && output)
+        {
+            i++;
+            str_index = 0;
+            sscanf(&(body[i]),"%d",&str_index);
 
-	  /* check if loop completed because no match found */
-	  if (output_temp->index == str_index)
-	    {
-	      if (output_temp->text != NULL)
-		{
-		  bt_len += strlen(output_temp->text);
-		  body_text = realloc(body_text,bt_len);
-		  j = 0;
-		  while (output_temp->text[j] != '\0')
-		    {
-		      if (output_temp->text[j] == '\n')
-			{
-			  body_text[len] = output_temp->text[j];
-			  len++;
-			  row++;
-			  col = -1;
-			}
-		      else if(output_temp->text[j] == '\t')
-			{
-			  int mt = 8;
-			  int tab_width = (mt-col%mt);/*?mt-col%mt:mt);*/
-			  bt_len+=tab_width-1;
-			  body_text = realloc(body_text,bt_len);
+            max_str_index++;
 
-			  for(k=0;k<tab_width;k++)
-			    body_text[len+k] = ' ';
-			  
-			  len+=tab_width;
-			  col+=tab_width-1;
-			}
-		      else if (output_temp->text[j] == '%')
-			{
-			  p_fields = realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
-			  j++; 
-			  
-			  if (output_temp->text[j] == 'm')
-			    {
-			      menus_on = true;
-			      field_width = 15;
-			      p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
-			      field_opts_off(p_fields[num_fields], O_EDIT);
-			    }
-			  else
-			    {
-			      field_width = 0;
-			      sscanf(&(output_temp->text[j]),"%d",&field_width);
-			      p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
-			      
-			      if (field_width >= 30)
-				field_opts_off(p_fields[num_fields],O_AUTOSKIP);
-			      
-			      if (field_width > 9)
-				i++; /* skip second digit of field width */
-			    }
-			  set_field_userptr(p_fields[num_fields],NULL);
-			  num_fields++;
-			  col += field_width-1;
+            if (str_index > 9)
+                i++; /* skip second digit of string index */
 
-			  bt_len += field_width;
-			  
-			  body_text = realloc(body_text,bt_len);
-			  for(k=0;k<field_width;k++)
-			    body_text[len+k] = ' ';
-			  len += field_width;
-			}
-		      else
-			{
-			  body_text[len] = output_temp->text[j];
-			  len++;
-			}
+            output_temp = output;
 
-		      col++;
-		      j++;
-		      
-		      if (col > w_pad_max_x)
-			w_pad_max_x = col;
-		    }
-		}
-	    }
-	}
-      else
-	{
-	  body_text[len] = body[i];
-	  len++;
-	}
+            while (output_temp->next != NULL)
+            {
+                output_temp = output_temp->next;
 
-      col++;
-      i++;
-      
-      if (col > w_pad_max_x)
-	w_pad_max_x = col;
-    }
-  
-  body_text[len] = '\0';
+                if (output_temp->index == str_index)
+                    break;
+            }
 
-  w_pad_max_y = row;
-  
-  w_pad_max_y++; /* some forms may not display correctly if this is not included */
-  w_pad_max_x++; /* adds a column for return char \n : else, a blank line will appear in the pad */
-  
-  w_pad = newpad(w_pad_max_y,w_pad_max_x);
-  keypad(w_pad,TRUE);
-  
-  if (num_fields)
-    {
-      p_fields = realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
-      p_fields[num_fields] = NULL;
-      p_form = new_form(p_fields);
+            /* check if loop completed because no match found */
+            if (output_temp->index == str_index)
+            {
+                if (output_temp->text != NULL)
+                {
+                    bt_len += strlen(output_temp->text);
+                    body_text = ipr_realloc(body_text,bt_len);
+                    j = 0;
+                    while (output_temp->text[j] != '\0')
+                    {
+                        if (output_temp->text[j] == '\n')
+                        {
+                            body_text[len] = output_temp->text[j];
+                            len++;
+                            row++;
+                            col = -1;
+                        }
+                        else if(output_temp->text[j] == '\t')
+                        {
+                            int mt = 8;
+                            int tab_width = (mt-col%mt);/*?mt-col%mt:mt);*/
+                            bt_len+=tab_width-1;
+                            body_text = ipr_realloc(body_text,bt_len);
+
+                            for(k=0;k<tab_width;k++)
+                                body_text[len+k] = ' ';
+
+                            len+=tab_width;
+                            col+=tab_width-1;
+                        }
+                        else if (output_temp->text[j] == '%')
+                        {
+                            p_fields = ipr_realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
+                            j++; 
+
+                            if (output_temp->text[j] == 'm')
+                            {
+                                menus_on = true;
+                                field_width = 15;
+                                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
+                                field_opts_off(p_fields[num_fields], O_EDIT);
+                            }
+                            else
+                            {
+                                field_width = 0;
+                                sscanf(&(output_temp->text[j]),"%d",&field_width);
+                                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
+
+                                if (field_width >= 30)
+                                    field_opts_off(p_fields[num_fields],O_AUTOSKIP);
+
+                                if (field_width > 9)
+                                    i++; /* skip second digit of field width */
+                            }
+                            set_field_userptr(p_fields[num_fields],NULL);
+                            num_fields++;
+                            col += field_width-1;
+
+                            bt_len += field_width;
+
+                            body_text = ipr_realloc(body_text,bt_len);
+                            for(k=0;k<field_width;k++)
+                                body_text[len+k] = ' ';
+                            len += field_width;
+                        }
+                        else
+                        {
+                            body_text[len] = output_temp->text[j];
+                            len++;
+                        }
+
+                        col++;
+                        j++;
+
+                        if (col > w_pad_max_x)
+                            w_pad_max_x = col;
+                    }
+                }
+            }
+        }
+        else
+        {
+            body_text[len] = body[i];
+            len++;
+        }
+
+        col++;
+        i++;
+
+        if (col > w_pad_max_x)
+            w_pad_max_x = col;
     }
 
-  /* make the form appear in the pad; not stdscr */
-  set_form_win(p_form,w_pad);
-  set_form_sub(p_form,w_pad);
+    body_text[len] = '\0';
 
-  /* calculate the footer size and turn any special characters on*/
-  i=0,j=0;
-  while(footer[i] != '\0')
+    w_pad_max_y = row;
+
+    w_pad_max_y++; /* some forms may not display correctly if this is not included */
+    w_pad_max_x++; /* adds a column for return char \n : else, a blank line will appear in the pad */
+
+    w_pad = newpad(w_pad_max_y,w_pad_max_x);
+    keypad(w_pad,TRUE);
+
+    if (num_fields)
     {
-      if (footer[i] == '%')
-	{
-	  i++;
-	  switch (footer[i])
-	    {
-	    case 'n':
-	      pad_scr_b += 3; /* add 3 lines to the footer */
-	      enter_on = true;
-	      break;
-	    case 'e':
-	      e_on = true; /* exit */
-	      break;
-	    case 'q':
-	      q_on = true; /* cancel */
-	      break;
-	    case 'r':
-	      r_on = true; /* refresh */
-	      break;
-	    case 'f':
-	      f_on = true; /* page up/down */
-	      break;
-	    }
-	}
-      
-      else
-	{
-	  if (footer[i] == '\n')
-	    pad_scr_b++;
-	  more_footer[j++] = footer[i];
-	}
-      i++;
+        p_fields = ipr_realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
+        p_fields[num_fields] = NULL;
+        p_form = new_form(p_fields);
     }
 
-  /* add null char to end of string */
-  more_footer[j] = '\0';
+    /* make the form appear in the pad; not stdscr */
+    set_form_win(p_form,w_pad);
+    set_form_sub(p_form,w_pad);
 
-  if (f_on && !enter_on)
-    pad_scr_b++;
-
-  /* clear all windows before writing new text to them */
-  clear();
-  wclear(w_pad);
-  if (pages)
-    wclear(w_page_header);
-  
-  while(1)
+    /* calculate the footer size and turn any special characters on*/
+    i=0,j=0;
+    while(footer[i] != '\0')
     {
-      getmaxyx(stdscr,stdscr_max_y,stdscr_max_x);
-      
-      /* clear all windows before writing new text to them */
-      clear();
-      wclear(w_pad);
-      if(pages)
-	wclear(w_page_header);
+        if (footer[i] == '%')
+        {
+            i++;
+            switch (footer[i])
+            {
+                case 'n':
+                    pad_scr_b += 3; /* add 3 lines to the footer */
+                    enter_on = true;
+                    break;
+                case 'e':
+                    e_on = true; /* exit */
+                    break;
+                case 'q':
+                    q_on = true; /* cancel */
+                    break;
+                case 'r':
+                    r_on = true; /* refresh */
+                    break;
+                case 'f':
+                    f_on = true; /* page up/down */
+                    break;
+            }
+        }
 
-      center = stdscr_max_x/2;
-      len = strlen(title);
-
-      /* add the title at the center of stdscr */
-      mvaddstr(0,(center-len/2)>0?center-len/2:0,title);
-
-      /* set the boundaries of the pad based on the size of the screen
-	 and determine whether or not the user is able to scroll */
-      if (stdscr_max_y-pad_scr_t-pad_scr_b+1 > w_pad_max_y)
-	{
-	  pad_b = w_pad_max_y;
-	  pad_t = 0;
-	  y_offscr = false; /*not scrollable*/
-	  pages = false;
-	  for (i=0;i<num_fields;i++)
-	    field_opts_on(p_fields[i],O_ACTIVE);
-	}
-      else
-	{
-	  pad_b = stdscr_max_y-pad_scr_t-pad_scr_b-1;
-	  y_offscr = true; /*scrollable*/
-	  if (f_on && max_str_index<=1)
-	    {
-	      pages = true;
-	      w_page_header = subpad(w_pad,header_lines,w_pad_max_x,0,0);
-	    }
-	}
-      if (stdscr_max_x > w_pad_max_x)
-	{
-	  pad_r = w_pad_max_x;
-	  pad_l = 0;
-	  x_offscr = false;
-	}
-      else
-	{
-	  pad_r = stdscr_max_x;
-	  x_offscr = true;
-	}
-
-      move(stdscr_max_y-pad_scr_b,0);
-      
-      if (enter_on)
-      {
-          if (num_fields == 0 || menus_on) {
-              addstr("\nPress Enter to Continue\n\n");
-              ground_cursor = true;
-          }
-          else
-              addstr("\nOr leave blank and press Enter to cancel\n\n");
-          }
-
-          if (f_on && !enter_on)
-              addstr("\n");
-          addstr(more_footer);
-          if (e_on)
-              addstr(EXIT_KEY_LABEL);
-          if (q_on)
-              addstr(CANCEL_KEY_LABEL);
-          if (r_on)
-              addstr(REFRESH_KEY_LABEL);
-          if (f_on && y_offscr)
-          {
-              addstr(PAGE_DOWN_KEY_LABEL);
-              addstr(PAGE_UP_KEY_LABEL);
-          }
-
-          post_form(p_form);
-
-          /* add the body of the text to the screen */
-          if (pages)
-          {
-              wmove(w_page_header,0,0);
-              waddstr(w_page_header,body_text);
-          }
-          wmove(w_pad,0,0);
-          waddstr(w_pad,body_text);
-
-          if (num_fields)
-          {
-              set_current_field(p_form,p_fields[active_field]);
-              if (active_field == 0)
-                  form_driver(p_form,REQ_NEXT_FIELD);
-              form_driver(p_form,REQ_PREV_FIELD);
-          }
-
-          refresh_stdscr = true;
-
-          for(;;)
-          {
-              if (s_status.index) /* add global status if defined */
-              {
-                  rc = s_status.index;
-                  s_status.index = 0;
-              }
-              if (invalid)
-              {
-                  status = catgets(catd,STATUS_SET,INVALID_OPTION_STATUS,"Status Return Error (invalid)");
-                  invalid = false;
-              }
-              else if (rc != 0)
-              {
-                  if ((status = strchr(catgets(catd,STATUS_SET,rc,"default"),'%')) == NULL)
-                  {
-                      status = catgets(catd,STATUS_SET,rc,"Status Return Error (rc != 0, w/out %)");
-                  }
-                  else if (status[1] == 'd')
-                  {
-                      sprintf(buffer,catgets(catd,STATUS_SET,rc,"Status Return Error (rc != 0 w/ %%d = %d"),s_status.num);
-                      status = buffer;
-                  }
-                  else if (status[1] == 's')
-                  {
-                      sprintf(buffer,catgets(catd,STATUS_SET,rc,"Status Return Error rc != 0 w/ %%s = %s"),s_status.str);
-                      status = buffer;
-                  }
-                  rc = 0;
-              }
-              else
-                  status = NULL;
-
-              move(stdscr_max_y-1,0);
-              clrtoeol(); /* clear last line */
-              mvaddstr(stdscr_max_y-1,0,status);
-              status = NULL;
-
-              if (f_on && y_offscr)
-              {
-                  if (!is_bottom)
-                      mvaddstr(stdscr_max_y-pad_scr_b,stdscr_max_x-8,"More...");
-                  else
-                      mvaddstr(stdscr_max_y-pad_scr_b,stdscr_max_x-8,"       ");
-
-                  for (i=0;i<num_fields;i++)
-                  {
-                      if (p_fields[i] != NULL)
-                      {
-                          field_info(p_fields[i],&h,&w,&t,&l,&o,&b); /* height, width, top, left, offscreen rows, buffer */
-
-                          /* turn all offscreen fields off */
-                          if (t>=header_lines+pad_t && t<=pad_b+pad_t)
-                          {
-                              field_opts_on(p_fields[i],O_ACTIVE);
-                              if (form_adjust)
-                              {
-                                  set_current_field(p_form,p_fields[i]);
-                                  form_adjust = false;
-                              }
-                          }
-                          else
-                              field_opts_off(p_fields[i],O_ACTIVE);
-                      }
-                  }
-              }  
-
-              if (refresh_stdscr)
-              {
-                  touchwin(stdscr);
-                  refresh_stdscr = FALSE;
-              }
-              else
-                  touchline(stdscr,stdscr_max_y-1,1);
-
-              if (ground_cursor)
-                  move(0,0);
-
-              refresh();
-
-              if (pages)
-              {
-                  touchwin(w_page_header);
-                  prefresh(w_page_header,0,pad_l,pad_scr_t,pad_scr_l,header_lines+1,pad_r-1);
-                  touchwin(w_pad);
-                  prefresh(w_pad,pad_t+header_lines,pad_l,pad_scr_t+header_lines,pad_scr_l,pad_b+pad_scr_t,pad_r-1);
-              }
-              else
-              {
-                  touchwin(w_pad);
-                  prefresh(w_pad,pad_t,pad_l,pad_scr_t,pad_scr_l,pad_b+pad_scr_t,pad_r-1);
-              }
-
-              if (ground_cursor) {
-                  move(stdscr_max_y-1,stdscr_max_x-1);
-                  refresh();
-              }
-
-              ch = wgetch(w_pad); /* pause for user input */
-
-              if (ch == KEY_RESIZE)
-                  break;
-
-              if (IS_ENTER_KEY(ch))
-              {
-                  char *p_char;
-
-                  if (num_fields>1)
-                      active_field = field_index(current_field(p_form));
-
-                  if (enter_on && num_fields == 0)
-                  {
-                      rc = (CANCEL_FLAG | rc);
-                      goto leave;
-                  }
-                  else if (enter_on && !menus_on) /* cancel if all fields are empty */
-                  {
-                      form_driver(p_form,REQ_VALIDATION);
-                      for (i=0;i<num_fields;i++)
-                      {
-                          if (strlen(strip_trailing_whitespace(field_buffer(p_fields[i],0))) != 0)
-                              break; /* fields are not empty -> continue */
-                          if (i == num_fields-1) /* all fields are empty */
-                          {
-                              rc = (CANCEL_FLAG | rc);
-                              goto leave;
-                          }
-                      }
-                  }
-
-                  if (num_fields > 0)
-                  {
-                      /* input field is always p_fields[0] if only 1 field */
-                      p_char = field_buffer(p_fields[0],0);
-                  }
-
-                  invalid = true;
-
-                  for (i = 0; i < screen->num_opts; i++)
-                  {
-
-                      temp = &(screen->options[i]);
-
-                      if ((temp->key == "\n") || ((num_fields > 0)?(strcasecmp(p_char,temp->key) == 0):0))
-                      {
-                          invalid = false;
-
-                          if (temp->key == "\n" && num_fields > 0) /* store field data to existing i_con (which should already
-                                                                    contain pointers) */
-                          {
-                              i_container *temp_i_con = i_con;
-                              form_driver(p_form,REQ_VALIDATION);
-
-                              for (i=num_fields-1;i>=0;i--)
-                              {
-                                  strncpy(temp_i_con->field_data,field_buffer(p_fields[i],0),MAX_FIELD_SIZE);
-                                  temp_i_con = temp_i_con->next_item;
-                              }
-                          }
-
-                          if (temp->screen_function == NULL)
-                              goto leave; /* continue with function */
-
-                          do 
-                              rc = temp->screen_function(i_con);
-                          while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
-
-                          if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
-                              goto leave; /* if screen flags exist on rc and they don't match the screen's flags, return */
-
-                          rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG); /* strip screen flags from rc */
-
-                          if (screen->rc_flags & REFRESH_FLAG)
-                          {
-                              s_status.index = rc;
-                              rc = (REFRESH_FLAG | rc);
-                              goto leave;
-                          }
-                          break;
-                      }
-                  }
-
-                  if (!invalid) 
-                  {
-                      /*clear fields*/
-                      form_driver(p_form,REQ_LAST_FIELD);
-                      for (i=0;i<num_fields;i++)
-                      {
-                          form_driver(p_form,REQ_CLR_FIELD);
-                          form_driver(p_form,REQ_NEXT_FIELD);
-                      }
-                      break;
-                  }
-              }
-
-              else if (IS_EXIT_KEY(ch) && e_on)
-              {
-                  rc = (EXIT_FLAG | rc);
-                  goto leave;
-              }
-              else if (IS_CANCEL_KEY(ch) && (q_on || screen == &n_main_menu))
-              {
-                  rc = (CANCEL_FLAG | rc);
-                  goto leave;
-              }
-              else if ((IS_REFRESH_KEY(ch) && r_on) || (ch == KEY_HOME && r_on))
-              {
-                  rc = REFRESH_SCREEN;
-                  goto leave;
-              }
-              else if (IS_PGUP_KEY(ch) && f_on && y_offscr)
-              {
-                  invalid = false;
-                  if (pad_t>0)
-                  {
-                      if (pages)
-                          pad_t -= (pad_b-header_lines+1);
-                      else
-                          pad_t -= (pad_b+1);
-                      rc = PGUP_STATUS;
-                  }
-                  else if (f_on && y_offscr)
-                      rc = TOP_STATUS;
-                  else
-                      invalid = true;
-
-                  if (!invalid)
-                  {
-                      if (pad_t<0)
-                          pad_t = 0;
-
-                      is_bottom = false;
-                      form_adjust = true;
-                      refresh_stdscr = true;
-                  }
-
-              }
-              else if (IS_PGDN_KEY(ch) && f_on && y_offscr)
-              {
-                  invalid = false;
-                  if (stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b)
-                  {
-                      if (pages)
-                          pad_t += (pad_b-header_lines+1);
-                      else
-                          pad_t += (pad_b+1);
-                      rc = PGDN_STATUS;
-                      if (!(stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b))
-                          is_bottom = true;
-                  }
-                  else if (is_bottom)
-                      rc = BTM_STATUS;
-                  else
-                      invalid = true;
-
-                  if (!invalid)
-                  {
-                      form_adjust = true;
-                      refresh_stdscr = true;
-                  }
-              }
-
-              else if (ch == KEY_RIGHT)
-              {
-                  if (x_offscr && stdscr_max_x+pad_l<w_pad_max_x)
-                      pad_l++;
-                  else if (!menus_on)
-                      form_driver(p_form, REQ_NEXT_CHAR);
-              }
-              else if (ch == KEY_LEFT)
-              {
-                  if (pad_l>0)
-                      pad_l--;
-                  else if (!menus_on)
-                      form_driver(p_form, REQ_PREV_CHAR);
-              }
-              else if (ch == KEY_UP)
-              {
-                  if ((y_offscr || num_fields == 0) && !pages)
-                  {
-                      if (pad_t>0)
-                      {
-                          pad_t--;
-                          form_adjust = true;
-                          is_bottom = false;
-                      }
-                  }
-                  else
-                      form_driver(p_form, REQ_PREV_FIELD);
-              }
-              else if (ch == KEY_DOWN)
-              {
-                  if ((y_offscr || num_fields == 0) && !pages)
-                  {
-                      if (y_offscr && stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b)
-                      {
-                          pad_t++;
-                          form_adjust = true;
-                      }
-                      if (!(stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b))
-                          is_bottom = true;
-                  }
-                  else
-                      form_driver(p_form, REQ_NEXT_FIELD);
-              }
-
-              else if (num_fields == 0)
-              {
-                  char tempstr[2];
-                  invalid = true;
-
-                  tempstr[0] = ch;
-                  tempstr[1] ='\0';
-
-                  for (i = 0; i < screen->num_opts; i++)
-                  {
-                      temp = &(screen->options[i]);
-
-                      if (temp->key)
-                      {
-                          if (strcasecmp(tempstr,temp->key) == 0)
-                          {
-                              invalid = false;
-
-                              if (temp->screen_function == NULL)
-                                  goto leave;
-
-                              do 
-                                  rc = temp->screen_function(i_con);
-                              while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
-
-                              if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
-                                  goto leave;
-
-                              rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG);
-
-                              if (screen->rc_flags & REFRESH_FLAG)
-                              {
-                                  rc = (REFRESH_FLAG | rc);
-                                  goto leave;
-                              }		      
-                              break;
-                          }
-                      }
-                  }
-                  break;
-              }
-
-              else if ((ch == KEY_BACKSPACE) || (ch == 127))
-                  form_driver(p_form, REQ_DEL_PREV);
-              else if (ch == KEY_DC)
-                  form_driver(p_form, REQ_DEL_CHAR);
-              else if (ch == KEY_IC)
-                  form_driver(p_form, REQ_INS_MODE);
-              else if (ch == KEY_EIC)
-                  form_driver(p_form, REQ_OVL_MODE);
-              else if (ch == KEY_HOME)
-                  form_driver(p_form, REQ_BEG_FIELD);
-              else if (ch == KEY_END)
-                  form_driver(p_form, REQ_END_FIELD);
-              else if (ch == '\t')
-                  form_driver(p_form, REQ_NEXT_FIELD);
-              else if (isascii(ch))
-                  form_driver(p_form, ch);
-          }
-      }
-  
- leave:
-  s_out->i_con = i_con;
-  s_out->rc = rc;
-  free(status);
-  free(body_text);
-  unpost_form(p_form);
-  free_form(p_form);
-  
-  for (i=0;i<num_fields;i++)
-    {
-      if (p_fields[i] != NULL)
-	free_field(p_fields[i]);
+        else
+        {
+            if (footer[i] == '\n')
+                pad_scr_b++;
+            more_footer[j++] = footer[i];
+        }
+        i++;
     }
-  delwin(w_pad);
-  delwin(w_page_header);
-  return s_out;
-  
-  mvaddstr(1,0,"inconceivable!");refresh();getch(); /* should never reach this point */
+
+    /* add null char to end of string */
+    more_footer[j] = '\0';
+
+    if (f_on && !enter_on)
+        pad_scr_b++;
+
+    /* clear all windows before writing new text to them */
+    clear();
+    wclear(w_pad);
+    if (pages)
+        wclear(w_page_header);
+
+    while(1)
+    {
+        getmaxyx(stdscr,stdscr_max_y,stdscr_max_x);
+
+        /* clear all windows before writing new text to them */
+        clear();
+        wclear(w_pad);
+        if(pages)
+            wclear(w_page_header);
+
+        center = stdscr_max_x/2;
+        len = strlen(title);
+
+        /* add the title at the center of stdscr */
+        mvaddstr(0,(center-len/2)>0?center-len/2:0,title);
+
+        /* set the boundaries of the pad based on the size of the screen
+         and determine whether or not the user is able to scroll */
+        if ((stdscr_max_y - pad_scr_t - pad_scr_b + 1) > w_pad_max_y)
+        {
+            pad_b = w_pad_max_y;
+            pad_t = 0;
+            y_offscr = false; /*not scrollable*/
+            pages = false;
+            for (i = 0; i < num_fields; i++)
+                field_opts_on(p_fields[i],O_ACTIVE);
+        }
+        else
+        {
+            pad_b = stdscr_max_y - pad_scr_t - pad_scr_b - 1;
+            y_offscr = true; /*scrollable*/
+            if (f_on && max_str_index<=1)
+            {
+                pages = true;
+                w_page_header = subpad(w_pad,header_lines,w_pad_max_x,0,0);
+            }
+        }
+        if (stdscr_max_x > w_pad_max_x)
+        {
+            pad_r = w_pad_max_x;
+            pad_l = 0;
+            x_offscr = false;
+        }
+        else
+        {
+            pad_r = stdscr_max_x;
+            x_offscr = true;
+        }
+
+        move(stdscr_max_y-pad_scr_b,0);
+
+        if (enter_on)
+        {
+            if (num_fields == 0 || menus_on) {
+                addstr("\nPress Enter to Continue\n\n");
+                ground_cursor = true;
+            }
+            else
+                addstr("\nOr leave blank and press Enter to cancel\n\n");
+        }
+
+        if (f_on && !enter_on)
+            addstr("\n");
+        addstr(more_footer);
+        if (e_on)
+            addstr(EXIT_KEY_LABEL);
+        if (q_on)
+            addstr(CANCEL_KEY_LABEL);
+        if (r_on)
+            addstr(REFRESH_KEY_LABEL);
+        if (f_on && y_offscr)
+        {
+            addstr(PAGE_DOWN_KEY_LABEL);
+            addstr(PAGE_UP_KEY_LABEL);
+        }
+
+        post_form(p_form);
+
+        /* add the body of the text to the screen */
+        if (pages)
+        {
+            wmove(w_page_header,0,0);
+            waddstr(w_page_header,body_text);
+        }
+        wmove(w_pad,0,0);
+        waddstr(w_pad,body_text);
+
+        if (num_fields)
+        {
+            set_current_field(p_form,p_fields[active_field]);
+            if (active_field == 0)
+                form_driver(p_form,REQ_NEXT_FIELD);
+            form_driver(p_form,REQ_PREV_FIELD);
+        }
+
+        refresh_stdscr = true;
+
+        for(;;)
+        {
+            if (s_status.index) /* add global status if defined */
+            {
+                rc = s_status.index;
+                s_status.index = 0;
+            }
+            if (invalid)
+            {
+                status = catgets(catd,STATUS_SET,INVALID_OPTION_STATUS,"Status Return Error (invalid)");
+                invalid = false;
+            }
+            else if (rc != 0)
+            {
+                if ((status = strchr(catgets(catd,STATUS_SET,rc,"default"),'%')) == NULL)
+                {
+                    status = catgets(catd,STATUS_SET,rc,"Status Return Error (rc != 0, w/out %)");
+                }
+                else if (status[1] == 'd')
+                {
+                    sprintf(buffer,catgets(catd,STATUS_SET,rc,"Status Return Error (rc != 0 w/ %%d = %d"),s_status.num);
+                    status = buffer;
+                }
+                else if (status[1] == 's')
+                {
+                    sprintf(buffer,catgets(catd,STATUS_SET,rc,"Status Return Error rc != 0 w/ %%s = %s"),s_status.str);
+                    status = buffer;
+                }
+                rc = 0;
+            }
+            else
+                status = NULL;
+
+            move(stdscr_max_y-1,0);
+            clrtoeol(); /* clear last line */
+            mvaddstr(stdscr_max_y-1,0,status);
+            status = NULL;
+
+            if (f_on && y_offscr)
+            {
+                if (!is_bottom)
+                    mvaddstr(stdscr_max_y-pad_scr_b,stdscr_max_x-8,"More...");
+                else
+                    mvaddstr(stdscr_max_y-pad_scr_b,stdscr_max_x-8,"       ");
+
+                for (i=0;i<num_fields;i++)
+                {
+                    if (p_fields[i] != NULL)
+                    {
+                        field_info(p_fields[i],&h,&w,&t,&l,&o,&b); /* height, width, top, left, offscreen rows, buffer */
+
+                        /* turn all offscreen fields off */
+                        if (t>=header_lines+pad_t && t<=pad_b+pad_t)
+                        {
+                            field_opts_on(p_fields[i],O_ACTIVE);
+                            if (form_adjust)
+                            {
+                                set_current_field(p_form,p_fields[i]);
+                                form_adjust = false;
+                            }
+                        }
+                        else
+                            field_opts_off(p_fields[i],O_ACTIVE);
+                    }
+                }
+            }  
+
+            if (refresh_stdscr)
+            {
+                touchwin(stdscr);
+                refresh_stdscr = FALSE;
+            }
+            else
+                touchline(stdscr,stdscr_max_y-1,1);
+
+            if (ground_cursor)
+                move(0,0);
+
+            refresh();
+
+            if (pages)
+            {
+                touchwin(w_page_header);
+                prefresh(w_page_header, 0, pad_l, pad_scr_t, pad_scr_l, header_lines+1 ,pad_r-1);
+                touchwin(w_pad);
+                prefresh(w_pad,pad_t+header_lines,pad_l,pad_scr_t+header_lines,pad_scr_l,pad_b+pad_scr_t,pad_r-1);
+            }
+            else
+            {
+                touchwin(w_pad);
+                prefresh(w_pad,pad_t,pad_l,pad_scr_t,pad_scr_l,pad_b+pad_scr_t,pad_r-1);
+            }
+
+            if (ground_cursor) {
+                move(stdscr_max_y-1,stdscr_max_x-1);
+                refresh();
+            }
+
+            ch = wgetch(w_pad); /* pause for user input */
+
+            if (ch == KEY_RESIZE)
+                break;
+
+            if (IS_ENTER_KEY(ch))
+            {
+                char *p_char;
+
+                if (num_fields>1)
+                    active_field = field_index(current_field(p_form));
+
+                if (enter_on && num_fields == 0)
+                {
+                    rc = (CANCEL_FLAG | rc);
+                    goto leave;
+                }
+                else if (enter_on && !menus_on) /* cancel if all fields are empty */
+                {
+                    form_driver(p_form,REQ_VALIDATION);
+                    for (i=0;i<num_fields;i++)
+                    {
+                        if (strlen(strip_trailing_whitespace(field_buffer(p_fields[i],0))) != 0)
+                            break; /* fields are not empty -> continue */
+                        if (i == num_fields-1) /* all fields are empty */
+                        {
+                            rc = (CANCEL_FLAG | rc);
+                            goto leave;
+                        }
+                    }
+                }
+
+                if (num_fields > 0)
+                {
+                    /* input field is always p_fields[0] if only 1 field */
+                    p_char = field_buffer(p_fields[0],0);
+                }
+
+                invalid = true;
+
+                for (i = 0; i < screen->num_opts; i++)
+                {
+
+                    temp = &(screen->options[i]);
+
+                    if ((temp->key == "\n") || ((num_fields > 0)?(strcasecmp(p_char,temp->key) == 0):0))
+                    {
+                        invalid = false;
+
+                        if (temp->key == "\n" && num_fields > 0) /* store field data to existing i_con (which should already
+                                                                  contain pointers) */
+                        {
+                            i_container *temp_i_con = i_con;
+                            form_driver(p_form,REQ_VALIDATION);
+
+                            for (i=num_fields-1;i>=0;i--)
+                            {
+                                strncpy(temp_i_con->field_data,field_buffer(p_fields[i],0),MAX_FIELD_SIZE);
+                                temp_i_con = temp_i_con->next_item;
+                            }
+                        }
+
+                        if (temp->screen_function == NULL)
+                            goto leave; /* continue with function */
+
+                        do 
+                            rc = temp->screen_function(i_con);
+                        while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
+
+                        if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
+                            goto leave; /* if screen flags exist on rc and they don't match the screen's flags, return */
+
+                        rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG); /* strip screen flags from rc */
+
+                        if (screen->rc_flags & REFRESH_FLAG)
+                        {
+                            s_status.index = rc;
+                            rc = (REFRESH_FLAG | rc);
+                            goto leave;
+                        }
+                        break;
+                    }
+                }
+
+                if (!invalid) 
+                {
+                    /*clear fields*/
+                    form_driver(p_form,REQ_LAST_FIELD);
+                    for (i=0;i<num_fields;i++)
+                    {
+                        form_driver(p_form,REQ_CLR_FIELD);
+                        form_driver(p_form,REQ_NEXT_FIELD);
+                    }
+                    break;
+                }
+            }
+
+            else if (IS_EXIT_KEY(ch) && e_on)
+            {
+                rc = (EXIT_FLAG | rc);
+                goto leave;
+            }
+            else if (IS_CANCEL_KEY(ch) && (q_on || screen == &n_main_menu))
+            {
+                rc = (CANCEL_FLAG | rc);
+                goto leave;
+            }
+            else if ((IS_REFRESH_KEY(ch) && r_on) || (ch == KEY_HOME && r_on))
+            {
+                rc = REFRESH_SCREEN;
+                goto leave;
+            }
+            else if (IS_PGUP_KEY(ch) && f_on && y_offscr)
+            {
+                invalid = false;
+                if (pad_t>0)
+                {
+                    if (pages)
+                        pad_t -= (pad_b-header_lines+1);
+                    else
+                        pad_t -= (pad_b+1);
+                    rc = PGUP_STATUS;
+                }
+                else if (f_on && y_offscr)
+                    rc = TOP_STATUS;
+                else
+                    invalid = true;
+
+                if (!invalid)
+                {
+                    if (pad_t<0)
+                        pad_t = 0;
+
+                    is_bottom = false;
+                    form_adjust = true;
+                    refresh_stdscr = true;
+                }
+
+            }
+            else if (IS_PGDN_KEY(ch) && f_on && y_offscr)
+            {
+                invalid = false;
+                if ((stdscr_max_y + pad_t) < (w_pad_max_y + pad_scr_t + pad_scr_b))
+                {
+                    if (pages)
+                        pad_t += (pad_b - header_lines + 1);
+                    else
+                        pad_t += (pad_b + 1);
+
+                    rc = PGDN_STATUS;
+
+                    if (!(stdscr_max_y + pad_t < w_pad_max_y + pad_scr_t + pad_scr_b))
+                        is_bottom = true;
+                }
+                else if (is_bottom)
+                    rc = BTM_STATUS;
+                else
+                    invalid = true;
+
+                if (!invalid)
+                {
+                    form_adjust = true;
+                    refresh_stdscr = true;
+                }
+            }
+
+            else if (ch == KEY_RIGHT)
+            {
+                if (x_offscr && stdscr_max_x+pad_l<w_pad_max_x)
+                    pad_l++;
+                else if (!menus_on)
+                    form_driver(p_form, REQ_NEXT_CHAR);
+            }
+            else if (ch == KEY_LEFT)
+            {
+                if (pad_l>0)
+                    pad_l--;
+                else if (!menus_on)
+                    form_driver(p_form, REQ_PREV_CHAR);
+            }
+            else if (ch == KEY_UP)
+            {
+                if ((y_offscr || num_fields == 0) && !pages)
+                {
+                    if (pad_t>0)
+                    {
+                        pad_t--;
+                        form_adjust = true;
+                        is_bottom = false;
+                    }
+                }
+                else
+                    form_driver(p_form, REQ_PREV_FIELD);
+            }
+            else if (ch == KEY_DOWN)
+            {
+                if ((y_offscr || num_fields == 0) && !pages)
+                {
+                    if (y_offscr && stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b)
+                    {
+                        pad_t++;
+                        form_adjust = true;
+                    }
+                    if (!(stdscr_max_y+pad_t<w_pad_max_y+pad_scr_t+pad_scr_b))
+                        is_bottom = true;
+                }
+                else
+                    form_driver(p_form, REQ_NEXT_FIELD);
+            }
+
+            else if (num_fields == 0)
+            {
+                char tempstr[2];
+                invalid = true;
+
+                tempstr[0] = ch;
+                tempstr[1] ='\0';
+
+                for (i = 0; i < screen->num_opts; i++)
+                {
+                    temp = &(screen->options[i]);
+
+                    if (temp->key)
+                    {
+                        if (strcasecmp(tempstr,temp->key) == 0)
+                        {
+                            invalid = false;
+
+                            if (temp->screen_function == NULL)
+                                goto leave;
+
+                            do 
+                                rc = temp->screen_function(i_con);
+                            while (rc == REFRESH_SCREEN || rc & REFRESH_FLAG);
+
+                            if ((rc & 0xF000) && !(screen->rc_flags & (rc & 0xF000)))
+                                goto leave;
+
+                            rc &= ~(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG);
+
+                            if (screen->rc_flags & REFRESH_FLAG)
+                            {
+                                rc = (REFRESH_FLAG | rc);
+                                goto leave;
+                            }		      
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+
+            else if ((ch == KEY_BACKSPACE) || (ch == 127))
+                form_driver(p_form, REQ_DEL_PREV);
+            else if (ch == KEY_DC)
+                form_driver(p_form, REQ_DEL_CHAR);
+            else if (ch == KEY_IC)
+                form_driver(p_form, REQ_INS_MODE);
+            else if (ch == KEY_EIC)
+                form_driver(p_form, REQ_OVL_MODE);
+            else if (ch == KEY_HOME)
+                form_driver(p_form, REQ_BEG_FIELD);
+            else if (ch == KEY_END)
+                form_driver(p_form, REQ_END_FIELD);
+            else if (ch == '\t')
+                form_driver(p_form, REQ_NEXT_FIELD);
+            else if (isascii(ch))
+                form_driver(p_form, ch);
+        }
+    }
+
+    leave:
+        s_out->i_con = i_con;
+    s_out->rc = rc;
+    ipr_free(body_text);
+    unpost_form(p_form);
+    free_form(p_form);
+
+    for (i=0;i<num_fields;i++)
+    {
+        if (p_fields[i] != NULL)
+            free_field(p_fields[i]);
+    }
+    delwin(w_pad);
+    delwin(w_page_header);
+    return s_out;
+
+    mvaddstr(1,0,"inconceivable!");refresh();getch(); /* should never reach this point */
 }
   
+struct screen_output *screen_driver(s_node *screen, fn_out *output,
+                                    i_container *i_con)
+{
+    return screen_driver_new(screen, output, 0, i_con);
+}
+
 void complete_screen_driver(char *title,char *body,char *complete)
 {
   int stdscr_max_y,stdscr_max_x,center,len;
@@ -1038,6 +1069,39 @@ void complete_screen_driver(char *title,char *body,char *complete)
   mvaddstr(stdscr_max_y/2,(center-len/2)>0?center-len/2:0,complete);
   refresh();
   return;
+}
+
+char *ipr_list_opts(char *body, char *key, int catalog_set, int catalog_num)
+{
+    char *string_buf;
+    int start_len = 0;
+
+    if (body == NULL) {
+        string_buf = catgets(catd,0,1,"Select one of the following");
+        body = ipr_realloc(body, strlen(string_buf) + 8);
+        sprintf(body, "\n%s:\n\n", string_buf);
+    }
+
+    start_len = strlen(body);
+    
+    string_buf = catgets(catd, catalog_set, catalog_num, "" );
+
+    body = ipr_realloc(body, start_len + strlen(key) + strlen(string_buf) + 16);
+    sprintf(body + start_len, "    %s. %s\n", key, string_buf);
+    return body;
+}
+
+char *ipr_end_list(char *body)
+{
+    int start_len = 0;
+    char *string_buf;
+
+    start_len = strlen(body);
+
+    string_buf = catgets(catd,0,2,"Selection");
+    body = ipr_realloc(body, start_len + strlen(string_buf) + 16);
+    sprintf(body + start_len, "\n\n%s: %%1", string_buf);
+    return body;
 }
 
 int main_menu(i_container *i_con)
@@ -1079,7 +1143,7 @@ int main_menu(i_container *i_con)
   struct ipr_block_desc *p_block_desc;
   int loop, len, retries;
   struct screen_output *s_out;
-  fn_out *output = init_output();
+  char *string_buf;
   mvaddstr(0,0,"MAIN MENU FUNCTION CALLED");
   
   init_message[0] = '\0';
@@ -1124,12 +1188,12 @@ int main_menu(i_container *i_con)
 
 		  if (p_head_raid_cmd)
 		    {
-		      p_tail_raid_cmd->p_next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+		      p_tail_raid_cmd->p_next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
 		      p_tail_raid_cmd = p_tail_raid_cmd->p_next;
 		    }
 		  else
 		    {
-		      p_head_raid_cmd = p_tail_raid_cmd = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+		      p_head_raid_cmd = p_tail_raid_cmd = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
 		    }
 
 		  p_tail_raid_cmd->p_next = NULL;
@@ -1147,13 +1211,13 @@ int main_menu(i_container *i_con)
 
 		  if (p_head_raid_cmd)
 		    {
-		      p_tail_raid_cmd->p_next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+		      p_tail_raid_cmd->p_next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
 		      p_tail_raid_cmd = p_tail_raid_cmd->p_next;
 		    }
 		  else
 		    {
 		      p_head_raid_cmd = p_tail_raid_cmd =
-			(struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+			(struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
 		    }
 
 		  p_tail_raid_cmd->p_next = NULL;
@@ -1225,11 +1289,11 @@ int main_menu(i_container *i_con)
 
                       if (p_head_dev_to_init)
                       {
-                          p_tail_dev_to_init->p_next = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
+                          p_tail_dev_to_init->p_next = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
                           p_tail_dev_to_init = p_tail_dev_to_init->p_next;
                       }
                       else
-                          p_head_dev_to_init = p_tail_dev_to_init = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
+                          p_head_dev_to_init = p_tail_dev_to_init = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
 
                       memset(p_tail_dev_to_init, 0, sizeof(struct devs_to_init_t));
 
@@ -1331,11 +1395,11 @@ int main_menu(i_container *i_con)
               {
                   if (p_head_dev_to_init)
                   {
-                      p_tail_dev_to_init->p_next = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
+                      p_tail_dev_to_init->p_next = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
                       p_tail_dev_to_init = p_tail_dev_to_init->p_next;
                   }
                   else
-                      p_head_dev_to_init = p_tail_dev_to_init = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
+                      p_head_dev_to_init = p_tail_dev_to_init = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
 
                   memset(p_tail_dev_to_init, 0, sizeof(struct devs_to_init_t));
 
@@ -1423,7 +1487,7 @@ int main_menu(i_container *i_con)
   while(p_cur_dev_to_init)
     {
       p_cur_dev_to_init = p_cur_dev_to_init->p_next;
-      free(p_head_dev_to_init);
+      ipr_free(p_head_dev_to_init);
       p_head_dev_to_init = p_cur_dev_to_init;
     }
 
@@ -1431,127 +1495,135 @@ int main_menu(i_container *i_con)
   while(p_cur_raid_cmd)
     {
       p_cur_raid_cmd = p_cur_raid_cmd->p_next;
-      free(p_head_raid_cmd);
+      ipr_free(p_head_raid_cmd);
       p_head_raid_cmd = p_cur_raid_cmd;
     }
-  
-  s_out = screen_driver(&n_main_menu,output,NULL);
+
+  string_buf = catgets(catd,n_main_menu.text_set,1,"Title");
+  n_main_menu.title = ipr_malloc(strlen(string_buf) + 4);
+  sprintf(n_main_menu.title, string_buf);
+
+  for (loop = 0; loop < n_main_menu.num_opts; loop++) {
+      n_main_menu.body = ipr_list_opts(n_main_menu.body,
+                                       n_main_menu.options[loop].key,
+                                       n_main_menu.text_set,
+                                       n_main_menu.options[loop].cat_num);
+  }
+  n_main_menu.body = ipr_end_list(n_main_menu.body);
+
+  s_out = screen_driver(&n_main_menu,NULL,NULL);
+  ipr_free(n_main_menu.body);
+  n_main_menu.body = NULL;
+  ipr_free(n_main_menu.title);
+  n_main_menu.title = NULL;
   rc = s_out->rc;
   i_con = s_out->i_con;
   i_con = free_i_con(i_con);
-  free(s_out);
-  output = free_fn_out(output);
+  ipr_free(s_out);
   return rc;
 }
 
-/* 1's */
+char *disk_status_body_init(int *num_lines)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+                  /*   .        .                  .            .                           .          */
+                  /*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
+    char *header = "OPT Vendor/Product ID           Device Name  PCI/SCSI Location           Status";
+
+    string_buf = catgets(catd,n_disk_status.text_set, 2,
+                         "Type option, press Enter.");
+    buffer = ipr_realloc(buffer, strlen(string_buf) + 4);
+    cur_len = sprintf(buffer, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_disk_status.text_set, 3,
+                         "Display hardware resource information details");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  5=%s\n\n", string_buf);
+    header_lines += 2;
+
+    buffer = ipr_realloc(buffer, cur_len + strlen(header) + 8);
+    cur_len += sprintf(buffer + cur_len, "%s\n", header);
+    header_lines += 1;
+
+    *num_lines = header_lines;
+    return buffer;
+}
+
 int disk_status(i_container *i_con)
 {
-  /*                  Display Disk Hardware Status
+    int rc, j;
+    int len = 0;
+    int num_lines = 0;
+    struct ipr_ioa *p_cur_ioa;
+    struct ipr_resource_entry *p_resource_entry;
+    struct screen_output *s_out;
+    char *string_buf;
+    int header_lines;
+    mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
-  Serial                Resource                                Hardware
-  Number   Type  Model  Name                                    Status
-  02137002  2757   001   /dev/ipr6                            Operational
-  03060044  5703   001   /dev/ipr5                            Not Operational
-  02127005  2782   001   /dev/ipr4                            Operational
-  002443C6  6713   072   /dev/sdr                                DPY/Active
-  0024B45C  6713   072   /dev/sds                                DPY/Active
-  00000DC7  6717   072   /dev/sdt                                DPY/Active
-  000BBBC1  6717   072   /dev/sdu                                DPY/Active
-  0002F5AA  6717   070   /dev/sdv                                DPY/Active
-  02123028  5702   001   /dev/ipr3                            Operational
-  09112004  2763   001   /dev/ipr2                            Operational
-  0007438C  6607   050   /dev/sdm                                Perf Degraded
-  0006B81C  6607   050   /dev/sdn                                Perf Degraded
-  00224BF2  6713   050   /dev/sdo                                Perf Degraded
-  00224ABE  6713   050   /dev/sdp                                Perf Degraded
-  More...
-  Press Enter to continue.
+    rc = RC_SUCCESS;
+    i_con = free_i_con(i_con);
 
-  e=Exit   q=Cancel   r=Refresh   f=PageDn   b=PageUp
-  d=Display disk unit details     p=Display device parity status
-  */
-  
-  int rc, array_num, j;
-  int len = 0;
-  char buffer[100];
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  struct ipr_resource_entry *p_resource_entry;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
-  
-  rc = RC_SUCCESS;
-  i_con = free_i_con(i_con);
+    check_current_config(false);
+   
+    /* Setup screen title */
+    string_buf = catgets(catd,n_disk_status.text_set,1,"Display Disk Hardware Status");
+    n_disk_status.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_disk_status.title, string_buf);
 
-  check_current_config(false);
-    
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->p_next)
+    n_disk_status.body = disk_status_body_init(&header_lines);
+
+    for(p_cur_ioa = p_head_ipr_ioa;
+        p_cur_ioa != NULL;
+        p_cur_ioa = p_cur_ioa->p_next)
     {
-	
-      array_num = 1;
-      if (p_cur_ioa->ioa.p_resource_entry == NULL)
-	continue;
-	
-      buf_size += 150;
-      out_str = realloc(out_str, buf_size);
-	
-      len += sprintf(buffer," %%1   ");
-      len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
-      i_con = add_i_con(i_con,"\0",(char *) p_cur_ioa->ioa.p_resource_entry,list);
-      
-      out_str = strcat(out_str,buffer);
-	
-      memset(buffer, 0, 100);
-      len = 0;
-	
-      num_lines++;
-      
-      for (j = 0; j < p_cur_ioa->num_devices; j++)
-	{
-	  p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
-	  if (p_resource_entry->is_ioa_resource)
-	    {
-	      continue;
-	    }
-	  
-	  len = sprintf(buffer," %%1   ");
-	  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
-	  i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[j].p_resource_entry, list);  
-	  
-	  buf_size += 150;
-	  out_str = realloc(out_str, buf_size);
-	  
-	  out_str = strcat(out_str,buffer);
-	  
-	  memset(buffer, 0, 100);
-	  
-	  len = 0;
-	  num_lines++;
-	}
+        if (p_cur_ioa->ioa.p_resource_entry == NULL)
+            continue;
+
+        n_disk_status.body = print_device(&p_cur_ioa->ioa,n_disk_status.body,"%1", p_cur_ioa);
+        i_con = add_i_con(i_con,"\0",(char *) p_cur_ioa->ioa.p_resource_entry,list);
+
+        num_lines++;
+
+        for (j = 0; j < p_cur_ioa->num_devices; j++)
+        {
+            p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
+            if (p_resource_entry->is_ioa_resource)
+            {
+                continue;
+            }
+
+            n_disk_status.body = print_device(&p_cur_ioa->dev[j],n_disk_status.body, "%1", p_cur_ioa);
+            i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[j].p_resource_entry, list);  
+
+            num_lines++;
+        }
     }
-    
-  
-  if (num_lines == 0)
+
+
+    if (num_lines == 0)
     {
-      sprintf(buffer,catgets(catd,n_disk_status.text_set,4,"\nNo devices found"));
-      out_str = strcat(out_str,buffer);
+       string_buf = catgets(catd,n_disk_status.text_set,4,
+                            "No devices found");
+       len = strlen(n_disk_status.body);
+       n_disk_status.body = ipr_realloc(n_disk_status.body, len +
+                                    strlen(string_buf) + 4);
+       sprintf(n_disk_status.body + len, "\n%s", string_buf);
     }
-    
-  strip_trailing_whitespace(out_str);
-    
-  output->next = add_fn_out(output->next,1,out_str);
-  
-  s_out = screen_driver(&n_disk_status,output,i_con);
-  rc = s_out->rc;
-  free(s_out);
-  output = free_fn_out(output);
-  return rc;
+
+    s_out = screen_driver_new(&n_disk_status,NULL,header_lines,i_con);
+    ipr_free(n_disk_status.body);
+    n_disk_status.body = NULL;
+    ipr_free(n_disk_status.title);
+    n_disk_status.title = NULL;
+
+    rc = s_out->rc;
+    ipr_free(s_out);
+    return rc;
 }
 
 #define IPR_LINE_FEED 0
@@ -1568,20 +1640,20 @@ void device_details_body(int code, char *field_data)
         start_len = cur_len = strlen(body);
 
     if (code == IPR_LINE_FEED) {
-        body = realloc(body, cur_len + 2);
+        body = ipr_realloc(body, cur_len + 2);
         sprintf(body + cur_len, "\n");
     } else {
         string_buf = catgets(catd,n_device_details.text_set,code,"");
         str_len = strlen(string_buf);
 
         if (!field_data) {
-            body = realloc(body, cur_len + str_len + 3);
+            body = ipr_realloc(body, cur_len + str_len + 3);
             sprintf(body + cur_len, "%s:\n", string_buf);
         } else {
             field_data_len = strlen(field_data);
 
             if (str_len < 30) {
-                body = realloc(body, cur_len + field_data_len + 38);
+                body = ipr_realloc(body, cur_len + field_data_len + 38);
                 cur_len += sprintf(body + cur_len, "%s", string_buf);
                 for (i = cur_len; i < 30 + start_len; i++) {
                     if (cur_len%2)
@@ -1591,7 +1663,7 @@ void device_details_body(int code, char *field_data)
                 }
                 sprintf(body + cur_len, " : %s\n", field_data);
             } else {
-                body = realloc(body, cur_len + str_len + field_data_len + 8);
+                body = ipr_realloc(body, cur_len + str_len + field_data_len + 8);
                 sprintf(body + cur_len, "%s : %s\n",string_buf, field_data);
             }
         }
@@ -1779,7 +1851,7 @@ int device_details(i_container *i_con)
     struct ipr_std_inq_data_long std_inq;
     char *p_char;
 
-    buffer = malloc(100);
+    buffer = ipr_malloc(100);
     struct screen_output *s_out;
     char *string_buf;
     mvaddstr(0,0,"DEVICE DETAILS FUNCTION CALLED");
@@ -1806,7 +1878,7 @@ int device_details(i_container *i_con)
     {
         string_buf = catgets(catd,n_device_details.text_set,1,"Title");
 
-        n_device_details.title = malloc(strlen(string_buf));
+        n_device_details.title = ipr_malloc(strlen(string_buf) + 4);
         sprintf(n_device_details.title, string_buf);
 
         memset(&ioa_vpd, 0, sizeof(ioa_vpd));
@@ -1862,7 +1934,7 @@ int device_details(i_container *i_con)
 
         string_buf = catgets(catd,n_device_details.text_set,101,"Title");
 
-        n_device_details.title = malloc(strlen(string_buf));
+        n_device_details.title = ipr_malloc(strlen(string_buf) + 4);
         sprintf(n_device_details.title, string_buf);
 
         ipr_strncpy_0(vendor_id, p_resource->std_inq_data.vpids.vendor_id, IPR_VENDOR_ID_LEN);
@@ -1926,7 +1998,7 @@ int device_details(i_container *i_con)
     } else {
         string_buf = catgets(catd,n_device_details.text_set,201,"Title");
 
-        n_device_details.title = malloc(strlen(string_buf));
+        n_device_details.title = ipr_malloc(strlen(string_buf) + 4);
         sprintf(n_device_details.title, string_buf);
 
         if (p_resource->subtype == IPR_SUBTYPE_GENERIC_SCSI)
@@ -2088,531 +2160,557 @@ int device_details(i_container *i_con)
     }
 
     s_out = screen_driver(&n_device_details,NULL,i_con);
-    free(n_device_details.title);
+    ipr_free(n_device_details.title);
     n_device_details.title = NULL;
-    free(n_device_details.body);
+    ipr_free(n_device_details.body);
     n_device_details.body = NULL;
     rc = s_out->rc;
-    free(s_out);
-    free(buffer);
+    ipr_free(s_out);
+    ipr_free(buffer);
     return rc;
 }
 
-/* 2's */
 int raid_screen(i_container *i_con)
 {
-  /*
-    Work with Device Parity Protection
+    /*
+     Work with Device Parity Protection
 
-    Select one of the following:
+     Select one of the following:
 
-    1. Display device parity status
-    2. Start device parity protection
-    3. Stop device parity protection
-    4. Include unit in device parity protection
-    5. Work with disk unit configuration
+     1. Display device parity status
+     2. Start device parity protection
+     3. Stop device parity protection
+     4. Include unit in device parity protection
+     5. Work with disk unit configuration
 
 
 
-    Selection:
+     Selection:
 
-    e=Exit  q=Cancel
-  */
+     e=Exit  q=Cancel
+     */
 
 #define IPR_INCLUDE 0
 #define IPR_REMOVE  1
 #define IPR_ADD_HOT_SPARE 0
 #define IPR_RMV_HOT_SPARE 1
 
-  int rc;
-  struct array_cmd_data *p_cur_raid_cmd;
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID SCREEN FUNCTION CALLED");
- 
-  p_cur_raid_cmd = p_head_raid_cmd;
- 
-  while(p_cur_raid_cmd)
+    int rc;
+    struct array_cmd_data *p_cur_raid_cmd;
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    char *string_buf;
+    int loop;
+    mvaddstr(0,0,"RAID SCREEN FUNCTION CALLED");
+
+    p_cur_raid_cmd = p_head_raid_cmd;
+
+    while(p_cur_raid_cmd)
     {
-      p_cur_raid_cmd = p_cur_raid_cmd->p_next;
-      free(p_head_raid_cmd);
-      p_head_raid_cmd = p_cur_raid_cmd;
+        p_cur_raid_cmd = p_cur_raid_cmd->p_next;
+        ipr_free(p_head_raid_cmd);
+        p_head_raid_cmd = p_cur_raid_cmd;
     }
 
-  s_out = screen_driver(&n_raid_screen,output,NULL);
-  rc = s_out->rc;
-  free(s_out);
-  output = free_fn_out(output);
-  return rc;
+    string_buf = catgets(catd,n_raid_screen.text_set,1,"Title");
+    n_raid_screen.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_raid_screen.title, string_buf);
+
+    for (loop = 0; loop < n_raid_screen.num_opts; loop++) {
+        n_raid_screen.body = ipr_list_opts(n_raid_screen.body,
+                                           n_raid_screen.options[loop].key,
+                                           n_raid_screen.text_set,
+                                           n_raid_screen.options[loop].cat_num);
+    }
+    n_raid_screen.body = ipr_end_list(n_raid_screen.body);
+
+    s_out = screen_driver(&n_raid_screen,output,NULL);
+    ipr_free(n_raid_screen.body);
+    n_raid_screen.body = NULL;
+    ipr_free(n_raid_screen.title);
+    n_raid_screen.title = NULL;
+    rc = s_out->rc;
+    ipr_free(s_out);
+    output = free_fn_out(output);
+    return rc;
+}
+
+char *raid_status_body_init(int *num_lines)
+{
+    char *buffer = NULL;
+    int header_lines = 0;
+                  /*            .          .                           .                               */
+                  /*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
+    char *header = "Device Name  RAID Level PCI/SCSI Location           Status";
+
+    buffer = ipr_realloc(buffer, strlen(header) + 8);
+    sprintf(buffer, "\n%s\n", header);
+    header_lines += 1;
+
+    *num_lines = header_lines;
+    return buffer;
+}
+
+char *print_parity_info(char *buffer, char *dev_name,
+                        char *raid_level, struct ipr_ioa *p_ioa,
+                        struct ipr_res_addr *res_addr)
+{
+    int i, tab_stop;
+    int len = strlen(buffer);
+
+    buffer = ipr_realloc(buffer, len + 100);
+
+    len += sprintf(buffer + len, "%-12s %-10s %s.%d", dev_name, raid_level,
+                   p_ioa->pci_address, p_ioa->host_no);
+    
+    tab_stop  = sprintf(buffer + len,"%d:%d:%d ",
+                        res_addr->bus,
+                        res_addr->target,
+                        res_addr->lun);
+
+    len += tab_stop;
+
+    for (i=0;i<12-tab_stop;i++)
+        buffer[len+i] = ' ';
+
+    return buffer;
 }
 
 int raid_status(i_container *i_con)
 {
-  /*
-    Display Device Parity Status
+    /*
+     Display Device Parity Status
 
-    Parity  Serial                Resource
-    Set   Number   Type  Model  Name                                    Status
+     Parity  Serial                Resource
+     Set   Number   Type  Model  Name                                    Status
      1   02127005  2782   001   /dev/ipr4
-         002443C6  6713   072   /dev/sdr                                Active
-         0024B45C  6713   072   /dev/sds                                Active
-         00000DC7  6717   072   /dev/sdt                                Active
-         000BBBC1  6717   072   /dev/sdu                                Active
-         0002F5AA  6717   070   /dev/sdv                                Active
+     002443C6  6713   072   /dev/sdr                                Active
+     0024B45C  6713   072   /dev/sds                                Active
+     00000DC7  6717   072   /dev/sdt                                Active
+     000BBBC1  6717   072   /dev/sdu                                Active
+     0002F5AA  6717   070   /dev/sdv                                Active
      2   00103039  2748   001   /dev/ipr0
-         0004C93D  6607   072   /dev/sda                                Active
-         0006E12B  6607   072   /dev/sdb                                Active
-         000716B1  6607   070   /dev/sdc                                Active
-         0006CBF1  6607   072   /dev/sdd                                Active
-         0005722D  6607   072   /dev/sde                                Active
-         0006E103  6607   070   /dev/sdf                                Active
+     0004C93D  6607   072   /dev/sda                                Active
+     0006E12B  6607   072   /dev/sdb                                Active
+     000716B1  6607   070   /dev/sdc                                Active
+     0006CBF1  6607   072   /dev/sdd                                Active
+     0005722D  6607   072   /dev/sde                                Active
+     0006E103  6607   070   /dev/sdf                                Active
 
-    e=Exit   q=Cancel   r=Refresh    f=PageDn   b=PageUp
-  */
+     e=Exit   q=Cancel   r=Refresh    f=PageDn   b=PageUp
+     */
 
-  int fd, rc, array_num, i, j;
-  struct ipr_cmd_status cmd_status;
-  struct ipr_array_query_data *array_query_data;
-  struct ipr_record_common *p_common_record;
-  struct ipr_array_record *p_array_record;
-  struct ipr_array2_record *p_array2_record;
-  int len = 0;
-  u8 array_id;
-  char buffer[100];
-  struct ipr_query_res_state res_state;
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  struct ipr_resource_entry *p_resource_entry;
-  int is_first;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID STATUS FUNCTION CALLED");
+    int fd, rc, array_num, i, j;
+    struct ipr_cmd_status cmd_status;
+    struct ipr_array_query_data *array_query_data;
+    struct ipr_record_common *p_common_record;
+    struct ipr_array2_record *p_array2_record;
+    u8 array_id;
+    char *buffer = NULL;
+    struct ipr_query_res_state res_state;
+    int num_lines = 0;
+    struct ipr_ioa *p_cur_ioa;
+    struct ipr_resource_entry *p_resource_entry;
+    int is_first;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    struct screen_output *s_out;
+    char *string_buf;
+    int header_lines;
+    char *raid_level;
+    struct ipr_supported_arrays *p_supported_arrays;
+    struct ipr_array_cap_entry *p_cur_array_cap_entry;
+    int found;
+    mvaddstr(0,0,"RAID STATUS FUNCTION CALLED");
 
-  rc = RC_SUCCESS;
-    
-  array_num = 1;
-  check_current_config(false);
+    rc = RC_SUCCESS;
 
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->p_next)
+    array_num = 1;
+    check_current_config(false);
+
+    /* Setup screen title */
+    string_buf = catgets(catd,n_raid_status.text_set,1,"Display Disk Hardware Status");
+    n_raid_status.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_raid_status.title, string_buf);
+
+    buffer = raid_status_body_init(&header_lines);
+
+    for(p_cur_ioa = p_head_ipr_ioa;
+        p_cur_ioa != NULL;
+        p_cur_ioa = p_cur_ioa->p_next)
     {
-      fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
+        fd = open(p_cur_ioa->ioa.dev_name, O_RDWR);
 
-      if (fd <= 1)
-	{
-	  syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
-	  continue;
-	}
+        if (fd <= 1)
+        {
+            syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
+            continue;
+        }
 
-      rc = ipr_query_command_status(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle, &cmd_status);
+        rc = ipr_query_command_status(fd, p_cur_ioa->ioa.p_resource_entry->resource_handle, &cmd_status);
 
-      if (rc != 0)
-      {
-          syslog(LOG_ERR, "Query Command status to %s failed. %m"IPR_EOL, p_cur_ioa->dev[j].dev_name);
-          close(fd);
-          continue;
-      }
+        if (rc != 0)
+        {
+            syslog(LOG_ERR, "Query Command status to %s failed. %m"IPR_EOL, p_cur_ioa->dev[j].dev_name);
+            close(fd);
+            continue;
+        }
 
-      array_query_data = p_cur_ioa->p_qac_data;
-      p_common_record =
-	(struct ipr_record_common *)array_query_data->data;
+        array_query_data = p_cur_ioa->p_qac_data;
+        p_common_record =
+            (struct ipr_record_common *)array_query_data->data;
 
-      for (i = 0;
-	   i < array_query_data->num_records;
-	   i++, p_common_record =
-	     (struct ipr_record_common *)((unsigned long)p_common_record + iprtoh16(p_common_record->record_len)))
-	{
-	  if (p_common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)
-	    {
-	      p_array_record = (struct ipr_array_record *)p_common_record;
-	      array_id =  p_array_record->array_id;
+        for (i = 0;
+             i < array_query_data->num_records;
+             i++, p_common_record =
+             (struct ipr_record_common *)((unsigned long)p_common_record + iprtoh16(p_common_record->record_len)))
+        {
+            if (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+            {
+                p_array2_record = (struct ipr_array2_record *)p_common_record;
+                array_id =  p_array2_record->array_id;
 
-	      /* Ignore array candidates */
-	      if (!p_array_record->established)
-		continue;
+                /* Ignore array candidates */
+                if (!p_array2_record->established)
+                    continue;
 
-	      len += sprintf(buffer, "%4d   %8s  001   %s\n",
-			       array_num++, p_cur_ioa->serial_num, p_cur_ioa->ioa.dev_name);
-	    }
-	  else if (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)
-	    {
-	      p_array2_record = (struct ipr_array2_record *)p_common_record;
-	      array_id =  p_array2_record->array_id;
+                p_supported_arrays = p_cur_ioa->p_supported_arrays;
+                p_cur_array_cap_entry = (struct ipr_array_cap_entry *)
+                    p_supported_arrays->data;
 
-	      /* Ignore array candidates */
-	      if (!p_array2_record->established)
-		continue;
+                for (i=0; i<iprtoh16(p_supported_arrays->num_entries); i++)
+                {
+                    if (p_array2_record->raid_level == p_cur_array_cap_entry->prot_level)
+                    {
+                        raid_level = p_cur_array_cap_entry->prot_level_str;
+                        break;
+                    }
+                    p_cur_array_cap_entry = (struct ipr_array_cap_entry *)
+                        ((void *)p_cur_array_cap_entry + iprtoh16(p_supported_arrays->entry_length));
+                }
 
-	      if (p_array2_record->no_config_entry)
-		{
-		  char serial_num[IPR_SERIAL_NUM_LEN+1];
+                memset(&res_state, 0, sizeof(res_state));
 
-		  /* Print out "array entry" */
-		  len += sprintf(buffer, "%4d   ",array_num++);
+                if (p_array2_record->no_config_entry) {
+                    buffer = print_parity_info(buffer, " ", raid_level, p_cur_ioa,
+                                               &p_array2_record->last_resource_address);
+                    res_state.not_oper = 1;
 
-		  ipr_strncpy_0(serial_num, p_array2_record->serial_number, IPR_SERIAL_NUM_LEN);
+                } else {
+                    found = 0;
 
-		  len += sprintf(buffer + len, "%8s  ", serial_num);
+                    for (j = 0;
+                         j < p_cur_ioa->num_devices;
+                         j++)
+                    {
+                        if (p_cur_ioa->dev[j].p_resource_entry->resource_handle ==
+                            p_array2_record->resource_handle)
+                        {
+                            found = 1;
+                            buffer = print_parity_info(buffer,
+                                                       p_cur_ioa->dev[j].dev_name,
+                                                       raid_level, p_cur_ioa,
+                                                       &p_cur_ioa->dev[j].p_resource_entry->resource_address);
 
-		  len += sprintf(buffer + len, "%03d   ", IPR_VSET_MODEL_NUMBER);
+                            /* Do a query resource state */
+                            rc = ipr_query_resource_state(fd, p_cur_ioa->dev[j].p_resource_entry->resource_handle, &res_state);
 
-		  len += sprintf(buffer + len, "%-16s", " ");
-		  len += sprintf(buffer + len, "%02d     %02d", 0, 0);
-		  
-		  len += sprintf(buffer + len, "    %3d    %2d    %2d  \n",
-				 p_array2_record->last_resource_address.bus,
-				 p_array2_record->last_resource_address.target,
-				 p_array2_record->last_resource_address.lun);
-		  
-		}
-	      else
-              {
-                  for (j = 0;
-                       j < p_cur_ioa->num_devices;
-                       j++)
-                  {
-                      if (p_cur_ioa->dev[j].p_resource_entry->resource_handle ==
-                          p_array2_record->resource_handle)
-                      {
-                          /* Print out "array entry" */
-                          len += sprintf(buffer, "%4d   ",array_num++);
+                            if (rc != 0)
+                            {
+                                syslog(LOG_ERR, "Query Resource State to a device (0x%08X) failed. %m"IPR_EOL,
+                                       IPR_GET_PHYSICAL_LOCATOR(p_resource_entry->resource_address));
+                                res_state.not_oper = 1;
+                            }
+                            break;
+                        }
+                    }
+                    if (!found)
+                        buffer = print_parity_info(buffer, " "," ", p_cur_ioa,
+                                                   &p_cur_ioa->ioa.p_resource_entry->resource_address);
+                }
+                buffer = print_parity_status(buffer, array_id,
+                                             &res_state, &cmd_status);
+            }
+            else
+            {
+                continue;
+            }
 
-                          len += print_dev_pty2(p_cur_ioa->dev[j].p_resource_entry,
-                                                buffer + len,
-                                                p_cur_ioa->dev[j].dev_name);
+            num_lines++;
 
-                          /* Do a query resource state */
-                          rc = ipr_query_resource_state(fd, p_cur_ioa->dev[j].p_resource_entry->resource_handle, &res_state);
+            for (j = 0;
+                 j < p_cur_ioa->num_devices;
+                 j++)
+            {
+                p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
 
-                          if (rc != 0)
-                          {
-                              syslog(LOG_ERR, "Query Resource State to a device (0x%08X) failed. %m"IPR_EOL,
-                                     IPR_GET_PHYSICAL_LOCATOR(p_resource_entry->resource_address));
-                              res_state.not_oper = 1;
-                          }
+                if ((p_resource_entry->is_array_member) &&
+                    (array_id == p_resource_entry->array_id))
+                {
+                    buffer = print_parity_info(buffer, " ", " ", p_cur_ioa,
+                                               &p_resource_entry->resource_address);
 
-                          len += print_parity_status(buffer + len, array_id, &res_state, &cmd_status);
+                    /* Do a query resource state */
+                    rc = ipr_query_resource_state(fd,
+                                                  p_resource_entry->resource_handle, &res_state);
 
-                          break;
-                      }
-                  }
-              }
-	    }
-	  else
-	    {
-	      continue;
-	    }
+                    if (rc != 0)
+                    {
+                        syslog(LOG_ERR, "Query Resource State to a device (0x%08X) failed. %m"IPR_EOL,
+                               IPR_GET_PHYSICAL_LOCATOR(p_resource_entry->resource_address));
+                        res_state.not_oper = 1;
+                    }
 
-	  out_str = strcat(out_str,buffer);
+                    buffer = print_parity_status(buffer, array_id, &res_state, &cmd_status);
+                    num_lines++;
+                }
+            }
+        }
 
-	  memset(buffer, 0, 100);
+        /* now display Hot Spares if any */
+        is_first = 1;
+        for (j = 0;
+             j < p_cur_ioa->num_devices;
+             j++)
+        {
+            p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
 
-	  len = 0;
-	  num_lines++;
+            if (p_resource_entry->is_hot_spare)
+            {
+                /* Print out "adapter entry" */
+                if (is_first)
+                {
+                    is_first = 0;
+                    buffer = print_parity_info(buffer, p_cur_ioa->ioa.dev_name, " ", p_cur_ioa,
+                                               &p_cur_ioa->ioa.p_resource_entry->resource_address);
+                    buffer = ipr_realloc(buffer, strlen(buffer + 2));
+                    strcat(buffer, "\n");
+                    num_lines++;
+                }
 
-	  for (j = 0;
-	       j < p_cur_ioa->num_devices;
-	       j++)
-          {
-              p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
+                buffer = print_parity_info(buffer, " ", " ", p_cur_ioa,
+                                           &p_resource_entry->resource_address);
 
-              if ((p_resource_entry->is_array_member) &&
-                  (array_id == p_resource_entry->array_id))
-              {
-                  len += sprintf(buffer + len, "       ");
-                  len += print_dev_pty2(p_resource_entry,
-                                        buffer + len,
-                                        p_cur_ioa->dev[j].dev_name);
+                /* Do a query resource state */
+                rc = ipr_query_resource_state(fd, p_resource_entry->resource_handle, &res_state);
 
-                  /* Do a query resource state */
-                  rc = ipr_query_resource_state(fd,
-                                                p_resource_entry->resource_handle, &res_state);
+                if (rc != 0)
+                {
+                    syslog(LOG_ERR, "Query Resource State to a device (0x%08X) failed. %m"IPR_EOL,
+                           IPR_GET_PHYSICAL_LOCATOR(p_resource_entry->resource_address));
+                    res_state.not_oper = 1;
+                }
 
-                  if (rc != 0)
-                  {
-                      syslog(LOG_ERR, "Query Resource State to a device (0x%08X) failed. %m"IPR_EOL,
-                             IPR_GET_PHYSICAL_LOCATOR(p_resource_entry->resource_address));
-                      res_state.not_oper = 1;
-                  }
+                buffer = print_parity_status(buffer, IPR_INVALID_ARRAY_ID,
+                                             &res_state, &cmd_status);
 
-                  len += print_parity_status(buffer + len, array_id, &res_state, &cmd_status);
-
-                  buf_size += 150;
-                  out_str = realloc(out_str, buf_size);
-
-                  out_str = strcat(out_str,buffer);
-
-                  memset(buffer, 0, 100);
-
-                  len = 0;
-                  num_lines++;
-              }
-          }
-	}
-
-      /* now display Hot Spares if any */
-      is_first = 1;
-      for (j = 0;
-	   j < p_cur_ioa->num_devices;
-	   j++)
-      {
-          p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
-
-          if (p_resource_entry->is_hot_spare)
-          {
-              /* Print out "adapter entry" */
-              if (is_first)
-              {
-                  is_first = 0;
-                  len = sprintf(buffer, "   -   ");
-                  len += print_dev_pty(p_cur_ioa->ioa.p_resource_entry,
-                                       buffer + len,
-                                       p_cur_ioa->ioa.dev_name);
-                  len += sprintf(buffer+len,"\n");
-
-                  buf_size += 150;
-                  out_str = realloc(out_str, buf_size);
-
-                  out_str = strcat(out_str,buffer);
-
-                  memset(buffer, 0, 100);
-                  len = 0;
-                  num_lines++;
-              }
-
-              len = sprintf(buffer + len, "       ");
-
-              len += print_dev_pty(p_resource_entry,
-                                   buffer + len,
-                                   p_cur_ioa->dev[j].dev_name);
-
-              /* Do a query resource state */
-              rc = ipr_query_resource_state(fd, p_resource_entry->resource_handle, &res_state);
-
-              if (rc != 0)
-              {
-                  syslog(LOG_ERR, "Query Resource State to a device (0x%08X) failed. %m"IPR_EOL,
-                         IPR_GET_PHYSICAL_LOCATOR(p_resource_entry->resource_address));
-                  res_state.not_oper = 1;
-              }
-
-              len += print_parity_status(buffer + len, IPR_INVALID_ARRAY_ID,
-                                         &res_state, &cmd_status);
-
-              buf_size += 150;
-              out_str = realloc(out_str, buf_size);
-
-              out_str = strcat(out_str,buffer);
-
-              memset(buffer, 0, 100);
-
-              len = 0;
-              num_lines++;
-          }
-      }
-      close(fd);
+                num_lines++;
+            }
+        }
+        close(fd);
     }
 
-  if (num_lines == 0)
+    if (num_lines == 0)
     {
-      sprintf(buffer,"\n  (Device parity protection has not been started)");
-      out_str = strcat(out_str,buffer);
+        buffer = ipr_realloc(buffer, 100);
+        sprintf(buffer,"\n  (Device parity protection has not been started)");
     }
 
-  out_str = strip_trailing_whitespace(out_str);
-  output->next = add_fn_out(output->next,1,out_str);
 
-  s_out = screen_driver(&n_raid_status,output,NULL);
-  rc = s_out->rc;
-  free(s_out);
-  free(out_str);
-  output = free_fn_out(output);
-  return rc;
+    n_raid_status.body = buffer;
+
+    s_out = screen_driver_new(&n_raid_status,NULL,header_lines, NULL);
+    ipr_free(n_raid_status.body);
+    n_raid_status.body = NULL;
+    ipr_free(n_raid_status.title);
+    n_raid_status.title = NULL;
+    rc = s_out->rc;
+    ipr_free(s_out);
+    ipr_free(out_str);
+    return rc;
 }
 
-int print_parity_status(char *buffer,
-                        u8 array_id,
-                        struct ipr_query_res_state *p_res_state,
-                        struct ipr_cmd_status *p_cmd_status)
+char *print_parity_status(char *buffer,
+                          u8 array_id,
+                          struct ipr_query_res_state *p_res_state,
+                          struct ipr_cmd_status *p_cmd_status)
 {
-  int len = 0;
-  struct ipr_cmd_status_record *p_status_record;
-  int k;
-  
-  if (p_res_state->not_oper)
-    len += sprintf(buffer + len, "Failed");
-  else if (p_res_state->not_ready)
-    len += sprintf(buffer + len, "Not Ready");
-  else if (p_res_state->read_write_prot)
-    len += sprintf(buffer + len, "R/W Prot");
-  else if (p_res_state->prot_dev_failed)
-    len += sprintf(buffer + len, "Failed");
-  else
+    int len = strlen(buffer);
+    struct ipr_cmd_status_record *p_status_record;
+    int k;
+
+    buffer = ipr_realloc(buffer, len + 32);
+
+    if (p_res_state->not_oper)
+        len += sprintf(buffer + len, "Failed");
+    else if (p_res_state->not_ready)
+        len += sprintf(buffer + len, "Not Ready");
+    else if (p_res_state->read_write_prot)
+        len += sprintf(buffer + len, "R/W Prot");
+    else if (p_res_state->prot_dev_failed)
+        len += sprintf(buffer + len, "Failed");
+    else
     {
-      p_status_record = p_cmd_status->record;
-      for (k = 0;
-	   k < p_cmd_status->num_records;
-	   k++, p_status_record =
+        p_status_record = p_cmd_status->record;
+        for (k = 0;
+             k < p_cmd_status->num_records;
+             k++, p_status_record =
              (struct ipr_cmd_status_record *)((unsigned long)p_status_record + iprtoh16(p_status_record->length)))
         {
-	  if ((p_status_record->array_id == array_id) &&
-	      (p_status_record->status & IPR_CMD_STATUS_IN_PROGRESS))
-	    {
-	      len += sprintf(buffer + len,"%d%% ",p_status_record->percent_complete);
-	      switch(p_status_record->command_code)
-		{
-		case IPR_RESYNC_ARRAY_PROTECTION:
-		  len += sprintf(buffer + len, "Synched");
-		  break;
-		case IPR_REBUILD_DEVICE_DATA:
-		  len += sprintf(buffer + len, "Rebuilt");
-		  break;
-		}
-	      break;
-	    }
-	}
-      
-      if (k == p_cmd_status->num_records)
-        {
-	  if ((p_res_state->prot_suspended ||
-	       p_res_state->prot_resuming))
+            if ((p_status_record->array_id == array_id) &&
+                (p_status_record->status & IPR_CMD_STATUS_IN_PROGRESS))
             {
-	      len += sprintf(buffer + len, "Unprot");
+                len += sprintf(buffer + len,"%d%% ",p_status_record->percent_complete);
+                switch(p_status_record->command_code)
+                {
+                    case IPR_RESYNC_ARRAY_PROTECTION:
+                        len += sprintf(buffer + len, "Synched");
+                        break;
+                    case IPR_REBUILD_DEVICE_DATA:
+                        len += sprintf(buffer + len, "Rebuilt");
+                        break;
+                }
+                break;
             }
-	  else
+        }
+
+        if (k == p_cmd_status->num_records)
+        {
+            if ((p_res_state->prot_suspended ||
+                 p_res_state->prot_resuming))
             {
-	      len += sprintf(buffer + len, "Active");
+                len += sprintf(buffer + len, "Unprot");
+            }
+            else
+            {
+                len += sprintf(buffer + len, "Active");
             }
         }
     }
-  
-  len += sprintf(buffer + len, "\n");
-  return len;
+
+    sprintf(buffer + len, "\n");
+    return buffer;
 }
 
 int raid_stop(i_container *i_con)
 {
-  /*
-    Stop Device Parity Protection
+    /*
+     Stop Device Parity Protection
 
-    Select the subsystems to stop device parity protection.
+     Select the subsystems to stop device parity protection.
 
-    Type choice, press Enter.
-    1=Stop device parity protection
+     Type choice, press Enter.
+     1=Stop device parity protection
 
-    Parity  Serial                Resource
-    Option     Set   Number   Type  Model  Name
-    1   02127005  2782   001   /dev/ipr4
-    2   00103039  2748   001   /dev/ipr0
+     Parity  Serial                Resource
+     Option     Set   Number   Type  Model  Name
+     1   02127005  2782   001   /dev/ipr4
+     2   00103039  2748   001   /dev/ipr0
 
-    e=Exit   q=Cancel    f=PageDn   b=PageUp
-  */
-  int rc, i, array_num;
-  struct ipr_record_common *p_common_record;
-  struct ipr_array_record *p_array_record;
-  u8 array_id;
-  char buffer[100];
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  u32 len;
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID STOP FUNCTION CALLED");
+     e=Exit   q=Cancel    f=PageDn   b=PageUp
+     */
+    int rc, i, array_num;
+    struct ipr_record_common *p_common_record;
+    struct ipr_array_record *p_array_record;
+    u8 array_id;
+    char *buffer = NULL;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    int num_lines = 0;
+    struct ipr_ioa *p_cur_ioa;
+    u32 len;
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"RAID STOP FUNCTION CALLED");
 
-  /* empty the linked list that contains field pointers */
-  i_con = free_i_con(i_con);
+    /* empty the linked list that contains field pointers */
+    i_con = free_i_con(i_con);
 
-  rc = RC_SUCCESS;
+    rc = RC_SUCCESS;
 
-  array_num = 1;
+    array_num = 1;
 
-  check_current_config(false);
+    check_current_config(false);
 
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->p_next)
+    for(p_cur_ioa = p_head_ipr_ioa;
+        p_cur_ioa != NULL;
+        p_cur_ioa = p_cur_ioa->p_next)
     {
-      p_cur_ioa->num_raid_cmds = 0;
+        p_cur_ioa->num_raid_cmds = 0;
 
-      for (i = 0;
-	   i < p_cur_ioa->num_devices;
-	   i++)
-	{
-	  p_common_record = p_cur_ioa->dev[i].p_qac_entry;
+        for (i = 0;
+             i < p_cur_ioa->num_devices;
+             i++)
+        {
+            p_common_record = p_cur_ioa->dev[i].p_qac_entry;
 
-	  if ((p_common_record != NULL) &&
-	      ((p_common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
-	       (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)))
-	    {
-	      p_array_record = (struct ipr_array_record *)p_common_record;
+            if ((p_common_record != NULL) &&
+                ((p_common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
+                 (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)))
+            {
+                p_array_record = (struct ipr_array_record *)p_common_record;
 
-	      if (p_array_record->stop_cand)
-		{
-		  rc = is_array_in_use(p_cur_ioa, p_array_record->array_id);
-		  if (rc != 0) continue;
+                if (p_array_record->stop_cand)
+                {
+                    rc = is_array_in_use(p_cur_ioa, p_array_record->array_id);
+                    if (rc != 0) continue;
 
-		  if (p_head_raid_cmd)
-		    {
-		      p_tail_raid_cmd->p_next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-		      p_tail_raid_cmd = p_tail_raid_cmd->p_next;
-		    }
-		  else
-		    {
-		      p_head_raid_cmd = p_tail_raid_cmd = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-		    }
+                    if (p_head_raid_cmd)
+                    {
+                        p_tail_raid_cmd->p_next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
+                        p_tail_raid_cmd = p_tail_raid_cmd->p_next;
+                    }
+                    else
+                    {
+                        p_head_raid_cmd = p_tail_raid_cmd = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
+                    }
 
-		  p_tail_raid_cmd->p_next = NULL;
+                    p_tail_raid_cmd->p_next = NULL;
 
-		  memset(p_tail_raid_cmd, 0, sizeof(struct array_cmd_data));
+                    memset(p_tail_raid_cmd, 0, sizeof(struct array_cmd_data));
 
-		  array_id =  p_array_record->array_id;
+                    array_id =  p_array_record->array_id;
 
-		  p_tail_raid_cmd->array_id = array_id;
-		  p_tail_raid_cmd->array_num = array_num;
-		  p_tail_raid_cmd->p_ipr_ioa = p_cur_ioa;
-		  p_tail_raid_cmd->p_ipr_device = &p_cur_ioa->dev[i];
+                    p_tail_raid_cmd->array_id = array_id;
+                    p_tail_raid_cmd->array_num = array_num;
+                    p_tail_raid_cmd->p_ipr_ioa = p_cur_ioa;
+                    p_tail_raid_cmd->p_ipr_device = &p_cur_ioa->dev[i];
 
-		  i_con = add_i_con(i_con,"\0",(char *)p_tail_raid_cmd,list);
-		    
-		  len = sprintf(buffer," %%1  ");
-		  len += print_device(&p_cur_ioa->dev[i],buffer+len,p_cur_ioa);
-		  
-		  buf_size += 150;
-		  out_str = realloc(out_str, buf_size);
+                    i_con = add_i_con(i_con,"\0",(char *)p_tail_raid_cmd,list);
 
-		  out_str = strcat(out_str,buffer);
+                    buffer = print_device(&p_cur_ioa->dev[i],buffer, "%1", p_cur_ioa);
 
-		  memset(buffer, 0, 100);
+                    buf_size += 150;
+                    out_str = realloc(out_str, buf_size);
 
-		  len = 0;
-		  num_lines++;
-		  array_num++;
+                    out_str = strcat(out_str,buffer);
+
+                    memset(buffer, 0, strlen(buffer));
+
+                    len = 0;
+                    num_lines++;
+                    array_num++;
                 }
             }
         }
     }
 
-  if (array_num == 1)
-    s_out = screen_driver(&n_raid_stop_fail,output,i_con); /*Stop Device Parity Protection Failed*/
-  
-  else   
+    if (array_num == 1)
+        s_out = screen_driver(&n_raid_stop_fail,output,i_con); /*Stop Device Parity Protection Failed*/
+
+    else   
     {
-      out_str = strip_trailing_whitespace(out_str);
-      output->next = add_fn_out(output->next,1,out_str);
-      
-      s_out = screen_driver(&n_raid_stop,output,i_con);
+        out_str = strip_trailing_whitespace(out_str);
+        output->next = add_fn_out(output->next,1,out_str);
+
+        s_out = screen_driver(&n_raid_stop,output,i_con);
     }
 
-  rc = s_out->rc;
-  free(s_out);
-  free(out_str);
-  output = free_fn_out(output);
-  return rc;
+    rc = s_out->rc;
+    free(s_out);
+    free(out_str);
+    output = free_fn_out(output);
+    return rc;
 }
 
 int confirm_raid_stop(i_container *i_con)
@@ -2651,7 +2749,7 @@ int confirm_raid_stop(i_container *i_con)
   int buf_size = 150;
   char *out_str = calloc(buf_size,sizeof(char));
   char *p_char;    
-  char buffer[150];
+  char *buffer = NULL;
   u32 num_lines = 0;
   i_container *temp_i_con;
   struct screen_output *s_out;
@@ -2714,17 +2812,14 @@ int confirm_raid_stop(i_container *i_con)
 	  p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
 	  p_ipr_device = p_cur_raid_cmd->p_ipr_device;
 	    
-	    
-	  len += sprintf(buffer,"  1   ");
-	  len += print_device(p_ipr_device,buffer+len,p_cur_ioa);
-
+	  buffer = print_device(p_ipr_device,buffer,"1",p_cur_ioa);
 	  
 	  buf_size += 150;
 	  out_str = realloc(out_str, buf_size);
 
 	  out_str = strcat(out_str,buffer);
 	  len = 0;
-	  memset(buffer, 0, 150);
+	  memset(buffer, 0, strlen(buffer));
 	  num_lines++;
 	  
 	  for (j = 0; j < p_cur_ioa->num_devices; j++)
@@ -2737,8 +2832,7 @@ int confirm_raid_stop(i_container *i_con)
 		  p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
 		  p_resource_flags = &p_device_record->resource_flags_to_become;
 		    
-		  len += sprintf(buffer,"  1   ");
-		  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+		  buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa);
 
 		  buf_size += 150;
 		  out_str = realloc(out_str, buf_size);
@@ -2746,7 +2840,7 @@ int confirm_raid_stop(i_container *i_con)
 		  out_str = strcat(out_str,buffer);
 		  len = 0;
 		  
-		  memset(buffer, 0, 150);
+		  memset(buffer, 0, strlen(buffer));
 		  num_lines++;
 		}
 	    }
@@ -2999,7 +3093,7 @@ int raid_start(i_container *i_con)
   struct ipr_record_common *p_common_record;
   struct ipr_array_record *p_array_record;
   u8 array_id;
-  char buffer[100];
+  char *buffer = NULL;
   int num_lines = 0;
   struct ipr_ioa *p_cur_ioa;
   u32 len;
@@ -3064,15 +3158,14 @@ int raid_start(i_container *i_con)
 		  
 		  i_con = add_i_con(i_con,"\0",(char *)p_tail_raid_cmd,list);
 		  
-		  len = sprintf(buffer," %%1   ");
-		  len += print_device(&p_cur_ioa->dev[i],buffer+len,p_cur_ioa);
+		  buffer = print_device(&p_cur_ioa->dev[i],buffer,"%1",p_cur_ioa);
 		  
 		  buf_size += 150;
 		  
 		  out_str = realloc(out_str, buf_size);
 		  
 		  out_str = strcat(out_str,buffer);
-		  memset(buffer, 0, 100);
+		  memset(buffer, 0, strlen(buffer));
 		  
 		  len = 0;
 		  num_lines++;
@@ -3216,164 +3309,162 @@ int raid_start_loop(i_container *i_con)
 
 int configure_raid_start(i_container *i_con)
 {
-  
-  char *p_char;
-  int found;
-  struct ipr_device *p_ipr_device;
-  struct array_cmd_data *p_cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
-  int rc, j;
-  char buffer[100];
-  int num_devs = 0;
-  struct ipr_ioa *p_cur_ioa;
-  u32 len;
-  struct ipr_resource_entry *p_resource_entry;
-  struct ipr_device_record *p_device_record;
-  struct ipr_array_query_data *p_qac_data_tmp;
-  /*  int configure_raid_parameters(struct array_cmd_data *p_cur_raid_cmd);*/
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  i_container *i_con2 = NULL;
-  i_container *temp_i_con = NULL;
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"CONFIGURE RAID START FUNCTION CALLED");
+    char *p_char;
+    int found;
+    struct ipr_device *p_ipr_device;
+    struct array_cmd_data *p_cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
+    int rc, j;
+    char *buffer = NULL;
+    int num_devs = 0;
+    struct ipr_ioa *p_cur_ioa;
+    u32 len;
+    struct ipr_resource_entry *p_resource_entry;
+    struct ipr_device_record *p_device_record;
+    struct ipr_array_query_data *p_qac_data_tmp;
+    /*  int configure_raid_parameters(struct array_cmd_data *p_cur_raid_cmd);*/
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    i_container *i_con2 = NULL;
+    i_container *temp_i_con = NULL;
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"CONFIGURE RAID START FUNCTION CALLED");
 
-  rc = RC_SUCCESS;
-  
-  p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+    rc = RC_SUCCESS;
 
-  for (j = 0; j < p_cur_ioa->num_devices; j++)
+    p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+
+    for (j = 0; j < p_cur_ioa->num_devices; j++)
     {
-      p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
-      p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+        p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
+        p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
 
-      if (p_device_record == NULL)
-	continue;
+        if (p_device_record == NULL)
+            continue;
 
-      if (p_cur_ioa->dev[j].is_start_cand)
-	continue;
+        if (p_cur_ioa->dev[j].is_start_cand)
+            continue;
 
-      if (!p_resource_entry->is_ioa_resource &&
-	  (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-	  (p_device_record->start_cand))
+        if (!p_resource_entry->is_ioa_resource &&
+            (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
+            (p_device_record->start_cand))
         {
-	  len = sprintf(buffer," %%1  ");
-	  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
-	  
-	  i_con2 = add_i_con(i_con2,"\0",(char *)&p_cur_ioa->dev[j],list);
-	 
-	  buf_size += 150;
-	  out_str = realloc(out_str, buf_size);
-	  
-	  out_str = strcat(out_str,buffer);
-	  
-	  memset(buffer, 0, 100);
+            buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1", p_cur_ioa);
 
-	  len = 0;
-	  num_devs++;
+            i_con2 = add_i_con(i_con2,"\0",(char *)&p_cur_ioa->dev[j],list);
+
+            buf_size += 150;
+            out_str = realloc(out_str, buf_size);
+
+            out_str = strcat(out_str,buffer);
+
+            memset(buffer, 0, strlen(buffer));
+
+            len = 0;
+            num_devs++;
         }
     }
 
-  if (num_devs)
+    if (num_devs)
     {
-      p_qac_data_tmp = malloc(sizeof(struct ipr_array_query_data));
-      memcpy(p_qac_data_tmp,
-	     p_cur_ioa->p_qac_data,
-	     sizeof(struct ipr_array_query_data));
+        p_qac_data_tmp = malloc(sizeof(struct ipr_array_query_data));
+        memcpy(p_qac_data_tmp,
+               p_cur_ioa->p_qac_data,
+               sizeof(struct ipr_array_query_data));
     }
-  
-  output->next = add_fn_out(output->next,1,out_str);
-  
-  do
+
+    output->next = add_fn_out(output->next,1,out_str);
+
+    do
     {
-      s_out = screen_driver(&n_configure_raid_start,output,i_con2);
-      rc = s_out->rc;
-      
-      if (rc > 0)
-	return rc;
-      
-      i_con2 = s_out->i_con;
-      free(s_out);
-      
-      found = 0;
-      
-      for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-	{
-	  p_ipr_device = (struct ipr_device *)temp_i_con->data;
-	  
-	  if (p_ipr_device != NULL)
-	    {
-	      p_char = temp_i_con->field_data;
-	      if (strcmp(p_char, "1") == 0)
-		{
-		  found = 1;
-		  p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-		  p_device_record->issue_cmd = 1;
-		  p_ipr_device->is_start_cand = 1;
-		}
-	    }
-	}
-      
-      if (found != 0)
-	{
-	  /* Go to parameters screen */
-	  rc = configure_raid_parameters(i_con);
-	  
-	  if (rc &  EXIT_FLAG)
-	    goto leave;
-	  if (rc & CANCEL_FLAG)
-	    {
-	      /* clear out current selections */
-	      for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-		{
-		  p_ipr_device = (struct ipr_device *)temp_i_con->data;
-		  if (p_ipr_device != NULL)
-		    {
-		      p_char = temp_i_con->field_data;
-		      if (strcmp(p_char, "1") == 0)
-			{
-			  p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-			  p_device_record->issue_cmd = 0;
-			  p_ipr_device->is_start_cand = 0;
-			}
-		    }
-		}
-	      rc = REFRESH_FLAG;
-	      continue;
-	    }
-	  p_cur_raid_cmd->p_qac_data =
-	    malloc(sizeof(struct ipr_array_query_data));
-	  
-	  /* save off qac data image with issue_cmd set
-	     for selected devices */
-	  memcpy(p_cur_raid_cmd->p_qac_data,
-		 p_cur_ioa->p_qac_data,
-		 sizeof(struct ipr_array_query_data));
-	  goto leave;
-	}
-      else
-	{
-	  s_status.index = INVALID_OPTION_STATUS;
-	  rc = REFRESH_FLAG;
-	}
+        s_out = screen_driver(&n_configure_raid_start,output,i_con2);
+        rc = s_out->rc;
+
+        if (rc > 0)
+            return rc;
+
+        i_con2 = s_out->i_con;
+        free(s_out);
+
+        found = 0;
+
+        for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
+        {
+            p_ipr_device = (struct ipr_device *)temp_i_con->data;
+
+            if (p_ipr_device != NULL)
+            {
+                p_char = temp_i_con->field_data;
+                if (strcmp(p_char, "1") == 0)
+                {
+                    found = 1;
+                    p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
+                    p_device_record->issue_cmd = 1;
+                    p_ipr_device->is_start_cand = 1;
+                }
+            }
+        }
+
+        if (found != 0)
+        {
+            /* Go to parameters screen */
+            rc = configure_raid_parameters(i_con);
+
+            if (rc &  EXIT_FLAG)
+                goto leave;
+            if (rc & CANCEL_FLAG)
+            {
+                /* clear out current selections */
+                for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
+                {
+                    p_ipr_device = (struct ipr_device *)temp_i_con->data;
+                    if (p_ipr_device != NULL)
+                    {
+                        p_char = temp_i_con->field_data;
+                        if (strcmp(p_char, "1") == 0)
+                        {
+                            p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
+                            p_device_record->issue_cmd = 0;
+                            p_ipr_device->is_start_cand = 0;
+                        }
+                    }
+                }
+                rc = REFRESH_FLAG;
+                continue;
+            }
+            p_cur_raid_cmd->p_qac_data =
+                malloc(sizeof(struct ipr_array_query_data));
+
+            /* save off qac data image with issue_cmd set
+             for selected devices */
+            memcpy(p_cur_raid_cmd->p_qac_data,
+                   p_cur_ioa->p_qac_data,
+                   sizeof(struct ipr_array_query_data));
+            goto leave;
+        }
+        else
+        {
+            s_status.index = INVALID_OPTION_STATUS;
+            rc = REFRESH_FLAG;
+        }
     } while (rc & REFRESH_FLAG);
 
- leave:
-  i_con2 = free_i_con(i_con2);
-  free(out_str);
-  output = free_fn_out(output);
-  
-  if (rc > 0)
+    leave:
+        i_con2 = free_i_con(i_con2);
+    free(out_str);
+    output = free_fn_out(output);
+
+    if (rc > 0)
     {
-      /* restore unmodified image of qac data */
-      memcpy(p_cur_ioa->p_qac_data,
-	     p_qac_data_tmp,
-	     sizeof(struct ipr_array_query_data));
+        /* restore unmodified image of qac data */
+        memcpy(p_cur_ioa->p_qac_data,
+               p_qac_data_tmp,
+               sizeof(struct ipr_array_query_data));
     }
-  
-  free(p_qac_data_tmp);
-      
-  return rc;
+
+    free(p_qac_data_tmp);
+
+    return rc;
 }
 
 int configure_raid_parameters(i_container *i_con)
@@ -3753,8 +3844,7 @@ int confirm_raid_start(i_container *i_con)
     struct ipr_resource_flags *p_resource_flags;
     struct ipr_ioa *p_cur_ioa;
     int rc, i, j, fd;
-    u16 len = 0;
-    char buffer[100];
+    char *buffer = NULL;
     u32 num_lines = 0;
     struct ipr_passthru_ioctl *ioa_ioctl;
     struct ipr_array_record *p_array_record;
@@ -3794,13 +3884,12 @@ int confirm_raid_start(i_container *i_con)
                        sizeof(struct ipr_array_query_data));
             }
 
-            len = sprintf(buffer," 1  ");
-            len += print_device(p_ipr_device,buffer+len,p_cur_ioa);
+            buffer = print_device(p_ipr_device,buffer,"1",p_cur_ioa);
 
             buf_size += 100;
             out_str = realloc(out_str, buf_size);
             out_str = strcat(out_str,buffer);
-            memset(buffer, 0, 100);
+            memset(buffer, 0, strlen(buffer));
             num_lines++;
 
             for (j = 0; j < p_cur_ioa->num_devices; j++)
@@ -3817,13 +3906,12 @@ int confirm_raid_start(i_container *i_con)
                 {
                     p_resource_flags = &p_device_record->resource_flags_to_become;
 
-                    len = sprintf(buffer," 1   ");
-                    len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+                    buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa);
 
                     buf_size += 100;
                     out_str = realloc(out_str, buf_size);
                     out_str = strcat(out_str,buffer);
-                    memset(buffer, 0, 100);
+                    memset(buffer, 0, strlen(buffer));
                     num_lines++;
                 }
             }
@@ -4124,34 +4212,34 @@ int raid_start_complete(i_container *i_con)
 
 int raid_rebuild(i_container *i_con)
 {
-/*                   Rebuild Disk Unit Data
-		     
-Type option, press Enter.
- 1=Select
+    /*                   Rebuild Disk Unit Data
 
-       Vendor   Product           Serial    PCI    PCI   SCSI  SCSI  SCSI
-OPT     ID        ID              Number    Bus    Dev    Bus   ID   Lun
-       IBM      DFHSS4W          0024A0B9    05     03      0     3    0
+     Type option, press Enter.
+     1=Select
+
+     Vendor   Product           Serial    PCI    PCI   SCSI  SCSI  SCSI
+     OPT     ID        ID              Number    Bus    Dev    Bus   ID   Lun
+     IBM      DFHSS4W          0024A0B9    05     03      0     3    0
 
 
-e=Exit   q=Cancel
+     e=Exit   q=Cancel
 
-*/
-  int rc, i, array_num;
-  struct ipr_record_common *p_common_record;
-  struct ipr_device_record *p_device_record;
-  struct array_cmd_data *p_cur_raid_cmd;
-  struct ipr_resource_entry *p_resource_entry;
-  u8 array_id;
-  char buffer[100];
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  u32 len = 0;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID REBUILD FUNCTION CALLED");
+     */
+    int rc, i, array_num;
+    struct ipr_record_common *p_common_record;
+    struct ipr_device_record *p_device_record;
+    struct array_cmd_data *p_cur_raid_cmd;
+    struct ipr_resource_entry *p_resource_entry;
+    u8 array_id;
+    char *buffer = NULL;
+    int num_lines = 0;
+    struct ipr_ioa *p_cur_ioa;
+    u32 len = 0;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"RAID REBUILD FUNCTION CALLED");
 
     rc = RC_SUCCESS;
 
@@ -4173,7 +4261,7 @@ e=Exit   q=Cancel
 
             if ((p_common_record != NULL) &&
                 ((p_common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
-                (p_common_record->record_id == IPR_RECORD_ID_DEVICE2_RECORD)))
+                 (p_common_record->record_id == IPR_RECORD_ID_DEVICE2_RECORD)))
             {
                 p_device_record = (struct ipr_device_record *)p_common_record;
 
@@ -4203,17 +4291,16 @@ e=Exit   q=Cancel
                     p_tail_raid_cmd->p_ipr_ioa = p_cur_ioa;
                     p_tail_raid_cmd->p_ipr_device = &p_cur_ioa->dev[i];
 
-		    i_con = add_i_con(i_con,"\0",(char *)p_tail_raid_cmd,list);
+                    i_con = add_i_con(i_con,"\0",(char *)p_tail_raid_cmd,list);
 
-		    len = sprintf(buffer," %%1   ");
-		    len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
-		    
-		    buf_size += 150;
-		    out_str = realloc(out_str, buf_size);
-		    
-		    out_str = strcat(out_str,buffer);
-		    
-                    memset(buffer, 0, 100);
+                    buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa);
+
+                    buf_size += 150;
+                    out_str = realloc(out_str, buf_size);
+
+                    out_str = strcat(out_str,buffer);
+
+                    memset(buffer, 0, strlen(buffer));
 
                     len = 0;
                     num_lines++;
@@ -4224,18 +4311,18 @@ e=Exit   q=Cancel
     }
 
     if (array_num == 1)
-      s_out = screen_driver(&n_raid_rebuild_fail,output,i_con);
-	
-    
+        s_out = screen_driver(&n_raid_rebuild_fail,output,i_con);
+
+
     else
-      screen_driver(&n_raid_rebuild,output,i_con);
-    
+        screen_driver(&n_raid_rebuild,output,i_con);
+
     rc = s_out->rc;
-    
+
     free(s_out);
     free(out_str);
     output = free_fn_out(output);
-    
+
     p_cur_raid_cmd = p_head_raid_cmd;
     while(p_cur_raid_cmd)
     {
@@ -4243,7 +4330,7 @@ e=Exit   q=Cancel
         free(p_head_raid_cmd);
         p_head_raid_cmd = p_cur_raid_cmd;
     }
-    
+
     return rc;
 }
 
@@ -4269,10 +4356,9 @@ int confirm_raid_rebuild(i_container *i_con)
     struct ipr_device_record *p_device_record;
     struct ipr_ioa *p_cur_ioa;
     int fd, rc;
-    u16 len;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
-    char buffer[100];
+    char *buffer = NULL;
     u32 num_lines = 0;
     int found = 0;
     char *p_char;
@@ -4330,14 +4416,13 @@ int confirm_raid_rebuild(i_container *i_con)
             p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
             p_device_record = (struct ipr_device_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
 
-            len = sprintf(buffer," 1   ");
-            len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
+            buffer = print_device(&p_cur_ioa->ioa,buffer,"1",p_cur_ioa);
 
             buf_size += 150;
             out_str = realloc(out_str, buf_size);
 
             out_str = strcat(out_str,buffer);
-            memset(buffer, 0, 100);
+            memset(buffer, 0, strlen(buffer));
             num_lines++;
         }
         p_cur_raid_cmd = p_cur_raid_cmd->p_next;
@@ -4399,7 +4484,7 @@ int raid_include(i_container *i_con)
   struct ipr_array_record *p_array_record;
   struct array_cmd_data *p_cur_raid_cmd;
   u8 array_id;
-  char buffer[100];
+  char *buffer = NULL;
   int num_lines = 0;
   struct ipr_ioa *p_cur_ioa;
   u32 len;
@@ -4496,15 +4581,14 @@ int raid_include(i_container *i_con)
 
 		  i_con = add_i_con(i_con,"\0",(char *)p_tail_raid_cmd,list);
 		  
-		  len = sprintf(buffer,"  %%1   ");
-		  len += print_device(&p_cur_ioa->dev[i],buffer+len,p_cur_ioa);
+		  buffer = print_device(&p_cur_ioa->dev[i],buffer,"%1",p_cur_ioa);
 
 		  buf_size += 150;
 		  out_str = realloc(out_str, buf_size);
 		  
 		  out_str = strcat(out_str,buffer);
 		  
-		  memset(buffer, 0, 100);
+		  memset(buffer, 0, strlen(buffer));
 		  
 		  len = 0;
 		  num_lines++;
@@ -4573,7 +4657,7 @@ int configure_raid_include(i_container *i_con)
   struct ipr_device_record *p_device_record;
   struct ipr_resource_entry *p_resource_entry;
   struct ipr_array2_record *p_array2_record;
-  char buffer[100];
+  char *buffer = NULL;
   int num_lines = 0;
   struct ipr_ioa *p_cur_ioa;
   u32 len = 0;
@@ -4734,14 +4818,13 @@ int configure_raid_include(i_container *i_con)
 	  
 	  p_resource_entry = p_cur_ioa->dev[j].p_resource_entry;
 	  
-	  len = sprintf(buffer,"  %%1  ");
-	  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+	  buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa);
 	  
 	  buf_size += 150;
 	  out_str = realloc(out_str, buf_size);
 	  
 	  out_str = strcat(out_str,buffer);
-	  memset(buffer, 0, 100);
+	  memset(buffer, 0, strlen(buffer));
 	  
 	  len = 0;
 	  num_lines++;
@@ -4862,7 +4945,7 @@ int confirm_raid_include(i_container *i_con)
   struct ipr_device_record *p_device_record;
   int i, j, found;
   u16 len;
-  char buffer[100];
+  char *buffer = NULL;
   u32 num_lines = 0;
   struct ipr_array_record *p_array_record;
   struct ipr_array_query_data   *p_qac_data;
@@ -4919,15 +5002,14 @@ int confirm_raid_include(i_container *i_con)
 
 		  if (found)
                     {
-		      len = sprintf(buffer,"  1  ");
-		      len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+                      buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa);
 
 		      buf_size += 150;
 		      out_str = realloc(out_str, buf_size);
 		      out_str = strcat(out_str,buffer);
 		      
 		      len = 0;
-		      memset(buffer, 0, 100);
+		      memset(buffer, 0, strlen(buffer));
 		      num_lines++;
                     }
                 }
@@ -4992,12 +5074,12 @@ int confirm_raid_include_device(i_container *i_con)
 
 
   */
-  char buffer[100];
+  char *buffer = NULL;
   struct array_cmd_data *p_cur_raid_cmd;
   struct ipr_resource_entry *p_resource_entry;
   struct ipr_device_record *p_device_record;
   struct devs_to_init_t *p_cur_dev_to_init;
-  u32 len, i, j, found;
+  u32 i, j, found;
   u32 num_lines = 0;
   u8 num_devs=0;
   struct ipr_ioa *p_cur_ioa;
@@ -5057,13 +5139,12 @@ int confirm_raid_include_device(i_container *i_con)
 		  
 		  if (found)
                     {
-		      len = sprintf(buffer,"  1  ");
-		      len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+                      buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa);
 
 		      buf_size += 100;
 		      out_str = realloc(out_str, buf_size);
 		      out_str = strcat(out_str,buffer);
-		      memset(buffer, 0, 100);
+		      memset(buffer, 0, strlen(buffer));
 		      num_lines++;
                     }
                 }
@@ -5663,7 +5744,7 @@ int concurrent_remove_device(i_container *i_con)
 {
   int rc, j;
   int len = 0;
-  char buffer[100];
+  char *buffer = NULL;
   int num_lines = 0;
   struct ipr_ioa *p_cur_ioa;
   struct ipr_resource_entry *p_resource_entry;
@@ -5690,8 +5771,7 @@ int concurrent_remove_device(i_container *i_con)
 	      continue;
 	    }
 	  
-	  len = sprintf(buffer," %%1   ");
-	  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+          buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1",p_cur_ioa);
 	  i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[j].p_resource_entry, list);
 	  
 	  buf_size += 150;
@@ -5699,7 +5779,7 @@ int concurrent_remove_device(i_container *i_con)
 	  
 	  out_str = strcat(out_str,buffer);
 	  
-	  memset(buffer, 0, 100);
+	  memset(buffer, 0, strlen(buffer));
 	  
 	  len = 0;
 	  num_lines++;
@@ -5711,6 +5791,7 @@ int concurrent_remove_device(i_container *i_con)
 
   if (num_lines == 0)
     {
+      buffer = realloc(buffer, 32);
       sprintf(buffer,"\nNo devices found");
       out_str = strcat(out_str,buffer);
     }
@@ -5776,9 +5857,8 @@ int reclaim_cache(i_container* i_con)
   struct ipr_ioa *p_cur_ioa;
   struct ipr_reclaim_query_data *p_reclaim_buffer, *p_cur_reclaim_buffer;
   int num_needed = 0;
-  char buffer[100];
+  char *buffer = NULL;
   int buf_size = 100;
-  int len;
   char *out_str;
   int ioa_num = 0;
   struct screen_output *s_out;
@@ -5836,16 +5916,13 @@ int reclaim_cache(i_container* i_con)
 	      (p_cur_ioa->p_reclaim_data->reclaim_known_needed ||
 	       p_cur_ioa->p_reclaim_data->reclaim_unknown_needed))
 	    {
-		
-		
-	      len = sprintf(buffer," %%1   ");
-	      len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
+	      buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa);
 
 	      buf_size += 100;
 	      out_str = realloc(out_str, buf_size);
 	      out_str = strcat(out_str,buffer);
 		
-	      memset(buffer, 0, 100);
+	      memset(buffer, 0, strlen(buffer));
 	      ioa_num++;
 	      i_con = add_i_con(i_con, "\0",(char *)p_cur_ioa,list);
 	    }
@@ -5901,8 +5978,7 @@ int confirm_reclaim(i_container *i_con)
   struct ipr_resource_entry *p_resource_entry;
   struct ipr_query_res_state res_state;
   int fd, j, rc;
-  u16 len;
-  char buffer[100];
+  char *buffer = NULL;
   i_container* current;
   int ioa_num = 0;
   int buf_size = 150*sizeof(char);
@@ -5984,14 +6060,13 @@ int confirm_reclaim(i_container *i_con)
       if (!res_state.read_write_prot)
           continue;
 
-      len = sprintf(buffer," %%1   ");
-      len += print_device(&p_reclaim_ioa->dev[j],buffer+len,p_reclaim_ioa);
+      buffer = print_device(&p_reclaim_ioa->dev[j],buffer,"%1",p_reclaim_ioa);
 
       buf_size += 150;
       out_str = realloc(out_str, buf_size);
       out_str = strcat(out_str,buffer);
 
-      memset(buffer, 0, 100);
+      memset(buffer, 0, strlen(buffer));
   }
 
   close(fd);
@@ -6235,7 +6310,7 @@ int configure_af_device(i_container *i_con, int action_code)
   int can_init;
   int dev_type;
   int change_size;
-  char buffer[100];
+  char *buffer = NULL;
   int num_devs = 0;
   struct ipr_ioa *p_cur_ioa;
   u32 len=0;
@@ -6431,15 +6506,14 @@ int configure_af_device(i_container *i_con, int action_code)
 	      p_tail_dev_to_init->change_size = change_size;
 	      p_tail_dev_to_init->p_ipr_device = &p_cur_ioa->dev[j];
 
-	      len = sprintf(buffer," %%1   ");
-	      len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+	      buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1",p_cur_ioa);
 	      
 	      i_con = add_i_con(i_con,"\0",dev_field,list);
 
 	      buf_size += 100;
 	      out_str = realloc(out_str, buf_size);
 	      out_str = strcat(out_str,buffer);
-	      memset(buffer, 0, 100);
+	      memset(buffer, 0, strlen(buffer));
 	      
 	      len = 0;
 	      num_devs++;
@@ -6518,7 +6592,7 @@ e=Exit   q=Cancel    f=PageDn   b=PageUp
   struct ipr_array_record *p_array_record;
   struct ipr_device_record *p_device_record;
   struct array_cmd_data *p_cur_raid_cmd;
-  char buffer[100];
+  char *buffer = NULL;
   int num_lines = 0;
   struct ipr_ioa *p_cur_ioa;
   u32 len;
@@ -6588,15 +6662,13 @@ e=Exit   q=Cancel    f=PageDn   b=PageUp
 	      
 	      p_resource_entry = p_cur_ioa->ioa.p_resource_entry;
 
-	      len = sprintf(buffer," %%1   ");
-	      len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
+	      buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa);
       
-	      
-	      buf_size += 150;
+              buf_size += 150;
 	      out_str = realloc(out_str, buf_size);
 	      
 	      out_str = strcat(out_str,buffer);
-	      memset(buffer, 0, 100);
+	      memset(buffer, 0, strlen(buffer));
 
 	      len = 0;
 	      num_lines++;
@@ -6708,7 +6780,7 @@ int select_hot_spare(i_container *i_con, int action)
 {
   struct array_cmd_data *p_cur_raid_cmd;
   int rc, j, found;
-  char buffer[100];
+  char *buffer = NULL;
   int num_devs = 0;
   struct ipr_ioa *p_cur_ioa;
   char *p_char;
@@ -6742,15 +6814,14 @@ int select_hot_spare(i_container *i_con, int action)
         {
 	  i_con2 = add_i_con(i_con2,"\0",(char *)&p_cur_ioa->dev[j],list);
 
-	  len = sprintf(buffer," %%1   ");
-	  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+          buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1",p_cur_ioa);
 	  
 	  buf_size += 150;
 	  out_str = realloc(out_str, buf_size);
 	  
 	  out_str = strcat(out_str,buffer);
 	  
-	  memset(buffer, 0, 100);
+	  memset(buffer, 0, strlen(buffer));
 
 	  len = 0;
 	  num_devs++;
@@ -6841,8 +6912,7 @@ Option  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun
   struct ipr_device_record *p_device_record;
   struct ipr_ioa *p_cur_ioa;
   int rc, j;
-  u16 len = 0;
-  char buffer[100];
+  char *buffer = NULL;
   u32 num_lines = 0;
   int hot_spare_complete(int action);
   int buf_size = 150;
@@ -6871,15 +6941,14 @@ Option  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun
 		  (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
 		  (p_device_record->issue_cmd))
                 {
-		  len = sprintf(buffer," 1   ");
-		  len += print_device(&p_cur_ioa->dev[j],buffer+len,p_cur_ioa);
+                  buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa);
 
 		  buf_size += 150;
 		  out_str = realloc(out_str, buf_size);
 		  
 		  out_str = strcat(out_str,buffer);
 
-		  memset(buffer, 0, 100);
+		  memset(buffer, 0, strlen(buffer));
 		  num_lines++;
                 }
             }
@@ -7017,7 +7086,7 @@ int battery_maint(i_container *i_con)
     struct ipr_ioa *p_cur_ioa;
     int num_needed = 0;
     int ioa_num = 0;
-    char buffer[100];
+    char *buffer = NULL;
     int len = 0;
     int buf_size = 100;
     char* out_str = calloc(buf_size,sizeof(char)) ;
@@ -7073,14 +7142,13 @@ int battery_maint(i_container *i_con)
             if ((p_cur_ioa->p_reclaim_data) &&
                 (p_cur_ioa->p_reclaim_data->rechargeable_battery_type))
             {
-                len = sprintf(buffer," %%1   ");
-                len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
+                buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa);
 
                 buf_size += 100;
                 out_str = realloc(out_str, buf_size);
                 out_str = strcat(out_str,buffer);
 
-                memset(buffer, 0, 100);
+                memset(buffer, 0, strlen(buffer));
                 len = 0;
                 ioa_num++;
                 i_con = add_i_con(i_con, "\0",(char *)p_cur_ioa,list); 
@@ -7182,10 +7250,9 @@ int confirm_force_battery_error(i_container *i_con)
   int rc;
   struct ipr_ioa *p_cur_ioa;
   int ioa_num = 0;
-  char buffer[100];
+  char *buffer = NULL;
 
   int buf_size = 100;
-  int len = 0;
   char *out_str = calloc(buf_size,sizeof(char));
   struct screen_output *s_out;
   fn_out *output = init_output();
@@ -7200,14 +7267,13 @@ int confirm_force_battery_error(i_container *i_con)
       if ((p_cur_ioa->p_reclaim_data) &&
 	  (p_cur_ioa->ioa.is_reclaim_cand))
         {
-	  len = sprintf(buffer," 2   ");
-	  len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
+          buffer = print_device(&p_cur_ioa->ioa,buffer,"2",p_cur_ioa);
 	  
 	  buf_size += 100;
 	  out_str = realloc(out_str, buf_size);
 	  out_str = strcat(out_str,buffer);
 
-	  memset(buffer, 0, 100);
+	  memset(buffer, 0, strlen(buffer));
 	  ioa_num++;
 	}
 
@@ -7413,7 +7479,7 @@ int bus_config(i_container *i_con)
      */
     int rc, config_num;
     struct array_cmd_data *p_cur_raid_cmd;
-    char buffer[100];
+    char *buffer = NULL;
     int num_lines = 0;
     struct ipr_ioa *p_cur_ioa;
     u32 len = 0;
@@ -7466,14 +7532,13 @@ int bus_config(i_container *i_con)
 
         i_con = add_i_con(i_con,"\0",(char *)p_cur_ioa,list);
 
-        len = sprintf(buffer," %%1   ");
-        len += print_device(&p_cur_ioa->ioa,buffer+len,p_cur_ioa);
+        buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa);
 
         buf_size += 150;
         out_str = realloc(out_str, buf_size);
 
         out_str = strcat(out_str,buffer);
-        memset(buffer, 0, 100);
+        memset(buffer, 0, strlen(buffer));
 
         len = 0;
         num_lines++;
@@ -8224,7 +8289,7 @@ int init_device(i_container *i_con)
     struct ipr_device_record *p_device_record;
     int can_init;
     int dev_type;
-    char buffer[100];
+    char *buffer = NULL;
     int num_devs = 0;
     struct ipr_ioa *p_cur_ioa;
     u32 len=0;
@@ -8369,15 +8434,14 @@ int init_device(i_container *i_con)
                 p_tail_dev_to_init->p_ipr_device = &p_cur_ioa->dev[j];
                 p_tail_dev_to_init->change_size = 0;
 
-                len = sprintf(buffer," %%1   ");
-                len += print_device(&p_cur_ioa->dev[j], buffer+len,p_cur_ioa);
+                buffer = print_device(&p_cur_ioa->dev[j], buffer,"%1",p_cur_ioa);
                 i_con = add_i_con(i_con,"\0",(char *)&p_cur_ioa->dev[j],list);
 
                 buf_size += 150*sizeof(char);
                 out_str = realloc(out_str, buf_size);
                 out_str = strcat(out_str,buffer);
 
-                memset(buffer, 0, 100);
+                memset(buffer, 0, strlen(buffer));
 
                 len = 0;
                 num_devs++;
@@ -8453,9 +8517,8 @@ int confirm_init_device(i_container *i_con)
   */
   int found;
   char  *p_char;
-  char buffer[100];
+  char *buffer = NULL;
   struct devs_to_init_t *p_cur_dev_to_init;
-  u32 len = 0;
   u32 num_devs = 0;
   int rc = RC_SUCCESS;
   i_container *temp_i_con, *i_num_devs;
@@ -8498,14 +8561,13 @@ int confirm_init_device(i_container *i_con)
     {
       if (p_cur_dev_to_init->do_init)
         {
-	  len = sprintf(buffer," 1   ");
-	  len += print_device(p_cur_dev_to_init->p_ipr_device,buffer+len,p_cur_dev_to_init->p_ioa);
+          buffer = print_device(p_cur_dev_to_init->p_ipr_device,buffer,"1",p_cur_dev_to_init->p_ioa);
 	  	  
 	  buf_size += 150*sizeof(char);
 	  out_str = realloc(out_str, buf_size);
 	  out_str = strcat(out_str,buffer);
 	  
-	  memset(buffer, 0, 100);
+	  memset(buffer, 0, strlen(buffer));
 	  num_devs++;
         }
       p_cur_dev_to_init = p_cur_dev_to_init->p_next;
@@ -10508,7 +10570,7 @@ char *strip_trailing_whitespace(char *p_str)
   return p_str;
 }
 
-u16 print_device(struct ipr_device *p_ipr_dev, char *p_buf, struct ipr_ioa *p_cur_ioa)
+char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option, struct ipr_ioa *p_cur_ioa)
 {
     u16 len = 0;
     struct ipr_resource_entry *p_resource_entry = p_ipr_dev->p_resource_entry;
@@ -10528,32 +10590,36 @@ u16 print_device(struct ipr_device *p_ipr_dev, char *p_buf, struct ipr_ioa *p_cu
     ipr_strncpy_0(vendor_id, p_resource_entry->std_inq_data.vpids.vendor_id, IPR_VENDOR_ID_LEN);
     ipr_strncpy_0(product_id, p_resource_entry->std_inq_data.vpids.product_id, IPR_PROD_ID_LEN);
 
-    len = sprintf(p_buf, "%-8s %-18s %-14s %s.%d/",
-                  vendor_id,
-                  product_id,
-                  dev_name,
-                  p_cur_ioa->pci_address,
-                  p_cur_ioa->host_no);
+    if (body)
+        len = strlen(body);
+    body = ipr_realloc(body, len + 100);
+
+    len += sprintf(body + len, " %s  %-8s %-18s %-12s %s.%d/",
+                   option,
+                   vendor_id,
+                   product_id,
+                   dev_name,
+                   p_cur_ioa->pci_address,
+                   p_cur_ioa->host_no);
 
     if (p_resource_entry->is_ioa_resource)
     {
-        len += sprintf(p_buf+len,"            ");
+        len += sprintf(body + len,"            ");
 
         if (p_cur_ioa->ioa_dead)
-            len += sprintf(p_buf+len, catgets(catd,n_print_device.text_set,1,
-                                              "Not Operational\n"));
+            len += sprintf(body + len, "Not Operational\n");
         else if (p_cur_ioa->nr_ioa_microcode)
         { 
-            len += sprintf(p_buf+len, catgets(catd,n_print_device.text_set,2,"Not Ready\n"));
+            len += sprintf(body + len, "Not Ready\n");
         } 
         else
         {
-            len += sprintf(p_buf+len, catgets(catd,n_print_device.text_set,3,"Operational\n"));
+            len += sprintf(body + len, "Operational\n");
         }
     }
     else
     {
-        int tab_stop  = sprintf(p_buf+len,"%d:%d:%d ",
+        int tab_stop  = sprintf(body + len,"%d:%d:%d ",
                                 p_resource_entry->resource_address.bus,
                                 p_resource_entry->resource_address.target,
                                 p_resource_entry->resource_address.lun);
@@ -10561,7 +10627,7 @@ u16 print_device(struct ipr_device *p_ipr_dev, char *p_buf, struct ipr_ioa *p_cu
         len += tab_stop;
 
         for (i=0;i<12-tab_stop;i++)
-            p_buf[len+i] = ' ';
+            body[len+i] = ' ';
 
         len += 12-tab_stop;
 
@@ -10648,35 +10714,35 @@ u16 print_device(struct ipr_device *p_ipr_dev, char *p_buf, struct ipr_ioa *p_cu
         }
 
         if (res_state.not_oper)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,1,"Not Operational\n"));
+            sprintf(body + len, "Not Operational\n");
         else if (res_state.not_ready ||
                  (res_state.read_write_prot && (iprtoh32(res_state.failing_dev_ioasc) == 0x02040200u)))
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,2,"Not ready\n"));
+            sprintf(body + len, "Not ready\n");
         else if ((res_state.read_write_prot) || (is_rw_protected(p_ipr_dev)))
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,4,"R/W Protected\n"));
+            sprintf(body + len, "R/W Protected\n");
         else if (res_state.prot_dev_failed)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,5,"DPY/Failed\n"));
+            sprintf(body + len, "DPY/Failed\n");
         else if (res_state.prot_suspended)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,6,"DPY/Unprotected\n"));
+            sprintf(body + len, "DPY/Unprotected\n");
         else if (res_state.prot_resuming)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,7,"DPY/Rebuilding\n"));
+            sprintf(body + len, "DPY/Rebuilding\n");
         else if (res_state.degraded_oper)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,8,"Perf Degraded\n"));
+            sprintf(body + len, "Perf Degraded\n");
         else if (res_state.service_req)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,9,"Redundant Hw Fail\n"));
+            sprintf(body + len, "Redundant Hw Fail\n");
         else if (format_req)
-            len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,10,"Format Required\n"));
+            sprintf(body + len, "Format Required\n");
         else
         {
             if (p_resource_entry->is_array_member)
-                len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,11,"DPY/Active\n"));
+                sprintf(body + len, "DPY/Active\n");
             else if (p_resource_entry->is_hot_spare)
-                len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,12,"HS/Active\n"));
+                sprintf(body + len, "HS/Active\n");
             else
-                len += sprintf(p_buf + len, catgets(catd,n_print_device.text_set,13,"Operational\n"));
+                sprintf(body + len, "Operational\n");
         }
     }
-    return len;
+    return body;
 }
 
 int is_format_allowed(struct ipr_device *p_ipr_dev)

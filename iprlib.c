@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.3 2004/01/13 21:13:32 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.4 2004/01/16 16:25:18 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -260,54 +260,84 @@ struct unsupported_af_dasd unsupported_af[] =
     }
 };
 
+int ipr_get_host_num(char *pci_dir)
+{
+    struct dirent *dir_entry;
+    DIR *sysfs_dir;
+    char sysfs_fname[100];
+    int host_num = -1;
+
+    sprintf(sysfs_fname,"/sys/bus/pci/drivers/ipr/%s",pci_dir);
+    sysfs_dir = opendir(sysfs_fname);
+
+    if (sysfs_dir != NULL)
+    {
+        for (dir_entry = readdir(sysfs_dir);
+             dir_entry != NULL;
+             dir_entry = readdir(sysfs_dir))
+        {
+            if (strstr(dir_entry->d_name, "host"))
+            {
+                sscanf(dir_entry->d_name, "host%d", &host_num);
+                break;
+            }
+        }
+    }
+
+    closedir(sysfs_dir);
+    return host_num;
+}
+
 void tool_init(char *tool_name)
 {
-  /* FIXME - host_no is the name of the proc file, dev_name = /dev/ipr* where * = minor number */
-    DIR *proc_dir;
+    DIR *sysfs_dir;
     struct dirent *dir_entry;
-    char line[100], temp[100], proc_fname[100], *p_char, *p_temp, *p_temp2;
+    char temp[100], sysfs_fname[100], *p_char;
     int ccin;
     struct ipr_ioa *p_ipr_ioa;
     int main_menu();
     int rc, minor_num, major_num;
     dev_t major_minor;
+    FILE *sysfs_file;
     struct stat file_stat;
 
     /* Find all the IPR IOAs attached and save away vital info about them */
-    proc_dir = opendir("/proc/scsi/ipr");
+    sysfs_dir = opendir("/sys/bus/pci/drivers/ipr");
 
-    if (proc_dir != NULL)
+    if (sysfs_dir != NULL)
     {
-        for (dir_entry = readdir(proc_dir);
+        for (dir_entry = readdir(sysfs_dir);
              dir_entry != NULL;
-             dir_entry = readdir(proc_dir))
+             dir_entry = readdir(sysfs_dir))
         {
             if (dir_entry->d_name[0] == '.')
                 continue;
 
-            sprintf(proc_fname, "/proc/scsi/ipr/%s", dir_entry->d_name);
-
-            /* Driver Version */
-            if (get_proc_string(proc_fname, "Driver Version:", line) == 0)
-            {
-                exit_on_error("%s Unable to extract Driver Version"IPR_EOL,tool_name);
-            }
+            if (!isdigit(dir_entry->d_name[0]))
+                continue;
 
             p_ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
             memset(p_ipr_ioa,0,sizeof(struct ipr_ioa));
-            p_temp = &line[16];
 
-            p_temp2 = strchr(p_temp, '\n');
-            if (p_temp2)
-                *p_temp2 = '\0';
-            strcpy(p_ipr_ioa->driver_version, p_temp);
+            /* PCI address */
+            strcpy(p_ipr_ioa->pci_address, dir_entry->d_name);
 
-            if ((driver_major = get_major_version(proc_fname)) == -1)
+            sysfs_file = fopen("/sys/bus/pci/drivers/ipr/version", "r");
+
+            if (sysfs_file == NULL)
+            {
+                exit_on_error("Fatal Error! /sys entry unreadable"IPR_EOL);
+            }
+
+            fgets(p_ipr_ioa->driver_version, 50, sysfs_file);
+            fclose(sysfs_file);
+
+            if ((driver_major = get_major_version(p_ipr_ioa->driver_version)) == -1)
             {
                 exit_on_error("%s Invalid Major Driver Version entry"IPR_EOL,tool_name);
             }
 
-            if ((driver_minor = get_minor_version(proc_fname)) == -1)
+            if ((driver_minor = get_minor_version(p_ipr_ioa->driver_version)) == -1)
             {
                 exit_on_error("%s Invalid Minor Driver Version entry"IPR_EOL,tool_name);
             }
@@ -319,62 +349,32 @@ void tool_init(char *tool_name)
                               temp, driver_major, tool_name, IPR_MAJOR_RELEASE);
             }
 
-            /* Get the CCIN */
-            if (get_proc_string(proc_fname, "IBM", line) == 0)
+            /* extract host_num from pci directory host## file */
+            p_ipr_ioa->host_num = ipr_get_host_num(dir_entry->d_name);
+
+            if (p_ipr_ioa->host_num == -1)
             {
-                exit_on_error("%s: %s Unable to extract CCIN in driver %s"IPR_EOL,
+                exit_on_error("%s: %s Unable to obtain host number in driver %s"IPR_EOL,
                               tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
-            rc = sscanf(line, "IBM %x", &ccin);
+            sprintf(sysfs_fname,"/sys/class/scsi_host/host%d/dev", p_ipr_ioa->host_num);
+            sysfs_file = fopen(sysfs_fname, "r");
 
-            if (rc < 1)
+            if (sysfs_file == NULL)
             {
-                exit_on_error("%s: %s Invalid CCIN entry in driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
+                exit_on_error("Fatal Error! /sys entry unreadable"IPR_EOL);
             }
 
-            /* Firmware Version */
-            if (get_proc_string(proc_fname, "Firmware Version:", line) == 0)
-            {
-                exit_on_error("%s: %s Unable to extract Firmware Version %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            p_temp = &line[18];
-
-            p_temp2 = strchr(p_temp, '\n');
-            if (p_temp2)
-                *p_temp2 = '\0';
-            strcpy(p_ipr_ioa->firmware_version, p_temp);
+            fscanf(sysfs_file,"%d:%d", &major_num, &minor_num);
+            fclose(sysfs_file);
 
             /* Generate the resource name */
-            sprintf(p_ipr_ioa->ioa.dev_name, "/dev/ipr%d", driver_minor);
-
+            sprintf(p_ipr_ioa->ioa.dev_name, "/dev/ipr%d", minor_num);
             strcpy(p_ipr_ioa->ioa.gen_name, p_ipr_ioa->ioa.dev_name);
-            p_ipr_ioa->ccin = ccin;
 
             p_ipr_ioa->p_next = NULL;
             p_ipr_ioa->num_raid_cmds = 0;
-
-            p_ipr_ioa->host_num = strtoul(dir_entry->d_name, NULL, 10);
-
-            /* get major number here */
-            if (get_proc_string(proc_fname, "Major Number:", line) == 0)
-            {
-                exit_on_error("%s: %s Unable to extract Major Number in driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-            else
-            {
-                rc = sscanf(line, "Major Number: %d", &major_num);
-
-                if (rc < 1)
-                {
-                    exit_on_error("%s: %s Invalid Major Number in driver %s"IPR_EOL,
-                                  tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-                }
-            }
 
             /* if /dev file exists verify major number */
             rc = stat(p_ipr_ioa->ioa.dev_name, &file_stat);
@@ -385,61 +385,13 @@ void tool_init(char *tool_name)
                     /* remove all ipr* files with old major number */
                     sprintf(temp,"rm %s",p_ipr_ioa->ioa.dev_name);
                     p_char = strstr(temp, "ipr");
-                    p_char[6] = '*';
-                    p_char[7] = '\0';
+                    p_char[3] = '*';
+                    p_char[4] = '\0';
                     system(temp);
                 }
-                p_char = strstr(p_ipr_ioa->ioa.dev_name, "ipr");
-                p_char += 6;
-                minor_num = strtoul(p_char, NULL, 10);
                 major_minor = MKDEV( major_num, minor_num);
 
                 mknod(p_ipr_ioa->ioa.dev_name, S_IFCHR|S_IRUSR|S_IWUSR, major_minor);
-            }
-
-            /* PCI address */
-            if (get_proc_string(proc_fname, "PCI Address:", line) == 0)
-            {
-                exit_on_error("%s: %s Unable to extract PCI Address from driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            rc = sscanf(line, "PCI Address: %s", p_ipr_ioa->pci_address);
-
-            if (rc < 1)
-            {
-                exit_on_error("%s: %s Invalid PCI Address in driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            /* Get the serial number */
-            if (get_proc_string(proc_fname, "Serial Number:", line) == 0)
-            {
-                exit_on_error("%s: %s Unable to extract Serial Number from driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            rc = sscanf(line, "Serial Number: %s", p_ipr_ioa->serial_num);
-
-            if (rc < 1)
-            {
-                exit_on_error("%s: %s Invalid Serial Number in driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            /* Part Number */
-            if (get_proc_string(proc_fname, "Card Part Number:", line) == 0)
-            {
-                exit_on_error("%s: %s Unable to extrace Card Part Number in driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
-            }
-
-            rc = sscanf(line, "Card Part Number: %s", p_ipr_ioa->part_num);
-
-            if (rc < 1)
-            {
-                exit_on_error("%s: %s Invalid Card Part Number in driver %s"IPR_EOL,
-                              tool_name, IPR_VERSION_STR, p_ipr_ioa->driver_version);
             }
 
             if (p_last_ipr_ioa)
@@ -455,38 +407,9 @@ void tool_init(char *tool_name)
         }
     }
 
-    closedir(proc_dir);
+    closedir(sysfs_dir);
 
     return;
-}
-
-int get_proc_string(char *proc_file_name, char *label, char *buffer)
-{
-	FILE *proc_file;
-	char line[100];
-	char old_line[100];
-	int lines_different;
-
-	memset(old_line, 0, 100);
-	memset(line, 0, 100);
-	proc_file = fopen(proc_file_name, "r");
-
-	if (proc_file == NULL)
-	{
-            exit_on_error("Fatal Error! /proc entry unreadable"IPR_EOL);
-	}
-
-	do
-	{
-		strcpy(old_line, line);
-		fgets(line, 100, proc_file);
-		lines_different = strcmp(line,old_line);
-	}while(strncmp(label, line, strlen(label)) && (line[0] != '\0') && lines_different);
-
-	strncpy(buffer, line, strlen(line));
-	fclose(proc_file);
-
-	return ((line[0] != '\0') && lines_different);
 }
 
 /* Try to dynamically add this device */
@@ -1129,15 +1052,11 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 };
 
 /* Will return -1 on error */
-int get_major_version(char *proc_file_name)
+int get_major_version(char *line)
 {
-	char line[100];
 	char *p_temp, *p_temp2;
 
-	if (get_proc_string(proc_file_name, "Driver Version:", line) == 0)
-		return -1;
-
-	p_temp = &line[16];
+	p_temp = &line[0];
 
 	p_temp2 = strchr(p_temp, '\n');
 	if (p_temp2)
@@ -1150,15 +1069,11 @@ int get_major_version(char *proc_file_name)
 }
 
 /* Will return -1 on error */
-int get_minor_version(char *proc_file_name)
+int get_minor_version(char *line)
 {
-	char line[100];
 	char *p_temp, *p_temp2;
 
-	if (get_proc_string(proc_file_name, "Driver Version:", line) == 0)
-		return -1;
-
-	p_temp = &line[18];
+	p_temp = &line[2];
 
 	p_temp2 = strchr(p_temp, '\n');
 	if (p_temp2)

@@ -1,35 +1,23 @@
 $quote "
 
-$ 1's
-$ ------------------------
+$set 0  Generic
+1 "Select one of the following"
+2 "Selction"
 
 $set 101  main_menu
 1 "Work with Disk Units"
-2 "Select one of the following:\
-\n\
-\n     1. Display disk hardware status\
-\n     2. Work with Disk Arrays\
-\n     3. Work with disk unit recovery\
-\n     4. Work with SCSI bus configuration\
-\n     5. Work with driver configuration\
-\n     6. Analyze log\
-\n\
-\n\
-\n\
-\nSelection:  %1"
-3 "%e"
+2 "Display disk hardware status"
+3 "Work with Disk Arrays"
+4 "Work with disk unit recovery"
+5 "Work with SCSI bus configuration"
+6 "Work with driver configuration"
+7 "Analyze log"
 
 $set 102 disk_status
-$ iSeries
 1 "Display Disk Hardware Status"
-2 "Type option, press Enter.\
-\n  5=Display hardware resource information details\
-\n\
-\n     Vendor   Product            Resource             PCI/SCSI          Hardware\
-\nOPT   ID        ID               Name                   Loc             Status\
-\n#1"
-3 "%e%q%r%f"
-4 "\nNo devices found"
+2 "Type option, press Enter."
+3 "Display hardware resource information details"
+4 "No devices found"
 
 $set 104 device_details
 1 "IOA Hardware Resource Information Details"
@@ -70,31 +58,19 @@ $set 104 device_details
 216 "Device Specific (Z5)"
 217 "Device Specific (Z6)"
 
-$ 2's
-$ ------------------------
-
 $set 200 raid_screen
 1 "Work with Disk Arrays"
-2 "Select one of the following:\
-\n\
-\n     1. Display disk array status\
-\n     2. Create a disk array\
-\n     3. Delete a disk array\
-\n     4. Add a device to a disk array\
-\n     5. Format device for advanced function\
-\n     6. Format device for JBOD function\
-\n     7. Configure a hot spare device\
-\n     8. Unconfigure a hot spare device\
-\n\
-\nSelection:  %1"
-3 "%e%q"
+2 "Display disk array status"
+3 "Create a disk array"
+4 "Delete a disk array"
+5 "Add a device to a disk array"
+6 "Format device for advanced function"
+7 "Format device for JBOD function"
+8 "Configure a hot spare device"
+9 "Unconfigure a hot spare device"
 
 $set 201 raid_status
-$ iSeries
 1 "Display Disk Array Status"
-2 "Parity  Serial                Resource\
-\n  Set   Number   Type  Model  Name                                  Status\
-\n#1"
 3 "%e%q%r%f"
 
 $ Other
@@ -1009,25 +985,6 @@ $set 504 confirm_set_default_editor
 \n\
 \nNew editor:     #1"
 3 "c=Confirm   %q"
-
-$set 700 print_device
-1 "Not Operational\n"
-2 "Not Ready\n"
-3 "Operational\n"
-4 "R/W Protected\n"
-5 "DPY/Failed\n"
-6 "DPY/Unprotected\n"
-7 "DPY/Rebuilding\n"
-8 "Perf Degraded\n"
-9 "Redundant Hw Fail\n"
-10 "Format Required\n"
-11 "DPY/Active\n"
-12 "HS/Active\n"
-
-
-
-
-
 
 $set 888 screen status strings
 1 ""

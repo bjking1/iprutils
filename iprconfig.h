@@ -132,8 +132,9 @@ ITEM **menu_test_menu(int field_index);
 typedef struct screen_node s_node;
 
 struct screen_opts {
-	int (*screen_function) (i_container *);
-	char *key;
+    int (*screen_function) (i_container *);
+    int cat_num;
+    char *key;
 };
 
 struct screen_node {
@@ -147,30 +148,36 @@ struct screen_node {
 };
 
 struct screen_opts main_menu_opt[] = {
-	{disk_status, "1"},
-	{raid_screen, "2"},
-	{disk_unit_recovery, "3"},
-	{bus_config, "4"},
-	{driver_config, "5"},
-	{log_menu, "6"}
+	{disk_status,        2, "1"},
+	{raid_screen,        3, "2"},
+	{disk_unit_recovery, 4, "3"},
+	{bus_config,         5, "4"},
+	{driver_config,      6, "5"},
+	{log_menu,           7, "6"}
 };
 
 s_node n_main_menu = {
-	101,
-	(EXIT_FLAG | CANCEL_FLAG),
-	NUM_OPTS(main_menu_opt),
-	&main_menu_opt[0]
+    101,
+    (EXIT_FLAG | CANCEL_FLAG),
+    NUM_OPTS(main_menu_opt),
+    &main_menu_opt[0],
+    NULL,
+    NULL,
+    "%e"
 };
 
 struct screen_opts disk_status_opt[] = {
-	{device_details, "\n"}
+	{device_details, 0, "\n"}
 };
 
 s_node n_disk_status = {
-	102,
-	(CANCEL_FLAG),
-	NUM_OPTS(disk_status_opt),
-	&disk_status_opt[0]
+    102,
+    (CANCEL_FLAG),
+    NUM_OPTS(disk_status_opt),
+    &disk_status_opt[0],
+    NULL,
+    NULL,
+    "%e%q%r%f"
 };
 
 s_node n_device_details = {
@@ -184,32 +191,38 @@ s_node n_device_details = {
 };
 
 struct screen_opts raid_screen_opt[] = {
-	{raid_status,      "1"},
-	{raid_start,       "2"},
-	{raid_stop,        "3"},
-	{raid_include,     "4"},
-	{af_include,       "5"},
-	{af_remove,        "6"},
-	{add_hot_spare,    "7"},
-	{remove_hot_spare, "8"}
+	{raid_status,      2, "1"},
+	{raid_start,       3, "2"},
+	{raid_stop,        4, "3"},
+	{raid_include,     5, "4"},
+	{af_include,       6, "5"},
+	{af_remove,        7, "6"},
+	{add_hot_spare,    8, "7"},
+	{remove_hot_spare, 9, "8"}
 };
 
 s_node n_raid_screen = {
-	200,
-	(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
-	NUM_OPTS(raid_screen_opt),
-	&raid_screen_opt[0]
+    200,
+    (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+    NUM_OPTS(raid_screen_opt),
+    &raid_screen_opt[0],
+    NULL,
+    NULL,
+    "%e%q"
 };
 
 s_node n_raid_status = {
-	201,
-	(CANCEL_FLAG),
-	0,
-	NULL
+    201,
+    (CANCEL_FLAG),
+    0,
+    NULL,
+    NULL,
+    NULL,
+    "%e%q%r%f"
 };
 
 struct screen_opts raid_stop_opt[] = {
-	{confirm_raid_stop, "\n"}
+	{confirm_raid_stop, 0, "\n"}
 };
 
 s_node n_raid_stop = {
@@ -227,7 +240,7 @@ s_node n_raid_stop_fail = {
 };
 
 struct screen_opts confirm_raid_stop_opt[] = {
-	{do_confirm_raid_stop, "\n"}
+	{do_confirm_raid_stop, 0, "\n"}
 };
 
 s_node n_confirm_raid_stop = {
@@ -252,7 +265,7 @@ s_node n_raid_stop_complete = {
 };
 
 struct screen_opts raid_start_opt[] = {
-	{raid_start_loop, "\n"}
+	{raid_start_loop, 0, "\n"}
 };
 
 s_node n_raid_start = {
@@ -277,7 +290,7 @@ s_node n_raid_start_loop = {
 };
 
 struct screen_opts configure_raid_start_opt[] = {
-	{NULL, "\n"} /* configure_raid_parameters  */
+	{NULL, 0, "\n"} /* configure_raid_parameters  */
 };
 
 s_node n_configure_raid_start = {
@@ -295,7 +308,7 @@ s_node n_configure_raid_parameters = {
 };
 
 struct screen_opts confirm_raid_start_opt[] = {
-  {NULL, "\n"} /* raid_start_complete */
+  {NULL, 0, "\n"} /* raid_start_complete */
 };
 
 s_node n_confirm_raid_start = {
@@ -313,7 +326,7 @@ s_node n_raid_start_complete = {
 };
 
 struct screen_opts raid_include_opt[] = {
-	{configure_raid_include, "\n"}
+	{configure_raid_include, 0, "\n"}
 };
 
 s_node n_raid_include = {
@@ -331,7 +344,7 @@ s_node n_raid_include_fail = {
 };
 
 struct screen_opts configure_raid_include_opt[] = {
-	{NULL, "\n"}	/* confirm_raid_include */
+	{NULL, 0, "\n"}	/* confirm_raid_include */
 };
 
 s_node n_configure_raid_include = {
@@ -349,7 +362,7 @@ s_node n_configure_raid_include_fail = {
 };
 
 struct screen_opts confirm_raid_include_opt[] = {
-	{confirm_raid_include_device, "\n"}
+	{confirm_raid_include_device, 0, "\n"}
 };
 
 s_node n_confirm_raid_include = {
@@ -360,7 +373,7 @@ s_node n_confirm_raid_include = {
 };
 
 struct screen_opts confirm_raid_include_device_opt[] = {
-	{NULL, "c"}
+	{NULL, 0, "c"}
 };
 
 s_node n_confirm_raid_include_device = {
@@ -434,7 +447,7 @@ s_node n_remove_hot_spare_fail = {
 };
 
 struct screen_opts hot_spare_opt[] = {
-  {NULL, "\n"}, /* select_hot_spare */
+  {NULL, 0, "\n"}, /* select_hot_spare */
 };
 
 s_node n_hot_spare = {
@@ -445,7 +458,7 @@ s_node n_hot_spare = {
 };
 
 struct screen_opts select_hot_spare_opt[] = {
-  {NULL, "\n"}
+  {NULL, 0, "\n"}
 };
 
 s_node n_select_hot_spare = {
@@ -456,7 +469,7 @@ s_node n_select_hot_spare = {
 };
 
 struct screen_opts confirm_hot_spare_opt[] = {
-  {NULL, "\n"} /* hot_spare_complete */
+  {NULL, 0, "\n"} /* hot_spare_complete */
 };
 
 s_node n_confirm_hot_spare = {
@@ -467,12 +480,12 @@ s_node n_confirm_hot_spare = {
 };
 
 struct screen_opts disk_unit_recovery_opt[] = {
-	{concurrent_add_device,    "1"},
-	{concurrent_remove_device, "2"},
-	{init_device,              "3"},
-	{reclaim_cache,            "4"},
-	{raid_rebuild,             "5"},
-	{battery_maint,            "6"}
+	{concurrent_add_device,    2, "1"},
+	{concurrent_remove_device, 3, "2"},
+	{init_device,              4, "3"},
+	{reclaim_cache,            5, "4"},
+	{raid_rebuild,             6, "5"},
+	{battery_maint,            7, "6"}
 };
 
 s_node n_disk_unit_recovery = {
@@ -483,7 +496,7 @@ s_node n_disk_unit_recovery = {
 };
 
 struct screen_opts concurrent_add_device_opt[] = {
-	{issue_concurrent_maintenance, "\n"}
+	{issue_concurrent_maintenance, 0, "\n"}
 };
 
 s_node n_concurrent_add_device = {
@@ -494,7 +507,7 @@ s_node n_concurrent_add_device = {
 };
 
 struct screen_opts concurrent_remove_device_opt[] = {
-	{issue_concurrent_maintenance, "\n"}
+	{issue_concurrent_maintenance, 0, "\n"}
 };
 
 s_node n_concurrent_remove_device = {
@@ -512,7 +525,7 @@ s_node n_device_concurrent_maintenance = {
 };
 
 struct screen_opts init_device_opt[] = {
-	{confirm_init_device, "\n"}
+	{confirm_init_device, 0, "\n"}
 };
 
 s_node n_init_device = {
@@ -523,7 +536,7 @@ s_node n_init_device = {
 };
 
 struct screen_opts confirm_inits_opt[] = {
-	{send_dev_inits, "c"}
+	{send_dev_inits, 0, "c"}
 };
 
 s_node n_confirm_init_device = {
@@ -548,7 +561,7 @@ s_node n_dev_init_complete = {
 };
 
 struct screen_opts reclaim_cache_opts[] = {
-	{confirm_reclaim, "1"}
+	{confirm_reclaim, 0, "1"}
 };
 
 s_node n_reclaim_cache = {
@@ -559,7 +572,7 @@ s_node n_reclaim_cache = {
 };
 
 struct screen_opts confirm_reclaim_opt[] = {
-	{NULL, "c"}		/* xxx */
+	{NULL, 0, "c"}		/* xxx */
 };
 
 
@@ -572,7 +585,7 @@ s_node n_confirm_reclaim = {
 };
 
 struct screen_opts confirm_reclaim_warning_opt[] = {
-	{reclaim_result, "s"}
+	{reclaim_result, 0, "s"}
 };
 
 s_node n_confirm_reclaim_warning = {
@@ -590,7 +603,7 @@ s_node n_reclaim_result = {
 };
 
 struct screen_opts raid_rebuild_opt[] = {
-	{confirm_raid_rebuild, "\n"}
+	{confirm_raid_rebuild, 0, "\n"}
 };
 
 s_node n_raid_rebuild = {
@@ -608,7 +621,7 @@ s_node n_raid_rebuild_fail = {
 };
 
 struct screen_opts confirm_raid_rebuild_opt[] = {
-	{NULL, "\n"}
+	{NULL, 0, "\n"}
 };
 
 s_node n_confirm_raid_rebuild = {
@@ -619,7 +632,7 @@ s_node n_confirm_raid_rebuild = {
 };
 
 struct screen_opts configure_af_device_opt[] = {
-	{confirm_init_device, "\n"}
+	{confirm_init_device, 0, "\n"}
 };
 
 s_node n_configure_af_device = {
@@ -630,7 +643,7 @@ s_node n_configure_af_device = {
 };
 
 struct screen_opts battery_maint_opt[] = {
-	{battery_fork, "\n"}
+	{battery_fork, 0, "\n"}
 };
 
 s_node n_battery_maint = {
@@ -641,8 +654,8 @@ s_node n_battery_maint = {
 };
 
 struct screen_opts battery_fork_opt[] = {
-	{confirm_force_battery_error, "2"},
-	{show_battery_info, "5"}
+	{confirm_force_battery_error, 2, "2"},
+	{show_battery_info, 3, "5"}
 };
 
 s_node n_battery_fork = {
@@ -653,7 +666,7 @@ s_node n_battery_fork = {
 };
 
 struct screen_opts confirm_force_battery_error_opt[] = {
-	{force_battery_error, "c"}
+	{force_battery_error, 0, "c"}
 };
 
 s_node n_confirm_force_battery_error = {
@@ -678,7 +691,7 @@ s_node n_show_battery_info = {
 };
 
 struct screen_opts bus_config_opt[] = {
-	{change_bus_attr, "\n"}
+	{change_bus_attr, 0, "\n"}
 };
 
 s_node n_bus_config = {
@@ -703,7 +716,7 @@ s_node n_change_bus_attr = { /* this is copied straight MENUS */
 };
 
 struct screen_opts confirm_bus_config_opt[] = {
-  {NULL, "c"} /* confirm_bus_config_reset */
+  {NULL, 0, "c"} /* confirm_bus_config_reset */
 };
 
 
@@ -736,14 +749,14 @@ s_node n_driver_config = {
 };
 
 struct screen_opts log_menu_opt[] = {
-	{ibm_storage_log_tail, "1"},
-	{ibm_storage_log,      "2"},
-	{kernel_log,           "3"},
-	{iprconfig_log,        "4"},
-	{kernel_root,          "5"},
-	{set_default_editor,   "6"},
-	{restore_log_defaults, "7"},
-	{ibm_boot_log,         "8"}
+	{ibm_storage_log_tail, 2, "1"},
+	{ibm_storage_log,      3, "2"},
+	{kernel_log,           4, "3"},
+	{iprconfig_log,        5, "4"},
+	{kernel_root,          6, "5"},
+	{set_default_editor,   7, "6"},
+	{restore_log_defaults, 8, "7"},
+	{ibm_boot_log,         9, "8"}
 };
 
 s_node n_log_menu = {
@@ -782,7 +795,7 @@ s_node n_iprconfig_log = {
 };
 
 struct screen_opts kernel_root_opt[] = {
-	{confirm_kernel_root, "\n"}
+	{confirm_kernel_root, 0, "\n"}
 };
 
 s_node n_kernel_root = {
@@ -793,7 +806,7 @@ s_node n_kernel_root = {
 };
 
 struct screen_opts confirm_kernel_root_opt[] = {
-	{NULL, "c"},
+	{NULL, 0, "c"},
 };
 
 s_node n_confirm_kernel_root = {
@@ -804,7 +817,7 @@ s_node n_confirm_kernel_root = {
 };
 
 struct screen_opts set_default_editor_opt[] = {
-	{confirm_set_default_editor, "\n"}
+	{confirm_set_default_editor, 0, "\n"}
 };
 
 s_node n_set_default_editor = {
@@ -815,7 +828,7 @@ s_node n_set_default_editor = {
 };
 
 struct screen_opts confirm_set_default_editor_opt[] = {
-	{NULL, "c"}
+	{NULL, 0, "c"}
 };
 
 s_node n_confirm_set_default_editor = {
