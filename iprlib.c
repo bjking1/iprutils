@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57 2004/06/11 15:19:04 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.58 2004/08/11 22:17:24 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1327,9 +1327,27 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
+	struct ipr_disk_attr attr;
+	int old_qdepth;
 
 	if (strlen(dev->gen_name) == 0)
 		return -ENOENT;
+
+	if ((rc = ipr_get_dev_attr(dev, &attr))) {
+		scsi_dbg(dev, "Failed to get device attributes. rc=%d\n", rc);
+		return rc;
+	}
+
+	/*
+	 * Set the queue depth to 1 for the duration of the code download.
+	 * This prevents us from getting I/O errors during the code update
+	 */
+	old_qdepth = attr.queue_depth;
+	attr.queue_depth = 1;
+	if ((rc = ipr_set_dev_attr(dev, &attr, 0))) {
+		scsi_dbg(dev, "Failed to set queue depth to 1. rc=%d\n", rc);
+		return rc;
+	}
 
 	fd = open(dev->gen_name, O_RDWR);
 	if (fd <= 1) {
@@ -1352,8 +1370,13 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 
 	if (rc != 0)
 		scsi_cmd_err(dev, &sense_data, "Write buffer", rc);
+	else
+		sleep(5);
 
 	close(fd);
+	attr.queue_depth = old_qdepth;
+	rc = ipr_set_dev_attr(dev, &attr, 0);
+
 	return rc;
 }
 
@@ -1862,6 +1885,7 @@ void check_current_config(bool allow_rebuild_refresh)
 	struct ipr_common_record *common_record;
 	struct ipr_dev_record *device_record;
 	struct ipr_array_record *array_record;
+	struct ipr_std_inq_data std_inq_data;
 	struct sense_data_t sense_data;
 	int *qac_entry_ref;
 
@@ -1881,6 +1905,12 @@ void check_current_config(bool allow_rebuild_refresh)
 		get_ioa_name(ioa, num_sg_devices);
 
 		ioa->num_devices = 0;
+
+		rc = ipr_inquiry(&ioa->ioa, IPR_STD_INQUIRY,
+				 &std_inq_data, sizeof(std_inq_data));
+
+		if (rc)
+			ioa->ioa_dead = 1;
 
 		/* Get Query Array Config Data */
 		rc = ipr_query_array_config(ioa, allow_rebuild_refresh,
@@ -3165,10 +3195,13 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 
 	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
 		scsi_info(dev, "Updating disk microcode using %s "
-			  "from %02X%02X%02X%02X to %08X\n", image->file,
+			  "from %02X%02X%02X%02X (%c%c%c%c) to %08X (%c%c%c%c)\n", image->file,
 			  page3_inq.release_level[0], page3_inq.release_level[1],
 			  page3_inq.release_level[2], page3_inq.release_level[3],
-			  image->version);
+			  page3_inq.release_level[0], page3_inq.release_level[1],
+			  page3_inq.release_level[2], page3_inq.release_level[3],
+			  image->version, image->version >> 24, (image->version >> 16) & 0xff,
+			  (image->version >> 8) & 0xff, image->version & 0xff);
 
 		buffer = (void *)img_hdr + img_off;
 		img_size = ucode_stats.st_size - img_off;
@@ -3182,8 +3215,18 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 	close(fd);
 }
 
-#define GPDD_TCQ_DEPTH 64
-#define AF_DISK_TCQ_DEPTH 64
+#define AS400_TCQ_DEPTH 16
+#define DEFAULT_TCQ_DEPTH 64
+
+static int get_tcq_depth(struct ipr_dev *dev)
+{
+	if (!dev->scsi_dev_data)
+		return AS400_TCQ_DEPTH;
+	if (!strncmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8))
+		return AS400_TCQ_DEPTH;
+
+	return DEFAULT_TCQ_DEPTH;
+}
 
 static int mode_select(struct ipr_dev *dev, void *buff, int length)
 {
@@ -3317,7 +3360,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 
 	if (page->qerr != 1) {
 		scsi_dbg(dev, "Cannot set QERR=1\n");
-		return -EIO;
+			return -EIO;
 	}
 
 	if (page->dque != 0) {
@@ -3353,7 +3396,7 @@ static int page0x20_setup(struct ipr_dev *dev)
 					     mode_pages.hdr.block_desc_len +
 					     sizeof(mode_pages.hdr));
 
-	return (page->max_tcq_depth == AF_DISK_TCQ_DEPTH);
+	return (page->max_tcq_depth == get_tcq_depth(dev));
 }
 
 static int ipr_setup_page0x20(struct ipr_dev *dev)
@@ -3374,7 +3417,7 @@ static int ipr_setup_page0x20(struct ipr_dev *dev)
 					     mode_pages.hdr.block_desc_len +
 					     sizeof(mode_pages.hdr));
 
-	page->max_tcq_depth = AF_DISK_TCQ_DEPTH;
+	page->max_tcq_depth = get_tcq_depth(dev);
 
 	len = mode_pages.hdr.length + 1;
 	mode_pages.hdr.length = 0;
@@ -3393,7 +3436,7 @@ static int dev_init_allowed(struct ipr_dev *dev)
 	struct ipr_query_res_state res_state;
 
 	if (!ipr_query_resource_state(dev, &res_state)) {
-		if (!res_state.read_write_prot)
+		if (!res_state.read_write_prot && !res_state.prot_dev_failed)
 			return 1;
 	}
 	return 0;
@@ -3440,7 +3483,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
-	if (runtime && page0x0a_setup(dev) && attr.queue_depth == GPDD_TCQ_DEPTH)
+	if (runtime && page0x0a_setup(dev) && attr.tcq_enabled)
 		return;
 	if (ipr_test_unit_ready(dev, &sense_data))
 		return;
@@ -3451,7 +3494,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 		return;
 	}
 
-	attr.queue_depth = GPDD_TCQ_DEPTH;
+	attr.queue_depth = get_tcq_depth(dev);
 	attr.tcq_enabled = 1;
 
 	if (ipr_modify_dev_attr(dev, &attr))
@@ -3533,6 +3576,9 @@ void ipr_init_dev(struct ipr_dev *dev)
 void ipr_init_ioa(struct ipr_ioa *ioa)
 {
 	int i = 0;
+
+	if (ioa->ioa_dead)
+		return;
 
 	for (i = 0; i < ioa->num_devices; i++)
 		ipr_init_dev(&ioa->dev[i]);

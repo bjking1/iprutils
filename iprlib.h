@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44 2004/05/23 05:45:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.45 2004/08/11 22:17:26 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -1299,7 +1299,7 @@ syslog(LOG_ERR, __VA_ARGS__);\
 
 #define scsi_log(level, dev, fmt, ...) \
 do { \
-if (dev->scsi_dev_data) { \
+if (dev->scsi_dev_data && !dev->ioa->ioa_dead) { \
       syslog(level, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
              dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
              dev->scsi_dev_data->lun, ##__VA_ARGS__); \
@@ -1336,7 +1336,11 @@ if (dev->scsi_dev_data) { \
       ioa_log(LOG_ERR, ioa, fmt, ##__VA_ARGS__)
 
 #define ioa_cmd_err(ioa, sense, cmd, rc) \
+do { \
+if (!ioa->ioa_dead) { \
       ioa_err(ioa, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
               cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
-              (sense)->add_sense_code_qual)
+              (sense)->add_sense_code_qual); \
+} \
+} while (0)
 #endif

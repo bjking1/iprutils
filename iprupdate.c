@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.14 2004/05/23 05:45:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.15 2004/08/11 22:17:26 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -24,7 +24,7 @@
 
 #include <sys/mman.h>
 
-static int ioa_needs_update(struct ipr_ioa *ioa)
+static int ioa_needs_update(struct ipr_ioa *ioa, int silent)
 {
 	struct sysfs_class_device *class_device;
 	struct sysfs_attribute *attr;
@@ -38,7 +38,8 @@ static int ioa_needs_update(struct ipr_ioa *ioa)
 	if (fw_version >= ioa->msl)
 		return 0;
 
-	ioa_info(ioa, "Adapter needs microcode update\n");
+	if (!silent)
+		ioa_info(ioa, "Adapter needs microcode update\n");
 	return 1;
 }
 
@@ -71,10 +72,17 @@ static void update_ioa_fw(struct ipr_ioa *ioa, int force)
 	int rc;
 	struct ipr_fw_images *list;
 
+	if (!ioa_needs_update(ioa, 1))
+		return;
+
 	rc = get_ioa_firmware_image_list(ioa, &list);
 
 	if (rc < 1) {
-		syslog(LOG_ERR, "Could not find firmware file for IBM %04X.\n", ioa->ccin);
+		syslog(LOG_ERR, "Could not find microcode file for IBM %04X. "
+		       "Please download the latest microcode from "
+		       "http://techsupport.services.ibm.com/server/mdownload/download.html. "
+		       "SCSI speeds will be limited to %d MB/s until updated microcode is downloaded.\n",
+		       ioa->ccin, IPR_SAFE_XFER_RATE);
 		return;
 	}
 
@@ -137,7 +145,7 @@ int main(int argc, char *argv[])
 
 	for (ioa = ipr_ioa_head; ioa; ioa = ioa->next) {
 		if (check_levels)
-			rc |= ioa_needs_update(ioa);
+			rc |= ioa_needs_update(ioa, 0);
 		else
 			update_ioa_fw(ioa, force_ioas);
 

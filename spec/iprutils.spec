@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.12
+Version: 2.0.13
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Jun 17 2004 Brian King <brking@us.ibm.com> 2.0.13
+- Fix handling of dead adapters in all of iprutils.
+- Improve iprupdate error logs to indicate where to download microcode from.
+- Set default tcq queue depth for AS400 disks to 16.
 * Fri Jun 11 2004 Brian King <brking@us.ibm.com> 2.0.12
 - Fix bug preventing ucode download to iSeries disks from working
 * Thu Jun 10 2004 Brian King <brking@us.ibm.com> 2.0.11

@@ -1606,10 +1606,10 @@ int device_details(i_container *i_con)
 		ipr_inquiry(device, 3, &page3_inq, sizeof(page3_inq));
 
 		ipr_strncpy_0(vendor_id,
-			      ioa_vpd.std_inq_data.vpids.vendor_id,
+			      scsi_dev_data->vendor_id,
 			      IPR_VENDOR_ID_LEN);
 		ipr_strncpy_0(product_id,
-			      ioa_vpd.std_inq_data.vpids.product_id,
+			      scsi_dev_data->product_id,
 			      IPR_PROD_ID_LEN);
 		ipr_strncpy_0(plant_code,
 			      ioa_vpd.ascii_plant_code,
@@ -1636,13 +1636,15 @@ int device_details(i_container *i_con)
 		body = add_line_to_body(body,"", NULL);
 		body = add_line_to_body(body,_("Manufacturer"), vendor_id);
 		body = add_line_to_body(body,_("Machine Type and Model"), product_id);
-		body = add_line_to_body(body,_("Firmware Version"), firmware_version);
-		body = add_line_to_body(body,_("Serial Number"), serial_num);
-		body = add_line_to_body(body,_("Part Number"), part_num);
-		body = add_line_to_body(body,_("Plant of Manufacturer"), plant_code);
-		if (cfc_vpd.cache_size[0])
-			body = add_line_to_body(body,_("Cache Size"), buffer);
-		body = add_line_to_body(body,_("DRAM Size"), dram_size);
+		if (!device->ioa->ioa_dead) {
+			body = add_line_to_body(body,_("Firmware Version"), firmware_version);
+			body = add_line_to_body(body,_("Serial Number"), serial_num);
+			body = add_line_to_body(body,_("Part Number"), part_num);
+			body = add_line_to_body(body,_("Plant of Manufacturer"), plant_code);
+			if (cfc_vpd.cache_size[0])
+				body = add_line_to_body(body,_("Cache Size"), buffer);
+			body = add_line_to_body(body,_("DRAM Size"), dram_size);
+		}
 		body = add_line_to_body(body,_("Resource Name"), device->gen_name);
 		body = add_line_to_body(body,"", NULL);
 		body = add_line_to_body(body,_("Physical location"), NULL);
@@ -1735,6 +1737,13 @@ int device_details(i_container *i_con)
 			ipr_strncpy_0(serial_num,
 				      device_record->serial_num,
 				      IPR_SERIAL_NUM_LEN);
+		} else {
+			ipr_strncpy_0(vendor_id,
+				      scsi_dev_data->vendor_id,
+				      IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0(product_id,
+				      scsi_dev_data->product_id,
+				      IPR_PROD_ID_LEN);
 		}
 
 		body = add_line_to_body(body,"", NULL);
@@ -5154,6 +5163,7 @@ int init_device(i_container *i_con)
 
 			/* If not a DASD, disallow format */
 			if (scsi_dev_data == NULL ||
+			    cur_ioa->ioa_dead ||
 			    ipr_is_hot_spare(&cur_ioa->dev[j]) ||
 			    ipr_is_volume_set(&cur_ioa->dev[j]) ||
 			    !device_supported(&cur_ioa->dev[j]) ||
@@ -5544,34 +5554,33 @@ int send_dev_inits(i_container *i_con)
 
 			disable_qerr(cur_dev_init->ipr_dev);
 
-			/* Issue mode select to setup block size */
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-			memset(ioctl_buffer, 0, 255);
-
-			mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
-
-			block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
-
-			/* Setup block size */
-			block_desc->block_length[0] = 0x00;
-			block_desc->block_length[1] = 0x02;
-
 			if (cur_dev_init->change_size == IPR_522_BLOCK)
+			{
+				/* Issue mode select to setup block size */
+				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+				memset(ioctl_buffer, 0, 255);
+
+				mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+
+				block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
+
+				/* Setup block size */
+				block_desc->block_length[0] = 0x00;
+				block_desc->block_length[1] = 0x02;
 				block_desc->block_length[2] = 0x0a;
-			else
-				block_desc->block_length[2] = 0x00;
 
-			length = sizeof(struct ipr_block_desc) +
-				sizeof(struct ipr_mode_parm_hdr);
+				length = sizeof(struct ipr_block_desc) +
+					sizeof(struct ipr_mode_parm_hdr);
 
-			status = ipr_mode_select(cur_dev_init->ipr_dev,
-						 &ioctl_buffer, length);
+				status = ipr_mode_select(cur_dev_init->ipr_dev,
+							 &ioctl_buffer, length);
 
-			if (status) {
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
+				if (status) {
+					cur_dev_init->do_init = 0;
+					num_devs--;
+					failure++;
+					continue;
+				}
 			}
 
 			/* Issue format */
@@ -7314,6 +7323,7 @@ int disk_config(i_container * i_con)
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL) ||
+			    cur_ioa->ioa_dead ||
 			    ((scsi_dev_data->type != TYPE_DISK) &&
 			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)) ||
 			    (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
@@ -7334,6 +7344,7 @@ int disk_config(i_container * i_con)
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL ) ||
+			    cur_ioa->ioa_dead ||
 			    (!ipr_is_hot_spare(&cur_ioa->dev[j])))
 
 				continue;
@@ -7698,7 +7709,7 @@ int download_ucode(i_container * i_con)
 
 	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
 
-		if (cur_ioa->ioa.scsi_dev_data == NULL)
+		if (cur_ioa->ioa.scsi_dev_data == NULL || cur_ioa->ioa_dead)
 			continue;
 
 		for (k=0; k<2; k++)
@@ -7712,6 +7723,7 @@ int download_ucode(i_container * i_con)
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL) ||
+			    cur_ioa->ioa_dead ||
 			    ((scsi_dev_data->type != TYPE_DISK) &&
 			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)) ||
 			    (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
@@ -7732,6 +7744,7 @@ int download_ucode(i_container * i_con)
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL ) ||
+			    cur_ioa->ioa_dead ||
 			    (!ipr_is_hot_spare(&cur_ioa->dev[j])))
 
 				continue;
