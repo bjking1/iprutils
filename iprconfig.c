@@ -225,6 +225,8 @@ int main(int argc, char *argv[])
 			else if (strcmp(argv[i], "--version") == 0) {
 				printf("iprconfig: %s\n", IPR_VERSION_STR);
 				exit(1);
+			} else if (strcmp(argv[i], "--debug") == 0) {
+				ipr_debug = 1;
 			} else if (next_editor)	{
 				strcpy(parm_editor, argv[i]);
 				next_editor = 0;

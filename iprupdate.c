@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.12 2004/04/06 21:10:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.13 2004/05/02 21:24:42 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -122,6 +122,8 @@ int main(int argc, char *argv[])
 			force_ioas = 1;
 		} else if (strcmp(argv[1], "--check_only") == 0) {
 			check_levels = 1;
+		} else if (strcmp(argv[1], "--debug") == 0) {
+			ipr_debug = 1;
 		} else {
 			printf("Usage: iprdate [options]\n");
 			printf("  Options: --version    Print iprupdate version\n");

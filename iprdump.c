@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.10 2004/04/06 21:10:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.11 2004/05/02 21:24:42 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -262,6 +262,8 @@ int main(int argc, char *argv[])
 		if (strcmp(argv[1], "--version") == 0) {
 			printf("iprdump: %s\n", IPR_VERSION_STR);
 			exit(1);
+		} else if (strcmp(argv[1], "--debug") == 0) {
+			ipr_debug = 1;
 		} else if (strcmp(argv[1], "-d") == 0) {
 			strcpy(usr_dir,argv[2]);
 			len = strlen(usr_dir);

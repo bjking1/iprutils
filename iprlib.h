@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.42 2004/04/28 22:53:22 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.43 2004/05/02 21:24:42 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -169,6 +169,7 @@ extern struct ipr_ioa *ipr_ioa_head;
 extern struct ipr_ioa *ipr_ioa_tail;
 extern int runtime;
 extern void (*exit_func) (void);
+extern int ipr_debug;
 
 struct ipr_res_addr {
 	u8 host;
@@ -1288,11 +1289,11 @@ static inline void ipr_strncpy_0(char *dest, char *source, int length)
 	dest[length] = '\0';
 }
 
-#if (IPR_DEBUG > 0)
-#define syslog_dbg(...) syslog(__VA_ARGS__)
-#else
-#define syslog_dbg(...)
-#endif
+#define syslog_dbg(...) \
+do { \
+if (ipr_debug) \
+syslog(LOG_ERR, __VA_ARGS__);\
+} while(0)
 
 #define scsi_log(level, dev, fmt, ...) \
 do { \
@@ -1306,7 +1307,7 @@ if (dev->scsi_dev_data) { \
 #define scsi_dbg(dev, fmt, ...) \
 do { \
 if (dev->scsi_dev_data) { \
-      syslog_dbg(LOG_DEBUG, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
+      syslog_dbg("%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
              dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
              dev->scsi_dev_data->lun, ##__VA_ARGS__); \
 } \

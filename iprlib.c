@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.51 2004/04/29 16:49:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.52 2004/05/02 21:24:42 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -23,14 +23,15 @@ static void default_exit_func()
 {
 }
 
-struct ipr_array_query_data *ipr_qac_data;
-struct scsi_dev_data *scsi_dev_table;
-u32 num_ioas;
-struct ipr_ioa *ipr_ioa_head;
-struct ipr_ioa *ipr_ioa_tail;
+struct ipr_array_query_data *ipr_qac_data = NULL;
+struct scsi_dev_data *scsi_dev_table = NULL;
+u32 num_ioas = 0;
+struct ipr_ioa *ipr_ioa_head = NULL;
+struct ipr_ioa *ipr_ioa_tail = NULL;
 int runtime = 0;
-char *tool_name;
+char *tool_name = NULL;
 void (*exit_func) (void) = default_exit_func;
+int ipr_debug = 0;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -470,15 +471,20 @@ void tool_init(char *name)
 	num_ioas = 0;
 
 	rc = sysfs_find_driver_bus("ipr", bus, 100);
-	if (rc)
+	if (rc) {
+		syslog_dbg("Failed to find ipr driver bus. %m\n");
 		return;
+	}
 
 	/* Find all the IPR IOAs attached and save away vital info about them */
 	sysfs_ipr_driver = sysfs_open_driver(bus, "ipr");
 	if (sysfs_ipr_driver == NULL) {
+		syslog_dbg("Failed to open ipr driver bus. %m\n");
 		sysfs_ipr_driver = sysfs_open_driver("ipr", bus);
-		if (sysfs_ipr_driver == NULL)
+		if (sysfs_ipr_driver == NULL) {
+			syslog_dbg("Failed to open ipr driver bus on second attempt. %m\n");
 			return;
+		}
 	}
 
 	ipr_devs = sysfs_get_driver_devices(sysfs_ipr_driver);
@@ -493,6 +499,9 @@ void tool_init(char *name)
 			strcpy(ipr_ioa->pci_address, pci_address);
 
 			sysfs_host_class = sysfs_open_class("scsi_host");
+			if (!sysfs_host_class)
+				exit_on_error("Failed to open scsi_host class.\n");
+
 			class_devices = sysfs_get_class_devices(sysfs_host_class);
 			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 				sysfs_host_device = sysfs_get_classdev_device(class_device);
@@ -507,6 +516,9 @@ void tool_init(char *name)
 			sysfs_close_class(sysfs_host_class);
 
 			sysfs_device_class = sysfs_open_class("scsi_device");
+			if (!sysfs_device_class)
+				exit_on_error("Failed to open scsi_device class\n");
+
 			class_devices = sysfs_get_class_devices(sysfs_device_class);
 			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 				sysfs_device_device = sysfs_get_classdev_device(class_device);
@@ -1640,13 +1652,18 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 	struct sysfs_device *sysfs_device_device;
 	struct sysfs_attribute *sysfs_attr;
 
-
 	sysfs_device_class = sysfs_open_class("scsi_device");
 	if (!sysfs_device_class) {
-		exit_on_error("Cannot open scsi_device class. "
-			      "Make sure /sys is mounted\n");
+		syslog_dbg("Failed to open scsi_device class. %m\n");
+		return 0;
 	}
+
 	class_devices = sysfs_get_class_devices(sysfs_device_class);
+	if (!class_devices) {
+		syslog_dbg("Get class devices for scsi_device failed. %m\n");
+		return 0;
+	}
+
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 
 		scsi_dev_base = realloc(scsi_dev_base,
@@ -1679,8 +1696,15 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 			 */      scsi_dev_data->opens = 0;
 
 		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "online");
-		if (sysfs_attr)
+		if (sysfs_attr) {
 			sscanf(sysfs_attr->value, "%d", &scsi_dev_data->online);
+		} else {
+			sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "state");
+			if (sysfs_attr && strstr(sysfs_attr->value, "offline"))
+				scsi_dev_data->online = 0;
+			else
+				scsi_dev_data->online = 1;
+		}
 
 		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "queue_depth");
 		if (sysfs_attr)
@@ -1717,11 +1741,18 @@ static void get_sg_names(int num_devs)
 	struct sysfs_device *sysfs_device_device;
 
 	sysfs_device_class = sysfs_open_class("scsi_generic");
+	if (!sysfs_device_class) {
+		syslog_dbg("Failed to open scsi_generic class. %m\n");
+		return;
+	}
+
 	class_devices = sysfs_get_class_devices(sysfs_device_class);
 	if (!class_devices) {
-		exit_on_error("Cannot open scsi_generic class. "
-			      "Make sure sg is loaded and /sys is mounted\n");
+		syslog_dbg("Failed to get class devices for scsi_generic class. %m\n");
+		sysfs_close_class(sysfs_device_class);
+		return;
 	}
+
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 		sysfs_device_device = sysfs_get_classdev_device(class_device);
 		if (!sysfs_device_device)
@@ -1748,11 +1779,17 @@ static void get_sd_names(int num_devs)
 	struct sysfs_device *sysfs_device_device;
 
 	sysfs_device_class = sysfs_open_class("block");
+	if (!sysfs_device_class) {
+		syslog_dbg("Failed to open block device class. %m\n");
+		return;
+	}
+
 	class_devices = sysfs_get_class_devices(sysfs_device_class);
 	if (!class_devices) {
-		exit_on_error("Cannot open block sysfs class. "
-			      "Make sure /sys is mounted\n");
+		syslog_dbg("Failed to get class devices for block device class. %m\n");
+		return;
 	}
+
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 		sysfs_device_device = sysfs_get_classdev_device(class_device);
 		if (!sysfs_device_device)
@@ -2916,7 +2953,7 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 	if (ret)
 		qsort(ret, j, sizeof(*ret), fw_compare);
 	else
-		syslog_dbg(LOG_ERR, "Could not find firmware file %s.\n", prefix);
+		syslog_dbg("Could not find firmware file %s.\n", prefix);
 
 	*list = ret;
 	return j;
@@ -3049,7 +3086,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 	fd = open(image->file, O_RDONLY);
 
 	if (fd < 0) {
-		syslog_dbg(LOG_ERR, "Could not open firmware file %s.\n", image->file);
+		syslog_dbg("Could not open firmware file %s.\n", image->file);
 		return;
 	}
 
@@ -3343,7 +3380,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 	if (enable_af(dev))
 		return;
 	if (setup_page0x0a(dev)) {
-		syslog_dbg(LOG_DEBUG, "Failed to enable TCQing for %s.\n",
+		syslog_dbg("Failed to enable TCQing for %s.\n",
 			   dev->scsi_dev_data->sysfs_device_name);
 		return;
 	}

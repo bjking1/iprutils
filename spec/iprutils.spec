@@ -22,21 +22,23 @@ make
 %install
 make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
 install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
-install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
 install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
+install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
 install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
 
 %ifarch ppc ppc64
 %post
-/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
 /usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
+/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
 /usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
 %endif
 
+%ifarch ppc ppc64
 %preun
 /usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
-/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
 /usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
+/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -49,7 +51,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Thu Apr 29 2004 Brian King <brking@us.ibm.com> 2.0.9
+* Thu May 2 2004 Brian King <brking@us.ibm.com> 2.0.9
+- Add --debug option to all utilities
+- Make utilities behave better when ipr is not loaded
 - Fix dependencies in init.d scripts
 - Only enable init.d scripts on ppc
 - Don't log an error if ipr is not loaded

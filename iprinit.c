@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.15 2004/04/06 21:10:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.16 2004/05/02 21:24:42 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -39,6 +39,8 @@ int main(int argc, char *argv[])
 			return 0;
 		} else if (strcmp(argv[1], "--daemon") == 0) {
 			daemonize = 1;
+		} else if (strcmp(argv[1], "--debug") == 0) {
+			ipr_debug = 1;
 		} else {
 			printf("Usage: iprinit [options]\n");
 			printf("  Options: --version    Print iprinit version\n");
