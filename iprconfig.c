@@ -8501,8 +8501,30 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	return body;
 }
 
-int is_format_allowed(struct ipr_dev *ipr_dev)
+int is_format_allowed(struct ipr_dev *dev)
 {
+	int rc;
+	struct ipr_cmd_status cmd_status;
+	struct ipr_cmd_status_record *status_record;
+	struct sense_data_t sense_data;
+
+	if (ipr_is_af_dasd_device(dev)) {
+		rc = ipr_query_command_status(dev, &cmd_status);
+		if (rc == 0 && cmd_status.num_records != 0) {
+			status_record = cmd_status.record;
+			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
+			    (status_record->status != IPR_CMD_STATUS_FAILED))
+				return 0;
+		}
+	} else {
+		rc = ipr_test_unit_ready(dev, &sense_data);
+
+		if (rc == CHECK_CONDITION &&
+		    (sense_data.error_code & 0x7F) == 0x70&&
+		    (sense_data.sense_key & 0x0F) == 0x02)
+			return 0;
+	}
+
 	return 1;
 }
 

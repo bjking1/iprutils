@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.23 2004/02/27 20:50:33 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.24 2004/03/04 22:52:07 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -162,6 +162,7 @@ extern struct ipr_array_query_data *ipr_array_query_data;
 extern u32 num_ioas;
 extern struct ipr_ioa *ipr_ioa_head;
 extern struct ipr_ioa *ipr_ioa_tail;
+extern int runtime;
 
 struct ipr_res_addr {
 	u8 reserved;
@@ -1172,6 +1173,8 @@ int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
 void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
+void ipr_init_dev(struct ipr_dev *);
+void ipr_init_ioa(struct ipr_ioa *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
