@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprconfig.c,v 1.2 2003/10/23 01:50:53 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprconfig.c,v 1.3 2003/10/31 15:16:43 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -18003,6 +18003,8 @@ int confirm_force_battery_error()
             else if ((ch == 'c') ||
                      (ch == 'C'))
             {
+                p_cur_ioa = p_head_ipr_ioa;
+
                 while(p_cur_ioa)
                 {
                     if ((p_cur_ioa->p_reclaim_data) &&
@@ -18015,6 +18017,7 @@ int confirm_force_battery_error()
                             syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL,
                                    p_cur_ioa->ioa.dev_name);
                             reclaim_rc = RC_FAILED;
+                            p_cur_ioa = p_cur_ioa->p_next;
                             continue;
                         }
 
