@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.37 2004/03/12 15:40:13 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.38 2004/03/12 21:01:27 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -3346,4 +3346,30 @@ void ipr_init_ioa(struct ipr_ioa *ioa)
 		ipr_init_dev(&ioa->dev[i]);
 
 	init_ioa_dev(&ioa->ioa);
+}
+
+struct ipr_dev *get_dev(struct ipr_res_addr *res_addr)
+{
+	struct ipr_ioa *cur_ioa;
+	int j;
+	struct scsi_dev_data *scsi_dev_data;
+
+	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
+
+		for (j = 0; j < cur_ioa->num_devices; j++) {
+
+			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+
+			if (scsi_dev_data == NULL)
+				continue;
+
+			if ((scsi_dev_data->host = res_addr->host) &&
+			    (scsi_dev_data->channel = res_addr->bus) &&
+			    (scsi_dev_data->target = res_addr->id) &&
+			    (scsi_dev_data->lun = res_addr->lun))
+				return &cur_ioa->dev[j];
+		}
+	}
+
+	return NULL;
 }

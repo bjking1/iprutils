@@ -1032,6 +1032,7 @@ void verify_device(struct ipr_dev *dev)
 					    (dev->ioa->qac_data->num_records != 0)) {
 
 						/* send evaluate device */
+						enable_af(dev);
 						evaluate_device(dev, dev->ioa, IPR_522_BLOCK);
 					}
 				}
@@ -1048,7 +1049,6 @@ int main_menu(i_container *i_con)
 	int loop;
 	struct screen_output *s_out;
 	struct scsi_dev_data *scsi_dev_data;
-	mvaddstr(0,0,"MAIN MENU FUNCTION CALLED");
 
 	check_current_config(false);
 
@@ -1312,8 +1312,6 @@ int disk_status(i_container *i_con)
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
 
-	mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
-
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
 
@@ -1542,7 +1540,6 @@ int device_details(i_container *i_con)
 	s_node *n_screen;
 
 	buffer = ipr_malloc(100);
-	mvaddstr(0,0,"DEVICE DETAILS FUNCTION CALLED");
 
 	rc = device_details_get_device(i_con, &device);
 	if (rc)
@@ -1864,7 +1861,6 @@ int raid_screen(i_container *i_con)
 	struct array_cmd_data *cur_raid_cmd;
 	struct screen_output *s_out;
 	int loop;
-	mvaddstr(0,0,"RAID SCREEN FUNCTION CALLED");
 
 	cur_raid_cmd = raid_cmd_head;
 
@@ -1906,7 +1902,6 @@ int raid_status(i_container *i_con)
 	struct ipr_dev_record *dev_record;
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
-	mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -2023,7 +2018,6 @@ int raid_stop(i_container *i_con)
 	int toggle = 1;
 	struct screen_output *s_out;
 	char *prot_level_str;
-	mvaddstr(0,0,"RAID STOP FUNCTION CALLED");
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -2121,7 +2115,6 @@ int confirm_raid_stop(i_container *i_con)
 	struct screen_output *s_out;
 	int toggle = 1;
 	int header_lines;
-	mvaddstr(0,0,"CONFIRM RAID STOP FUNCTION CALLED");
 
 	found = 0;
 
@@ -2346,7 +2339,6 @@ int raid_start(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"RAID START FUNCTION CALLED");
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -2430,7 +2422,6 @@ int raid_start_loop(i_container *i_con)
 	int found = 0;
 	char *input;
 	i_container *temp_i_con;
-	mvaddstr(0,0,"RAID START LOOP FUNCTION CALLED");
 
 	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
@@ -2481,7 +2472,6 @@ int configure_raid_start(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"CONFIGURE RAID START FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -2936,7 +2926,6 @@ int confirm_raid_start(i_container *i_con)
 	int header_lines;
 	int toggle = 0;
 	struct screen_output *s_out;
-	mvaddstr(0,0,"CONFIRM RAID START FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -3121,7 +3110,6 @@ int raid_rebuild(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle=1;
-	mvaddstr(0,0,"RAID REBUILD FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -3220,7 +3208,6 @@ int confirm_raid_rebuild(i_container *i_con)
 	int toggle=1;
 	i_container *temp_i_con;
 	struct screen_output *s_out;
-	mvaddstr(0,0,"CONFIRM RAID REBUILD FUNCTION CALLED");
 
 	for (temp_i_con = i_con; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
@@ -3312,7 +3299,6 @@ int raid_include(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 1;
-	mvaddstr(0,0,"RAID INCLUDE FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 
@@ -3453,7 +3439,6 @@ int configure_raid_include(i_container *i_con)
 	i_container *temp_i_con;
 	int toggle = 0;
 	struct screen_output *s_out;
-	mvaddstr(0,0,"CONFIGURE RAID INCLUDE FUNCTION CALLED");
 
 	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
@@ -3648,7 +3633,6 @@ int confirm_raid_include(i_container *i_con)
 	struct devs_to_init_t *cur_dev_init;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"CONFIRM RAID INCLUDE FUNCTION CALLED");
 
 	for (k=0; k<2; k++)
 		buffer[k] = body_init_status(n_confirm_raid_include.header, &header_lines, k);
@@ -3930,7 +3914,6 @@ int dev_include_complete(u8 num_devs)
 int af_include(i_container *i_con)
 {
 	int rc;
-	mvaddstr(0,0,"AF INCLUDE FUNCTION CALLED");
 	rc = configure_af_device(i_con,IPR_INCLUDE);
 	return rc;
 }
@@ -3938,7 +3921,6 @@ int af_include(i_container *i_con)
 int af_remove(i_container *i_con)
 {
 	int rc;
-	mvaddstr(0,0,"AF REMOVE FUNCTION CALLED");
 	rc = configure_af_device(i_con,IPR_REMOVE);
 	return rc;
 }
@@ -3959,7 +3941,6 @@ int configure_af_device(i_container *i_con, int action_code)
 	int header_lines;
 	s_node *n_screen;
 	struct screen_output *s_out;
-	mvaddstr(0,0,"CONFIGURE AF DEVICE  FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 
@@ -4122,7 +4103,7 @@ int configure_af_device(i_container *i_con, int action_code)
 int add_hot_spare(i_container *i_con)
 {
 	int rc;
-	mvaddstr(0,0,"ADD HOT SPARE FUNCTION CALLED");
+
 	do {
 		rc = hot_spare(i_con, IPR_ADD_HOT_SPARE);
 	} while (rc & REFRESH_FLAG);
@@ -4132,7 +4113,7 @@ int add_hot_spare(i_container *i_con)
 int remove_hot_spare(i_container *i_con)
 {
 	int rc;
-	mvaddstr(0,0,"REMOVE HOT SPARE FUNCTION CALLED");
+
 	do {
 		rc = hot_spare(i_con, IPR_RMV_HOT_SPARE);
 	} while (rc & REFRESH_FLAG);
@@ -4155,7 +4136,6 @@ int hot_spare(i_container *i_con, int action)
 	struct screen_output *s_out;
 	s_node *n_screen;
 	int header_lines;
-	mvaddstr(0,0,"HOT SPARE FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 
@@ -4324,8 +4304,6 @@ int select_hot_spare(i_container *i_con, int action)
 	int toggle = 0;
 	i_container *i_con_head_saved;
 
-	mvaddstr(0,0,"SELECT HOT SPARE FUNCTION CALLED");
-
 	if (action == IPR_ADD_HOT_SPARE)
 		n_screen = &n_select_add_hot_spare;
 	else
@@ -4429,7 +4407,6 @@ int confirm_hot_spare(int action)
 	s_node *n_screen;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"CONFIRM HOT SPARE FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -4537,7 +4514,6 @@ int disk_unit_recovery(i_container *i_con)
 	int rc;
 	struct screen_output *s_out;
 	int loop;
-	mvaddstr(0,0,"DISK UNIT RECOVERY FUNCTION CALLED");
 
 	for (loop = 0; loop < n_disk_unit_recovery.num_opts; loop++) {
 		n_disk_unit_recovery.body = ipr_list_opts(n_disk_unit_recovery.body,
@@ -4571,7 +4547,8 @@ int process_conc_maint(i_container *i_con, int action)
 	s_node *n_screen;
 	struct screen_output *s_out;
 	struct ipr_dev_record *dev_record;
-	
+	struct ipr_res_addr res_addr;
+	int time = 12;
 
 	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
@@ -4709,13 +4686,69 @@ int process_conc_maint(i_container *i_con, int action)
 
 	/* call function to complete conc maint */
 	if (!rc) {
-		if (action == IPR_VERIFY_CONC_REMOVE)
+		if (action == IPR_VERIFY_CONC_REMOVE) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_REMOVE);
-		else if (action == IPR_VERIFY_CONC_ADD)
+			evaluate_device(ipr_dev, 0);
+		} else if (action == IPR_VERIFY_CONC_ADD) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_ADD);
+			res_addr.host = ipr_dev->scsi_dev_data->host;
+			res_addr.bus = ipr_dev->scsi_dev_data->channel;
+			res_addr.target = ipr_dev->scsi_dev_data->id;
+			res_addr.lun = ipr_dev->scsi_dev_data->lun;
+
+			while (time--) {
+				check_current_config(false);
+				if ((ipr_dev = get_dev(&res_addr))) {
+					ipr_init_dev(ipr_dev);
+					break;
+				}
+				sleep(5);
+			}
+		}
 	}
 
 	return rc;
+}
+
+void get_dev_raid_level(struct ipr_ioa *cur_ioa)
+{
+	int j, i;
+	struct ipr_array_record *array_record;
+	char prot_level_str[32];
+	struct ipr_dev_record *dev_record;
+	int array_id;
+
+	/* extract RAID level from vset to pass to device */
+	for (j = 0; j < cur_ioa->num_devices; j++) {
+		if (!ipr_is_volume_set(&cur_ioa->dev[j]))
+			continue;
+
+		array_record = (struct ipr_array_record *)
+			cur_ioa->dev[j].qac_entry;
+
+		if (array_record->start_cand)
+			continue;
+
+		/* query resource state to acquire protection level string */
+		prot_level_str = get_prot_level_str(cur_ioa->supported_arrays,
+						    array_record->raid_level);
+		strncpy(cur_ioa->dev[j].prot_level_str,prot_level_str, 8);
+
+		dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
+		array_id = dev_record->array_id;
+
+		for (i = 0; i < cur_ioa->num_devices; i++) {
+			dev_record = (struct ipr_dev_record *)cur_ioa->dev[i].qac_entry;
+
+			if (!(ipr_is_array_member(&cur_ioa->dev[i])) ||
+			    (ipr_is_volume_set(&cur_ioa->dev[i])) ||
+			    ((dev_record != NULL) &&
+			     (dev_record->array_id != array_id)))
+				continue;
+
+			strncpy(cur_ioa->dev[i].prot_level_str, prot_level_str, 8);
+		}
+	}
 }
 
 int start_conc_maint(i_container *i_con, int action)
@@ -4734,7 +4767,6 @@ int start_conc_maint(i_container *i_con, int action)
 	int found;
 	s_node *n_screen;
 	int header_lines;
-	mvaddstr(0,0,"CONCURRENT REMOVE DEVICE FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -4766,6 +4798,7 @@ int start_conc_maint(i_container *i_con, int action)
 			ses_channel = scsi_dev_data->channel;
 
 			for (i=0; i<((ntohs(ses_data.byte_count)-8)/sizeof(struct ipr_drive_elem_status)); i++) {
+				get_dev_raid_level(cur_ioa);
 				found = 0;
 
 				for (l=0; l<cur_ioa->num_devices; l++) {
@@ -4775,7 +4808,8 @@ int start_conc_maint(i_container *i_con, int action)
 						continue;
 
 					if ((scsi_dev_data->channel == ses_channel) &&
-					    (scsi_dev_data->id == ses_data.elem_status[i].scsi_id)) {
+					    (scsi_dev_data->id == ses_data.elem_status[i].scsi_id) &&
+					    (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_POPULATED)) {
 
 						found++;
 						if (action == IPR_CONC_ADD)
@@ -4877,7 +4911,6 @@ int init_device(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"INIT DEVICE FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -5044,7 +5077,6 @@ int confirm_init_device(i_container *i_con)
 	int found = 0;
 	int post_attention = 0;
 	struct ipr_dev *dev;
-	mvaddstr(0,0,"CONFIRM INIT DEVICE FUNCTION CALLED");
 
 	for (temp_i_con = i_con_head;
 	     temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
@@ -5492,10 +5524,14 @@ int dev_init_complete(u8 num_devs)
 
 				ioa = cur_dev_init->ioa;
 
-				if (cur_dev_init->change_size != 0)
+				if (cur_dev_init->change_size != 0) {
+					if (cur_dev_init->change_size == IPR_522_BLOCK)
+						enable_af(cur_dev_init->ipr_dev);
+
 					/* send evaluate device down */
 					evaluate_device(cur_dev_init->ipr_dev,
 							ioa, cur_dev_init->change_size);
+				}
 			}
 
 			flush_stdscr();
@@ -5525,7 +5561,6 @@ int reclaim_cache(i_container* i_con)
 	int header_lines;
 	int toggle=1;
 	int k;
-	mvaddstr(0,0,"RECLAIM CACHE FUNCTION CALLED");
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -5599,7 +5634,6 @@ int confirm_reclaim(i_container *i_con)
 	int header_lines;
 	int toggle=1;
 	int ioa_num;
-	mvaddstr(0,0,"CONFIRM RECLAIM CACHE FUNCTION CALLED");
 
 	for (temp_i_con = i_con_head; temp_i_con;
 	     temp_i_con = temp_i_con->next_item) {
@@ -5685,7 +5719,6 @@ int reclaim_warning(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle=1;
-	mvaddstr(0,0,"CONFIRM RECLAIM CACHE FUNCTION CALLED");
 
 	reclaim_ioa = (struct ipr_ioa *)i_con->data;
 	if (!reclaim_ioa)
@@ -5724,7 +5757,6 @@ int reclaim_result(i_container *i_con)
 	int action;
 	char buffer[32];
 	char *body = NULL;
-	mvaddstr(0,0,"RECLAIM RESULT FUNCTION CALLED");
 
 	reclaim_ioa = (struct ipr_ioa *) i_con->data;
 
@@ -5809,7 +5841,6 @@ int battery_maint(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle=1;
-	mvaddstr(0,0,"BATTERY MAINT FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 
@@ -5962,7 +5993,6 @@ int confirm_force_battery_error(void)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle=1;
-	mvaddstr(0,0,"CONFIRM FORCE BATTERY ERROR FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -6003,7 +6033,6 @@ int battery_fork(i_container *i_con)
 	char *input;
 
 	i_container *temp_i_con;
-	mvaddstr(0,0,"CONFIRM FORCE BATTERY ERROR FUNCTION CALLED");
 
 	for (temp_i_con = i_con_head; temp_i_con != NULL; temp_i_con = temp_i_con->next_item) {
 		cur_ioa = (struct ipr_ioa *)temp_i_con->data;
@@ -6035,7 +6064,6 @@ int force_battery_error(i_container *i_con)
 	int rc, reclaim_rc;
 	struct ipr_ioa *cur_ioa;
 	struct ipr_reclaim_query_data reclaim_buffer;
-	mvaddstr(0,0,"FORCE BATTERY ERROR FUNCTION CALLEd");
 
 	reclaim_rc = rc = RC_SUCCESS;
 
@@ -6081,7 +6109,6 @@ int bus_config(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"BUS CONFIG FUNCTION CALLED");
 	rc = RC_SUCCESS;
 
 	i_con = free_i_con(i_con);
@@ -6196,8 +6223,6 @@ int change_bus_attr(i_container *i_con)
 			  struct bus_attr *bus_attr,
 			  int row,
 			  int header_lines);
-
-	mvaddstr(0,0,"CHANGE BUS ATTR FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -6386,8 +6411,6 @@ int confirm_change_bus_attr(i_container *i_con)
 	char *body = NULL;
 	char buffer[128];
 	struct screen_output *s_out;
-
-	mvaddstr(0,0,"CHANGE BUS ATTR FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -6865,7 +6888,6 @@ int driver_config(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
-	mvaddstr(0,0,"DRIVER CONFIG FUNCTION CALLED");
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -6952,7 +6974,6 @@ int change_driver_config(i_container *i_con)
 	char buffer[128];
 	char *body = NULL;
 	char *input;
-	mvaddstr(0,0,"KERNEL ROOT FUNCTION CALLED");
 
 	for (temp_i_con = i_con_head; temp_i_con != NULL;
 	     temp_i_con = temp_i_con->next_item) {
@@ -7026,8 +7047,6 @@ int disk_config(i_container * i_con)
 	struct ipr_dev_record *dev_record;
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
-
-	mvaddstr(0,0,"DISK CONFIG FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -7307,7 +7326,6 @@ int change_disk_config(i_container * i_con)
 	char *body = NULL;
 	struct screen_output *s_out;
 	struct ipr_array_record *array_record;
-	mvaddstr(0,0,"CHANGE BUS ATTR FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 
@@ -7439,8 +7457,6 @@ int download_ucode(i_container * i_con)
 	struct ipr_dev_record *dev_record;
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
-
-	mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -7799,7 +7815,6 @@ int log_menu(i_container *i_con)
 	struct stat file_stat;
 	struct screen_output *s_out;
 	int offset = 0;
-	mvaddstr(0,0,"LOG MENU FUNCTION CALLED");
 
 	sprintf(cmnd,"%s/boot.msg",log_root_dir);
 	rc = stat(cmnd, &file_stat);
@@ -7830,7 +7845,6 @@ int ibm_storage_log_tail(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
 	int rc, len;
-	mvaddstr(0,0,"IBM STORAGE LOG TAIL FUNCTION CALLED");
 
 	def_prog_mode();
 	rc = system("rm -rf /tmp/.ipr.err; mkdir /tmp/.ipr.err");
@@ -7883,8 +7897,6 @@ int ibm_storage_log(i_container *i_con)
 	struct dirent **dirent;
 	int num_dir_entries;
 	int len;
-
-	mvaddstr(0,0,"IBM STORAGE LOG FUNCTION CALLED");
 
 	def_prog_mode();
 
@@ -7957,8 +7969,6 @@ int kernel_log(i_container *i_con)
 	int num_dir_entries;
 	int len;
 
-	mvaddstr(0,0,"KERNEL LOG FUNCTION CALLED");
-
 	def_prog_mode();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
@@ -8022,8 +8032,6 @@ int iprconfig_log(i_container *i_con)
 	int num_dir_entries;
 	int len;
 
-	mvaddstr(0,0,"IPRCONFIG LOG FUNCTION CALLED");
-
 	def_prog_mode();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
@@ -8082,7 +8090,6 @@ int kernel_root(i_container *i_con)
 	int rc;
 	struct screen_output *s_out;
 	char *body = NULL;
-	mvaddstr(0,0,"KERNEL ROOT FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 
@@ -8111,7 +8118,6 @@ int confirm_kernel_root(i_container *i_con)
 	char *input;
 	struct screen_output *s_out;
 	char *body = NULL;
-	mvaddstr(0,0,"CONFIRM KERNEL ROOT FUNCTION CALLED");
 
 	input = strip_trailing_whitespace(i_con->field_data);
 	dir = opendir(input);
@@ -8156,7 +8162,6 @@ int set_default_editor(i_container *i_con)
 	int rc = 0;
 	struct screen_output *s_out;
 	char *body = NULL;
-	mvaddstr(0,0,"SET DEFAULT EDITOR FUNCTION CALLED");
 
 	i_con = free_i_con(i_con);
 	i_con = add_i_con(i_con,"",NULL);
@@ -8182,7 +8187,6 @@ int confirm_set_default_editor(i_container *i_con)
 	char *input;
 	struct screen_output *s_out;
 	char *body = NULL;
-	mvaddstr(0,0,"CONFIRM SET DEFAULT EDITOR FUNCTION CALLED");
 
 	input = strip_trailing_whitespace(i_con->field_data);
 	if (strcmp(editor, input) == 0)
@@ -8214,7 +8218,6 @@ int confirm_set_default_editor(i_container *i_con)
 
 int restore_log_defaults(i_container *i_con)
 {
-	mvaddstr(0,0,"RESTORE LOG DEFAULTS FUNCTION CALLED");
 	strcpy(log_root_dir, DEFAULT_LOG_DIR);
 	strcpy(editor, DEFAULT_EDITOR);
 	return 64; /*"Default log values restored"*/
@@ -8226,8 +8229,6 @@ int ibm_boot_log(i_container *i_con)
 	int rc;
 	int len;
 	struct stat file_stat;
-
-	mvaddstr(0,0,"IBM BOOT LOG FUNCTION CALLED");
 
 	sprintf(cmnd,"%s/boot.msg",log_root_dir);
 	rc = stat(cmnd, &file_stat);

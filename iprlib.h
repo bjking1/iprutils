@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.28 2004/03/11 23:25:36 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.29 2004/03/12 21:01:28 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -84,6 +84,8 @@
 #define IPR_WRITE_BUFFER_TIMEOUT             (10 * 60)    /* 10 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
 #define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
+#define IPR_DRIVE_ELEM_STATUS_EMPTY          5
+#define IPR_DRIVE_ELEM_STATUS_POPULATED      1
 #define IPR_TIMEOUT_MINUTE_RADIX		0x4000
 
 #define IPR_IOA_DEBUG                        0xDDu
@@ -166,7 +168,7 @@ extern struct ipr_ioa *ipr_ioa_tail;
 extern int runtime;
 
 struct ipr_res_addr {
-	u8 reserved;
+	u8 host;
 	u8 bus;
 	u8 target;
 	u8 lun;
