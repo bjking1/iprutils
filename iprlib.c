@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.42 2004/03/15 22:11:46 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.43 2004/03/16 04:30:01 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1861,7 +1861,7 @@ void check_current_config(bool allow_rebuild_refresh)
 					/* add phantom qac entry to ioa device list */
 					ioa->dev[device_count].scsi_dev_data = NULL;
 					ioa->dev[device_count].qac_entry = common_record;
-
+					ioa->dev[device_count].ioa = ioa;
 					strcpy(ioa->dev[device_count].dev_name, "");
 					strcpy(ioa->dev[device_count].gen_name, "");
 					device_count++;

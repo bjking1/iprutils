@@ -1550,6 +1550,11 @@ int device_details(i_container *i_con)
 		(struct ipr_array_record *)device->qac_entry;
 	rc = 0;
 
+	memset(&ioa_vpd, 0, sizeof(ioa_vpd));
+	memset(&cfc_vpd, 0, sizeof(cfc_vpd));
+	memset(&dram_vpd, 0, sizeof(dram_vpd));
+	memset(&page3_inq, 0, sizeof(page3_inq));
+
 	if (scsi_dev_data) {
 		scsi_channel = scsi_dev_data->channel;
 		scsi_id = scsi_dev_data->id;
@@ -1574,11 +1579,6 @@ int device_details(i_container *i_con)
 	if ((scsi_dev_data) &&
 	    (scsi_dev_data->type == IPR_TYPE_ADAPTER)) {
 		n_screen = &n_adapter_details;
-
-		memset(&ioa_vpd, 0, sizeof(ioa_vpd));
-		memset(&cfc_vpd, 0, sizeof(cfc_vpd));
-		memset(&dram_vpd, 0, sizeof(dram_vpd));
-		memset(&page3_inq, 0, sizeof(page3_inq));
 
 		ipr_inquiry(device, IPR_STD_INQUIRY, &ioa_vpd, sizeof(ioa_vpd));
 		ipr_inquiry(device, 1, &cfc_vpd, sizeof(cfc_vpd));
@@ -1692,41 +1692,56 @@ int device_details(i_container *i_con)
 	} else {
 		n_screen = &n_device_details;
 
-		memset(&read_cap, 0, sizeof(read_cap));
-		rc = ipr_read_capacity(device, &read_cap);
-
-		rc = ipr_inquiry(device, 0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
 		rc = ipr_inquiry(device, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
 
-		ipr_strncpy_0(vendor_id,
-			      std_inq.std_inq_data.vpids.vendor_id,
-			      IPR_VENDOR_ID_LEN);
-		ipr_strncpy_0(product_id,
-			      std_inq.std_inq_data.vpids.product_id,
-			      IPR_PROD_ID_LEN);
+		if (!rc) {
+			ipr_strncpy_0(vendor_id,
+				      std_inq.std_inq_data.vpids.vendor_id,
+				      IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0(product_id,
+				      std_inq.std_inq_data.vpids.product_id,
+				      IPR_PROD_ID_LEN);
+			ipr_strncpy_0(serial_num,
+				      std_inq.std_inq_data.serial_num,
+				      IPR_SERIAL_NUM_LEN);
+		} else if (device_record) {
+			ipr_strncpy_0(vendor_id,
+				      device_record->vendor_id,
+				      IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0(product_id,
+				      device_record->product_id,
+				      IPR_PROD_ID_LEN);
+			ipr_strncpy_0(serial_num,
+				      device_record->serial_num,
+				      IPR_SERIAL_NUM_LEN);
+		}
 
 		body = add_line_to_body(body,"", NULL);
 		body = add_line_to_body(body,_("Manufacturer"), vendor_id);
 		body = add_line_to_body(body,_("Product ID"), product_id);
 
-		len = sprintf(buffer, "%X%X%X%X",
-			      dasd_page3_inq.release_level[0],
-			      dasd_page3_inq.release_level[1],
-			      dasd_page3_inq.release_level[2],
-			      dasd_page3_inq.release_level[3]);
+		rc = ipr_inquiry(device, 0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
 
-		if (isalnum(dasd_page3_inq.release_level[0]) &&
-		    isalnum(dasd_page3_inq.release_level[1]) &&
-		    isalnum(dasd_page3_inq.release_level[2]) &&
-		    isalnum(dasd_page3_inq.release_level[3]))
+		if (!rc) {
+			len = sprintf(buffer, "%X%X%X%X",
+				      dasd_page3_inq.release_level[0],
+				      dasd_page3_inq.release_level[1],
+				      dasd_page3_inq.release_level[2],
+				      dasd_page3_inq.release_level[3]);
 
-			sprintf(buffer + len, " (%c%c%c%c)",
-				dasd_page3_inq.release_level[0],
-				dasd_page3_inq.release_level[1],
-				dasd_page3_inq.release_level[2],
-				dasd_page3_inq.release_level[3]);
+			if (isalnum(dasd_page3_inq.release_level[0]) &&
+			    isalnum(dasd_page3_inq.release_level[1]) &&
+			    isalnum(dasd_page3_inq.release_level[2]) &&
+			    isalnum(dasd_page3_inq.release_level[3]))
 
-		body = add_line_to_body(body,_("Firmware Version"), buffer);
+				sprintf(buffer + len, " (%c%c%c%c)",
+					dasd_page3_inq.release_level[0],
+					dasd_page3_inq.release_level[1],
+					dasd_page3_inq.release_level[2],
+					dasd_page3_inq.release_level[3]);
+
+			body = add_line_to_body(body,_("Firmware Version"), buffer);
+		}
 
 		if (strcmp(vendor_id,"IBMAS400") == 0) {
 			/* The service level on IBMAS400 dasd is located
@@ -1737,12 +1752,12 @@ int device_details(i_container *i_con)
 			body = add_line_to_body(body,_("Level"), buffer);
 		}
 
-		ipr_strncpy_0(serial_num,
-			      std_inq.std_inq_data.serial_num,
-			      IPR_SERIAL_NUM_LEN);
 		body = add_line_to_body(body,_("Serial Number"), serial_num);
 
-		if (ntohl(read_cap.block_length) &&
+		memset(&read_cap, 0, sizeof(read_cap));
+		rc = ipr_read_capacity(device, &read_cap);
+
+		if (!rc && ntohl(read_cap.block_length) &&
 		    ntohl(read_cap.max_user_lba))  {
 
 			lba_divisor = (1000*1000*1000) /
@@ -1776,7 +1791,7 @@ int device_details(i_container *i_con)
 
 		rc =  ipr_inquiry(device, 0, &page0_inq, sizeof(page0_inq));
 
-		for (i = 0; (i < page0_inq.page_length) && !rc; i++) {
+		for (i = 0; !rc && i < page0_inq.page_length; i++) {
 			if (page0_inq.supported_page_codes[i] == 0xC7) {
 				/* FIXME 0xC7 is SCSD, do further research to find
 				 what needs to be tested for this affirmation.*/
@@ -4849,13 +4864,13 @@ int start_conc_maint(i_container *i_con, int action)
 	int num_lines = 0;
 	struct ipr_ioa *cur_ioa;
 	struct scsi_dev_data *scsi_dev_data;
+	struct ipr_dev_record *dev_rcd;
 	struct screen_output *s_out;
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_dev **local_dev = NULL;
 	int local_dev_count = 0;
 	u8 ses_channel;
 	int toggle = 1;
-	int found;
 	s_node *n_screen;
 	int header_lines;
 
@@ -4890,31 +4905,8 @@ int start_conc_maint(i_container *i_con, int action)
 
 			for (i=0; i<((ntohs(ses_data.byte_count)-8)/sizeof(struct ipr_drive_elem_status)); i++) {
 				get_dev_raid_level(cur_ioa);
-				found = 0;
 
-				for (l=0; l<cur_ioa->num_devices; l++) {
-					scsi_dev_data = cur_ioa->dev[l].scsi_dev_data;
-
-					if (scsi_dev_data == NULL)
-						continue;
-
-					if ((scsi_dev_data->channel == ses_channel) &&
-					    (scsi_dev_data->id == ses_data.elem_status[i].scsi_id) &&
-					    (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_POPULATED)) {
-
-						found++;
-						if (action == IPR_CONC_ADD)
-							continue;
-
-						for (k=0; k<2; k++)
-							buffer[k] = print_device(&cur_ioa->dev[l],buffer[k],"%1",cur_ioa, k);
-						i_con = add_i_con(i_con,"\0", &cur_ioa->dev[l]);
-
-						num_lines++;
-					}
-				}
-
-				if (!found && ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
+				if (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					local_dev = realloc(local_dev, (sizeof(void *) *
 									local_dev_count) + 1);
 					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
@@ -4931,6 +4923,33 @@ int start_conc_maint(i_container *i_con, int action)
 					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count]);
 
 					num_lines++;
+					continue;
+				}
+
+				for (l = 0; action != IPR_CONC_ADD && l < cur_ioa->num_devices; l++) {
+					if (ses_data.elem_status[i].status !=
+					    IPR_DRIVE_ELEM_STATUS_POPULATED)
+						continue;
+
+					scsi_dev_data = cur_ioa->dev[l].scsi_dev_data;
+					dev_rcd = (struct ipr_dev_record *)cur_ioa->dev[l].qac_entry;
+
+					if ((scsi_dev_data &&
+					     scsi_dev_data->channel == ses_channel &&
+					     scsi_dev_data->id == ses_data.elem_status[i].scsi_id) ||
+					    (dev_rcd && !dev_rcd->no_cfgte_dev &&
+					     dev_rcd->resource_addr.bus == ses_channel &&
+					     dev_rcd->resource_addr.target == ses_data.elem_status[i].scsi_id) ||
+					    (dev_rcd && dev_rcd->no_cfgte_dev &&
+					     dev_rcd->last_resource_addr.bus == ses_channel &&
+					     dev_rcd->last_resource_addr.target == ses_data.elem_status[i].scsi_id)) {
+						for (k=0; k<2; k++)
+							buffer[k] = print_device(&cur_ioa->dev[l],buffer[k],"%1",cur_ioa, k);
+						i_con = add_i_con(i_con,"\0", &cur_ioa->dev[l]);
+
+						num_lines++;
+						break;
+					}
 				}
 			}
 		}
@@ -8517,19 +8536,35 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			common_record = ipr_dev->qac_entry;
 			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 				device_record = (struct ipr_dev_record *)common_record;
-				tab_stop  = sprintf(body + len,"%d:%d:%d ",
-						    device_record->last_resource_addr.bus,
-						    device_record->last_resource_addr.target,
-						    device_record->last_resource_addr.lun);
+				if (device_record->no_cfgte_dev) {
+					tab_stop  = sprintf(body + len,"%d:%d:%d ",
+							    device_record->last_resource_addr.bus,
+							    device_record->last_resource_addr.target,
+							    device_record->last_resource_addr.lun);
+				} else {
+					tab_stop  = sprintf(body + len,"%d:%d:%d ",
+							    device_record->resource_addr.bus,
+							    device_record->resource_addr.target,
+							    device_record->resource_addr.lun);
+				}
+
 				ipr_strncpy_0(vendor_id, device_record->vendor_id, IPR_VENDOR_ID_LEN);
 				ipr_strncpy_0(product_id , device_record->product_id, IPR_PROD_ID_LEN);
 			} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
 				array_record = (struct ipr_array_record *)common_record;
 
-				tab_stop  = sprintf(body + len,"%d:%d:%d ",
-						    array_record->last_resource_addr.bus,
-						    array_record->last_resource_addr.target,
-						    array_record->last_resource_addr.lun);
+				if (array_record->no_config_entry) {
+					tab_stop  = sprintf(body + len,"%d:%d:%d ",
+							    array_record->last_resource_addr.bus,
+							    array_record->last_resource_addr.target,
+							    array_record->last_resource_addr.lun);
+				} else {
+					tab_stop  = sprintf(body + len,"%d:%d:%d ",
+							    array_record->resource_addr.bus,
+							    array_record->resource_addr.target,
+							    array_record->resource_addr.lun);
+				}
+
 				ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
 				ipr_strncpy_0(product_id , array_record->product_id,
 					      IPR_PROD_ID_LEN);

@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.33 2004/03/15 22:11:46 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.34 2004/03/16 04:30:40 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -1280,14 +1280,22 @@ static inline void ipr_strncpy_0(char *dest, char *source, int length)
 #endif
 
 #define scsi_log(level, dev, fmt, ...) \
+do { \
+if (dev->scsi_dev_data) { \
       syslog(level, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
              dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
-             dev->scsi_dev_data->lun, ##__VA_ARGS__)
+             dev->scsi_dev_data->lun, ##__VA_ARGS__); \
+} \
+} while (0)
 
 #define scsi_dbg(dev, fmt, ...) \
+do { \
+if (dev->scsi_dev_data) { \
       syslog_dbg(LOG_DEBUG, "%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
              dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
-             dev->scsi_dev_data->lun, ##__VA_ARGS__)
+             dev->scsi_dev_data->lun, ##__VA_ARGS__); \
+} \
+} while (0)
 
 #define scsi_info(dev, fmt, ...) \
       scsi_log(LOG_NOTICE, dev, fmt, ##__VA_ARGS__)
