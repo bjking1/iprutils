@@ -9,7 +9,7 @@ iprconfig \- IBM Power RAID storage adapter configuration/recovery utility
 .SH SYNOPIPR
 .BI "iprconfig [-e editor] [-k dir]"
 .sp
-.BI "iprconfig --version"
+.BI "iprconfig --version --debug --force"
 .SH DESCRIPTION
 .B iprconfig
 is used to configure IBM Power RAID storage adapters, display information
@@ -137,6 +137,15 @@ Default is /var/log.
 .B \-\-version
 Print version number of 
 .B iprconfig
+.TP
+.B \-\-debug
+Enable additional error logging. Enabling this will result in additional 
+errors logging to /var/log/messages.
+.TP
+.B \-\-force
+Disable safety checks. Use this to disable safety checks in iprconfig. 
+This will allow you to format devices that are not at the appropriate 
+code levels. Only use this option if you really know what you are doing. 
 .SH AUTHOR
 Brian King <brking@us.ibm.com>
 .SH NOTES

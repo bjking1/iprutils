@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.12 2004/04/06 21:10:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.13 2004/05/23 05:45:41 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -104,13 +104,13 @@ static int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
 	cdb[13] = len & 0xff;
 
 	if (cmd == IPRDBG_WRITE) {
-		rc = sg_ioctl(fd, cdb, buffer,
-			      len, SG_DXFER_TO_DEV,
-			      &sense_data, IPR_INTERNAL_TIMEOUT);
+		rc = sg_ioctl_noretry(fd, cdb, buffer,
+				      len, SG_DXFER_TO_DEV,
+				      &sense_data, IPR_INTERNAL_TIMEOUT);
 	} else {
-		rc = sg_ioctl(fd, cdb, buffer,
-			      len, SG_DXFER_FROM_DEV,
-			      &sense_data, IPR_INTERNAL_TIMEOUT);
+		rc = sg_ioctl_noretry(fd, cdb, buffer,
+				      len, SG_DXFER_FROM_DEV,
+				      &sense_data, IPR_INTERNAL_TIMEOUT);
 	}
 
 	if (rc != 0)

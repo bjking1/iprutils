@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.11 2004/05/02 21:24:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.12 2004/05/23 05:45:41 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -253,19 +253,19 @@ static void handle_signal(int signal)
 int main(int argc, char *argv[])
 {
 	struct ipr_ioa *ioa;
-	int count, len;
+	int count, len, i;
 
 	openlog("iprdump", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 	strcpy(usr_dir, IPRDUMP_DIR);
 
-	if (argc > 1) {
-		if (strcmp(argv[1], "--version") == 0) {
+	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--version") == 0) {
 			printf("iprdump: %s\n", IPR_VERSION_STR);
 			exit(1);
-		} else if (strcmp(argv[1], "--debug") == 0) {
+		} else if (strcmp(argv[i], "--debug") == 0) {
 			ipr_debug = 1;
-		} else if (strcmp(argv[1], "-d") == 0) {
-			strcpy(usr_dir,argv[2]);
+		} else if (strcmp(argv[i], "-d") == 0) {
+			strcpy(usr_dir,argv[++i]);
 			len = strlen(usr_dir);
 			if (len < sizeof(usr_dir) && usr_dir[len] != '/') {
 				usr_dir[len + 1] = '/';
@@ -274,6 +274,7 @@ int main(int argc, char *argv[])
 		} else {
 			printf("Usage: iprdump [options]\n");
 			printf("  Options: --version    Print iprdump version\n");
+			printf("           --debug      Print extra debugging information\n");
 			printf("           -d <usr_dir>\n");
 			exit(1);
 		}

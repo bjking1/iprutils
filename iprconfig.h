@@ -812,7 +812,6 @@ s_node n_confirm_reclaim_warning = {
 		__("ATTENTION!!!   ATTENTION!!!   ATTENTION!!!   ATTENTION!!!\n"),
 		__("ATTENTION: Proceed with this function only if directed to from a "
 		   "service procedure. Data in the IOA cache will be discarded. "
-		   "By proceeding you will be allowing UNKNOWN data loss. "
 		   "This data loss may or may not be detected by the host operating."
 		   "system. Filesystem corruption may result on the system.\n\n"),
 		__("Press 's' to continue.\n\n"),

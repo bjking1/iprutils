@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.9
+Version: 2.0.10
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu May 23 2004 Brian King <brking@us.ibm.com> 2.0.10
+- Don't let iprdbg sg ioctls be retried.
+- Add --force flag to iprconfig to allow user to workaround buggy
+  drive firmware.
+- Don't initialize read/write protected disks
+- Fix some reclaim cache bugs
+- Don't setup Mode Page 0x0A if test unit ready fails
 * Thu May 2 2004 Brian King <brking@us.ibm.com> 2.0.9
 - Add --debug option to all utilities
 - Make utilities behave better when ipr is not loaded

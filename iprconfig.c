@@ -227,6 +227,8 @@ int main(int argc, char *argv[])
 				exit(1);
 			} else if (strcmp(argv[i], "--debug") == 0) {
 				ipr_debug = 1;
+			} else if (strcmp(argv[i], "--force") == 0) {
+				ipr_force = 1;
 			} else if (next_editor)	{
 				strcpy(parm_editor, argv[i]);
 				next_editor = 0;
@@ -238,6 +240,8 @@ int main(int argc, char *argv[])
 				printf(_("  Options: -e name    Default editor for viewing error logs\n"));
 				printf(_("           -k dir     Kernel messages root directory\n"));
 				printf(_("           --version  Print iprconfig version\n"));
+				printf(_("           --debug    Enable additional error logging\n"));
+				printf(_("           --force    Disable safety checks. See man page for details.\n"));
 				printf(_("  Use quotes around parameters with spaces\n"));
 				exit(1);
 			}
@@ -4848,6 +4852,10 @@ int process_conc_maint(i_container *i_con, int action)
 		if (action == IPR_VERIFY_CONC_REMOVE) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_REMOVE);
 			dev_rcd = (struct ipr_dev_record *) ipr_dev->qac_entry;
+			getmaxyx(stdscr,max_y,max_x);
+			move(max_y-1,0);
+			printw(_("Operation in progress - please wait"));
+			refresh();
 
 			if (!ipr_is_af_dasd_device(ipr_dev))
 				ipr_write_dev_attr(ipr_dev, "delete", "1");
@@ -5419,16 +5427,12 @@ int send_dev_inits(i_container *i_con)
 	int rc;
 	struct ipr_query_res_state res_state;
 	u8 ioctl_buffer[IOCTL_BUFFER_SIZE];
-	u8 ioctl_buffer2[IOCTL_BUFFER_SIZE];
-	struct ipr_control_mode_page *control_mode_page;
-	struct ipr_control_mode_page *control_mode_page_changeable;
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
 	struct ipr_block_desc *block_desc;
 	struct scsi_dev_data *scsi_dev_data;
 	int status;
 	int opens;
 	u8 failure = 0;
-	int is_520_block = 0;
 	int max_y, max_x;
 	u8 length;
 
@@ -5469,8 +5473,7 @@ int send_dev_inits(i_container *i_con)
 						 scsi_dev_data->id,
 						 scsi_dev_data->lun);
 
-			if ((opens != 0) && (!res_state.read_write_prot))
-			{
+			if ((opens != 0) && (!res_state.read_write_prot)) {
 				syslog(LOG_ERR,
 				       _("Cannot obtain exclusive access to %s\n"),
 				       cur_dev_init->ipr_dev->gen_name);
@@ -5480,100 +5483,31 @@ int send_dev_inits(i_container *i_con)
 				continue;
 			}
 
-			/* Mode sense */
-			rc = ipr_mode_sense(cur_dev_init->ipr_dev, 0x0a, ioctl_buffer);
+			disable_qerr(cur_dev_init->ipr_dev);
 
-			if (rc != 0)
-			{
-				syslog(LOG_ERR, _("Mode Sense to %s failed. %m\n"),
-				       cur_dev_init->ipr_dev->gen_name);
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
-			}
+			if (cur_dev_init->change_size == IPR_512_BLOCK) {
+				/* Issue mode select to change block size */
+				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+				memset(ioctl_buffer, 0, 255);
 
-			/* Mode sense - changeable parms */
-			rc = ipr_mode_sense(cur_dev_init->ipr_dev, 0x4a, ioctl_buffer2);
+				mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+				block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
 
-			if (rc != 0)
-			{
-				syslog(LOG_ERR, _("Mode Sense to %s failed. %m\n"),
-				       cur_dev_init->ipr_dev->gen_name);
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
-			}
-
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-			block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
-			if ((block_desc->block_length[0] == 0x00) &&
-			    (block_desc->block_length[1] == 0x02) &&
-			    (block_desc->block_length[2] == 0x08))
-				/* block size is 520 */
-				is_520_block = 1;
-
-			control_mode_page = (struct ipr_control_mode_page *)
-				(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
-
-			control_mode_page_changeable = (struct ipr_control_mode_page *)
-				(((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
-
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-			/* Turn off QERR since some drives do not like QERR
-			 and IMMED bit at the same time. */
-			IPR_SET_MODE(control_mode_page_changeable->qerr,
-				     control_mode_page->qerr, 0);
-
-			length = mode_parm_hdr->length + 1;
-			mode_parm_hdr->length = 0;
-			mode_parm_hdr->medium_type = 0;
-			mode_parm_hdr->device_spec_parms = 0;
-			control_mode_page->hdr.parms_saveable = 0;
-			rc = ipr_mode_select(cur_dev_init->ipr_dev, ioctl_buffer, length);
-
-			if (rc != 0) {
-				syslog(LOG_ERR, _("Mode Select %s to disable qerr failed. %m\n"),
-				       cur_dev_init->ipr_dev->gen_name);
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
-			}
-
-			/* Issue mode select to change block size */
-			mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-			memset(ioctl_buffer, 0, 255);
-
-			mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
-
-			block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
-
-			/* Setup block size */
-			block_desc->block_length[0] = 0x00;
-			block_desc->block_length[1] = 0x02;
-
-			if (cur_dev_init->change_size == IPR_512_BLOCK)
+				/* Setup block size */
+				block_desc->block_length[0] = 0x00;
+				block_desc->block_length[1] = 0x02;
 				block_desc->block_length[2] = 0x00;
-			else if (is_520_block)
-				block_desc->block_length[2] = 0x08;
-			else
-				block_desc->block_length[2] = 0x0a;
 
-			rc = ipr_mode_select(cur_dev_init->ipr_dev,ioctl_buffer,
-					     sizeof(struct ipr_block_desc) +
-					     sizeof(struct ipr_mode_parm_hdr));
+				rc = ipr_mode_select(cur_dev_init->ipr_dev,ioctl_buffer,
+						     sizeof(struct ipr_block_desc) +
+						     sizeof(struct ipr_mode_parm_hdr));
 
-			if (rc != 0) {
-				cur_dev_init->do_init = 0;
-				num_devs--;
-				failure++;
-				continue;
+				if (rc != 0) {
+					cur_dev_init->do_init = 0;
+					num_devs--;
+					failure++;
+					continue;
+				}
 			}
 
 			/* Issue the format. Failure will be detected by query command status */
@@ -5834,13 +5768,16 @@ int confirm_reclaim(i_container *i_con)
 	struct ipr_ioa *cur_ioa, *reclaim_ioa;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_query_res_state res_state;
+	struct ipr_dev_record *dev_rcd;
+	struct ipr_array_record *array_rcd;
 	int j, k, rc;
 	char *buffer[2];
 	i_container* temp_i_con;
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle=1;
-	int ioa_num;
+	int ioa_num = 0;
+	char *prot_level_str;
 
 	for (temp_i_con = i_con_head; temp_i_con;
 	     temp_i_con = temp_i_con->next_item) {
@@ -5872,10 +5809,8 @@ int confirm_reclaim(i_container *i_con)
 
 	for (j = 0; j < reclaim_ioa->num_devices; j++) {
 		scsi_dev_data = reclaim_ioa->dev[j].scsi_dev_data;
-		if (!scsi_dev_data ||
-		    (scsi_dev_data->type != TYPE_DISK &&
-		     scsi_dev_data->type != IPR_TYPE_AF_DISK))  /* FIXME correct check? */
-				continue;
+		if (!scsi_dev_data || !ipr_is_af(&reclaim_ioa->dev[j]))
+			continue;
 
 		/* Do a query resource state to see whether or not the
 		 device will be affected by the operation */
@@ -5884,9 +5819,28 @@ int confirm_reclaim(i_container *i_con)
 		if (rc != 0)
 			res_state.not_oper = 1;
 
-		/* FIXME Necessary? We have not set this field. Relates to not_oper?*/
-		if (!res_state.read_write_prot)
+		if (!res_state.read_write_prot && !res_state.not_oper)
 			continue;
+
+		if (ipr_is_volume_set(&reclaim_ioa->dev[j])) {
+			strcpy(reclaim_ioa->dev[j].prot_level_str, res_state.vset.prot_level_str);
+		} else if (ipr_is_af_dasd_device(&reclaim_ioa->dev[j])) {
+			dev_rcd = (struct ipr_dev_record *)reclaim_ioa->dev[j].qac_entry;
+
+			for (k = 0; k < reclaim_ioa->num_devices; k++) {
+				if (!ipr_is_volume_set(&reclaim_ioa->dev[k]))
+					continue;
+
+				array_rcd = (struct ipr_array_record *)reclaim_ioa->dev[k].qac_entry;
+
+				if (array_rcd->array_id == dev_rcd->array_id) {
+					prot_level_str = get_prot_level_str(reclaim_ioa->supported_arrays,
+									    array_rcd->raid_level);
+					strcpy(reclaim_ioa->dev[j].prot_level_str, prot_level_str);
+					break;
+				}
+			}
+		}
 
 		for (k=0; k<2; k++)
 			buffer[k] = print_device(&reclaim_ioa->dev[j],buffer[k],"1",reclaim_ioa, k);
@@ -8824,9 +8778,14 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			/* Issue mode sense/mode select to determine if device needs to be formatted */
 			status = ipr_mode_sense(ipr_dev, 0x0a, &ioctl_buffer);
 
-			if (status)
+			if (status == CHECK_CONDITION &&
+			    sense_data.sense_key == 0x03 &&
+			    sense_data.add_sense_code == 0x31 &&
+			    sense_data.add_sense_code_qual == 0x00) {
+				format_req = 1;
+			} else if (status) {
 				res_state.not_oper = 1;
-			else {
+			} else {
 				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
 				if (mode_parm_hdr->block_desc_len > 0) {

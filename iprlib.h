@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.43 2004/05/02 21:24:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44 2004/05/23 05:45:42 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -170,6 +170,7 @@ extern struct ipr_ioa *ipr_ioa_tail;
 extern int runtime;
 extern void (*exit_func) (void);
 extern int ipr_debug;
+extern int ipr_force;
 
 struct ipr_res_addr {
 	u8 host;
@@ -1148,6 +1149,7 @@ struct ipr_encl_status_ctl_pg
 };
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
+int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
 void tool_init();

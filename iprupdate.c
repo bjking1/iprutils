@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.13 2004/05/02 21:24:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.14 2004/05/23 05:45:42 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -110,22 +110,22 @@ int main(int argc, char *argv[])
 
 	force_devs = force_ioas = 0;
 
-	if (argc > 1) {
-		if (strcmp(argv[1], "--force") == 0)
+	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--force") == 0) {
 			force_devs = force_ioas = 1;
-		else if (strcmp(argv[1], "--version") == 0) {
+		} else if (strcmp(argv[i], "--version") == 0) {
 			printf("iprupdate: %s\n", IPR_VERSION_STR);
 			exit(1);
-		} else if (strcmp(argv[1], "--force-devs") == 0) {
+		} else if (strcmp(argv[i], "--force-devs") == 0) {
 			force_devs = 1;
-		} else if (strcmp(argv[1], "--force-ioas") == 0) {
+		} else if (strcmp(argv[i], "--force-ioas") == 0) {
 			force_ioas = 1;
-		} else if (strcmp(argv[1], "--check_only") == 0) {
+		} else if (strcmp(argv[i], "--check_only") == 0) {
 			check_levels = 1;
-		} else if (strcmp(argv[1], "--debug") == 0) {
+		} else if (strcmp(argv[i], "--debug") == 0) {
 			ipr_debug = 1;
 		} else {
-			printf("Usage: iprdate [options]\n");
+			printf("Usage: iprupdate [options]\n");
 			printf("  Options: --version    Print iprupdate version\n");
 			exit(1);
 		}

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.16 2004/05/02 21:24:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.17 2004/05/23 05:45:41 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -30,20 +30,23 @@ int main(int argc, char *argv[])
 	struct ipr_ioa *ioa;
 	int daemonize = 0;
 	int daemonized = 0;
+	int i;
 
 	openlog("iprinit", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
-	if (argc > 1) {
-		if (strcmp(argv[1], "--version") == 0) {
+	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--version") == 0) {
 			printf("iprinit: %s\n", IPR_VERSION_STR);
 			return 0;
-		} else if (strcmp(argv[1], "--daemon") == 0) {
+		} else if (strcmp(argv[i], "--daemon") == 0) {
 			daemonize = 1;
-		} else if (strcmp(argv[1], "--debug") == 0) {
+		} else if (strcmp(argv[i], "--debug") == 0) {
 			ipr_debug = 1;
+		} else if (strcmp(argv[i], "--force") == 0) {
+			ipr_force = 1;
 		} else {
 			printf("Usage: iprinit [options]\n");
-			printf("  Options: --version    Print iprinit version\n");
+			printf("  Options: --version [--daemon]   Print iprinit version\n");
 			return -EINVAL;
 		}
 	}

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.54 2004/05/03 01:41:45 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.55 2004/05/23 05:45:41 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -32,6 +32,7 @@ int runtime = 0;
 char *tool_name = NULL;
 void (*exit_func) (void) = default_exit_func;
 int ipr_debug = 0;
+int ipr_force = 0;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -386,6 +387,9 @@ int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 	attr = sysfs_get_classdev_attr(class_device, "fw_version");
 	sscanf(attr->value, "%8X", &fw_version);
 	sysfs_close_class_device(class_device);
+
+	if (ipr_force)
+		return IPR_MAX_XFER_RATE;
 
 	if (fw_version < ioa->msl)
 		max_xfer_rate = IPR_SAFE_XFER_RATE;
@@ -1568,10 +1572,10 @@ int enable_af(struct ipr_dev *dev)
 
 #define IPR_MAX_XFER 0x8000
 const int cdb_size[] ={6, 10, 10, 0, 16, 12, 16, 16};
-int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
-	     void *data, u32 xfer_len, u32 data_direction,
-	     struct sense_data_t *sense_data,
-	     u32 timeout_in_sec)
+static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
+		     void *data, u32 xfer_len, u32 data_direction,
+		     struct sense_data_t *sense_data,
+		     u32 timeout_in_sec, int retries)
 {
 	int rc;
 	sg_io_hdr_t io_hdr_t;
@@ -1605,7 +1609,7 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		dxferp = data;
 	}
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < (retries + 1); i++) {
 		memset(&io_hdr_t, 0, sizeof(io_hdr_t));
 		memset(sense_data, 0, sizeof(struct sense_data_t));
 
@@ -1641,6 +1645,26 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 	}
 
 	return rc;
+};
+
+int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
+	     void *data, u32 xfer_len, u32 data_direction,
+	     struct sense_data_t *sense_data,
+	     u32 timeout_in_sec)
+{
+	return _sg_ioctl(fd, cdb,
+			 data, xfer_len, data_direction,
+			 sense_data, timeout_in_sec, 1);
+};
+
+int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
+		     void *data, u32 xfer_len, u32 data_direction,
+		     struct sense_data_t *sense_data,
+		     u32 timeout_in_sec)
+{
+	return _sg_ioctl(fd, cdb,
+			 data, xfer_len, data_direction,
+			 sense_data, timeout_in_sec, 0);
 };
 
 int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
@@ -2601,11 +2625,20 @@ bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 	 disk is not supported all together. */
 	if (unsupp_af->supported_with_min_ucode_level) {
 		if (disk_needs_msl(unsupp_af, &std_inq_data)) {
-			if (!silent)
-				syslog(LOG_ERR,"Disk %s needs updated microcode "
-				       "before transitioning to 522 bytes/sector "
-				       "format.", ipr_dev->gen_name);
-			return true;
+			if (ipr_force) {
+				if (!silent)
+					scsi_err(ipr_dev, "Disk %s needs updated microcode "
+						 "before transitioning to 522 bytes/sector "
+						 "format. IGNORING SINCE --force USED!",
+						 ipr_dev->gen_name);
+				return false;
+			} else {
+				if (!silent)
+					scsi_err(ipr_dev, "Disk %s needs updated microcode "
+					       "before transitioning to 522 bytes/sector "
+					       "format.", ipr_dev->gen_name);
+				return true;
+			}
 		}
 	} else {/* disk is not supported at all */
 		if (!silent)
@@ -3352,6 +3385,17 @@ static int ipr_setup_page0x20(struct ipr_dev *dev)
 	return 0;
 }
 
+static int dev_init_allowed(struct ipr_dev *dev)
+{
+	struct ipr_query_res_state res_state;
+
+	if (!ipr_query_resource_state(dev, &res_state)) {
+		if (!res_state.read_write_prot)
+			return 1;
+	}
+	return 0;
+}
+
 /*
  * VSETs:
  * 1. Adjust queue depth based on number of devices
@@ -3389,16 +3433,18 @@ static void init_vset_dev(struct ipr_dev *dev)
 static void init_gpdd_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
+	struct sense_data_t sense_data;
 
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
 	if (runtime && page0x0a_setup(dev) && attr.queue_depth == GPDD_TCQ_DEPTH)
 		return;
+	if (ipr_test_unit_ready(dev, &sense_data))
+		return;
 	if (enable_af(dev))
 		return;
 	if (setup_page0x0a(dev)) {
-		syslog_dbg("Failed to enable TCQing for %s.\n",
-			   dev->scsi_dev_data->sysfs_device_name);
+		scsi_dbg(dev, "Failed to enable TCQing.\n");
 		return;
 	}
 
@@ -3421,9 +3467,11 @@ static void init_af_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
 
-	if (runtime && page0x20_setup(dev) && page0x0a_setup(dev))
-		return;
 	if (ipr_set_dasd_timeouts(dev))
+		return;
+	if (runtime && !dev_init_allowed(dev))
+		return;
+	if (runtime && page0x20_setup(dev) && page0x0a_setup(dev))
 		return;
 	if (setup_page0x01(dev))
 		return;
