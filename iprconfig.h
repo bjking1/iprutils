@@ -1050,7 +1050,7 @@ struct screen_opts download_ucode_opt[] = {
 
 s_node n_download_ucode = {
 	.rc_flags = (CANCEL_FLAG),
-	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | FWD_FLAG ),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG | FWD_FLAG | TOGGLE_FLAG),
 	.num_opts = NUM_OPTS(download_ucode_opt),
 	.options  = &download_ucode_opt[0],
 	.title    = __("Download Microcode"),
@@ -1063,7 +1063,7 @@ s_node n_download_ucode = {
 
 s_node n_choose_ucode = {
 	.rc_flags = (CANCEL_FLAG),
-	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.f_flags  = (CANCEL_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
 	.title    = __("Choose Microcode Image"),
@@ -1078,7 +1078,7 @@ s_node n_choose_ucode = {
 
 s_node n_confirm_download_ucode = {
 	.rc_flags = (CANCEL_FLAG),
-	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.f_flags  = (CANCEL_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
 	.title    = __("Confirm Microcode Download"),
@@ -1239,4 +1239,7 @@ const char *screen_status[] = {
 	/* 63 */ __("Editor unchanged"),
 	/* 64 */ __("Default log values restored"),
 	/* 65 */ __("Editor returned %d. Try setting the default editor.")
+      /* 66 */ __("Change Disk Configuration failed."),
+      /* 67 */ __("Microcode Download failed.")
+      /* NOTE:  127 maximum limit */
 };

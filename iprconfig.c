@@ -4437,8 +4437,14 @@ int hot_spare_complete(int action)
 		else
 			rc = ipr_remove_hot_spare(cur_ioa);
 
-		if (rc != 0)
-			return RC_FAILED;
+		if (rc != 0) {
+			if (action == IPR_ADD_HOT_SPARE)
+				/* Enable Device as Hot Spare failed */
+				return 55 | EXIT_FLAG; 
+			else
+				/* Disable Device as Hot Spare failed */
+				return 56 | EXIT_FLAG;
+		} 
 	}
 
 	flush_stdscr();
@@ -4584,7 +4590,7 @@ int process_conc_maint(i_container *i_con, int action)
 				  sizeof(struct ipr_encl_status_ctl_pg));
 
 	if (rc)
-		return RC_FAILED;
+		return 30 | EXIT_FLAG;
 
 	if (action == IPR_VERIFY_CONC_REMOVE)
 		n_screen = &n_verify_conc_remove;
@@ -7304,7 +7310,7 @@ int change_disk_config(i_container * i_con)
 
 	rc = ipr_get_dev_attr(ipr_dev, &disk_attr);
 	if (rc)
-		return RC_FAILED;  /* FIXME test */
+		return 66 | EXIT_FLAG;
 
 	i_con_head_saved = i_con_head; /* FIXME */
 	i_con_head = i_con = NULL;
@@ -7564,8 +7570,8 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	else
 		rc = get_dasd_firmware_image_list(ipr_dev, &list);
 
-	if (rc <= 0)
-		return RC_FAILED;
+	if (rc < 0)
+		return 67;
 	else
 		list_count = rc;
 
@@ -7573,10 +7579,14 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	i_con_head_saved = i_con_head;
 	i_con_head = i_con = NULL;
 
-	for (i=0; i<list_count; i++) {
-		sprintf(buffer," %%1   %.8X %s\n",list[i].version,list[i].file);
-		body = add_line_to_body(body,buffer, NULL);
-		i_con = add_i_con(i_con,"\0",&list[i]);
+	if (list_count) {
+		for (i=0; i<list_count; i++) {
+			sprintf(buffer," %%1   %.8X %s\n",list[i].version,list[i].file);
+			body = add_line_to_body(body,buffer, NULL);
+			i_con = add_i_con(i_con,"\0",&list[i]);
+		}
+	} else {
+		body = add_line_to_body(body,"(No available images)",NULL);
 	}
 
 	n_choose_ucode.body = body;
