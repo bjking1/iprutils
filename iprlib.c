@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.26 2004/03/03 17:43:05 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.27 2004/03/03 18:54:18 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2656,7 +2656,7 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 		syslog_dbg(LOG_ERR, "Could not find firmware file %s.\n", prefix);
 
 	*list = ret;
-	return 0;
+	return j;
 }
 
 void ipr_update_ioa_fw(struct ipr_ioa *ioa,
