@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.2 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.2.2.1 2003/11/07 22:07:20 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -23,20 +23,6 @@
 
 #include <sys/mman.h>
 
-struct image_header
-{
-    u32 header_length;
-    u32 lid_table_offset;
-    u8 major_release;
-    u8 card_type;
-    u8 minor_release[2];
-#define LINUX_HEADER_RESERVED_BYTES 20
-    u8 reserved[LINUX_HEADER_RESERVED_BYTES];
-    char eyecatcher[16];        /* IBMAS400 CCIN */
-    u32 num_lids;
-    struct ipr_software_inq_lid_info lid[1];
-};
-
 int open_dev(struct ipr_ioa *p_ioa, struct ipr_device *p_device);
 
 int main(int argc, char *argv[])
@@ -49,7 +35,7 @@ int main(int argc, char *argv[])
     struct ipr_inquiry_page_cx page_cx_inq;
     int num_ioa_lids = 0;
     int num_binary_lids = 0;
-    char ucode_file[50];
+    char ucode_file[100], prefix[100];
     int do_download, ucode_fd, dasd_ucode_fd;
     struct image_header *p_image_hdr;
     struct ipr_dasd_ucode_header *p_dasd_image_hdr;
@@ -69,6 +55,7 @@ int main(int argc, char *argv[])
     int image_size;
     int device_update_blocked;
     int u320_disabled;
+    u8 modification_level[4];
 
     struct software_inq_lid_info
     {
@@ -129,8 +116,6 @@ int main(int argc, char *argv[])
             syslog(LOG_ERR, "Cannot open %s. %m"IPR_EOL, p_cur_ioa->ioa.dev_name);
             continue;
         }
-
-        sprintf(ucode_file, "/etc/microcode/ibmsis%X.img", p_cur_ioa->ccin);
 
         /* Do a page 0 inquiry to the adapter to get the supported page codes */
         memset(&ioa_cmd, 0, sizeof(ioa_cmd));
@@ -217,10 +202,19 @@ int main(int argc, char *argv[])
         do_download = 0;
 
         /* Parse the binary file */
+        rc = find_ioa_firmware_image(p_cur_ioa, ucode_file);
+
+        if (rc)
+        {
+            syslog(LOG_ERR, "Could not find firmware file for IBM %04X."IPR_EOL,
+                   p_cur_ioa->ccin);
+            close(fd);
+            continue;
+        }
 
         ucode_fd = open(ucode_file, O_RDONLY);
 
-        if (ucode_fd < 0)
+        if (ucode_fd == -1)
         {
             syslog(LOG_ERR, "Could not open firmware file %s. %m"IPR_EOL, ucode_file);
             close(fd);
@@ -303,7 +297,8 @@ int main(int argc, char *argv[])
             (force_download == 1) ||
             (force_ioas == 1))
         {
-            syslog(LOG_NOTICE, "Updating IOA firmware on %s"IPR_EOL, p_cur_ioa->ioa.dev_name);
+            syslog(LOG_NOTICE, "Updating IOA firmware on %s with %s"IPR_EOL,
+                   p_cur_ioa->ioa.dev_name, ucode_file);
 
             /* Do the update if the two are different */
             /* Might want to fork off a process here so we can start
@@ -434,7 +429,7 @@ int main(int argc, char *argv[])
                 /* check if vendor id is IBMAS400 */
                 if (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0)
                 {
-                    sprintf(ucode_file, "/etc/microcode/device/ibmsis%02X%02X%02X%02X.img",
+                    sprintf(prefix, "ibmsis%02X%02X%02X%02X.img",
                             dasd_page3_inq.load_id[0], dasd_page3_inq.load_id[1],
                             dasd_page3_inq.load_id[2],
                             dasd_page3_inq.load_id[3]);
@@ -443,11 +438,9 @@ int main(int argc, char *argv[])
                 else if (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBM     ", 8) == 0)
                 {
                     if (p_device->opens)
-                    {
                         device_update_blocked = 1;
-                    }
 
-                    sprintf(ucode_file, "/etc/microcode/device/%.7s.%02X%02X%02X%02X",
+                    sprintf(prefix, "%.7s.%02X%02X%02X%02X",
                             p_device->p_resource_entry->std_inq_data.vpids.product_id,
                             dasd_page3_inq.load_id[0], dasd_page3_inq.load_id[1],
                             dasd_page3_inq.load_id[2],
@@ -468,6 +461,18 @@ int main(int argc, char *argv[])
                 do_download = 0;
 
                 /* Parse the binary file */
+
+                rc = find_dasd_firmware_image(p_device, prefix, ucode_file, modification_level);
+
+                if (rc == IPR_DASD_UCODE_NOT_FOUND)
+                {
+                    syslog_dbg(LOG_ERR, "Could not find firmware file %s. %m"IPR_EOL, prefix);
+                    close(dev_fd);
+                    continue;
+                }
+
+                if (rc == IPR_DASD_UCODE_NO_HDR)
+                    image_offset = 0;
 
                 dasd_ucode_fd = open(ucode_file, O_RDONLY);
 
@@ -501,18 +506,7 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
-                if ((memcmp(p_dasd_image_hdr->load_id, dasd_page3_inq.load_id, 4)) &&
-                    (memcmp(p_device->p_resource_entry->std_inq_data.vpids.vendor_id, "IBMAS400", 8) == 0))
-                {
-                    syslog(LOG_ERR, "Firmware file corrupt: %s. %m"IPR_EOL, ucode_file);
-                    close(dev_fd);
-                    close(dasd_ucode_fd);
-                    munmap(p_dasd_image_hdr, ucode_stats.st_size);
-                    continue;
-                }
-
-                if ((memcmp(p_dasd_image_hdr->modification_level,
-                            dasd_page3_inq.release_level, 4) > 0) ||
+                if ((memcmp(modification_level, dasd_page3_inq.release_level, 4) > 0) ||
                     (force_download == 1) ||
                     (force_devs == 1))
                 {
@@ -539,10 +533,10 @@ int main(int argc, char *argv[])
                         continue;
                     }
 
-                    if (isprint(p_dasd_image_hdr->modification_level[0]) &&
-                        isprint(p_dasd_image_hdr->modification_level[1]) &&
-                        isprint(p_dasd_image_hdr->modification_level[2]) &&
-                        isprint(p_dasd_image_hdr->modification_level[3]) &&
+                    if (isprint(modification_level[0]) &&
+                        isprint(modification_level[1]) &&
+                        isprint(modification_level[2]) &&
+                        isprint(modification_level[3]) &&
                         isprint(dasd_page3_inq.release_level[0]) &&
                         isprint(dasd_page3_inq.release_level[1]) &&
                         isprint(dasd_page3_inq.release_level[2]) &&
@@ -558,10 +552,8 @@ int main(int argc, char *argv[])
                                dasd_page3_inq.release_level[1],
                                dasd_page3_inq.release_level[2],
                                dasd_page3_inq.release_level[3],
-                               p_dasd_image_hdr->modification_level[0],
-                               p_dasd_image_hdr->modification_level[1],
-                               p_dasd_image_hdr->modification_level[2],
-                               p_dasd_image_hdr->modification_level[3]);
+                               modification_level[0], modification_level[1],
+                               modification_level[2], modification_level[3]);
                     }
                     else
                     {

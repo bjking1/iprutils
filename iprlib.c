@@ -9,8 +9,12 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2.2.1 2003/10/29 14:04:59 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.2.2.2 2003/11/07 22:07:19 bjking1 Exp $
  */
+
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 #ifndef iprlib_h
 #include "iprlib.h"
@@ -260,6 +264,249 @@ struct unsupported_af_dasd unsupported_af[] =
         min_ucode_mask: {1, 1, 1, 1}
     }
 };
+
+struct ipr_ioa_fw
+{
+    u16 ccin;
+    char *name; 
+};
+
+struct ipr_ioa_fw ipr_ioa_fw_table[] =
+{
+    {0x5702, "44415254"},
+    {0x5703, "5052414D"},
+    {0x5709, "5052414E"},
+    {0x570A, "44415255"},
+    {0x570B, "44415255"}
+};
+
+static int select_ioa_ucode_file(const struct dirent *p_dir_entry)
+{
+    return 1;
+}
+
+static int select_dasd_ucode_file(const struct dirent *p_dir_entry)
+{
+    return 1;
+}
+
+static u32 get_ioa_ucode_version(char *ucode_file)
+{
+    int fd, rc;
+    struct stat ucode_stats;
+    struct image_header *p_image_hdr;
+
+    fd = open(ucode_file, O_RDONLY);
+
+    if (fd == -1)
+        return 0;
+
+    /* Get the size of the microcode image */
+    rc = fstat(fd, &ucode_stats);
+
+    if (rc != 0)
+    {
+        close(fd);
+        return 0;
+    }
+
+    /* Map the image in memory */
+    p_image_hdr = mmap(NULL, ucode_stats.st_size,
+                       PROT_READ, MAP_SHARED, fd, 0);
+
+    if (p_image_hdr == MAP_FAILED)
+    {
+        close(fd);
+        return 0;
+    }
+
+    rc = (p_image_hdr->major_release << 24) |
+        (p_image_hdr->card_type << 16) |
+        (p_image_hdr->minor_release[0] << 8) |
+        (p_image_hdr->minor_release[1]);
+
+    munmap(p_image_hdr, ucode_stats.st_size);
+    close(fd);
+
+    return rc;
+}
+
+static u32 get_dasd_ucode_version(char *ucode_file, int ftype)
+{
+    int fd;
+    struct stat ucode_stats;
+    struct ipr_dasd_ucode_header *p_dasd_image_hdr;
+    char *p_char;
+    u32 rc;
+
+    fd = open(ucode_file, O_RDONLY);
+
+    if (fd == -1)
+        return 0;
+
+    if (ftype == IPR_DASD_UCODE_ETC)
+    {
+
+        /* Get the size of the microcode image */
+        rc = fstat(fd, &ucode_stats);
+
+        if (rc != 0)
+        {
+            fprintf(stderr, "Failed to stat %s\n", ucode_file);
+            close(fd);
+            return 0;
+        }
+
+        /* Map the image in memory */
+        p_dasd_image_hdr = mmap(NULL, ucode_stats.st_size,
+                                PROT_READ, MAP_SHARED, fd, 0);
+
+        if (p_dasd_image_hdr == MAP_FAILED)
+        {
+            fprintf(stderr, "mmap of %s failed\n", ucode_file);
+            close(fd);
+            return 0;
+        }
+
+        rc = (p_dasd_image_hdr->modification_level[0] << 24) |
+            (p_dasd_image_hdr->modification_level[1] << 16) |
+            (p_dasd_image_hdr->modification_level[2] << 8) |
+            p_dasd_image_hdr->modification_level[3];
+
+        munmap(p_dasd_image_hdr, ucode_stats.st_size);
+        close(fd);
+    }
+    else
+    {
+        p_char = strrchr(ucode_file, '.');
+
+        if (!p_char)
+            return 0;
+
+        rc = strtoul(p_char+1, NULL, 16);
+    }
+
+    return rc;
+}
+
+int find_ioa_firmware_image(struct ipr_ioa *p_ioa, char *fname)
+{
+    char etc_ucode_file[100];
+    char usr_ucode_file[100];
+    struct ipr_ioa_fw *ioa_fw = NULL;
+    struct dirent **pp_dirent;
+    u32 etc_version = 0;
+    u32 usr_version = 0;
+    int i, rc;
+
+    for (i = 0; i < sizeof(ipr_ioa_fw_table)/sizeof(struct ipr_ioa_fw); i++)
+    {
+        if (ipr_ioa_fw_table[i].ccin == p_ioa->ccin)
+        {
+            ioa_fw = &ipr_ioa_fw_table[i];
+            break;
+        }
+    }
+
+    if (ioa_fw)
+    {
+        rc = scandir("/usr/lib/microcode", &pp_dirent,
+                     select_ioa_ucode_file, alphasort);
+
+        if (rc > 0)
+        {
+            rc--;
+
+            for (i = rc ; i >= 0; i--)
+            {
+                if (strstr(pp_dirent[i]->d_name, ioa_fw->name) == pp_dirent[i]->d_name)
+                {
+                    sprintf(usr_ucode_file, "/usr/lib/microcode/%s",
+                            pp_dirent[i]->d_name);
+                    break;
+                }
+            }
+        }
+
+        free(*pp_dirent);
+    }
+
+    sprintf(etc_ucode_file, "/etc/microcode/ibmsis%X.img", p_ioa->ccin);
+
+    etc_version = get_ioa_ucode_version(etc_ucode_file);
+    usr_version = get_ioa_ucode_version(usr_ucode_file);
+
+    if (etc_version > usr_version)
+    {
+        sprintf(fname, etc_ucode_file);
+        return 0;
+    }
+    else if (usr_version == 0)
+    {
+        return -1;
+    }
+    else
+    {
+        sprintf(fname, usr_ucode_file);
+        return 0;
+    }
+
+    return -1;
+}
+
+int find_dasd_firmware_image(struct ipr_device *p_device, char *prefix, char *fname, char *version)
+{
+    char etc_ucode_file[100];
+    char usr_ucode_file[100];
+    struct dirent **pp_dirent;
+    u32 etc_version = 0;
+    u32 usr_version = 0;
+    int i, rc;
+
+    rc = scandir("/usr/lib/microcode", &pp_dirent,
+                 select_dasd_ucode_file, alphasort);
+
+    if (rc > 0)
+    {
+        rc--;
+
+        for (i = rc ; i >= 0; i--)
+        {
+            if (strstr(pp_dirent[i]->d_name, prefix) == pp_dirent[i]->d_name)
+            {
+                sprintf(usr_ucode_file, "/usr/lib/microcode/%s",
+                        pp_dirent[i]->d_name);
+                break;
+            }
+        }
+
+        free(*pp_dirent);
+    }
+
+    sprintf(etc_ucode_file, "/etc/microcode/device/%s", prefix);
+
+    etc_version = get_dasd_ucode_version(etc_ucode_file, IPR_DASD_UCODE_ETC);
+    usr_version = get_dasd_ucode_version(usr_ucode_file, IPR_DASD_UCODE_USRLIB);
+
+    if (etc_version > usr_version)
+    {
+        sprintf(fname, etc_ucode_file);
+        memcpy(version, &etc_version, sizeof(u32));
+        return IPR_DASD_UCODE_HDR;
+    }
+    else if (usr_version == 0)
+    {
+        return IPR_DASD_UCODE_NOT_FOUND;
+    }
+    else
+    {
+        sprintf(fname, usr_ucode_file);
+        memcpy(version, &usr_version, sizeof(u32));
+        return IPR_DASD_UCODE_NO_HDR;
+    }
+
+    return -1;
+}
 
 void tool_init(char *tool_name)
 {

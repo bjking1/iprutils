@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.4.2.1 2003/10/29 14:04:59 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.4.2.2 2003/11/07 22:07:20 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -39,6 +39,13 @@
 #include <pci/pci.h>
 #include <stdbool.h>
 #include <netinet/in.h>
+
+#define IPR_DASD_UCODE_USRLIB 0
+#define IPR_DASD_UCODE_ETC 1
+
+#define IPR_DASD_UCODE_NOT_FOUND -1
+#define IPR_DASD_UCODE_NO_HDR 1
+#define IPR_DASD_UCODE_HDR 2
 
 #define IOCTL_BUFFER_SIZE 512
 #define IPR_MAX_NUM_BUSES               4
@@ -1346,6 +1353,20 @@ struct ipr_inquiry_page_cx  /* Extended Software Inquiry  */
     struct ipr_software_inq_lid_info lidinfo[15];
 };
 
+struct image_header
+{
+    u32 header_length;
+    u32 lid_table_offset;
+    u8 major_release;
+    u8 card_type;
+    u8 minor_release[2];
+#define LINUX_HEADER_RESERVED_BYTES 20
+    u8 reserved[LINUX_HEADER_RESERVED_BYTES];
+    char eyecatcher[16];        /* IBMAS400 CCIN */
+    u32 num_lids;
+    struct ipr_software_inq_lid_info lid[1];
+};
+
 struct ipr_driver_cfg
 {
     u16 debug_level;
@@ -1424,6 +1445,9 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
                           int limited_config);
 void iprlog_location(struct ipr_resource_entry *);
 bool is_af_blocked(struct ipr_device *p_ipr_device, int silent);
+int find_ioa_firmware_image(struct ipr_ioa *p_ioa, char *fname);
+int find_dasd_firmware_image(struct ipr_device *p_device, char *prefix, char *fname,
+                             char *version);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
