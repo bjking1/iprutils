@@ -1,0 +1,203 @@
+.TH SISCONFIG 8 "March 2003"
+.SH NAME
+sisconfig \- IBM storage adapter configuration/recovery utility
+.SH SYNOPSIS
+.BI "sisconfig [-e editor] [-k dir] [-p mode]"
+.sp
+.BI "sisconfig --version"
+.SH DESCRIPTION
+.B sisconfig
+is used to configure IBM storage adapters, display information
+about them, and to perform IOA and disk unit recovery scenarios. It was originally
+designed to emulate IBM iSeries DST/SST green screens and should have similar
+behavior. The interface is completely menu driven. The various screens will
+look slightly different depending on the hardware platform sisconfig is
+being run on. The various menu options are: 
+.PP
+.B 1. Display disk hardware status.
+.br
+This option can be used to display various information regarding
+the SCSI IOAs attached to the system and the disk units controlled by
+them. For each IOA and disk unit, their serial number, type,
+model number, resource name, and hardware status will be 
+available. The model numbers are:
+.PP
+001	IOA resource
+.br
+020	JBOD Disk unit resource
+.br
+050	Disk unit resource
+.br
+060	Compressed disk unit
+.br
+07x	Parity protected disk unit
+.br
+08x	Compressed, parity protected disk unit
+.br
+090	Hot Spare disk unit
+.br
+200	Parity set resource
+.br
+.br
+Note: for the 07x and 08x models, the x describes the amount
+of the device which is used as parity. 4 = 1/4 parity, 
+2 = 1/8 parity, 1 = 1/16 parity, 0 = no parity, 9 = other parity distribution.
+.PP
+By selecting Display disk unit details from this screen it is possible
+to obtain the physical location for each resource listed. This information
+can be used to locate failing devices. On this 
+screen, beside each resource is an OPT field. By entering a 5 beside
+any resource, detailed information about that resource can be obtained.
+For an IOA resource, this will display the driver version, the IOA
+firmware version, and the physical location amongst other things.
+.PP
+.B 2. Work with device parity protection
+.br
+This option will present a second menu containing device parity related
+commands. 
+.PP
+.B Display device parity status
+is used to display the status of hardware parity protection
+on the system. 
+.PP
+.B Start device parity protection
+is used to combine a set of devices into one or more disk arrays/parity sets.
+.B ATTENTION:
+Data on selected devices will NOT be preserved when creating the parity set.
+.PP
+.B Stop device parity protection
+is used to stop device parity protection and delete disk arrays.
+Selecting this option will provide you with a candidate list of disk arrays 
+which can be stopped. If you have devices which are in disk arrays and they 
+are not available as candidates to stop, you may need to format the 
+devices using sisconfig.
+.PP
+.B Include unit in device parity protection
+is used to allow compatible devices to be included into an existing
+parity protected array.
+.B ATTENTION:
+All data on the devices to be included will be lost
+as the devices will be zeroed before being included into the array.  Data already on
+a device in the existing array will not be affected.
+.PP
+.B Work with disk unit configuration
+is used to create and delete hot spare devices and to enable and disable device
+advanced functions. In order to create a disk array when starting from JBOD disks (020),
+the disks must first be enabled for advanced function which will reformat the devices.
+.PP
+.B 3. Work with disk unit recovery
+is used to perform the following disk unit recovery actions:
+.PP
+.B Device Concurrent Maintenance.
+.br
+This is used to add or replace disk units from the system concurrent with running.
+Not all systems support device concurrent maintenance. Concurrent maintenance is
+currently only supported with SES (SCSI Enclosure Services) packaging.
+To use this facility, you will need to know the physical location of the 
+device you would like to replace. Device concurrent maintenance can be used to
+add a new device to a running system and to replace a failed device. Extreme
+caution should be used when performing device concurrent maintenance.
+.PP
+.B Initialize and format disk unit
+is used to issue a SCSI format command to attached devices. A format
+unit command has special meaning to the IOA and is used as a service
+action for certain error conditions. Formatting a disk unit will lose
+all data on that drive. To make a compressed disk unit usable a format
+can must used.
+.PP
+.B Reclaim IOA cache storage
+is used to repair cache error conditions. 
+.B Warning!
+Use this option with care. This is used to discard data from the cache
+and may result in data loss. This option is designed to be used by
+authorized IBM hardware customer engineers.
+.PP
+.B Rebuild disk unit data
+is generally used following concurrent maintenance.  Select this option after
+failing array member device has been replaced to reconstruct the device as 
+an active array member.
+.PP
+.B Work with resources containing cache battery packs
+is used to display information regarding rechargeable cache battery packs 
+and to force rechargeable cache battery packs into an error state so that
+they can be replaced prior to failure. 
+.B ATTENTION:
+Once an error has been forced on a rechargeable cache battery pack write
+caching will be disabled until the battery pack is replaced.
+.PP
+.B 4. Work with configuration
+is used to change configurable driver and adapter options, such as driver
+verbosity, maximum bus speed allowed, initiator SCSI ID, etc.
+.PP
+.B 5. Analyze Log
+is an option available to analyze /var/log/messages* files. By default
+it will use vi as the editor to open the concatenated error log files.
+This can be changed by using option 6 on the
+.B Kernel Messages Log 
+menu. Selecting
+option 1 on the Kernel Messages Log menu will display only the most recent 
+errors logged by the ibmsis device driver and may be useful to filter out 
+some of the clutter. Option 2 will display all recorded errors logged by the
+ibmsis device driver. Option 3 will display all kernel messages. Option 4 will
+display errors logged by the sisconfig utility. This may be useful for
+debugging problems. Option 5 can be used to change where the tool looks
+to find the kernel messages files. The default is to look in /var/log.
+.SH OPTIONS
+.TP
+.B \-e editor
+Default editor for viewing error logs. The default editor is vi, but can be 
+changed with this parameter.
+.TP
+.B -k directory
+Kernel messages root directory. Root directory to look for kernel messages.
+Default is /var/log.
+.TP
+.B -p mode
+Select the mode in which device location data should be displayed.  Mode options are 
+.B iseries, pseries
+and
+.B
+generic.
+.TP
+.B \-\-version
+Print version number of 
+.B sisconfig
+.SH AUTHOR
+Brian King (bjking1@us.ibm.com)
+.SH AVAILABILITY
+The ibmsis device driver and all associated user space utilities are available
+for download at
+.nf
+.B http://www.ibm.com/servers/eserver/iseries/linux/
+.SH NOTES
+.TP
+.B Notes on using under iSeries 5250 telnet
+.PP
+Only use this utility across 5250 telnet when there are no other options
+available to you. Since there may be occasions when 5250 telnet is your only
+option to access your Linux console, every attempt has been made to make 
+this utility usable under 5250 telnet. By following a few guidelines,
+you can make your 5250 telnet experience more productive and much less
+frustrating.
+.PP
+1. First of all, it will be helpful to know how the keys are mapped under
+5250 telnet. From the 5250 telnet window, hit ESC. This will get you to the 
+.B Send TELNET Control Functions
+menu. Take option 6 to display the keyboard map. Take note of how TAB, ESC, 
+CTLC, and SENDWOCR are bound. They will be useful in the future.
+.PP
+2. When selecting menu options, enter the menu number, followed by the
+enter key, same as usual.
+.PP
+3. When typing single character commands (eg. r=Refresh), type the single
+character followed by the SENDWOCR key (F11 by default).
+.PP
+4. When on a device/array/IOA selection screen (eg. Display Disk Unit Details),
+do NOT use the arrow keys to navigate. Instead use the TAB key (F7 by default)
+to navigate these screens.
+.PP
+5. Beware of the backspace and delete keys. As a rule do NOT use them. 
+.PP
+6. When editing the root kernel message log directory or the default editor,
+you may use the arrow keys, but not the backspace and delete keys. Use the 
+space bar to remove already typed characters.

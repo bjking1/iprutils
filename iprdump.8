@@ -1,0 +1,29 @@
+.TH SISDUMP 8 "July 2002"
+.SH NAME
+sisdump - IBM storage adapter dump utility
+.SH SYNOPSIS
+.B sisdump
+.SH DESCRIPTION
+.B sisdump
+is used to gather information in the event of an adapter failure.
+The dump data will by default be saved in the /var/log/ directory with the
+prefix ibmsis_D# where # will be the dump ID of the file.  Information
+will be posted in /var/log/messages in the event of a dump condition
+indicating the dump ID for cross reference.  The sisdump utility can be
+instantiated any time after the ibmsis driver is loaded and the file system
+to where the dump data is targetted to be stored has also been loaded.
+.SH OPTIONS
+.TP
+.B \-\-version
+Print the version number of
+.B sisdump
+.TP
+.B \-d <directory>
+Assign directory where dump data is to be stored.  Default is /var/log/.
+.SH AUTHOR
+Michael Anderson (mjanders@us.ibm.com)
+.SH AVAILABILITY
+The ibmsis device driver and all associated userspace utilities are available
+for download at
+.nf
+.B http://www.ibm.com/servers/eserver/iseries/linux/

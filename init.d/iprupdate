@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+#       /etc/rc.d/init.d/sisupdated
+#
+# Runs the sisupdate utility for ibmsis supported devices
+#
+# chkconfig:  2345 30 90
+# description: Runs the sisupdate utility to update firmware images \
+#   for adapters and devices under the ibmsis device driver.
+# processname: sisupdate
+. /etc/init.d/functions
+
+prog="sisupdate"
+
+start() {
+        echo -n $"Starting $prog: "
+        $prog
+        RETVAL=$?
+        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/sisupdate
+        echo
+        return $RETVAL
+}
+
+stop() {
+       return 0
+}
+
+rhstatus() {
+       status $prog
+}
+
+restart() {
+       stop
+       start
+}
+
+reload() {
+       return 0
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        restart
+        ;;
+  reload)
+        reload
+        ;;
+  status)
+        rhstatus
+        ;;
+  condrestart)
+        [ -f /var/lock/subsys/sisupdate ] && restart || :
+        ;;
+  *)
+        echo "Usage: $0 {start|stop|status|restart|condrestart}"
+        exit 1
+esac
+
+exit $?

@@ -1,0 +1,57 @@
+Version 1.19.2
+- Enhance the start/stop parity screens to support new hardware.
+Multiple arrays with specified devices and RAID levels may not be
+chosen.
+- Add screens to support hot spare
+- To support new hardware, add options to format dasd devices to
+allow advanced function or to be formatted as JBOD.
+- Add screens to allow SCSI Bus configurations
+- Add screens to allow device driver configurations.
+- Updated screens to present pSeries and xSeries platform device
+locations.
+- Add support for 5703 and 2780 IOAs.
+---------------------------------------------------------------------
+Version 1.18.14
+- update sisconfig screens for start parity, formatting of the 
+device no longer occurs before starting parity set.  The start
+parity is now one step operation.
+---------------------------------------------------------------------
+Version 1.18.10
+- Update concurrent maintanence to check if device is in use before
+allowing device removal.
+---------------------------------------------------------------------
+Version 1.18.9
+- Fixes for format operations on 5702 IOA
+- smart dump enhancements
+---------------------------------------------------------------------
+Version 1.18.1
+- Add support for 2757, 2782 and 5702 IOAs
+- Add Dynamic major numbering mechanism.
+---------------------------------------------------------------------
+Version 1.17.1
+- DASD RAID 5* (device parity array) support
+- sisdump.c moved to sistrace.c  sisdump.c now used for IOA auto
+  dump facility
+---------------------------------------------------------------------
+Version 1.16.1
+- DASD concurrent maintenance support
+- DASD microcode update support
+---------------------------------------------------------------------
+Version 1.15.4
+- Added a bunch of fixes/hacks to make sisconfig more useable across
+  5250 telnet.
+- Added documentation on using sisconfig across 5250 telnet
+- Fixed some multiple paging bugs on Display Dist Unit Details screen
+and on the reclaim screen.
+---------------------------------------------------------------------
+Version 1.15.2
+- Improved the robustness of /proc parsing. ibmsis device driver
+  can now change the format of its proc file entry much more
+  easily.
+- Fixed a bug in sisconfig when running in non-devfs mode prior to
+  running scsidev the first time. It would try to open the /dev/scsi
+  directory, which may not have existed at this point.
+---------------------------------------------------------------------
+Version 1.15.2
+- Created this file to track updates
+---------------------------------------------------------------------

@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+#       /etc/rc.d/init.d/sisdumpd
+#
+# Runs the sisdump utility for the ibmsis device driver
+#
+# chkconfig:  2345 20 90
+# description: Starts the sisdump daemon which is used to gather \
+#   data for failure analysis in  the event of a severe failure  \
+#   of the ibmsis driver and its supported hardware.
+# processname: sisdump
+
+prog="sisdump"
+RETVAL=0
+
+. /etc/init.d/functions
+
+start() {
+        echo -n $"Starting $prog: "
+        daemon $prog
+        RETVAL=$?
+        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/sisdump
+        echo
+        return $RETVAL
+}
+
+stop() {
+       echo -n $"Stopping $prog: "
+       killproc $prog
+       RETVAL=$?
+       [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/sisdump
+       echo
+       return $RETVAL
+}
+
+rhstatus() {
+       status $prog
+}
+
+restart() {
+       stop
+       start
+}
+
+reload() {
+       echo -n $"Reloading $prog: "
+       killproc $prog -HUP
+       RETVAL=$?
+       echo
+       return $RETVAL
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart)
+        restart
+        ;;
+  reload)
+        reload
+        ;;
+  status)
+        rhstatus
+        ;;
+  condrestart)
+        [ -f /var/lock/subsys/sisdump ] && restart || :
+        ;;
+  *)
+        echo "Usage: $0 {start|stop|status|restart|condrestart}"
+        exit 1
+esac
+
+exit $?
