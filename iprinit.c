@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.17 2004/05/23 05:45:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.17.2.1 2004/10/25 22:31:43 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -31,6 +31,8 @@ int main(int argc, char *argv[])
 	int daemonize = 0;
 	int daemonized = 0;
 	int i;
+
+	ipr_sg_required = 1;
 
 	openlog("iprinit", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 

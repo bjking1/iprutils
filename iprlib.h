@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44.2.1 2004/10/06 14:18:12 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.44.2.2 2004/10/25 22:31:44 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -172,6 +172,7 @@ extern int runtime;
 extern void (*exit_func) (void);
 extern int ipr_debug;
 extern int ipr_force;
+int ipr_sg_required;
 
 struct ipr_res_addr {
 	u8 host;
@@ -1227,7 +1228,7 @@ static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 }
 
 static inline int ipr_is_volume_set(struct ipr_dev *device)
-{       
+{
 	if ((device->qac_entry != NULL) &&
 	    (device->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD))
 		return 1;

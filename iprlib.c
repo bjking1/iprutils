@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57.2.1 2004/10/06 14:18:11 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57.2.2 2004/10/25 22:31:43 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -33,6 +33,7 @@ char *tool_name = NULL;
 void (*exit_func) (void) = default_exit_func;
 int ipr_debug = 0;
 int ipr_force = 0;
+int ipr_sg_required = 0;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -643,8 +644,10 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 
 	ioa->nr_ioa_microcode = 0;
 
-	if (strlen(ioa->ioa.gen_name) == 0)
+	if (strlen(ioa->ioa.gen_name) == 0) {
+		scsi_err((&ioa->ioa), "Adapter sg device does not exist\n");
 		return -ENOENT;
+	}
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd <= 1) {
@@ -1806,7 +1809,8 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 
 static void get_sg_names(int num_devs)
 {
-	int i;
+	int i, fd;
+	int sg_delay = 3;
 	struct sysfs_class *sysfs_device_class;
 	struct dlist *class_devices;
 	struct sysfs_class_device *class_device;
@@ -1835,6 +1839,21 @@ static void get_sg_names(int num_devs)
 				    sysfs_device_device->name)) {
 				sprintf(scsi_dev_table[i].gen_name, "/dev/%s",
 					class_device->name);
+				for (sg_delay = 3, fd = 0; sg_delay && ipr_sg_required; sg_delay--) {
+					fd = open(scsi_dev_table[i].gen_name, O_RDWR);
+					if (fd != -1) {
+						close(fd);
+						break;
+					}
+
+					syslog_dbg("Waiting for %s to show up\n",
+						   scsi_dev_table[i].gen_name);
+					sleep(1);
+				}
+
+				if (fd == -1)
+					syslog_dbg("Failed to open %s. %d %d\n", scsi_dev_table[i].gen_name,
+						   sg_delay, ipr_sg_required);
 				break;
 			}
 		}

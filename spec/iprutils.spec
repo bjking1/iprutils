@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.13
+Version: 2.0.13.1
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Oct 22 2004 Brian King <brking@us.ibm.com> 2.0.13.1
+- Fix iprinit to wait for scsi generic devices to show up in case we are
+  racing with hotplug. Fixes the following error:
+      0:255:0:0: Mode Sense failed. rc=1, SK: 5 ASC: 24 ASCQ: 0
 * Tue Oct 5 2004 Brian King <brking@us.ibm.com> 2.0.13
 - Improve iprupdate error logs to indicate where to download microcode from.
 - Set default tcq queue depth for AS400 disks to 16.
