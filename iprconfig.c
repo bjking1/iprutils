@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprconfig.c,v 1.2 2003/10/23 01:50:53 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprconfig.c,v 1.2.2.1 2003/10/31 19:25:02 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -10434,6 +10434,32 @@ int dev_include_complete(u8 num_devs)
 
         if (!not_done)
         {
+            for (p_cur_raid_cmd = p_head_raid_cmd;
+                 p_cur_raid_cmd != NULL; 
+                 p_cur_raid_cmd = p_cur_raid_cmd->p_next)
+            {
+                if (p_cur_raid_cmd->do_cmd)
+                {
+                    int fd = open(p_cur_raid_cmd->p_ipr_device->dev_name, O_RDWR);
+
+                    if (fd < 0)
+                    {
+                        syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL,
+                               p_cur_raid_cmd->p_ipr_device->dev_name);
+                        continue;
+                    }
+
+                    rc = ioctl(fd, BLKRRPART, 0);
+
+                    if (rc)
+                    {
+                        syslog(LOG_ERR, "Re-reading %s partition tables failed. %m"IPR_EOL,
+                               p_cur_raid_cmd->p_ipr_device->dev_name);
+                        continue;
+                    }
+                }
+            }
+
             if (done_bad)
             {
                 rc =  RC_FAILED;
@@ -10441,7 +10467,6 @@ int dev_include_complete(u8 num_devs)
             }
 
             check_current_config(false);
-            revalidate_devs(NULL);
             rc =  RC_SUCCESS;
             mvprintw(8, 44, "Complete");
             form_driver(p_form,
