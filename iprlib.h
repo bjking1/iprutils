@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.3 2003/10/23 01:50:54 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.4 2003/10/27 13:52:43 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -227,9 +227,9 @@ struct ipr_record_common
 
 struct ipr_mode_page_hdr
 {
-    u8 parms_saveable:1;
-    u8 reserved1:1;
     u8 page_code:6;
+    u8 reserved1:1;
+    u8 parms_saveable:1;
     u8 page_length;
 };
 
@@ -605,9 +605,9 @@ struct ipr_mode_page_28_scsi_dev_bus_attr
 
 struct ipr_mode_page_hdr
 {
-    u8 page_code:6;
-    u8 reserved1:1;
     u8 parms_saveable:1;
+    u8 reserved1:1;
+    u8 page_code:6;
     u8 page_length;
 };
 
