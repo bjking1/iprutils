@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.7 2004/01/29 17:36:29 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.8 2004/01/30 16:49:53 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -51,7 +51,6 @@
 #define IPR_VPD_DRAM_SIZE_LEN                3
 #define IPR_VPD_PART_NUM_LEN                 12
 #define IPR_CCB_CDB_LEN                      16
-#define IPR_EOL                              "\n"
 #define IPR_IOCTL_SEND_COMMAND               0xf1f1
 #define IPR_MAX_PSERIES_LOCATION_LEN         48
 #define IPR_MAX_PHYSICAL_DEVS                192
@@ -91,6 +90,7 @@
 #define IPR_STD_INQ_PART_NUM_LEN     12
 #define IPR_STD_INQ_EC_LEVEL_LEN     10
 #define IPR_STD_INQ_FRU_NUM_LEN      12
+#define IPR_STD_INQ_AS400_SERV_LVL_OFF       107
 
 #define  IPR_START_STOP_STOP                 0x00u
 #define  IPR_START_STOP_START                0x01u
@@ -173,11 +173,9 @@ cur_val = new_val;                                      \
 #define  IPR_CONC_MAINT_REMOVE               0x1u
 
 #define IPR_RECORD_ID_SUPPORTED_ARRAYS       _i16((u16)0)
-#define IPR_RECORD_ID_ARRAY_RECORD           _i16((u16)1)
-#define IPR_RECORD_ID_DEVICE_RECORD          _i16((u16)2)
 #define IPR_RECORD_ID_COMP_RECORD            _i16((u16)3)
-#define IPR_RECORD_ID_ARRAY2_RECORD          _i16((u16)4)
-#define IPR_RECORD_ID_DEVICE2_RECORD         _i16((u16)5)
+#define IPR_RECORD_ID_ARRAY_RECORD           _i16((u16)4)
+#define IPR_RECORD_ID_DEVICE_RECORD          _i16((u16)5)
 
 /******************************************************************/
 /* Driver Commands                                                */
@@ -194,10 +192,10 @@ cur_val = new_val;                                      \
 
 #define  IPR_PERI_TYPE_DISK            0x00u
 
-extern struct ipr_array_query_data *p_ipr_array_query_data;
+extern struct ipr_array_query_data *ipr_array_query_data;
 extern u32 num_ioas;
-extern struct ipr_ioa *p_head_ipr_ioa;
-extern struct ipr_ioa *p_last_ipr_ioa;
+extern struct ipr_ioa *ipr_ioa_head;
+extern struct ipr_ioa *ipr_ioa_tail;
 extern int driver_major;
 extern int driver_minor;
 
@@ -217,7 +215,7 @@ struct ipr_std_inq_vpids
     u8 product_id[IPR_PROD_ID_LEN];           /* Product ID */
 };
 
-struct ipr_record_common
+struct ipr_common_record
 {
     u16 record_id;
     u16 record_len;
@@ -392,32 +390,9 @@ struct ipr_array_cap_entry
     u8                          prot_level_str[8];
 };
 
-struct ipr_array_record  //FIXME remove me
+struct ipr_array_record
 {
-    struct ipr_record_common common;
-    u8  reserved:6;
-    u8  known_zeroed:1;
-    u8  issue_cmd:1;
-    u8  reserved1;
-
-    u8  reserved2:5;
-    u8  non_func:1;
-    u8  exposed:1;
-    u8  established:1;
-
-    u8  reserved3:5;
-    u8  resync_cand:1;
-    u8  stop_cand:1;
-    u8  start_cand:1;
-
-    u8  reserved4[3];
-    u8  array_id;
-    u32 reserved5;
-};
-
-struct ipr_array2_record
-{
-    struct ipr_record_common common;
+    struct ipr_common_record common;
 
     u8  reserved1:6;
     u8  known_zeroed:1;
@@ -442,7 +417,7 @@ struct ipr_array2_record
     u8  raid_level;
     u8  array_id;
     u32 resource_handle;
-    u32 resource_address;
+    struct ipr_res_addr resource_addr;
     struct ipr_res_addr last_resource_addr;
     u8  vendor_id[IPR_VENDOR_ID_LEN];
     u8  product_id[IPR_PROD_ID_LEN];
@@ -450,23 +425,9 @@ struct ipr_array2_record
     u32 reserved;
 };
 
-struct ipr_resource_flags
+struct ipr_dev_record
 {
-    u8 capacity_reduction_hi:2;
-    u8 reserved2:1;
-    u8 aff:1;
-    u8 reserved1:1;
-    u8 is_array_member:1;
-    u8 is_compressed:1;
-    u8 is_ioa_resource:1;
-
-    u8 reserved3:7;
-    u8 capacity_reduction_lo:1;
-};
-
-struct ipr_device_record
-{
-    struct ipr_record_common common;
+    struct ipr_common_record common;
     u8  reserved:6;
     u8  known_zeroed:1;
     u8  issue_cmd:1;
@@ -504,6 +465,20 @@ struct ipr_device_record
     u8 product_id[IPR_PROD_ID_LEN];
     u8 serial_num[IPR_SERIAL_NUM_LEN];
     u32 reserved5;
+};
+
+struct ipr_resource_flags
+{
+    u8 capacity_reduction_hi:2;
+    u8 reserved2:1;
+    u8 aff:1;
+    u8 reserved1:1;
+    u8 is_array_member:1;
+    u8 is_compressed:1;
+    u8 is_ioa_resource:1;
+
+    u8 reserved3:7;
+    u8 capacity_reduction_lo:1;
 };
 
 /* 44 bytes */
@@ -803,29 +778,9 @@ struct ipr_array_cap_entry
     u8                          prot_level_str[8];
 };
 
-struct ipr_array_record  //FIXME  remove me
+struct ipr_array_record
 {
-    struct ipr_record_common common;
-    u8  issue_cmd:1;
-    u8  known_zeroed:1;
-    u8  reserved:6;
-    u8  reserved1;
-    u8  established:1;
-    u8  exposed:1;
-    u8  non_func:1;
-    u8  reserved2:5;
-    u8  start_cand:1;
-    u8  stop_cand:1;
-    u8  resync_cand:1;
-    u8  reserved3:5;
-    u8  reserved4[3];
-    u8  array_id;
-    u32 reserved5;
-};
-
-struct ipr_array2_record
-{
-    struct ipr_record_common common;
+    struct ipr_common_record common;
 
     u8  issue_cmd:1;
     u8  known_zeroed:1;
@@ -850,7 +805,7 @@ struct ipr_array2_record
     u8  raid_level;
     u8  array_id;
     u32 resource_handle;
-    u32 resource_address;
+    struct ipr_res_addr resource_addr;
     struct ipr_res_addr last_resource_addr;
     u8  vendor_id[IPR_VENDOR_ID_LEN];
     u8  product_id[IPR_PROD_ID_LEN];
@@ -858,23 +813,9 @@ struct ipr_array2_record
     u32 reserved;
 };
 
-struct ipr_resource_flags
+struct ipr_dev_record
 {
-    u8 is_ioa_resource:1;
-    u8 is_compressed:1;
-    u8 is_array_member:1;
-    u8 reserved1:1;
-    u8 aff:1;
-    u8 reserved2:1;
-    u8 capacity_reduction_hi:2;
-
-    u8 capacity_reduction_lo:1;
-    u8 reserved3:7;
-};
-
-struct ipr_device_record
-{
-    struct ipr_record_common common;
+    struct ipr_common_record common;
     u8  issue_cmd:1;
     u8  known_zeroed:1;
     u8  reserved:6;
@@ -912,6 +853,20 @@ struct ipr_device_record
     u8 product_id[IPR_PROD_ID_LEN];
     u8 serial_num[IPR_SERIAL_NUM_LEN];
     u32 reserved5;
+};
+
+struct ipr_resource_flags
+{
+    u8 is_ioa_resource:1;
+    u8 is_compressed:1;
+    u8 is_array_member:1;
+    u8 reserved1:1;
+    u8 aff:1;
+    u8 reserved2:1;
+    u8 capacity_reduction_hi:2;
+
+    u8 capacity_reduction_lo:1;
+    u8 reserved3:7;
 };
 
 /* 44 bytes */
@@ -1100,7 +1055,7 @@ struct sg_map_info
     struct sg_scsi_id sg_dat;
 };
 
-struct ipr_device{
+struct ipr_dev{
     char                       dev_name[64];
     char                       gen_name[64];
     u32                        is_start_cand:1;
@@ -1108,13 +1063,13 @@ struct ipr_device{
     u32                        reserved:30;
     u32                        pci_bus_number;
     u32                        pci_slot;
-    struct scsi_dev_data      *p_scsi_dev_data;
-    struct ipr_record_common  *p_qac_entry;
+    struct scsi_dev_data      *scsi_dev_data;
+    struct ipr_common_record  *qac_entry;
 };
 
 #define IPR_MAX_IOA_DEVICES        (IPR_MAX_NUM_BUSES * 15 * 2 + 1)
 struct ipr_ioa {
-    struct ipr_device              ioa;
+    struct ipr_dev              ioa;
     u16                            ccin;
     u32                            host_addr;
     u32                            num_raid_cmds;
@@ -1126,12 +1081,12 @@ struct ipr_ioa {
     int                            host_num;
     char                           pci_address[16];
     char                           host_name[16];
-    struct ipr_device              dev[IPR_MAX_IOA_DEVICES];
-    struct ipr_array_query_data   *p_qac_data;
-    struct ipr_supported_arrays   *p_supported_arrays;
-    struct ipr_reclaim_query_data *p_reclaim_data;
+    struct ipr_dev              dev[IPR_MAX_IOA_DEVICES];
+    struct ipr_array_query_data   *qac_data;
+    struct ipr_supported_arrays   *supported_arrays;
+    struct ipr_reclaim_query_data *reclaim_data;
     struct ipr_ioa                *next;
-    struct ipr_ioa                *p_cmd_next;
+    struct ipr_ioa                *cmd_next;
 };
 
 struct ipr_dasd_inquiry_page3
@@ -1151,7 +1106,7 @@ struct ipr_array_query_data
     u16 resp_len;
     u8  reserved;
     u8  num_records;
-    u8 data[IPR_QAC_BUFFER_SIZE];
+    u8  data[IPR_QAC_BUFFER_SIZE];
 };
 
 struct ipr_block_desc {
@@ -1204,10 +1159,10 @@ struct ipr_pagewh_28
 
 struct ipr_supported_arrays
 {
-    struct ipr_record_common common;
-    u16                         num_entries;
-    u16                         entry_length;
-    u8                          data[0];
+    struct ipr_common_record common;
+    u16                      num_entries;
+    u16                      entry_length;
+    u8                       data[0];
 };
 
 struct ipr_read_cap
@@ -1395,17 +1350,16 @@ struct ipr_driver_cfg {
 };
 
 int get_proc_string(char *proc_file_name, char *label, char *buffer);
-int scan_device(struct scsi_dev_data *p_scsi_dev_data);
-int remove_device(struct scsi_dev_data *p_scsi_dev_data);
+int scan_device(struct scsi_dev_data *scsi_dev_data);
+int remove_device(struct scsi_dev_data *scsi_dev_data);
 int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
-             void *p_data, u32 xfer_len, u32 data_direction,
-             struct sense_data_t *p_sense_data,
+             void *data, u32 xfer_len, u32 data_direction,
+             struct sense_data_t *sense_data,
              u32 timeout_in_sec);
 int get_major_version(char *proc_file_name);
 int get_minor_version(char *proc_file_name);
 void check_current_config(bool allow_rebuild_refresh);
-void get_sg_ioctl_data(struct sg_map_info *p_sg_map_info, int num_devs);
-int get_scsi_dev_data(struct scsi_dev_data *p_scsi_dev_data);
+void get_sg_ioctl_data(struct sg_map_info *sg_map_info, int num_devs);
 int num_device_opens(int host_num, int channel, int id, int lun);
 void tool_init();
 void exit_on_error(char *, ...);
@@ -1419,17 +1373,17 @@ void  ipr_config_file_entry(char *usr_file_name,
                             char *field,
                             char *value,
                             int update);
-void ipr_save_page_28(struct ipr_ioa *p_ioa,
-                      struct ipr_page_28 *p_page_28_cur,
-                      struct ipr_page_28 *p_page_28_chg,
-                      struct ipr_page_28 *p_page_28_ipr);
-void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
+void ipr_save_page_28(struct ipr_ioa *ioa,
+                      struct ipr_page_28 *page_28_cur,
+                      struct ipr_page_28 *page_28_chg,
+                      struct ipr_page_28 *page_28_ipr);
+void ipr_set_page_28(struct ipr_ioa *cur_ioa,
                      int limited_config,
                      int reset_scheduled);
-void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
+void ipr_set_page_28_init(struct ipr_ioa *cur_ioa,
                           int limited_config);
-void iprlog_location(struct ipr_ioa *p_ioa);
-bool is_af_blocked(struct ipr_device *p_ipr_device, int silent);
+void iprlog_location(struct ipr_ioa *ioa);
+bool is_af_blocked(struct ipr_dev *ipr_dev, int silent);
 int ipr_query_array_config(char *file, bool allow_rebuild_refresh,
                            bool set_array_id, int array_id, void *buff);
 int ipr_query_command_status(char *file, void *buff);
@@ -1442,18 +1396,18 @@ int ipr_read_capacity_16(char *file, void *buff);
 int ipr_query_resource_state(char *file, void *buff);
 int ipr_start_stop_start(char *file);
 int ipr_start_stop_stop(char *file);
-int ipr_stop_array_protection(char *file, struct ipr_array_query_data *p_qac_data);
-int ipr_remove_hot_spare(char *file, struct ipr_array_query_data *p_qac_data);
-int ipr_start_array_protection(char *file, struct ipr_array_query_data *p_qac_data, int stripe_size, int prot_level);
-int ipr_add_hot_spare(char *file, struct ipr_array_query_data *p_qac_data);
-int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *p_qac_data);
+int ipr_stop_array_protection(char *file, struct ipr_array_query_data *qac_data);
+int ipr_remove_hot_spare(char *file, struct ipr_array_query_data *qac_data);
+int ipr_start_array_protection(char *file, struct ipr_array_query_data *qac_data, int stripe_size, int prot_level);
+int ipr_add_hot_spare(char *file, struct ipr_array_query_data *qac_data);
+int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *qac_data);
 int ipr_test_unit_ready(char *file, struct sense_data_t *sense_data);
 int ipr_format_unit(char *file);
-int ipr_add_array_device(char *file, struct ipr_array_query_data *p_qac_data);
+int ipr_add_array_device(char *file, struct ipr_array_query_data *qac_data);
 int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff);
 int ipr_evaluate_device(char *file, u32 res_handle);
 int ipr_inquiry(char *file, u8 page, void *buff, u8 length);
-void ipr_reset_adapter(struct ipr_ioa *p_ioa);
+void ipr_reset_adapter(struct ipr_ioa *ioa);
 static inline int ipr_read_driver_cfg(struct ipr_driver_cfg *driver_cfg) { return -EIO;}; //FIXME
 static inline int ipr_write_driver_cfg(struct ipr_driver_cfg *driver_cfg) { return -EIO;}; //FIXME
 
@@ -1463,39 +1417,42 @@ static inline int ipr_write_driver_cfg(struct ipr_driver_cfg *driver_cfg) { retu
  * Returns: 0 if not AF DASD
  *          1 if AF DASD
  *---------------------------------------------------------------------------*/
-static inline int ipr_is_af_dasd_device(struct ipr_device *device)
+static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
-    if ((device->p_qac_entry != NULL) &&
+    if ((device->qac_entry != NULL) &&
         (strlen(device->dev_name) == 0) &&
-        (device->p_scsi_dev_data->type == IPR_TYPE_AF_DISK))
+        (device->scsi_dev_data) &&
+        (device->scsi_dev_data->type == IPR_TYPE_AF_DISK))
         return 1;
     else
         return 0;
 }
 
-static inline int ipr_is_volume_set(struct ipr_device *device)
+static inline int ipr_is_volume_set(struct ipr_dev *device)
 {
-    if ((device->p_qac_entry != NULL) &&
+    if ((device->qac_entry != NULL) &&
         (strlen(device->dev_name) != 0) &&
-        (device->p_scsi_dev_data->type == TYPE_DISK))
+        (device->scsi_dev_data) &&
+        (device->scsi_dev_data->type == TYPE_DISK))
         return 1;
     else
         return 0;
 }
 
-static inline int ipr_is_hidden(struct ipr_device *device)
+static inline int ipr_is_hidden(struct ipr_dev *device)
 {
     if (ipr_is_af_dasd_device(device) ||
-        device->p_scsi_dev_data->type == 3)  //FIXME SES type.
+        ((device->scsi_dev_data) &&
+         (device->scsi_dev_data->type == 3)))  //FIXME SES type.
         return 1;
     else
         return 0;
 }
 
-static inline int ipr_is_hot_spare(struct ipr_device *device)
+static inline int ipr_is_hot_spare(struct ipr_dev *device)
 {
-    struct ipr_device_record *dev_record =
-        (struct ipr_device_record *)device->p_qac_entry;
+    struct ipr_dev_record *dev_record =
+        (struct ipr_dev_record *)device->qac_entry;
 
     if ((dev_record != NULL) &&
         (dev_record->is_hot_spare))
@@ -1504,10 +1461,10 @@ static inline int ipr_is_hot_spare(struct ipr_device *device)
         return 0;
 }
 
-static inline int ipr_is_array_member(struct ipr_device *device)
+static inline int ipr_is_array_member(struct ipr_dev *device)
 {
-    struct ipr_device_record *dev_record =
-        (struct ipr_device_record *)device->p_qac_entry;
+    struct ipr_dev_record *dev_record =
+        (struct ipr_dev_record *)device->qac_entry;
 
     if ((dev_record != NULL) &&
         (dev_record->array_member))
@@ -1516,9 +1473,9 @@ static inline int ipr_is_array_member(struct ipr_device *device)
         return 0;
 }
 
-static inline int ipr_is_af(struct ipr_device *device)
+static inline int ipr_is_af(struct ipr_dev *device)
 {
-    if (device->p_qac_entry != NULL)
+    if (device->qac_entry != NULL)
         return 1;
     else
         return 0;

@@ -16,53 +16,52 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-struct device_detail_struct{
-  struct ipr_ioa *p_ioa;
-  struct ipr_device *p_ipr_dev;
-  int field_index;
+struct device_detail_struct {
+  struct ipr_ioa *ioa;
+  struct ipr_dev *ipr_dev;
+  int             field_index;
 };
 
-struct devs_to_init_t{
-  struct ipr_device *p_ipr_device;
-  struct ipr_ioa *p_ioa;
-  int change_size;
+struct devs_to_init_t {
+  struct ipr_dev       *ipr_dev;
+  struct ipr_ioa       *ioa;
+  int                   change_size;
 #define IPR_522_BLOCK 522
 #define IPR_512_BLOCK 512
-  int cmplt;
-  int do_init;
-  int dev_type;
+  int                   cmplt;
+  int                   do_init;
+  int                   dev_type;
 #define IPR_AF_DASD_DEVICE      1
 #define IPR_JBOD_DASD_DEVICE    2
   struct devs_to_init_t *next;
 };
 
-struct prot_level
-{
-  struct ipr_array_cap_entry *p_array_cap_entry;
-  u8     is_valid_entry:1;
-  u8     reserved:7;
+struct prot_level {
+  struct ipr_array_cap_entry *array_cap_entry;
+  u8                          is_valid_entry:1;
+  u8                          reserved:7;
 };
 
-struct array_cmd_data{
-  u8 array_id;
-  u8 prot_level;
-  u16 stripe_size;
-  u32 array_num;
-  u32 do_cmd;
-  struct ipr_array_query_data   *p_qac_data;
-  struct ipr_ioa        *p_ipr_ioa;
-  struct ipr_device     *p_ipr_device;
-  struct array_cmd_data *next;
+struct array_cmd_data {
+  u8                           array_id;
+  u8                           prot_level;
+  u16                          stripe_size;
+  u32                          array_num;
+  u32                          do_cmd;
+  struct ipr_array_query_data *qac_data;
+  struct ipr_ioa              *ipr_ioa;
+  struct ipr_dev              *ipr_dev;
+  struct array_cmd_data       *next;
 };
 
 /* not needed once menus incorporated into screen_driver */
-struct window_l{
-    WINDOW *p_win;
+struct window_l {
+    WINDOW          *win;
     struct window_l *next;
 };
 
-struct panel_l{
-    PANEL *p_panel;
+struct panel_l {
+    PANEL *panel;
     struct panel_l *next;
 };
 
@@ -70,17 +69,17 @@ struct devs_to_init_t *dev_init_head;
 struct devs_to_init_t *dev_init_tail;
 struct array_cmd_data *raid_cmd_head;
 struct array_cmd_data *raid_cmd_tail;
-static char dev_field[] = "dev";
-static int term_is_5250 = 0;
-char log_root_dir[200];
-char editor[200];
-FILE *errpath;
-int  toggle_field;
+static char            dev_field[] = "dev";
+static int             term_is_5250 = 0;
+char                   log_root_dir[200];
+char                   editor[200];
+FILE                  *errpath;
+int                    toggle_field;
+nl_catd                catd;
 
 #define DEFAULT_LOG_DIR "/var/log"
 #define DEFAULT_EDITOR "vi -R"
 #define FAILSAFE_EDITOR "vi -R -"
-
 
 #define IS_CANCEL_KEY(c) ((c == KEY_F(4)) || (c == 'q') || (c == 'Q'))
 #define CANCEL_KEY_LABEL "q=Cancel   "
@@ -101,54 +100,56 @@ int  toggle_field;
 #define IS_5250_CHAR(c) (c == 0xa)
 
 i_container *free_i_con(i_container *x_con);
-fn_out *free_fn_out(fn_out *out);
-i_container *add_i_con(i_container *x_con,char *f,void *d,i_type t);
-fn_out *init_output();
-fn_out *add_fn_out(fn_out *output,int i,char *text);
+fn_out      *free_fn_out(fn_out *out);
+i_container *add_i_con(i_container *x_con,
+                       char *f,
+                       void *d,i_type t);
+fn_out      *init_output();
+fn_out      *add_fn_out(fn_out *output,int i,
+                        char *text);
 i_container *copy_i_con(i_container *x_con);
 
-struct special_status
-{
-  int index;
-  int num;
-  char *str;
+struct special_status {
+    int   index;
+    int   num;
+    char *str;
 } s_status;
 
-struct screen_output *screen_driver(s_node *screen, fn_out *output, i_container *i_con);
-char *strip_trailing_whitespace(char *p_str);
-
-
-char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
-                   struct ipr_ioa *p_cur_ioa, int type);
-int is_format_allowed(struct ipr_device *p_ipr_dev);
-int is_rw_protected(struct ipr_device *p_ipr_dev);
-
-/*int is_valid_device(char *p_frame, char *p_slot, char *p_dsa, char *p_ua,
-                    char *p_location, char *p_pci_bus, char *p_pci_device,
-                    char *p_scsi_channel, char *p_scsi_id, char *p_scsi_lun);*/
-int select_log_file(const struct dirent *p_dir_entry);
-int compare_log_file(const void *pp_first, const void *pp_second);
-
-void evaluate_device(struct ipr_device *p_ipr_device, struct ipr_ioa *p_ioa, int change_size);
-
-int is_array_in_use(struct ipr_ioa *p_cur_ioa, u8 array_id);
-
+struct screen_output *screen_driver(s_node *screen,
+                                    fn_out *output,
+                                    i_container *i_con);
+char *strip_trailing_whitespace(char *str);
+char *print_device(struct ipr_dev *ipr_dev,
+                   char *body,
+                   char *option,
+                   struct ipr_ioa *cur_ioa,
+                   int type);
+int is_format_allowed(struct ipr_dev *ipr_dev);
+int is_rw_protected(struct ipr_dev *ipr_dev);
+int select_log_file(const struct dirent *dir_entry);
+int compare_log_file(const void *log_file1,
+                     const void *log_file2);
+void evaluate_device(struct ipr_dev *ipr_dev,
+                     struct ipr_ioa *ioa,
+                     int change_size);
+int is_array_in_use(struct ipr_ioa *cur_ioa,
+                    u8 array_id);
 int display_menu(ITEM **menu_item,
                  int menu_start_row,
                  int menu_index_max,
                  int **userptr);
-
-void free_screen(struct panel_l *p_panel, struct window_l *p_win, FIELD **p_fields);
+void free_screen(struct panel_l *panel,
+                 struct window_l *win,
+                 FIELD **fields);
 void flush_stdscr();
 int flush_line();
-
-nl_catd catd;
 
 void *ipr_realloc(void *buffer, int size)
 {
     void *new_buffer = realloc(buffer, size);
 
-/*    syslog(LOG_ERR, "realloc from %lx to %lx of length %d\n", buffer, new_buffer, size);
+/*    syslog(LOG_ERR, "realloc from %lx to %lx of length %d\n",
+             buffer, new_buffer, size);
 */    return new_buffer;
 }
 
@@ -165,89 +166,90 @@ void *ipr_malloc(int size)
 /*    syslog(LOG_ERR, "malloc %lx of length %d\n", new_buffer, size);
 */    return new_buffer;
 }
-    
+
 int main(int argc, char *argv[])
 {
-  int next_editor, next_dir, next_platform, i;
-  char parm_editor[200], parm_dir[200];
-  
-  p_head_ipr_ioa = p_last_ipr_ioa = NULL;
-  
-  /* makes program compatible with all terminals - originally did not display text correctly when user was running xterm */
-  setenv("TERM", "vt100", 1);
+    int  next_editor, next_dir, next_platform, i;
+    char parm_editor[200], parm_dir[200];
 
-  setlocale(LC_ALL, "");
+    ipr_ioa_head = ipr_ioa_tail = NULL;
 
-  strcpy(parm_dir, DEFAULT_LOG_DIR);
-  strcpy(parm_editor, DEFAULT_EDITOR);
+    /* makes program compatible with all terminals -
+     originally did not display text correctly when user was running xterm */
+    setenv("TERM", "vt100", 1);
 
-  openlog("iprconfig",
-	  LOG_PID |     /* Include the PID with each error */
-	  LOG_CONS,     /* Write to system console if there is an error
+    setlocale(LC_ALL, "");
+
+    strcpy(parm_dir, DEFAULT_LOG_DIR);
+    strcpy(parm_editor, DEFAULT_EDITOR);
+
+    openlog("iprconfig",
+            LOG_PID |     /* Include the PID with each error */
+            LOG_CONS,     /* Write to system console if there is an error
                            sending to system logger */
-	  LOG_USER);
-  
-  if (argc > 1)
+            LOG_USER);
+
+    if (argc > 1)
     {
-      next_editor = 0;
-      next_dir = 0;
-      next_platform = 0;
-      for (i = 1; i < argc; i++)
+        next_editor = 0;
+        next_dir = 0;
+        next_platform = 0;
+        for (i = 1; i < argc; i++)
         {
-	  if (strcmp(argv[i], "-e") == 0)
-	    next_editor = 1;
-	  else if (strcmp(argv[i], "-k") == 0)
-	    next_dir = 1;
-	  else if (strcmp(argv[i], "--version") == 0)
+            if (strcmp(argv[i], "-e") == 0)
+                next_editor = 1;
+            else if (strcmp(argv[i], "-k") == 0)
+                next_dir = 1;
+            else if (strcmp(argv[i], "--version") == 0)
             {
-	      printf("iprconfig: %s"IPR_EOL, IPR_VERSION_STR);
-	      exit(1);
+                printf("iprconfig: %s\n", IPR_VERSION_STR);
+                exit(1);
             }
-	  else if (next_editor)
+            else if (next_editor)
             {
-	      strcpy(parm_editor, argv[i]);
-	      next_editor = 0;
+                strcpy(parm_editor, argv[i]);
+                next_editor = 0;
             }
-	  else if (next_dir)
+            else if (next_dir)
             {
-	      strcpy(parm_dir, argv[i]);
-	      next_dir = 0;
+                strcpy(parm_dir, argv[i]);
+                next_dir = 0;
             }
-	  else
+            else
             {
-	      printf("Usage: iprconfig [options]"IPR_EOL);
-	      printf("  Options: -e name    Default editor for viewing error logs"IPR_EOL);
-	      printf("           -k dir     Kernel messages root directory"IPR_EOL);
-	      printf("           --version  Print iprconfig version"IPR_EOL);
-	      printf("  Use quotes around parameters with spaces"IPR_EOL);
-	      exit(1);
+                printf("Usage: iprconfig [options]\n");
+                printf("  Options: -e name    Default editor for viewing error logs\n");
+                printf("           -k dir     Kernel messages root directory\n");
+                printf("           --version  Print iprconfig version\n");
+                printf("  Use quotes around parameters with spaces\n");
+                exit(1);
             }
         }
     }
 
-  strcpy(log_root_dir, parm_dir);
-  strcpy(editor, parm_editor);
+    strcpy(log_root_dir, parm_dir);
+    strcpy(editor, parm_editor);
 
-  tool_init("iprconfig");
+    tool_init("iprconfig");
 
-  initscr();
-  cbreak(); /* take input chars one at a time, no wait for \n */
-       
-  keypad(stdscr,TRUE);
-  noecho();
+    initscr();
+    cbreak(); /* take input chars one at a time, no wait for \n */
 
-  s_status.index = 0;
+    keypad(stdscr,TRUE);
+    noecho();
 
-  /* open the text catalog */
-  catd=catopen("./text.cat",NL_CAT_LOCALE);
+    s_status.index = 0;
 
-  main_menu(NULL);
+    /* open the text catalog */
+    catd=catopen("./text.cat",NL_CAT_LOCALE);
 
-  clear();
-  refresh();
-  endwin();
-  exit(0);
-  return 0;
+    main_menu(NULL);
+
+    clear();
+    refresh();
+    endwin();
+    exit(0);
+    return 0;
 }
 
 struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int header_lines, i_container *i_con)
@@ -265,35 +267,37 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
      e=exit   q=quit  f=pagedn ...  <- footer
      */
 
-    WINDOW *w_pad,*w_page_header; /* windows to hold text */
-    FIELD **p_fields = NULL; /* field list for forms */
-    FORM *p_form = NULL; /* p_form for input fields */
+    WINDOW *w_pad,*w_page_header;              /* windows to hold text */
+    FIELD **fields = NULL;                     /* field list for forms */
+    FORM *form = NULL;                       /* form for input fields */
 
-    fn_out *output_temp; /* help store function input */
-    int rc = 0; /* the status of the screen */
-    char *status; /* displays screen operations */
-    char buffer[100]; /* needed for special status strings */
-    bool invalid = false; /* invalid status display */
+    fn_out *output_temp;                       /* help store function input */
+    int rc = 0;                            /* the status of the screen */
+    char *status;                            /* displays screen operations */
+    char buffer[100];                       /* needed for special status strings */
+    bool invalid = false;                   /* invalid status display */
 
     bool t_on=false,e_on=false,q_on=false,r_on=false,f_on=false,enter_on=false,menus_on=false; /* control user input handling */
     bool ground_cursor=false;
 
-    int stdscr_max_y,stdscr_max_x,w_pad_max_y=0,w_pad_max_x=0; /* limits of the windows */
-    int pad_l=0,pad_r,pad_t=0,pad_b,pad_scr_t=2,pad_scr_b=2,pad_scr_l=0; /* position of the pad */
-    int center,len=0,ch,i=0,j,k,row=0,col=0,bt_len=0; /* text positioning */
-    int field_width,num_fields=0; /*form positioning */
-    int h,w,t,l,o,b; /* form querying */
+    int stdscr_max_y,stdscr_max_x;
+    int w_pad_max_y=0,w_pad_max_x=0;       /* limits of the windows */
+    int pad_l=0,pad_r,pad_t=0,pad_b;
+    int pad_scr_t=2,pad_scr_b=2,pad_scr_l=0; /* position of the pad */
+    int center,len=0,ch;
+    int i=0,j,k,row=0,col=0,bt_len=0;      /* text positioning */
+    int field_width,num_fields=0;          /* form positioning */
+    int h,w,t,l,o,b;                       /* form querying */
 
-    int active_field = 0; /* return to same active field after a quit */
-    bool pages = false,is_bottom = false; /* control page up/down in multi-page screens */
-    bool form_adjust = false; /* correct cursor position in multi-page screens */
-    int str_index,max_str_index=0; /* text positioning in multi-page screens */
+    int active_field = 0;                  /* return to same active field after a quit */
+    bool pages = false,is_bottom = false;   /* control page up/down in multi-page screens */
+    bool form_adjust = false;               /* correct cursor position in multi-page screens */
+    int str_index,max_str_index=0;         /* text positioning in multi-page screens */
     bool refresh_stdscr = true;
-    bool x_offscr,y_offscr; /* scrolling windows */
+    bool x_offscr,y_offscr;                 /* scrolling windows */
 
     struct screen_output *s_out;
-
-    struct screen_opts *temp; /* reference to another screen */
+    struct screen_opts   *temp;                 /* reference to another screen */
 
     char *title,*body,*footer,*body_text,more_footer[100]; /* screen text */
     int options;
@@ -315,7 +319,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
         footer = catgets(catd,screen->text_set,3+output->cat_offset,"KAPLOWEE   %e");
 
     bt_len = strlen(body);
-    body_text = calloc(bt_len+1,sizeof(char));
+    body_text = calloc(bt_len + 1, sizeof(char));
 
     /* determine max size needed and find where to put form fields and device input in the text and add them
      * '%' marks a field.  The number after '%' represents the field's width
@@ -335,30 +339,30 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
         }
         else if (body[i] == '%')
         {
-            p_fields = ipr_realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
+            fields = ipr_realloc(fields,sizeof(FIELD **) * (num_fields + 1));
             i++;
 
             if (body[i] == 'm')
             {
                 menus_on = true;
                 field_width = 15;
-                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
-                field_opts_off(p_fields[num_fields], O_EDIT);
+                fields[num_fields] = new_field(1,field_width,row,col,0,0);
+                field_opts_off(fields[num_fields], O_EDIT);
             }
             else
             {
                 field_width = 0;
                 sscanf(&(body[i]),"%d",&field_width);
 
-                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
+                fields[num_fields] = new_field(1,field_width,row,col,0,0);
 
                 if (field_width >= 30)
-                    field_opts_off(p_fields[num_fields],O_AUTOSKIP);
+                    field_opts_off(fields[num_fields],O_AUTOSKIP);
 
                 if (field_width > 9)
                     i++; /* skip second digit of field index */
             }
-            set_field_userptr(p_fields[num_fields],NULL);
+            set_field_userptr(fields[num_fields],NULL);
             num_fields++;
             col += field_width-1;
 
@@ -423,29 +427,29 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                         }
                         else if (output_temp->text[j] == '%')
                         {
-                            p_fields = ipr_realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
+                            fields = ipr_realloc(fields,sizeof(FIELD **) * (num_fields + 1));
                             j++; 
 
                             if (output_temp->text[j] == 'm')
                             {
                                 menus_on = true;
                                 field_width = 15;
-                                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
-                                field_opts_off(p_fields[num_fields], O_EDIT);
+                                fields[num_fields] = new_field(1,field_width,row,col,0,0);
+                                field_opts_off(fields[num_fields], O_EDIT);
                             }
                             else
                             {
                                 field_width = 0;
                                 sscanf(&(output_temp->text[j]),"%d",&field_width);
-                                p_fields[num_fields] = new_field(1,field_width,row,col,0,0);
+                                fields[num_fields] = new_field(1,field_width,row,col,0,0);
 
                                 if (field_width >= 30)
-                                    field_opts_off(p_fields[num_fields],O_AUTOSKIP);
+                                    field_opts_off(fields[num_fields],O_AUTOSKIP);
 
                                 if (field_width > 9)
                                     i++; /* skip second digit of field width */
                             }
-                            set_field_userptr(p_fields[num_fields],NULL);
+                            set_field_userptr(fields[num_fields],NULL);
                             num_fields++;
                             col += field_width-1;
 
@@ -496,14 +500,14 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
 
     if (num_fields)
     {
-        p_fields = ipr_realloc(p_fields,sizeof(FIELD **) * (num_fields + 1));
-        p_fields[num_fields] = NULL;
-        p_form = new_form(p_fields);
+        fields = ipr_realloc(fields,sizeof(FIELD **) * (num_fields + 1));
+        fields[num_fields] = NULL;
+        form = new_form(fields);
     }
 
     /* make the form appear in the pad; not stdscr */
-    set_form_win(p_form,w_pad);
-    set_form_sub(p_form,w_pad);
+    set_form_win(form,w_pad);
+    set_form_sub(form,w_pad);
 
     /* calculate the footer size and turn any special characters on*/
     i=0,j=0;
@@ -583,7 +587,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
             y_offscr = false; /*not scrollable*/
             pages = false;
             for (i = 0; i < num_fields; i++)
-                field_opts_on(p_fields[i],O_ACTIVE);
+                field_opts_on(fields[i],O_ACTIVE);
         }
         else
         {
@@ -636,7 +640,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
             addstr(PAGE_UP_KEY_LABEL);
         }
 
-        post_form(p_form);
+        post_form(form);
 
         /* add the body of the text to the screen */
         if (pages)
@@ -649,10 +653,10 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
 
         if (num_fields)
         {
-            set_current_field(p_form,p_fields[active_field]);
+            set_current_field(form,fields[active_field]);
             if (active_field == 0)
-                form_driver(p_form,REQ_NEXT_FIELD);
-            form_driver(p_form,REQ_PREV_FIELD);
+                form_driver(form,REQ_NEXT_FIELD);
+            form_driver(form,REQ_PREV_FIELD);
         }
 
         refresh_stdscr = true;
@@ -666,23 +670,28 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
             }
             if (invalid)
             {
-                status = catgets(catd,STATUS_SET,INVALID_OPTION_STATUS,"Status Return Error (invalid)");
+                status = catgets(catd,STATUS_SET,
+                                 INVALID_OPTION_STATUS,"Status Return Error (invalid)");
                 invalid = false;
             }
             else if (rc != 0)
             {
-                if ((status = strchr(catgets(catd,STATUS_SET,rc,"default"),'%')) == NULL)
+                if ((status = strchr(catgets(catd, STATUS_SET,
+                                             rc,"default"),'%')) == NULL)
                 {
-                    status = catgets(catd,STATUS_SET,rc,"Status Return Error (rc != 0, w/out %)");
+                    status = catgets(catd, STATUS_SET,
+                                     rc,"Status Return Error (rc != 0, w/out %)");
                 }
                 else if (status[1] == 'd')
                 {
-                    sprintf(buffer,catgets(catd,STATUS_SET,rc,"Status Return Error (rc != 0 w/ %%d = %d"),s_status.num);
+                    sprintf(buffer,catgets(catd,STATUS_SET,
+                                           rc,"Status Return Error (rc != 0 w/ %%d = %d"),s_status.num);
                     status = buffer;
                 }
                 else if (status[1] == 's')
                 {
-                    sprintf(buffer,catgets(catd,STATUS_SET,rc,"Status Return Error rc != 0 w/ %%s = %s"),s_status.str);
+                    sprintf(buffer,catgets(catd,STATUS_SET,
+                                           rc,"Status Return Error rc != 0 w/ %%s = %s"),s_status.str);
                     status = buffer;
                 }
                 rc = 0;
@@ -704,27 +713,27 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
 
                 for (i=0;i<num_fields;i++)
                 {
-                    if (p_fields[i] != NULL)
+                    if (fields[i] != NULL)
                     {
-                        field_info(p_fields[i],&h,&w,&t,&l,&o,&b); /* height, width, top, left, offscreen rows, buffer */
+                        field_info(fields[i],&h,&w,&t,&l,&o,&b); /* height, width, top, left, offscreen rows, buffer */
 
                         /* turn all offscreen fields off */
                         if (t>=header_lines+pad_t && t<=pad_b+pad_t)
                         {
-                            field_opts_on(p_fields[i],O_ACTIVE);
+                            field_opts_on(fields[i],O_ACTIVE);
                             if (form_adjust)
                             {
-                                set_current_field(p_form,p_fields[i]);
+                                set_current_field(form,fields[i]);
                                 form_adjust = false;
                             }
                         }
                         else
-                            field_opts_off(p_fields[i],O_ACTIVE);
+                            field_opts_off(fields[i],O_ACTIVE);
                     }
                 }
             }  
 
-            if (t_on && toggle_field && ((field_opts(p_fields[toggle_field]) & O_ACTIVE) != O_ACTIVE))
+            if (t_on && toggle_field && ((field_opts(fields[toggle_field]) & O_ACTIVE) != O_ACTIVE))
             {
                 ch = KEY_NPAGE;
             }
@@ -737,7 +746,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                     refresh_stdscr = FALSE;
                 }
                 else
-                    touchline(stdscr,stdscr_max_y-1,1);
+                    touchline(stdscr,stdscr_max_y - 1,1);
 
                 if (ground_cursor)
                     move(0,0);
@@ -747,18 +756,24 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                 if (pages)
                 {
                     touchwin(w_page_header);
-                    prefresh(w_page_header, 0, pad_l, pad_scr_t, pad_scr_l, header_lines+1 ,pad_r-1);
+                    prefresh(w_page_header, 0, pad_l,
+                             pad_scr_t, pad_scr_l,
+                             header_lines + 1 ,pad_r - 1);
                     touchwin(w_pad);
-                    prefresh(w_pad,pad_t+header_lines,pad_l,pad_scr_t+header_lines,pad_scr_l,pad_b+pad_scr_t,pad_r-1);
+                    prefresh(w_pad, pad_t + header_lines,
+                             pad_l, pad_scr_t + header_lines,
+                             pad_scr_l, pad_b + pad_scr_t, pad_r - 1);
                 }
                 else
                 {
                     touchwin(w_pad);
-                    prefresh(w_pad,pad_t,pad_l,pad_scr_t,pad_scr_l,pad_b+pad_scr_t,pad_r-1);
+                    prefresh(w_pad, pad_t, pad_l,
+                             pad_scr_t, pad_scr_l,
+                             pad_b + pad_scr_t, pad_r - 1);
                 }
 
                 if (ground_cursor) {
-                    move(stdscr_max_y-1,stdscr_max_x-1);
+                    move(stdscr_max_y - 1, stdscr_max_x - 1);
                     refresh();
                 }
 
@@ -770,10 +785,10 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
 
             if (IS_ENTER_KEY(ch))
             {
-                char *p_char;
+                char *input;
 
                 if (num_fields>1)
-                    active_field = field_index(current_field(p_form));
+                    active_field = field_index(current_field(form));
 
                 if (enter_on && num_fields == 0)
                 {
@@ -782,10 +797,10 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                 }
                 else if (enter_on && !menus_on) /* cancel if all fields are empty */
                 {
-                    form_driver(p_form,REQ_VALIDATION);
+                    form_driver(form,REQ_VALIDATION);
                     for (i=0;i<num_fields;i++)
                     {
-                        if (strlen(strip_trailing_whitespace(field_buffer(p_fields[i],0))) != 0)
+                        if (strlen(strip_trailing_whitespace(field_buffer(fields[i],0))) != 0)
                             break; /* fields are not empty -> continue */
                         if (i == num_fields-1) /* all fields are empty */
                         {
@@ -797,8 +812,8 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
 
                 if (num_fields > 0)
                 {
-                    /* input field is always p_fields[0] if only 1 field */
-                    p_char = field_buffer(p_fields[0],0);
+                    /* input field is always fields[0] if only 1 field */
+                    input = field_buffer(fields[0],0);
                 }
 
                 invalid = true;
@@ -808,7 +823,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
 
                     temp = &(screen->options[i]);
 
-                    if ((temp->key == "\n") || ((num_fields > 0)?(strcasecmp(p_char,temp->key) == 0):0))
+                    if ((temp->key == "\n") || ((num_fields > 0)?(strcasecmp(input,temp->key) == 0):0))
                     {
                         invalid = false;
 
@@ -816,11 +831,11 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                                                                   contain pointers) */
                         {
                             i_container *temp_i_con = i_con;
-                            form_driver(p_form,REQ_VALIDATION);
+                            form_driver(form,REQ_VALIDATION);
 
                             for (i=num_fields-1;i>=0;i--)
                             {
-                                strncpy(temp_i_con->field_data,field_buffer(p_fields[i],0),MAX_FIELD_SIZE);
+                                strncpy(temp_i_con->field_data,field_buffer(fields[i],0),MAX_FIELD_SIZE);
                                 temp_i_con = temp_i_con->next_item;
                             }
                         }
@@ -850,11 +865,11 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                 if (!invalid) 
                 {
                     /*clear fields*/
-                    form_driver(p_form,REQ_LAST_FIELD);
+                    form_driver(form,REQ_LAST_FIELD);
                     for (i=0;i<num_fields;i++)
                     {
-                        form_driver(p_form,REQ_CLR_FIELD);
-                        form_driver(p_form,REQ_NEXT_FIELD);
+                        form_driver(form,REQ_CLR_FIELD);
+                        form_driver(form,REQ_NEXT_FIELD);
                     }
                     break;
                 }
@@ -879,7 +894,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
             {
                 rc = TOGGLE_SCREEN;
                 if (num_fields>1)
-                    toggle_field = field_index(current_field(p_form)) + 1;
+                    toggle_field = field_index(current_field(form)) + 1;
                 goto leave;
             }
             else if (IS_PGUP_KEY(ch) && f_on && y_offscr)
@@ -941,14 +956,14 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                 if (x_offscr && stdscr_max_x+pad_l<w_pad_max_x)
                     pad_l++;
                 else if (!menus_on)
-                    form_driver(p_form, REQ_NEXT_CHAR);
+                    form_driver(form, REQ_NEXT_CHAR);
             }
             else if (ch == KEY_LEFT)
             {
                 if (pad_l>0)
                     pad_l--;
                 else if (!menus_on)
-                    form_driver(p_form, REQ_PREV_CHAR);
+                    form_driver(form, REQ_PREV_CHAR);
             }
             else if (ch == KEY_UP)
             {
@@ -962,7 +977,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                     }
                 }
                 else
-                    form_driver(p_form, REQ_PREV_FIELD);
+                    form_driver(form, REQ_PREV_FIELD);
             }
             else if (ch == KEY_DOWN)
             {
@@ -977,7 +992,7 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
                         is_bottom = true;
                 }
                 else
-                    form_driver(p_form, REQ_NEXT_FIELD);
+                    form_driver(form, REQ_NEXT_FIELD);
             }
 
             else if (num_fields == 0)
@@ -1023,21 +1038,21 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
             }
 
             else if ((ch == KEY_BACKSPACE) || (ch == 127))
-                form_driver(p_form, REQ_DEL_PREV);
+                form_driver(form, REQ_DEL_PREV);
             else if (ch == KEY_DC)
-                form_driver(p_form, REQ_DEL_CHAR);
+                form_driver(form, REQ_DEL_CHAR);
             else if (ch == KEY_IC)
-                form_driver(p_form, REQ_INS_MODE);
+                form_driver(form, REQ_INS_MODE);
             else if (ch == KEY_EIC)
-                form_driver(p_form, REQ_OVL_MODE);
+                form_driver(form, REQ_OVL_MODE);
             else if (ch == KEY_HOME)
-                form_driver(p_form, REQ_BEG_FIELD);
+                form_driver(form, REQ_BEG_FIELD);
             else if (ch == KEY_END)
-                form_driver(p_form, REQ_END_FIELD);
+                form_driver(form, REQ_END_FIELD);
             else if (ch == '\t')
-                form_driver(p_form, REQ_NEXT_FIELD);
+                form_driver(form, REQ_NEXT_FIELD);
             else if (isascii(ch))
-                form_driver(p_form, ch);
+                form_driver(form, ch);
         }
     }
 
@@ -1045,13 +1060,13 @@ struct screen_output *screen_driver_new(s_node *screen, fn_out *output, int head
         s_out->i_con = i_con;
     s_out->rc = rc;
     ipr_free(body_text);
-    unpost_form(p_form);
-    free_form(p_form);
+    unpost_form(form);
+    free_form(form);
 
     for (i=0;i<num_fields;i++)
     {
-        if (p_fields[i] != NULL)
-            free_field(p_fields[i]);
+        if (fields[i] != NULL)
+            free_field(fields[i]);
     }
     delwin(w_pad);
     delwin(w_page_header);
@@ -1088,7 +1103,7 @@ void complete_screen_driver(char *title,char *body,char *complete)
 char *ipr_list_opts(char *body, char *key, int catalog_set, int catalog_num)
 {
     char *string_buf;
-    int start_len = 0;
+    int   start_len = 0;
 
     if (body == NULL) {
         string_buf = catgets(catd,0,1,"Select one of the following");
@@ -1107,7 +1122,7 @@ char *ipr_list_opts(char *body, char *key, int catalog_set, int catalog_num)
 
 char *ipr_end_list(char *body)
 {
-    int start_len = 0;
+    int   start_len = 0;
     char *string_buf;
 
     start_len = strlen(body);
@@ -1120,304 +1135,307 @@ char *ipr_end_list(char *body)
 
 int main_menu(i_container *i_con)
 {
-  /*
-    Work with Disk Units
+    /*
+     Work with Disk Units
 
-    Select one of the following:
+     Select one of the following:
 
-    1. Display disk hardware status
-    2. Work with device parity protection
-    3. Work with disk unit recovery
-    4. Work with configuration
-    5. Analyze Log
+     1. Display disk hardware status
+     2. Work with device parity protection
+     3. Work with disk unit recovery
+     4. Work with configuration
+     5. Analyze Log
 
 
 
-    Selection:
+     Selection:
 
-    e=Exit
+     e=Exit
 
-  */
-  int rc;
-  struct ipr_cmd_status cmd_status;
-  char init_message[60];
-  int k, j;
-  struct ipr_cmd_status_record *p_status_record;
-  int num_devs = 0;
-  int num_stops = 0;
-  int num_starts = 0;
-  struct ipr_ioa *p_cur_ioa;
-  struct devs_to_init_t *p_cur_dev_to_init;
-  struct array_cmd_data *p_cur_raid_cmd;
-  u8 ioctl_buffer[IPR_MODE_SENSE_LENGTH];
-  struct sense_data_t sense_data;
-  struct scsi_dev_data *p_scsi_dev_data;
-  struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-  struct ipr_block_desc *p_block_desc;
-  int loop, retries;
-  struct screen_output *s_out;
-  char *string_buf;
-  mvaddstr(0,0,"MAIN MENU FUNCTION CALLED");
-  
-  init_message[0] = '\0';
+     */
+    int rc;
+    struct ipr_cmd_status cmd_status;
+    char init_message[60];
+    int k, j;
+    struct ipr_cmd_status_record *status_record;
+    int num_devs = 0;
+    int num_stops = 0;
+    int num_starts = 0;
+    struct ipr_ioa *cur_ioa;
+    struct devs_to_init_t *cur_dev_init;
+    struct array_cmd_data *cur_raid_cmd;
+    u8 ioctl_buffer[IPR_MODE_SENSE_LENGTH];
+    struct sense_data_t sense_data;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_block_desc *block_desc;
+    int loop, retries;
+    struct screen_output         *s_out;
+    char *string_buf;
+    mvaddstr(0,0,"MAIN MENU FUNCTION CALLED");
 
-  check_current_config(false);
+    init_message[0] = '\0';
 
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->next)
+    check_current_config(false);
+
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-      p_cur_ioa->num_raid_cmds = 0;
+        cur_ioa->num_raid_cmds = 0;
 
-      /* Do a query command status to see if any long running array commands
-	 are currently running */
-      rc = ipr_query_command_status(p_cur_ioa->ioa.gen_name,
-                                    &cmd_status);
+        /* Do a query command status to see if any long running array commands
+         are currently running */
+        rc = ipr_query_command_status(cur_ioa->ioa.gen_name,
+                                      &cmd_status);
 
-      if (rc != 0)
-          continue;
+        if (rc != 0)
+            continue;
 
-      p_status_record = &cmd_status.record[0];
+        status_record = &cmd_status.record[0];
 
-      for (k = 0; k < cmd_status.num_records; k++, p_status_record++)
-	{
-	  if ((p_status_record->status & IPR_CMD_STATUS_IN_PROGRESS))
-	    {
-	      if (p_status_record->command_code == IPR_START_ARRAY_PROTECTION)
-		{
-		  p_cur_ioa->num_raid_cmds++;
-		  num_starts++;
+        for (k = 0; k < cmd_status.num_records; k++, status_record++)
+        {
+            if ((status_record->status & IPR_CMD_STATUS_IN_PROGRESS))
+            {
+                if (status_record->command_code == IPR_START_ARRAY_PROTECTION)
+                {
+                    cur_ioa->num_raid_cmds++;
+                    num_starts++;
 
-		  if (raid_cmd_head)
-		    {
-		      raid_cmd_tail->next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
-		      raid_cmd_tail = raid_cmd_tail->next;
-		    }
-		  else
-		    {
-		      raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
-		    }
+                    if (raid_cmd_head)
+                    {
+                        raid_cmd_tail->next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_tail = raid_cmd_tail->next;
+                    }
+                    else
+                    {
+                        raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
+                    }
 
-		  raid_cmd_tail->next = NULL;
+                    raid_cmd_tail->next = NULL;
 
-		  memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+                    memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-		  raid_cmd_tail->array_id = p_status_record->array_id;
-		  raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-		  raid_cmd_tail->do_cmd = 1;
-		}
-	      else if (p_status_record->command_code == IPR_STOP_ARRAY_PROTECTION)
-		{
-		  p_cur_ioa->num_raid_cmds++;
-		  num_stops++;
+                    raid_cmd_tail->array_id = status_record->array_id;
+                    raid_cmd_tail->ipr_ioa = cur_ioa;
+                    raid_cmd_tail->do_cmd = 1;
+                }
+                else if (status_record->command_code == IPR_STOP_ARRAY_PROTECTION)
+                {
+                    cur_ioa->num_raid_cmds++;
+                    num_stops++;
 
-		  if (raid_cmd_head)
-		    {
-		      raid_cmd_tail->next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
-		      raid_cmd_tail = raid_cmd_tail->next;
-		    }
-		  else
-		    {
-		      raid_cmd_head = raid_cmd_tail =
-			(struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
-		    }
+                    if (raid_cmd_head)
+                    {
+                        raid_cmd_tail->next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_tail = raid_cmd_tail->next;
+                    }
+                    else
+                    {
+                        raid_cmd_head = raid_cmd_tail =
+                            (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
+                    }
 
-		  raid_cmd_tail->next = NULL;
+                    raid_cmd_tail->next = NULL;
 
-		  memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+                    memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-		  raid_cmd_tail->array_id = p_status_record->array_id;
-		  raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-		  raid_cmd_tail->do_cmd = 1;
-		}
-	    }
-	}
-      
-      /* Do a query command status for all devices to check for formats in
-	 progress */
-      for (j = 0; j < p_cur_ioa->num_devices; j++)
-      {
-          p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
+                    raid_cmd_tail->array_id = status_record->array_id;
+                    raid_cmd_tail->ipr_ioa = cur_ioa;
+                    raid_cmd_tail->do_cmd = 1;
+                }
+            }
+        }
 
-          if (p_scsi_dev_data->type == IPR_TYPE_ADAPTER)
-              continue;
+        /* Do a query command status for all devices to check for formats in
+         progress */
+        for (j = 0; j < cur_ioa->num_devices; j++)
+        {
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
-          if (ipr_is_af(&p_cur_ioa->dev[j]))
-          {
-              /* ignore if its a volume set */
-              if (ipr_is_volume_set(&p_cur_ioa->dev[j]))
-                  continue;
+            if ((scsi_dev_data == NULL) ||
+                (scsi_dev_data->type == IPR_TYPE_ADAPTER))
+                continue;
 
-              /* Do a query command status */
-              rc = ipr_query_command_status(p_cur_ioa->dev[j].gen_name, &cmd_status);
+            if (ipr_is_af(&cur_ioa->dev[j]))
+            {
+                /* Send Test Unit Ready to start device if its a volume set */
+                if (ipr_is_volume_set(&cur_ioa->dev[j])) {
+                    ipr_test_unit_ready(cur_ioa->dev[j].gen_name, &sense_data);
+                    continue;
+                }
 
-              if (rc != 0)
-                  continue;
+                /* Do a query command status */
+                rc = ipr_query_command_status(cur_ioa->dev[j].gen_name, &cmd_status);
 
-              if (cmd_status.num_records == 0)
-              {
-                  /* Do nothing */
-              }
-              else
-              {
-                  if (cmd_status.record->status == IPR_CMD_STATUS_IN_PROGRESS)
-                  {
-                      if (dev_init_head)
-                      {
-                          dev_init_tail->next = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
-                          dev_init_tail = dev_init_tail->next;
-                      }
-                      else
-                          dev_init_head = dev_init_tail = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
+                if (rc != 0)
+                    continue;
 
-                      memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
+                if (cmd_status.num_records == 0)
+                {
+                    /* Do nothing */
+                }
+                else
+                {
+                    if (cmd_status.record->status == IPR_CMD_STATUS_IN_PROGRESS)
+                    {
+                        if (dev_init_head)
+                        {
+                            dev_init_tail->next = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
+                            dev_init_tail = dev_init_tail->next;
+                        }
+                        else
+                            dev_init_head = dev_init_tail = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
 
-                      dev_init_tail->p_ioa = p_cur_ioa;
-                      dev_init_tail->dev_type = IPR_AF_DASD_DEVICE;
-                      dev_init_tail->p_ipr_device = &p_cur_ioa->dev[j];
-                      dev_init_tail->do_init = 1;
+                        memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
 
-                      num_devs++;
-                  }
-                  else if (cmd_status.record->status == IPR_CMD_STATUS_SUCCESSFUL)
-                  {
-                      /* Check if evaluate device capabilities is necessary */
-                      /* Issue mode sense */
-                      rc = ipr_mode_sense(p_cur_ioa->dev[j].gen_name, 0, ioctl_buffer);
+                        dev_init_tail->ioa = cur_ioa;
+                        dev_init_tail->dev_type = IPR_AF_DASD_DEVICE;
+                        dev_init_tail->ipr_dev = &cur_ioa->dev[j];
+                        dev_init_tail->do_init = 1;
 
-                      if (rc == 0) {
-                          p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                        num_devs++;
+                    }
+                    else if (cmd_status.record->status == IPR_CMD_STATUS_SUCCESSFUL)
+                    {
+                        /* Check if evaluate device capabilities is necessary */
+                        /* Issue mode sense */
+                        rc = ipr_mode_sense(cur_ioa->dev[j].gen_name, 0, ioctl_buffer);
 
-                          if (p_mode_parm_hdr->block_desc_len > 0)
-                          {
-                              p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr+1);
+                        if (rc == 0) {
+                            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-                              if((p_block_desc->block_length[1] == 0x02) && 
-                                 (p_block_desc->block_length[2] == 0x00))
-                              {
-                                  /* Send evaluate device capabilities */
-                                  remove_device(p_cur_ioa->dev[j].p_scsi_dev_data);
-                                  evaluate_device(&p_cur_ioa->dev[j], p_cur_ioa, IPR_512_BLOCK);
-                              }
+                            if (mode_parm_hdr->block_desc_len > 0)
+                            {
+                                block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
 
-                          }
-                      }
-                  }
-              }
-          }
-          else /* JBOD */
-          {
-              retries = 0;
+                                if((block_desc->block_length[1] == 0x02) && 
+                                   (block_desc->block_length[2] == 0x00))
+                                {
+                                    /* Send evaluate device capabilities */
+                                    remove_device(cur_ioa->dev[j].scsi_dev_data);
+                                    evaluate_device(&cur_ioa->dev[j], cur_ioa, IPR_512_BLOCK);
+                                }
 
-              redo_tur:
+                            }
+                        }
+                    }
+                }
+            }
+            else /* JBOD */
+            {
+                retries = 0;
 
-              /* Send Test Unit Ready to find percent complete in sense data. */
-              rc = ipr_test_unit_ready(p_cur_ioa->dev[j].gen_name, &sense_data);
+                redo_tur:
 
-              if ((rc == CHECK_CONDITION) &&
-                  ((sense_data.error_code & 0x7F) == 0x70) &&
-                  ((sense_data.sense_key & 0x0F) == 0x02) &&  /* NOT READY */
-                  (sense_data.add_sense_code == 0x04) &&      /* LOGICAL UNIT NOT READY */
-                  (sense_data.add_sense_code_qual == 0x02))   /* INIT CMD REQ */
-              {
-                  rc = ipr_start_stop_start(p_cur_ioa->dev[j].gen_name);
+                    /* Send Test Unit Ready to find percent complete in sense data. */
+                    rc = ipr_test_unit_ready(cur_ioa->dev[j].gen_name, &sense_data);
 
-                  if (retries == 0) {
-                      retries++;
-                      goto redo_tur;
-                  }
-              }
-              else if ((rc == CHECK_CONDITION) &&
-                       ((sense_data.error_code & 0x7F) == 0x70) &&
-                       ((sense_data.sense_key & 0x0F) == 0x02) &&  /* NOT READY */
-                       (sense_data.add_sense_code == 0x04) &&      /* LOGICAL UNIT NOT READY */
-                       (sense_data.add_sense_code_qual == 0x04))   /* FORMAT IN PROGRESS */
-              {
-                  if (dev_init_head)
-                  {
-                      dev_init_tail->next = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
-                      dev_init_tail = dev_init_tail->next;
-                  }
-                  else
-                      dev_init_head = dev_init_tail = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
+                if ((rc == CHECK_CONDITION) &&
+                    ((sense_data.error_code & 0x7F) == 0x70) &&
+                    ((sense_data.sense_key & 0x0F) == 0x02) &&  /* NOT READY */
+                    (sense_data.add_sense_code == 0x04) &&      /* LOGICAL UNIT NOT READY */
+                    (sense_data.add_sense_code_qual == 0x02))   /* INIT CMD REQ */
+                {
+                    rc = ipr_start_stop_start(cur_ioa->dev[j].gen_name);
 
-                  memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
+                    if (retries == 0) {
+                        retries++;
+                        goto redo_tur;
+                    }
+                }
+                else if ((rc == CHECK_CONDITION) &&
+                         ((sense_data.error_code & 0x7F) == 0x70) &&
+                         ((sense_data.sense_key & 0x0F) == 0x02) &&  /* NOT READY */
+                         (sense_data.add_sense_code == 0x04) &&      /* LOGICAL UNIT NOT READY */
+                         (sense_data.add_sense_code_qual == 0x04))   /* FORMAT IN PROGRESS */
+                {
+                    if (dev_init_head)
+                    {
+                        dev_init_tail->next = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
+                        dev_init_tail = dev_init_tail->next;
+                    }
+                    else
+                        dev_init_head = dev_init_tail = (struct devs_to_init_t *)ipr_malloc(sizeof(struct devs_to_init_t));
 
-                  dev_init_tail->p_ioa = p_cur_ioa;
-                  dev_init_tail->dev_type = IPR_JBOD_DASD_DEVICE;
-                  dev_init_tail->p_ipr_device = &p_cur_ioa->dev[j];
+                    memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
 
-                  dev_init_tail->do_init = 1;
+                    dev_init_tail->ioa = cur_ioa;
+                    dev_init_tail->dev_type = IPR_JBOD_DASD_DEVICE;
+                    dev_init_tail->ipr_dev = &cur_ioa->dev[j];
 
-                  num_devs++;
-              }
-              else if (rc != CHECK_CONDITION)
-              {
-                  /* Check if evaluate device capabilities needs to be issued */
+                    dev_init_tail->do_init = 1;
 
-                  /* Issue mode sense to get the block size */
-                  rc = ipr_mode_sense(p_cur_ioa->dev[j].gen_name,
-                                      0x0a, &ioctl_buffer);
+                    num_devs++;
+                }
+                else if (rc != CHECK_CONDITION)
+                {
+                    /* Check if evaluate device capabilities needs to be issued */
 
-                  if (rc == 0) {
-                      p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                    /* Issue mode sense to get the block size */
+                    rc = ipr_mode_sense(cur_ioa->dev[j].gen_name,
+                                        0x0a, &ioctl_buffer);
 
-                      if (p_mode_parm_hdr->block_desc_len > 0)
-                      {
-                          p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr+1);
+                    if (rc == 0) {
+                        mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-                          if ((!(p_block_desc->block_length[1] == 0x02) ||
-                               !(p_block_desc->block_length[2] == 0x00)) &&
-                              (p_cur_ioa->p_qac_data->num_records != 0))
-                          {
-                              /* send evaluate device */
-                              evaluate_device(&p_cur_ioa->dev[j], p_cur_ioa, IPR_522_BLOCK);
-                          }
-                      }
-                  }
-              }
-          }
-      }
-  }
-  
-  p_cur_dev_to_init = dev_init_head;
-  while(p_cur_dev_to_init)
-    {
-      p_cur_dev_to_init = p_cur_dev_to_init->next;
-      ipr_free(dev_init_head);
-      dev_init_head = p_cur_dev_to_init;
+                        if (mode_parm_hdr->block_desc_len > 0)
+                        {
+                            block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
+
+                            if ((!(block_desc->block_length[1] == 0x02) ||
+                                 !(block_desc->block_length[2] == 0x00)) &&
+                                (cur_ioa->qac_data->num_records != 0))
+                            {
+                                /* send evaluate device */
+                                evaluate_device(&cur_ioa->dev[j], cur_ioa, IPR_522_BLOCK);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-  p_cur_raid_cmd = raid_cmd_head;
-  while(p_cur_raid_cmd)
+    cur_dev_init = dev_init_head;
+    while(cur_dev_init)
     {
-      p_cur_raid_cmd = p_cur_raid_cmd->next;
-      ipr_free(raid_cmd_head);
-      raid_cmd_head = p_cur_raid_cmd;
+        cur_dev_init = cur_dev_init->next;
+        ipr_free(dev_init_head);
+        dev_init_head = cur_dev_init;
     }
 
-  string_buf = catgets(catd,n_main_menu.text_set,1,"Title");
-  n_main_menu.title = ipr_malloc(strlen(string_buf) + 4);
-  sprintf(n_main_menu.title, string_buf);
+    cur_raid_cmd = raid_cmd_head;
+    while(cur_raid_cmd)
+    {
+        cur_raid_cmd = cur_raid_cmd->next;
+        ipr_free(raid_cmd_head);
+        raid_cmd_head = cur_raid_cmd;
+    }
 
-  for (loop = 0; loop < n_main_menu.num_opts; loop++) {
-      n_main_menu.body = ipr_list_opts(n_main_menu.body,
-                                       n_main_menu.options[loop].key,
-                                       n_main_menu.text_set,
-                                       n_main_menu.options[loop].cat_num);
-  }
-  n_main_menu.body = ipr_end_list(n_main_menu.body);
+    string_buf = catgets(catd,n_main_menu.text_set,1,"Title");
+    n_main_menu.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_main_menu.title, string_buf);
 
-  s_out = screen_driver(&n_main_menu,NULL,NULL);
-  ipr_free(n_main_menu.body);
-  n_main_menu.body = NULL;
-  ipr_free(n_main_menu.title);
-  n_main_menu.title = NULL;
-  rc = s_out->rc;
-  i_con = s_out->i_con;
-  i_con = free_i_con(i_con);
-  ipr_free(s_out);
-  return rc;
+    for (loop = 0; loop < n_main_menu.num_opts; loop++) {
+        n_main_menu.body = ipr_list_opts(n_main_menu.body,
+                                         n_main_menu.options[loop].key,
+                                         n_main_menu.text_set,
+                                         n_main_menu.options[loop].cat_num);
+    }
+    n_main_menu.body = ipr_end_list(n_main_menu.body);
+
+    s_out = screen_driver(&n_main_menu,NULL,NULL);
+    ipr_free(n_main_menu.body);
+    n_main_menu.body = NULL;
+    ipr_free(n_main_menu.title);
+    n_main_menu.title = NULL;
+    rc = s_out->rc;
+    i_con = s_out->i_con;
+    i_con = free_i_con(i_con);
+    ipr_free(s_out);
+    return rc;
 }
 
 char *disk_status_body_init(int *num_lines, int type)
@@ -1426,9 +1444,9 @@ char *disk_status_body_init(int *num_lines, int type)
     char *buffer = NULL;
     int cur_len;
     int header_lines = 0;
-                  /*   .        .                  .            .                           .          */
-                  /*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
     char *header[] = {
+       /*   .        .                  .            .                           .          */
+       /*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
         "OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
         "OPT Name   PCI/SCSI Location          Description               Status"};
     char *sep[]    = {
@@ -1463,16 +1481,16 @@ int disk_status(i_container *i_con)
     int rc, j, i, k;
     int len = 0;
     int num_lines = 0;
-    struct ipr_ioa *p_cur_ioa;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct ipr_ioa *cur_ioa;
+    struct scsi_dev_data *scsi_dev_data;
     struct screen_output *s_out;
     char *string_buf;
     int header_lines;
-    mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
     int array_id;
     char *buffer[2];
     int toggle = 1;
-    struct ipr_device_record *dev_record;
+    struct ipr_dev_record *dev_record;
+    mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
     rc = RC_SUCCESS;
     i_con = free_i_con(i_con);
@@ -1487,91 +1505,91 @@ int disk_status(i_container *i_con)
     for (k=0; k<2; k++)
         buffer[k] = disk_status_body_init(&header_lines, k);
 
-    for(p_cur_ioa = p_head_ipr_ioa;
-        p_cur_ioa != NULL;
-        p_cur_ioa = p_cur_ioa->next)
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-        if (p_cur_ioa->ioa.p_scsi_dev_data == NULL)
+        if (cur_ioa->ioa.scsi_dev_data == NULL)
             continue;
 
         for (k=0; k<2; k++)
-            buffer[k] = print_device(&p_cur_ioa->ioa,buffer[k],"%1", p_cur_ioa, k);
+            buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1", cur_ioa, k);
 
-        i_con = add_i_con(i_con,"\0",(char *) p_cur_ioa->ioa.p_scsi_dev_data,list);
+        i_con = add_i_con(i_con,"\0",(char *) cur_ioa->ioa.scsi_dev_data,list);
 
         num_lines++;
 
         /* print JBOD and non-member AF devices*/
-        for (j = 0; j < p_cur_ioa->num_devices; j++)
+        for (j = 0; j < cur_ioa->num_devices; j++)
         {
-            p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-            if ((p_scsi_dev_data->type == IPR_TYPE_ADAPTER) ||
-                (ipr_is_hot_spare(&p_cur_ioa->dev[j])) ||
-                (ipr_is_volume_set(&p_cur_ioa->dev[j])) ||
-                (ipr_is_array_member(&p_cur_ioa->dev[j])))
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+            if ((scsi_dev_data->type == IPR_TYPE_ADAPTER) ||
+                (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
+                (ipr_is_volume_set(&cur_ioa->dev[j])) ||
+                (ipr_is_array_member(&cur_ioa->dev[j])))
             {
                 continue;
             }
 
             for (k=0; k<2; k++)
-                buffer[k] = print_device(&p_cur_ioa->dev[j],buffer[k], "%1", p_cur_ioa, k);
+                buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-            i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[j].p_scsi_dev_data, list);  
+            i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[j].scsi_dev_data, list);  
 
             num_lines++;
         }
 
         /* print Hot Spare devices*/
-        for (j = 0; j < p_cur_ioa->num_devices; j++)
+        for (j = 0; j < cur_ioa->num_devices; j++)
         {
-            p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-            if (!ipr_is_hot_spare(&p_cur_ioa->dev[j]))
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+            if (!ipr_is_hot_spare(&cur_ioa->dev[j]))
             {
                 continue;
             }
 
             for (k=0; k<2; k++)
-                buffer[k] = print_device(&p_cur_ioa->dev[j],buffer[k], "%1", p_cur_ioa, k);
+                buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
-            i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[j].p_scsi_dev_data, list);  
+            i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[j].scsi_dev_data, list);  
 
             num_lines++;
         }
 
         /* print volume set and associated devices*/
-        for (j = 0; j < p_cur_ioa->num_devices; j++)
+        for (j = 0; j < cur_ioa->num_devices; j++)
         {
-            p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-            if (!ipr_is_volume_set(&p_cur_ioa->dev[j]))
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+            if (!ipr_is_volume_set(&cur_ioa->dev[j]))
                 continue;
 
             for (k=0; k<2; k++)
-                buffer[k] = print_device(&p_cur_ioa->dev[j],buffer[k], "%1", p_cur_ioa, k);
+                buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
 
             i_con = add_i_con(i_con,"\0",
-                              (char *)p_cur_ioa->dev[j].p_scsi_dev_data,
+                              (char *)cur_ioa->dev[j].scsi_dev_data,
                               list);
 
-            dev_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+            dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
             array_id = dev_record->array_id;
             num_lines++;
 
-            for (i = 0; i < p_cur_ioa->num_devices; i++)
+            for (i = 0; i < cur_ioa->num_devices; i++)
             {
-                p_scsi_dev_data = p_cur_ioa->dev[i].p_scsi_dev_data;
-                dev_record = (struct ipr_device_record *)p_cur_ioa->dev[i].p_qac_entry;
+                scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+                dev_record = (struct ipr_dev_record *)cur_ioa->dev[i].qac_entry;
 
-                if (!(ipr_is_array_member(&p_cur_ioa->dev[i])) ||
-                     (ipr_is_volume_set(&p_cur_ioa->dev[i])) ||
+                if (!(ipr_is_array_member(&cur_ioa->dev[i])) ||
+                     (ipr_is_volume_set(&cur_ioa->dev[i])) ||
                      ((dev_record != NULL) &&
                       (dev_record->array_id != array_id)))
                 {
                     continue;
                 }
                 for (k=0; k<2; k++)
-                    buffer[k] = print_device(&p_cur_ioa->dev[i],buffer[k], "%1", p_cur_ioa, k);
+                    buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
 
-                i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[i].p_scsi_dev_data, list);
+                i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[i].scsi_dev_data, list);
                 num_lines++;
             }
         }
@@ -1655,32 +1673,34 @@ void device_details_body(int code, char *field_data)
     n_device_details.body = body;
 }
 
-int device_details_get_device(i_container *i_con, struct device_detail_struct *p_device)
+int device_details_get_device(i_container *i_con, struct device_detail_struct *device)
 {
     i_container *temp_i_con;
     int j, invalid=0;
     int dev_num = 0;
-    struct scsi_dev_data *p_scsi_dev_data;
-    char *p_char;
+    struct scsi_dev_data *scsi_dev_data;
+    char *input;
     int found = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
 
     if (i_con == NULL)
     {
         return 1;
     }
 
-    for (temp_i_con = i_con; temp_i_con != NULL && !invalid; temp_i_con = temp_i_con->next_item)
-    {
-        p_scsi_dev_data = (struct scsi_dev_data *)(temp_i_con->data);
-        if (p_scsi_dev_data != NULL)
-        {
-            p_char = temp_i_con->field_data;
+    for (temp_i_con = i_con;
+         temp_i_con != NULL && !invalid;
+         temp_i_con = temp_i_con->next_item) {
 
-            if (p_char == NULL)
+        scsi_dev_data = (struct scsi_dev_data *)(temp_i_con->data);
+        if (scsi_dev_data != NULL)
+        {
+            input = temp_i_con->field_data;
+
+            if (input == NULL)
                 continue;
 
-            if (strcmp(p_char, "5") == 0)
+            if (strcmp(input, "5") == 0)
             {
                 if (dev_num)
                 {
@@ -1691,21 +1711,21 @@ int device_details_get_device(i_container *i_con, struct device_detail_struct *p
                 {
                     found = 0;
 
-                    for (p_cur_ioa = p_head_ipr_ioa;
-                         p_cur_ioa != NULL;
-                         p_cur_ioa = p_cur_ioa->next)
+                    for (cur_ioa = ipr_ioa_head;
+                         cur_ioa != NULL;
+                         cur_ioa = cur_ioa->next)
                     {
-                        if (p_cur_ioa->ioa.p_scsi_dev_data == p_scsi_dev_data)
+                        if (cur_ioa->ioa.scsi_dev_data == scsi_dev_data)
                         {
-                            p_device->p_ipr_dev = &p_cur_ioa->ioa;
+                            device->ipr_dev = &cur_ioa->ioa;
                             found = 1;
                             break;
                         }
-                        for (j = 0; j < p_cur_ioa->num_devices; j++)
+                        for (j = 0; j < cur_ioa->num_devices; j++)
                         {
-                            if (p_scsi_dev_data == p_cur_ioa->dev[j].p_scsi_dev_data)
+                            if (scsi_dev_data == cur_ioa->dev[j].scsi_dev_data)
                             {
-                                p_device->p_ipr_dev = &p_cur_ioa->dev[j];
+                                device->ipr_dev = &cur_ioa->dev[j];
                                 found = 1;
                                 break;
                             }
@@ -1714,11 +1734,11 @@ int device_details_get_device(i_container *i_con, struct device_detail_struct *p
                             break;
                     }
 
-                    p_device->p_ioa = p_cur_ioa;
+                    device->ioa = cur_ioa;
                     dev_num++;
                 }
             }
-            else if (strcmp(p_char, " ") != 0 && p_char != NULL && strcmp(p_char, "") != 0)
+            else if (strcmp(input, " ") != 0 && input != NULL && strcmp(input, "") != 0)
             {
                 invalid = 1;
             }
@@ -1798,18 +1818,14 @@ int device_details(i_container *i_con)
 
      */
 
-    struct device_detail_struct *p_detail_device;
     char *buffer;
     struct device_detail_struct detail_device;
-
     int rc;
-
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct ipr_array2_record *ipr_array2_record;
-    struct ipr_ioa *p_ioa;
-
-    struct ipr_supported_arrays *p_supported_arrays;
-    struct ipr_array_cap_entry *p_cur_array_cap_entry;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_array_record *ipr_array_record;
+    struct ipr_ioa *ioa;
+    struct ipr_supported_arrays *supported_arrays;
+    struct ipr_array_cap_entry *cur_array_cap_entry;
     int i;
     u8 product_id[IPR_PROD_ID_LEN+1];
     u8 vendor_id[IPR_VENDOR_ID_LEN+1];
@@ -1824,7 +1840,9 @@ int device_details(i_container *i_con)
     long double device_capacity; 
     unsigned long long max_user_lba_int;
     double lba_divisor;
-    char scsi_channel[3], scsi_id[3], scsi_lun[4];
+    int scsi_channel;
+    int scsi_id;
+    int scsi_lun;
     struct ipr_ioa_vpd ioa_vpd;
     struct ipr_cfc_vpd cfc_vpd;
     struct ipr_dram_vpd dram_vpd;
@@ -1832,7 +1850,11 @@ int device_details(i_container *i_con)
     struct ipr_inquiry_page3 page3_inq;
     struct ipr_dasd_inquiry_page3 dasd_page3_inq;
     struct ipr_std_inq_data_long std_inq;
-    char *p_char;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
+    struct ipr_array_record *array_record;
+    char *hex;
+    int len;
 
     buffer = ipr_malloc(100);
     struct screen_output *s_out;
@@ -1843,21 +1865,36 @@ int device_details(i_container *i_con)
     if (rc)
         return rc;
 
-    p_detail_device = &detail_device;
-    p_scsi_dev_data = p_detail_device->p_ipr_dev->p_scsi_dev_data;
-    ipr_array2_record = (struct ipr_array2_record *)p_detail_device->p_ipr_dev->p_qac_entry;
-    p_ioa = p_detail_device->p_ioa;
+    scsi_dev_data = detail_device.ipr_dev->scsi_dev_data;
+    ipr_array_record = (struct ipr_array_record *)detail_device.ipr_dev->qac_entry;
+    ioa = detail_device.ioa;
 
     rc = 0;
 
-    sprintf(scsi_channel, "%d", p_scsi_dev_data->channel);
-    sprintf(scsi_id, "%d", p_scsi_dev_data->id);
-    sprintf(scsi_lun, "%d", p_scsi_dev_data->lun);
+    if (scsi_dev_data) {
+        scsi_channel = scsi_dev_data->channel;
+        scsi_id = scsi_dev_data->id;
+        scsi_lun = scsi_dev_data->lun;
+    } else if (detail_device.ipr_dev->qac_entry) {
+        common_record = detail_device.ipr_dev->qac_entry;
+        if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
+            device_record = (struct ipr_dev_record *)common_record;
+            scsi_channel = device_record->last_resource_addr.bus;
+            scsi_id = device_record->last_resource_addr.target;
+            scsi_lun = device_record->last_resource_addr.lun;
+        } else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+            array_record = (struct ipr_array_record *)common_record;
+            scsi_channel = array_record->last_resource_addr.bus;
+            scsi_id = array_record->last_resource_addr.target;
+            scsi_lun = array_record->last_resource_addr.lun;
+        }
+    }
 
     read_cap.max_user_lba = 0;
     read_cap.block_length = 0;
 
-    if (p_scsi_dev_data->type == IPR_TYPE_ADAPTER)
+    if ((scsi_dev_data) &&
+        (scsi_dev_data->type == IPR_TYPE_ADAPTER))
     {
         string_buf = catgets(catd,n_device_details.text_set,1,"Title");
 
@@ -1869,13 +1906,13 @@ int device_details(i_container *i_con)
         memset(&dram_vpd, 0, sizeof(dram_vpd));
         memset(&page3_inq, 0, sizeof(page3_inq));
 
-        ipr_inquiry(p_ioa->ioa.gen_name, IPR_STD_INQUIRY,
+        ipr_inquiry(ioa->ioa.gen_name, IPR_STD_INQUIRY,
                     &ioa_vpd, sizeof(ioa_vpd));
-        ipr_inquiry(p_ioa->ioa.gen_name, 1,
+        ipr_inquiry(ioa->ioa.gen_name, 1,
                     &cfc_vpd, sizeof(cfc_vpd));
-        ipr_inquiry(p_ioa->ioa.gen_name, 2,
+        ipr_inquiry(ioa->ioa.gen_name, 2,
                     &dram_vpd, sizeof(dram_vpd));
-        ipr_inquiry(p_ioa->ioa.gen_name, 3,
+        ipr_inquiry(ioa->ioa.gen_name, 3,
                     &page3_inq, sizeof(page3_inq));
 
         ipr_strncpy_0(vendor_id, ioa_vpd.std_inq_data.vpids.vendor_id, IPR_VENDOR_ID_LEN);
@@ -1895,57 +1932,59 @@ int device_details(i_container *i_con)
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(2, vendor_id);
         device_details_body(3, product_id);
-        device_details_body(4, p_ioa->driver_version);
+        device_details_body(4, ioa->driver_version);
         device_details_body(5, firmware_version);
         device_details_body(6, serial_num);
         device_details_body(7, part_num);
         device_details_body(8, plant_code);
         device_details_body(9, buffer);
         device_details_body(10, dram_size);
-        device_details_body(11, p_ioa->ioa.gen_name);
+        device_details_body(11, ioa->ioa.gen_name);
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(12, NULL);
-        device_details_body(13, p_ioa->pci_address);
-        sprintf(buffer,"%d", p_ioa->host_num);
+        device_details_body(13, ioa->pci_address);
+        sprintf(buffer,"%d", ioa->host_num);
         device_details_body(14, buffer);
-    } else if ((ipr_array2_record) &&
-               (ipr_array2_record->common.record_id ==
-                IPR_RECORD_ID_ARRAY2_RECORD)) {
+    } else if ((ipr_array_record) &&
+               (ipr_array_record->common.record_id ==
+                IPR_RECORD_ID_ARRAY_RECORD)) {
 
         string_buf = catgets(catd,n_device_details.text_set,101,"Title");
 
         n_device_details.title = ipr_malloc(strlen(string_buf) + 4);
         sprintf(n_device_details.title, string_buf);
 
-        ipr_strncpy_0(vendor_id, ipr_array2_record->vendor_id, IPR_VENDOR_ID_LEN);
+        ipr_strncpy_0(vendor_id, ipr_array_record->vendor_id, IPR_VENDOR_ID_LEN);
 
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(2, vendor_id);
 
-        p_supported_arrays = p_ioa->p_supported_arrays;
-        p_cur_array_cap_entry = (struct ipr_array_cap_entry *)p_supported_arrays->data;
-        for (i=0; i<iprtoh16(p_supported_arrays->num_entries); i++)
-        {
-            if (p_cur_array_cap_entry->prot_level == ipr_array2_record->raid_level)
+        supported_arrays = ioa->supported_arrays;
+        if (supported_arrays) {
+            cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
+            for (i=0; i<iprtoh16(supported_arrays->num_entries); i++)
             {
-                sprintf(buffer,"RAID %s", p_cur_array_cap_entry->prot_level_str);
-                device_details_body(102, buffer);
-                break;
+                if (cur_array_cap_entry->prot_level == ipr_array_record->raid_level)
+                {
+                    sprintf(buffer,"RAID %s", cur_array_cap_entry->prot_level_str);
+                    device_details_body(102, buffer);
+                    break;
+                }
+
+                cur_array_cap_entry = (struct ipr_array_cap_entry *)
+                    ((void *)cur_array_cap_entry + iprtoh16(supported_arrays->entry_length));
             }
 
-            p_cur_array_cap_entry = (struct ipr_array_cap_entry *)
-                ((void *)p_cur_array_cap_entry + iprtoh16(p_supported_arrays->entry_length));
+            if (iprtoh16(ipr_array_record->stripe_size) > 1024)
+                sprintf(buffer,"%d M",iprtoh16(ipr_array_record->stripe_size)/1024);
+            else
+                sprintf(buffer,"%d k",iprtoh16(ipr_array_record->stripe_size));
+
+            device_details_body(103, buffer);
         }
 
-        if (iprtoh16(ipr_array2_record->stripe_size) > 1024)
-            sprintf(buffer,"%d M",iprtoh16(ipr_array2_record->stripe_size)/1024);
-        else
-            sprintf(buffer,"%d k",iprtoh16(ipr_array2_record->stripe_size));
-
-        device_details_body(103, buffer);
-
         /* Do a read capacity to determine the capacity */
-        rc = ipr_read_capacity_16(p_detail_device->p_ipr_dev->gen_name, &read_cap16);
+        rc = ipr_read_capacity_16(detail_device.ipr_dev->gen_name, &read_cap16);
 
         if ((rc == 0) &&
             (iprtoh32(read_cap16.max_user_lba_hi) ||
@@ -1963,7 +2002,7 @@ int device_details(i_container *i_con)
             sprintf(buffer,"%.2Lf GB",device_capacity/lba_divisor);
             device_details_body(104, buffer);
         }
-        device_details_body(11, p_detail_device->p_ipr_dev->dev_name);
+        device_details_body(11, detail_device.ipr_dev->dev_name);
     } else {
         string_buf = catgets(catd,n_device_details.text_set,201,"Title");
 
@@ -1971,11 +2010,11 @@ int device_details(i_container *i_con)
         sprintf(n_device_details.title, string_buf);
 
         memset(&read_cap, 0, sizeof(read_cap));
-        rc = ipr_read_capacity(p_detail_device->p_ipr_dev->gen_name, &read_cap);
+        rc = ipr_read_capacity(detail_device.ipr_dev->gen_name, &read_cap);
 
-        rc = ipr_inquiry(p_detail_device->p_ipr_dev->gen_name,
+        rc = ipr_inquiry(detail_device.ipr_dev->gen_name,
                          0x03, &dasd_page3_inq, sizeof(dasd_page3_inq));
-        rc = ipr_inquiry(p_detail_device->p_ipr_dev->gen_name,
+        rc = ipr_inquiry(detail_device.ipr_dev->gen_name,
                          IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
 
         ipr_strncpy_0(vendor_id, std_inq.std_inq_data.vpids.vendor_id, IPR_VENDOR_ID_LEN);
@@ -1985,17 +2024,34 @@ int device_details(i_container *i_con)
         device_details_body(2, vendor_id);
         device_details_body(202, product_id);
 
-        sprintf(buffer, "%X%X%X%X", dasd_page3_inq.release_level[0],
-                dasd_page3_inq.release_level[1], dasd_page3_inq.release_level[2],
-                dasd_page3_inq.release_level[3]);
+        len = sprintf(buffer, "%X%X%X%X", dasd_page3_inq.release_level[0],
+                      dasd_page3_inq.release_level[1], dasd_page3_inq.release_level[2],
+                      dasd_page3_inq.release_level[3]);
+
+        if (isalnum(dasd_page3_inq.release_level[0]) &&
+            isalnum(dasd_page3_inq.release_level[1]) &&
+            isalnum(dasd_page3_inq.release_level[2]) &&
+            isalnum(dasd_page3_inq.release_level[3]))
+
+            sprintf(buffer + len, " (%c%c%c%c)",
+                    dasd_page3_inq.release_level[0],
+                    dasd_page3_inq.release_level[1],
+                    dasd_page3_inq.release_level[2],
+                    dasd_page3_inq.release_level[3]);
+            
         device_details_body(5, buffer);
 
         if (strcmp(vendor_id,"IBMAS400") == 0) {
-            sprintf(buffer, "%X", 0xFF);  //FIXME should display service level here, byte 107 of STD INQ?
+            /* The service level on IBMAS400 dasd is located
+             at byte 107 in the STD Inq data */
+            hex = (char *)&std_inq;
+            sprintf(buffer, "%X",
+                    hex[IPR_STD_INQ_AS400_SERV_LVL_OFF]);
             device_details_body(207, buffer);
         }
 
-        device_details_body(6, std_inq.std_inq_data.serial_num);
+        ipr_strncpy_0(serial_num, std_inq.std_inq_data.serial_num, IPR_SERIAL_NUM_LEN);
+        device_details_body(6, serial_num);
 
         if (iprtoh32(read_cap.block_length) && iprtoh32(read_cap.max_user_lba))
         {
@@ -2005,33 +2061,33 @@ int device_details(i_container *i_con)
             device_details_body(104, buffer);
         }
 
-        if (strlen(p_detail_device->p_ipr_dev->dev_name) > 0)
+        if (strlen(detail_device.ipr_dev->dev_name) > 0)
         {
-            device_details_body(11, p_detail_device->p_ipr_dev->dev_name);
+            device_details_body(11, detail_device.ipr_dev->dev_name);
         }
 
         device_details_body(IPR_LINE_FEED, NULL);
         device_details_body(12, NULL);
-        device_details_body(13, p_ioa->pci_address);
+        device_details_body(13, ioa->pci_address);
 
-        sprintf(buffer,"%d", p_ioa->host_num);
+        sprintf(buffer,"%d", ioa->host_num);
         device_details_body(203, buffer);
 
-        sprintf(buffer,"%d",p_scsi_dev_data->channel);
+        sprintf(buffer,"%d",scsi_channel);
         device_details_body(204, buffer);
 
-        sprintf(buffer,"%d",p_scsi_dev_data->id);
+        sprintf(buffer,"%d",scsi_id);
         device_details_body(205, buffer);
 
-        sprintf(buffer,"%d",p_scsi_dev_data->lun);
+        sprintf(buffer,"%d",scsi_lun);
         device_details_body(206, buffer);
 
-        rc =  ipr_inquiry(p_detail_device->p_ipr_dev->gen_name,
+        rc =  ipr_inquiry(detail_device.ipr_dev->gen_name,
                           0, &page0_inq, sizeof(page0_inq));
 
         for (i = 0; (i < page0_inq.page_length) && !rc; i++)
         {
-            if (page0_inq.supported_page_codes[i] == 0xC7)  //FIXME!!! what is 0xC7?
+            if (page0_inq.supported_page_codes[i] == 0xC7)  //FIXME 0xC7 is SCSD, do further research to find what needs to be tested for this affirmation.
             {
                 device_details_body(IPR_LINE_FEED, NULL);
                 device_details_body(208, NULL);
@@ -2045,11 +2101,11 @@ int device_details(i_container *i_con)
                 ipr_strncpy_0(buffer, std_inq.part_number, IPR_STD_INQ_PART_NUM_LEN);
                 device_details_body(7, buffer);
 
-                p_char = (u8 *)&std_inq.std_inq_data;
+                hex = (u8 *)&std_inq.std_inq_data;
                 sprintf(buffer, "%02X%02X%02X%02X%02X%02X%02X%02X",
-                        p_char[0], p_char[1], p_char[2],
-                        p_char[3], p_char[4], p_char[5],
-                        p_char[6], p_char[7]);
+                        hex[0], hex[1], hex[2],
+                        hex[3], hex[4], hex[5],
+                        hex[6], hex[7]);
                 device_details_body(211, buffer);
 
                 ipr_strncpy_0(buffer, std_inq.z1_term, IPR_STD_INQ_Z1_TERM_LEN);
@@ -2085,6 +2141,10 @@ int device_details(i_container *i_con)
     return rc;
 }
 
+#define IPR_INCLUDE 0
+#define IPR_REMOVE  1
+#define IPR_ADD_HOT_SPARE 0
+#define IPR_RMV_HOT_SPARE 1
 int raid_screen(i_container *i_con)
 {
     /*
@@ -2105,26 +2165,21 @@ int raid_screen(i_container *i_con)
      e=Exit  q=Cancel
      */
 
-#define IPR_INCLUDE 0
-#define IPR_REMOVE  1
-#define IPR_ADD_HOT_SPARE 0
-#define IPR_RMV_HOT_SPARE 1
-
     int rc;
-    struct array_cmd_data *p_cur_raid_cmd;
+    struct array_cmd_data *cur_raid_cmd;
     struct screen_output *s_out;
     fn_out *output = init_output();
     char *string_buf;
     int loop;
     mvaddstr(0,0,"RAID SCREEN FUNCTION CALLED");
 
-    p_cur_raid_cmd = raid_cmd_head;
+    cur_raid_cmd = raid_cmd_head;
 
-    while(p_cur_raid_cmd)
+    while(cur_raid_cmd)
     {
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
         ipr_free(raid_cmd_head);
-        raid_cmd_head = p_cur_raid_cmd;
+        raid_cmd_head = cur_raid_cmd;
     }
 
     string_buf = catgets(catd,n_raid_screen.text_set,1,"Title");
@@ -2168,14 +2223,14 @@ int raid_stop(i_container *i_con)
      e=Exit   q=Cancel    f=PageDn   b=PageUp
      */
     int rc, i, array_num;
-    struct ipr_record_common *p_common_record;
-    struct ipr_array_record *p_array_record;
+    struct ipr_common_record *common_record;
+    struct ipr_array_record *array_record;
     u8 array_id;
     char *buffer = NULL;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
     int num_lines = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 len;
     struct screen_output *s_out;
     fn_out *output = init_output();
@@ -2190,27 +2245,26 @@ int raid_stop(i_container *i_con)
 
     check_current_config(false);
 
-    for(p_cur_ioa = p_head_ipr_ioa;
-        p_cur_ioa != NULL;
-        p_cur_ioa = p_cur_ioa->next)
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-        p_cur_ioa->num_raid_cmds = 0;
+        cur_ioa->num_raid_cmds = 0;
 
         for (i = 0;
-             i < p_cur_ioa->num_devices;
+             i < cur_ioa->num_devices;
              i++)
         {
-            p_common_record = p_cur_ioa->dev[i].p_qac_entry;
+            common_record = cur_ioa->dev[i].qac_entry;
 
-            if ((p_common_record != NULL) &&
-                ((p_common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
-                 (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)))
+            if ((common_record != NULL) &&
+                (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
             {
-                p_array_record = (struct ipr_array_record *)p_common_record;
+                array_record = (struct ipr_array_record *)common_record;
 
-                if (p_array_record->stop_cand)
+                if (array_record->stop_cand)
                 {
-                    rc = is_array_in_use(p_cur_ioa, p_array_record->array_id);
+                    rc = is_array_in_use(cur_ioa, array_record->array_id);
                     if (rc != 0) continue;
 
                     if (raid_cmd_head)
@@ -2227,16 +2281,16 @@ int raid_stop(i_container *i_con)
 
                     memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-                    array_id =  p_array_record->array_id;
+                    array_id =  array_record->array_id;
 
                     raid_cmd_tail->array_id = array_id;
                     raid_cmd_tail->array_num = array_num;
-                    raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-                    raid_cmd_tail->p_ipr_device = &p_cur_ioa->dev[i];
+                    raid_cmd_tail->ipr_ioa = cur_ioa;
+                    raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
 
                     i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
 
-                    buffer = print_device(&p_cur_ioa->dev[i],buffer, "%1", p_cur_ioa, 0);
+                    buffer = print_device(&cur_ioa->dev[i],buffer, "%1", cur_ioa, 0);
 
                     buf_size += 150;
                     out_str = realloc(out_str, buf_size);
@@ -2293,60 +2347,57 @@ int confirm_raid_stop(i_container *i_con)
 
      q=Cancel    f=PageDn   b=PageUp
      */
-    struct ipr_device *p_ipr_device;
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct ipr_array_record *p_array_record;
-
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_dev *ipr_dev;
+    struct ipr_array_record *array_record;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_ioa *cur_ioa;
     int rc, j;
-    int found = 0; /* from raid_stop */
-    u16 len=0;
+    int found = 0;
+    u16 len = 0;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
-    char *p_char;    
+    char *input;    
     char *buffer = NULL;
     u32 num_lines = 0;
-    struct ipr_device_record *dev_record;
+    struct ipr_dev_record *dev_record;
     i_container *temp_i_con;
     struct screen_output *s_out;
     fn_out *output = init_output();
-
     mvaddstr(0,0,"CONFIRM RAID STOP FUNCTION CALLED");
 
     found = 0;
 
     for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-        p_cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
-        if (p_cur_raid_cmd != NULL)
+        cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
+        if (cur_raid_cmd != NULL)
         {
-            p_char = temp_i_con->field_data;
-            if (strcmp(p_char, "1") == 0)
+            input = temp_i_con->field_data;
+            if (strcmp(input, "1") == 0)
             {
                 found = 1;
-                p_cur_raid_cmd->do_cmd = 1;
+                cur_raid_cmd->do_cmd = 1;
 
-                p_array_record = (struct ipr_array_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-                if (!p_array_record->issue_cmd)
+                array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
+                if (!array_record->issue_cmd)
                 {
-                    p_array_record->issue_cmd = 1;
+                    array_record->issue_cmd = 1;
 
                     /* known_zeroed means do not preserve
                      user data on stop */
-                    p_array_record->known_zeroed = 1;
-                    p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds++;
+                    array_record->known_zeroed = 1;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds++;
                 }
             }
             else
             {
-                p_cur_raid_cmd->do_cmd = 0;
-                p_array_record = (struct ipr_array_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
+                cur_raid_cmd->do_cmd = 0;
+                array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
 
-                if (p_array_record->issue_cmd)
+                if (array_record->issue_cmd)
                 {
-                    p_array_record->issue_cmd = 0;
-                    p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds--;
+                    array_record->issue_cmd = 0;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds--;
                 }
             }
         }
@@ -2360,16 +2411,16 @@ int confirm_raid_stop(i_container *i_con)
 
     rc = RC_SUCCESS;
 
-    p_cur_raid_cmd = raid_cmd_head;
+    cur_raid_cmd = raid_cmd_head;
 
-    while(p_cur_raid_cmd)
+    while(cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-            p_ipr_device = p_cur_raid_cmd->p_ipr_device;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
+            ipr_dev = cur_raid_cmd->ipr_dev;
 
-            buffer = print_device(p_ipr_device,buffer,"1",p_cur_ioa, 0);
+            buffer = print_device(ipr_dev,buffer,"1",cur_ioa, 0);
 
             buf_size += 150;
             out_str = realloc(out_str, buf_size);
@@ -2379,16 +2430,15 @@ int confirm_raid_stop(i_container *i_con)
             memset(buffer, 0, strlen(buffer));
             num_lines++;
 
-            for (j = 0; j < p_cur_ioa->num_devices; j++)
+            for (j = 0; j < cur_ioa->num_devices; j++)
             {
-                p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-                dev_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+                dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
-                if ((ipr_is_array_member(&p_cur_ioa->dev[j])) &&
+                if ((ipr_is_array_member(&cur_ioa->dev[j])) &&
                     (dev_record != NULL) &&
-                    (dev_record->array_id == p_cur_raid_cmd->array_id))
+                    (dev_record->array_id == cur_raid_cmd->array_id))
                 {
-                    buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa, 0);
+                    buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
 
                     buf_size += 150;
                     out_str = realloc(out_str, buf_size);
@@ -2401,7 +2451,7 @@ int confirm_raid_stop(i_container *i_con)
                 }
             }
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
     output->next = add_fn_out(output->next,1,out_str);
@@ -2416,39 +2466,39 @@ int confirm_raid_stop(i_container *i_con)
 
 int do_confirm_raid_stop(i_container *i_con)
 {
-    struct ipr_device *p_ipr_device;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_dev *ipr_dev;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_ioa *cur_ioa;
     int rc;
     int raid_stop_complete();
-    int max_y,max_x;
+    int max_y, max_x;
     fn_out *output = init_output();
     mvaddstr(0,0,"DO CONFIRM RAID STOP FUNCTION CALLED");
 
-    p_cur_raid_cmd = raid_cmd_head;
-    while(p_cur_raid_cmd)
+    cur_raid_cmd = raid_cmd_head;
+    while(cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-            p_ipr_device = p_cur_raid_cmd->p_ipr_device;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
+            ipr_dev = cur_raid_cmd->ipr_dev;
 
-            rc = is_array_in_use(p_cur_ioa, p_cur_raid_cmd->array_id);
+            rc = is_array_in_use(cur_ioa, cur_raid_cmd->array_id);
             if (rc != 0)
             {
                 syslog(LOG_ERR,
-                       "Array %s is currently in use and cannot be deleted."
-                       IPR_EOL, p_ipr_device->dev_name);
+                       "Array %s is currently in use and cannot be deleted.\n",
+                       ipr_dev->dev_name);
                 output = free_fn_out(output);
                 return (20 | EXIT_FLAG);
             }
 
-            if (p_ipr_device->p_qac_entry->record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+            if (ipr_dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD)
             {
                 getmaxyx(stdscr,max_y,max_x);
                 move(max_y-1,0);printw("Operation in progress - please wait");refresh();
 
-                rc = ipr_start_stop_stop(p_ipr_device->gen_name);
+                rc = ipr_start_stop_stop(ipr_dev->gen_name);
 
                 if (rc != 0) {
                     output = free_fn_out(output);
@@ -2456,17 +2506,17 @@ int do_confirm_raid_stop(i_container *i_con)
                 }
             }
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
-    for (p_cur_ioa = p_head_ipr_ioa;
-         p_cur_ioa != NULL;
-         p_cur_ioa = p_cur_ioa->next)
+    for (cur_ioa = ipr_ioa_head;
+         cur_ioa != NULL;
+         cur_ioa = cur_ioa->next)
     {
-        if (p_cur_ioa->num_raid_cmds > 0)
+        if (cur_ioa->num_raid_cmds > 0)
         {
-            rc = ipr_stop_array_protection(p_cur_ioa->ioa.gen_name,
-                                           p_cur_ioa->p_qac_data);
+            rc = ipr_stop_array_protection(cur_ioa->ioa.gen_name,
+                                           cur_ioa->qac_data);
             if (rc != 0)
             {
                 output = free_fn_out(output);
@@ -2500,17 +2550,16 @@ int raid_stop_complete()
      */
 
     struct ipr_cmd_status cmd_status;
-    struct ipr_cmd_status_record *p_record;
+    struct ipr_cmd_status_record *status_record;
     int done_bad;
     int not_done = 0;
     int rc, j;
     u32 percent_cmplt = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 num_stops = 0;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_record_common *p_common_record;
-    struct scsi_dev_data *p_scsi_dev_data;
-
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_common_record *common_record;
+    struct scsi_dev_data *scsi_dev_data;
     char *title, *body, *complete;
 
     title = catgets(catd,n_raid_stop_complete.text_set,1,"Stop Device Parity Protection Status");
@@ -2531,41 +2580,41 @@ int raid_stop_complete()
         num_stops = 0;
         not_done = 0;
 
-        for (p_cur_ioa = p_head_ipr_ioa;
-             p_cur_ioa != NULL;
-             p_cur_ioa = p_cur_ioa->next)
+        for (cur_ioa = ipr_ioa_head;
+             cur_ioa != NULL;
+             cur_ioa = cur_ioa->next)
         {
-            if (p_cur_ioa->num_raid_cmds > 0)
+            if (cur_ioa->num_raid_cmds > 0)
             {
-                rc = ipr_query_command_status(p_cur_ioa->ioa.gen_name, &cmd_status);
+                rc = ipr_query_command_status(cur_ioa->ioa.gen_name, &cmd_status);
 
                 if (rc) {
-                    p_cur_ioa->num_raid_cmds = 0;
+                    cur_ioa->num_raid_cmds = 0;
                     done_bad = 1;
                     continue;
                 }
 
-                p_record = cmd_status.record;
+                status_record = cmd_status.record;
 
-                for (j=0; j < cmd_status.num_records; j++, p_record++)
+                for (j=0; j < cmd_status.num_records; j++, status_record++)
                 {
-                    if (p_record->command_code == IPR_STOP_ARRAY_PROTECTION)
+                    if (status_record->command_code == IPR_STOP_ARRAY_PROTECTION)
                     {
-                        for (p_cur_raid_cmd = raid_cmd_head;
-                             p_cur_raid_cmd != NULL; 
-                             p_cur_raid_cmd = p_cur_raid_cmd->next)
+                        for (cur_raid_cmd = raid_cmd_head;
+                             cur_raid_cmd != NULL; 
+                             cur_raid_cmd = cur_raid_cmd->next)
                         {
-                            if ((p_cur_raid_cmd->p_ipr_ioa = p_cur_ioa) &&
-                                (p_cur_raid_cmd->array_id == p_record->array_id))
+                            if ((cur_raid_cmd->ipr_ioa = cur_ioa) &&
+                                (cur_raid_cmd->array_id == status_record->array_id))
                             {
                                 num_stops++;
-                                if (p_record->status == IPR_CMD_STATUS_IN_PROGRESS)
+                                if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
                                 {
-                                    if (p_record->percent_complete < percent_cmplt)
-                                        percent_cmplt = p_record->percent_complete;
+                                    if (status_record->percent_complete < percent_cmplt)
+                                        percent_cmplt = status_record->percent_complete;
                                     not_done = 1;
                                 }
-                                else if (p_record->status != IPR_CMD_STATUS_SUCCESSFUL)
+                                else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
                                 {
                                     rc = (20 | EXIT_FLAG); /* "Stop Parity Protection failed" */
                                 }
@@ -2584,18 +2633,18 @@ int raid_stop_complete()
             if (done_bad)
                 return (20 | EXIT_FLAG); /* "Stop Parity Protection failed" */
 
-            for (p_cur_raid_cmd = raid_cmd_head;
-                 p_cur_raid_cmd != NULL; 
-                 p_cur_raid_cmd = p_cur_raid_cmd->next)
+            for (cur_raid_cmd = raid_cmd_head;
+                 cur_raid_cmd != NULL; 
+                 cur_raid_cmd = cur_raid_cmd->next)
             {
-                p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-                p_common_record = p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-                if ((p_common_record != NULL) &&
-                    (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD))
+                cur_ioa = cur_raid_cmd->ipr_ioa;
+                common_record = cur_raid_cmd->ipr_dev->qac_entry;
+                if ((common_record != NULL) &&
+                    (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
                 {
-                    p_scsi_dev_data = p_cur_raid_cmd->p_ipr_device->p_scsi_dev_data;
-                    remove_device(p_scsi_dev_data);
-                    scan_device(p_scsi_dev_data);
+                    scsi_dev_data = cur_raid_cmd->ipr_dev->scsi_dev_data;
+                    remove_device(scsi_dev_data);
+                    scan_device(scsi_dev_data);
                 }
             }
             check_current_config(false);
@@ -2609,240 +2658,238 @@ int raid_stop_complete()
 
 int raid_start(i_container *i_con)
 {
-  int rc, i, array_num;
-  struct array_cmd_data *p_cur_raid_cmd;
-  struct ipr_record_common *p_common_record;
-  struct ipr_array_record *p_array_record;
-  u8 array_id;
-  char *buffer = NULL;
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  u32 len;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID START FUNCTION CALLED");
-  /* empty the linked list that contains field pointers */
-  i_con = free_i_con(i_con);
-  
-  rc = RC_SUCCESS;
-  
-  array_num = 1;
+    int rc, i, array_num;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_common_record *common_record;
+    struct ipr_array_record *array_record;
+    u8 array_id;
+    char *buffer = NULL;
+    int num_lines = 0;
+    struct ipr_ioa *cur_ioa;
+    u32 len;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"RAID START FUNCTION CALLED");
 
-  check_current_config(false);
-  
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->next)
+    /* empty the linked list that contains field pointers */
+    i_con = free_i_con(i_con);
+
+    rc = RC_SUCCESS;
+
+    array_num = 1;
+
+    check_current_config(false);
+
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-      p_cur_ioa->num_raid_cmds = 0;
-      
-      for (i = 0;
-	   i < p_cur_ioa->num_devices;
-	   i++)
+        cur_ioa->num_raid_cmds = 0;
+
+        for (i = 0;
+             i < cur_ioa->num_devices;
+             i++)
         {
-	  p_common_record = p_cur_ioa->dev[i].p_qac_entry;
-	  
-	  if ((p_common_record != NULL) &&
-	      ((p_common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
-	       (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)))
+            common_record = cur_ioa->dev[i].qac_entry;
+
+            if ((common_record != NULL) &&
+                (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
             {
-	      p_array_record = (struct ipr_array_record *)p_common_record;
-	      
-	      if (p_array_record->start_cand)
+                array_record = (struct ipr_array_record *)common_record;
+
+                if (array_record->start_cand)
                 {
-		  rc = is_array_in_use(p_cur_ioa, p_array_record->array_id);
-		  if (rc != 0) continue;
-		  
-		  if (raid_cmd_head)
+                    rc = is_array_in_use(cur_ioa, array_record->array_id);
+                    if (rc != 0) continue;
+
+                    if (raid_cmd_head)
                     {
-		      raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-		      raid_cmd_tail = raid_cmd_tail->next;
+                        raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_tail = raid_cmd_tail->next;
                     }
-		  else
+                    else
                     {
-		      raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
                     }
-		  
-		  raid_cmd_tail->next = NULL;
-		  
-		  memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
-		  
-		  array_id =  p_array_record->array_id;
-		  
-		  raid_cmd_tail->array_id = array_id;
-		  raid_cmd_tail->array_num = array_num;
-		  raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-		  raid_cmd_tail->p_ipr_device = &p_cur_ioa->dev[i];
-		  raid_cmd_tail->p_qac_data = NULL;
-		  
-		  i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
-		  
-		  buffer = print_device(&p_cur_ioa->dev[i],buffer,"%1",p_cur_ioa, 0);
-		  
-		  buf_size += 150;
-		  
-		  out_str = realloc(out_str, buf_size);
-		  
-		  out_str = strcat(out_str,buffer);
-		  memset(buffer, 0, strlen(buffer));
-		  
-		  len = 0;
-		  num_lines++;
-		  array_num++;
+
+                    raid_cmd_tail->next = NULL;
+
+                    memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+
+                    array_id =  array_record->array_id;
+
+                    raid_cmd_tail->array_id = array_id;
+                    raid_cmd_tail->array_num = array_num;
+                    raid_cmd_tail->ipr_ioa = cur_ioa;
+                    raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
+                    raid_cmd_tail->qac_data = NULL;
+
+                    i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+
+                    buffer = print_device(&cur_ioa->dev[i],buffer,"%1",cur_ioa, 0);
+
+                    buf_size += 150;
+
+                    out_str = realloc(out_str, buf_size);
+
+                    out_str = strcat(out_str,buffer);
+                    memset(buffer, 0, strlen(buffer));
+
+                    len = 0;
+                    num_lines++;
+                    array_num++;
                 }
             }
         }
     }
 
-  if (array_num == 1)
+    if (array_num == 1)
     {
-      s_out = screen_driver(&n_raid_start_fail,output,i_con); /* Start Device Parity Protection Failed */
-      rc = s_out->rc;
-      free(s_out);
+        s_out = screen_driver(&n_raid_start_fail,output,i_con); /* Start Device Parity Protection Failed */
+        rc = s_out->rc;
+        free(s_out);
     }
-    
 
-  else
+
+    else
     {
-      output->next = add_fn_out(output->next,1,out_str);
+        output->next = add_fn_out(output->next,1,out_str);
 
-      s_out = screen_driver(&n_raid_start,output,i_con);
-      rc = s_out->rc;
-      free(s_out);
-      
-      p_cur_raid_cmd = raid_cmd_head;
-      
-      while(p_cur_raid_cmd)
-	{
-	  if (p_cur_raid_cmd->p_qac_data)
-	    {
-	      free(p_cur_raid_cmd->p_qac_data);
-	      p_cur_raid_cmd->p_qac_data = NULL;
-	    }
-	  p_cur_raid_cmd = p_cur_raid_cmd->next;
-	  free(raid_cmd_head);
-	  raid_cmd_head = p_cur_raid_cmd;
-	}
+        s_out = screen_driver(&n_raid_start,output,i_con);
+        rc = s_out->rc;
+        free(s_out);
+
+        cur_raid_cmd = raid_cmd_head;
+
+        while(cur_raid_cmd)
+        {
+            if (cur_raid_cmd->qac_data)
+            {
+                free(cur_raid_cmd->qac_data);
+                cur_raid_cmd->qac_data = NULL;
+            }
+            cur_raid_cmd = cur_raid_cmd->next;
+            free(raid_cmd_head);
+            raid_cmd_head = cur_raid_cmd;
+        }
     }
-  
-  free(out_str);
-  output = free_fn_out(output);
-  return rc;
+
+    free(out_str);
+    output = free_fn_out(output);
+    return rc;
 }
 
 int raid_start_loop(i_container *i_con)
 {
-  int rc;
-  int array_num;
-  struct ipr_array_record *p_array_record;
-  struct array_cmd_data *p_cur_raid_cmd;
-  u8 array_id;
-  int num_vsets;
-  int found = 0;
-  char *p_char;
-  i_container *temp_i_con;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID START LOOP FUNCTION CALLED");
-  
-  found = 0;
+    int rc;
+    int array_num;
+    struct ipr_array_record *array_record;
+    struct array_cmd_data *cur_raid_cmd;
+    u8 array_id;
+    int num_vsets;
+    int found = 0;
+    char *input;
+    i_container *temp_i_con;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"RAID START LOOP FUNCTION CALLED");
 
-  p_cur_raid_cmd = raid_cmd_head;
-  
-  for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
+    found = 0;
+    cur_raid_cmd = raid_cmd_head;
+
+    for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-      p_cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
-      if (p_cur_raid_cmd != NULL)
-	{
-	  p_char = temp_i_con->field_data;
-	  p_array_record = (struct ipr_array_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-	  
-	  if (strcmp(p_char, "1") == 0)
-	    {
-	      if (p_array_record->common.record_id == IPR_RECORD_ID_ARRAY2_RECORD)
-		{
-		  rc = RC_SUCCESS;
-		  
-		  rc = configure_raid_start(temp_i_con);
-       		  
-		  if (rc > 0)
-		    {
-		      output = free_fn_out(output);
-		      return rc;
-		    }
-		  
-		  if (RC_SUCCESS == rc)
-		    {
-		      num_vsets++;
-		      found = 1;
-		      p_cur_raid_cmd->do_cmd = 1;
-		      p_array_record->issue_cmd = 1;
-		      p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds++;
-		      
-		      raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-		      raid_cmd_tail = raid_cmd_tail->next;
-		      raid_cmd_tail->next = NULL;
-		      
-		      memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
-		      
-		      array_id =  p_array_record->array_id;
-		      
-		      raid_cmd_tail->array_id = array_id;
-		      raid_cmd_tail->array_num = array_num;
-		      raid_cmd_tail->p_ipr_ioa = p_cur_raid_cmd->p_ipr_ioa;
-		      raid_cmd_tail->p_ipr_device = p_cur_raid_cmd->p_ipr_device;
-		      
-		      p_cur_raid_cmd = raid_cmd_tail;
-		      array_num++;
-		    }
-		}
-	      else
-		{
-		  found = 1;
-		  p_cur_raid_cmd->do_cmd = 1;
-		  p_array_record->issue_cmd = 1;
-		  p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds++;
-		}
-	    }
-	  else
-	    {
-	      p_cur_raid_cmd->do_cmd = 0;
-	    }
-	}
-    }
-  
-  if (found != 0)
-    {
-      
-      /* Go to verification screen */
-      rc = confirm_raid_start(NULL);
-      rc |= EXIT_FLAG;
-    }
-  else
-    {
-      rc =  INVALID_OPTION_STATUS; /* "Invalid options specified" */
+        cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
+        if (cur_raid_cmd != NULL)
+        {
+            input = temp_i_con->field_data;
+            array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
+
+            if (strcmp(input, "1") == 0)
+            {
+                if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
+                {
+                    rc = RC_SUCCESS;
+
+                    rc = configure_raid_start(temp_i_con);
+
+                    if (rc > 0)
+                    {
+                        output = free_fn_out(output);
+                        return rc;
+                    }
+
+                    if (RC_SUCCESS == rc)
+                    {
+                        num_vsets++;
+                        found = 1;
+                        cur_raid_cmd->do_cmd = 1;
+                        array_record->issue_cmd = 1;
+                        cur_raid_cmd->ipr_ioa->num_raid_cmds++;
+
+                        raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_tail = raid_cmd_tail->next;
+                        raid_cmd_tail->next = NULL;
+
+                        memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+
+                        array_id =  array_record->array_id;
+
+                        raid_cmd_tail->array_id = array_id;
+                        raid_cmd_tail->array_num = array_num;
+                        raid_cmd_tail->ipr_ioa = cur_raid_cmd->ipr_ioa;
+                        raid_cmd_tail->ipr_dev = cur_raid_cmd->ipr_dev;
+
+                        cur_raid_cmd = raid_cmd_tail;
+                        array_num++;
+                    }
+                }
+                else
+                {
+                    found = 1;
+                    cur_raid_cmd->do_cmd = 1;
+                    array_record->issue_cmd = 1;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds++;
+                }
+            }
+            else
+            {
+                cur_raid_cmd->do_cmd = 0;
+            }
+        }
     }
 
-  output = free_fn_out(output);
-  return rc;
+    if (found != 0)
+    {
+
+        /* Go to verification screen */
+        rc = confirm_raid_start(NULL);
+        rc |= EXIT_FLAG;
+    }
+    else
+    {
+        rc =  INVALID_OPTION_STATUS; /* "Invalid options specified" */
+    }
+
+    output = free_fn_out(output);
+    return rc;
 }
 
 int configure_raid_start(i_container *i_con)
 {
-    char *p_char;
+    char *input;
     int found;
-    struct ipr_device *p_ipr_device;
-    struct array_cmd_data *p_cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
+    struct ipr_dev *ipr_dev;
+    struct array_cmd_data *cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
     int rc, j;
     char *buffer = NULL;
     int num_devs = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 len;
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct ipr_device_record *p_device_record;
-    struct ipr_array_query_data *p_qac_data_tmp;
-    /*  int configure_raid_parameters(struct array_cmd_data *p_cur_raid_cmd);*/
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_dev_record *device_record;
+    struct ipr_array_query_data *qac_data_tmp;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
     i_container *i_con2 = NULL;
@@ -2853,26 +2900,27 @@ int configure_raid_start(i_container *i_con)
 
     rc = RC_SUCCESS;
 
-    p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+    cur_ioa = cur_raid_cmd->ipr_ioa;
 
-    for (j = 0; j < p_cur_ioa->num_devices; j++)
+    for (j = 0; j < cur_ioa->num_devices; j++)
     {
-        p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-        p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+        scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+        device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
-        if (p_device_record == NULL)
+        if ((device_record == NULL) ||
+            (scsi_dev_data == NULL))
             continue;
 
-        if (p_cur_ioa->dev[j].is_start_cand)
+        if (cur_ioa->dev[j].is_start_cand)
             continue;
 
-        if ((p_scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
-            (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-            (p_device_record->start_cand))
+        if ((scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
+            (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+            (device_record->start_cand))
         {
-            buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1", p_cur_ioa, 0);
+            buffer = print_device(&cur_ioa->dev[j],buffer,"%1", cur_ioa, 0);
 
-            i_con2 = add_i_con(i_con2,"\0",(char *)&p_cur_ioa->dev[j],list);
+            i_con2 = add_i_con(i_con2,"\0",(char *)&cur_ioa->dev[j],list);
 
             buf_size += 150;
             out_str = realloc(out_str, buf_size);
@@ -2888,9 +2936,9 @@ int configure_raid_start(i_container *i_con)
 
     if (num_devs)
     {
-        p_qac_data_tmp = malloc(sizeof(struct ipr_array_query_data));
-        memcpy(p_qac_data_tmp,
-               p_cur_ioa->p_qac_data,
+        qac_data_tmp = malloc(sizeof(struct ipr_array_query_data));
+        memcpy(qac_data_tmp,
+               cur_ioa->qac_data,
                sizeof(struct ipr_array_query_data));
     }
 
@@ -2911,17 +2959,17 @@ int configure_raid_start(i_container *i_con)
 
         for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
         {
-            p_ipr_device = (struct ipr_device *)temp_i_con->data;
+            ipr_dev = (struct ipr_dev *)temp_i_con->data;
 
-            if (p_ipr_device != NULL)
+            if (ipr_dev != NULL)
             {
-                p_char = temp_i_con->field_data;
-                if (strcmp(p_char, "1") == 0)
+                input = temp_i_con->field_data;
+                if (strcmp(input, "1") == 0)
                 {
                     found = 1;
-                    p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-                    p_device_record->issue_cmd = 1;
-                    p_ipr_device->is_start_cand = 1;
+                    device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                    device_record->issue_cmd = 1;
+                    ipr_dev->is_start_cand = 1;
                 }
             }
         }
@@ -2938,28 +2986,28 @@ int configure_raid_start(i_container *i_con)
                 /* clear out current selections */
                 for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
                 {
-                    p_ipr_device = (struct ipr_device *)temp_i_con->data;
-                    if (p_ipr_device != NULL)
+                    ipr_dev = (struct ipr_dev *)temp_i_con->data;
+                    if (ipr_dev != NULL)
                     {
-                        p_char = temp_i_con->field_data;
-                        if (strcmp(p_char, "1") == 0)
+                        input = temp_i_con->field_data;
+                        if (strcmp(input, "1") == 0)
                         {
-                            p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-                            p_device_record->issue_cmd = 0;
-                            p_ipr_device->is_start_cand = 0;
+                            device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                            device_record->issue_cmd = 0;
+                            ipr_dev->is_start_cand = 0;
                         }
                     }
                 }
                 rc = REFRESH_FLAG;
                 continue;
             }
-            p_cur_raid_cmd->p_qac_data =
+            cur_raid_cmd->qac_data =
                 malloc(sizeof(struct ipr_array_query_data));
 
             /* save off qac data image with issue_cmd set
              for selected devices */
-            memcpy(p_cur_raid_cmd->p_qac_data,
-                   p_cur_ioa->p_qac_data,
+            memcpy(cur_raid_cmd->qac_data,
+                   cur_ioa->qac_data,
                    sizeof(struct ipr_array_query_data));
             goto leave;
         }
@@ -2978,12 +3026,12 @@ int configure_raid_start(i_container *i_con)
     if (rc > 0)
     {
         /* restore unmodified image of qac data */
-        memcpy(p_cur_ioa->p_qac_data,
-               p_qac_data_tmp,
+        memcpy(cur_ioa->qac_data,
+               qac_data_tmp,
                sizeof(struct ipr_array_query_data));
     }
 
-    free(p_qac_data_tmp);
+    free(qac_data_tmp);
 
     return rc;
 }
@@ -3013,21 +3061,20 @@ int configure_raid_parameters(i_container *i_con)
 
      e=Exit   q=Cancel
      */
-
-    FIELD *p_input_fields[4];
-    FIELD *p_cur_field;
-    FORM *p_form;
+    FIELD *input_fields[4];
+    FIELD *cur_field;
+    FORM *form;
     ITEM **raid_item = NULL;
-    struct array_cmd_data *p_cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
+    struct array_cmd_data *cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
     int raid_index_default;
     unsigned long raid_index = 0;
     unsigned long index;
     char buffer[24];
     int rc, i;
-    struct ipr_ioa *p_cur_ioa;
-    struct ipr_supported_arrays *p_supported_arrays;
-    struct ipr_array_cap_entry *p_cur_array_cap_entry;
-    struct ipr_device_record *p_device_record;
+    struct ipr_ioa *cur_ioa;
+    struct ipr_supported_arrays *supported_arrays;
+    struct ipr_array_cap_entry *cur_array_cap_entry;
+    struct ipr_dev_record *device_record;
     struct text_str
     {
         char line[16];
@@ -3050,39 +3097,39 @@ int configure_raid_parameters(i_container *i_con)
     rc = RC_SUCCESS;
 
     /* Title */
-    p_input_fields[0] = new_field(1, max_x - start_x,   /* new field size */ 
+    input_fields[0] = new_field(1, max_x - start_x,   /* new field size */ 
                                   0, 0,       /* upper left corner */
                                   0,           /* number of offscreen rows */
                                   0);               /* number of working buffers */
 
     /* Protection Level */
-    p_input_fields[1] = new_field(1, 9,   /* new field size */ 
+    input_fields[1] = new_field(1, 9,   /* new field size */ 
                                   8, 44,       /*  */
                                   0,           /* number of offscreen rows */
                                   0);          /* number of working buffers */
 
     /* Stripe Size */
-    p_input_fields[2] = new_field(1, 9,   /* new field size */ 
+    input_fields[2] = new_field(1, 9,   /* new field size */ 
                                   9, 44,       /*  */
                                   0,           /* number of offscreen rows */
                                   0);          /* number of working buffers */
 
-    p_input_fields[3] = NULL;
+    input_fields[3] = NULL;
 
 
-    p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-    p_supported_arrays = p_cur_ioa->p_supported_arrays;
-    p_cur_array_cap_entry = (struct ipr_array_cap_entry *)p_supported_arrays->data;
+    cur_ioa = cur_raid_cmd->ipr_ioa;
+    supported_arrays = cur_ioa->supported_arrays;
+    cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
 
     /* determine number of devices selected for this parity set */
-    for (i=0; i<p_cur_ioa->num_devices; i++)
+    for (i=0; i<cur_ioa->num_devices; i++)
     {
-        p_device_record = (struct ipr_device_record *)
-            p_cur_ioa->dev[i].p_qac_entry;
+        device_record = (struct ipr_dev_record *)
+            cur_ioa->dev[i].qac_entry;
 
-        if ((p_device_record != NULL) &&
-            (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-            (p_device_record->issue_cmd))
+        if ((device_record != NULL) &&
+            (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+            (device_record->issue_cmd))
         {
             selected_count++;
         }
@@ -3094,15 +3141,15 @@ int configure_raid_parameters(i_container *i_con)
     prot_level_list = malloc(sizeof(struct prot_level));
     prot_level_list[raid_index].is_valid_entry = 0;
 
-    for (i=0; i<iprtoh16(p_supported_arrays->num_entries); i++)
+    for (i=0; i<iprtoh16(supported_arrays->num_entries); i++)
     {
-        if ((selected_count <= p_cur_array_cap_entry->max_num_array_devices) &&
-            (selected_count >= p_cur_array_cap_entry->min_num_array_devices) &&
-            ((selected_count % p_cur_array_cap_entry->min_mult_array_devices) == 0))
+        if ((selected_count <= cur_array_cap_entry->max_num_array_devices) &&
+            (selected_count >= cur_array_cap_entry->min_num_array_devices) &&
+            ((selected_count % cur_array_cap_entry->min_mult_array_devices) == 0))
         {
-            prot_level_list[raid_index].p_array_cap_entry = p_cur_array_cap_entry;
+            prot_level_list[raid_index].array_cap_entry = cur_array_cap_entry;
             prot_level_list[raid_index].is_valid_entry = 1;
-            if (0 == strcmp(p_cur_array_cap_entry->prot_level_str,IPR_DEFAULT_RAID_LVL))
+            if (0 == strcmp(cur_array_cap_entry->prot_level_str,IPR_DEFAULT_RAID_LVL))
             {
                 raid_index_default = raid_index;
             }
@@ -3110,37 +3157,37 @@ int configure_raid_parameters(i_container *i_con)
             prot_level_list = realloc(prot_level_list, sizeof(struct prot_level) * (raid_index + 1));
             prot_level_list[raid_index].is_valid_entry = 0;
         }
-        p_cur_array_cap_entry = (struct ipr_array_cap_entry *)
-            ((void *)p_cur_array_cap_entry + iprtoh16(p_supported_arrays->entry_length));
+        cur_array_cap_entry = (struct ipr_array_cap_entry *)
+            ((void *)cur_array_cap_entry + iprtoh16(supported_arrays->entry_length));
     }
 
     raid_index = raid_index_default;
-    p_cur_array_cap_entry = prot_level_list[raid_index].p_array_cap_entry;
-    stripe_sz = iprtoh16(p_cur_array_cap_entry->recommended_stripe_size);
+    cur_array_cap_entry = prot_level_list[raid_index].array_cap_entry;
+    stripe_sz = iprtoh16(cur_array_cap_entry->recommended_stripe_size);
 
-    p_form = new_form(p_input_fields);
+    form = new_form(input_fields);
 
-    set_current_field(p_form, p_input_fields[1]);
+    set_current_field(form, input_fields[1]);
 
-    set_field_just(p_input_fields[0], JUSTIFY_CENTER);
+    set_field_just(input_fields[0], JUSTIFY_CENTER);
 
-    field_opts_off(p_input_fields[0], O_ACTIVE);
-    field_opts_off(p_input_fields[1], O_EDIT);
-    field_opts_off(p_input_fields[2], O_EDIT);
+    field_opts_off(input_fields[0], O_ACTIVE);
+    field_opts_off(input_fields[1], O_EDIT);
+    field_opts_off(input_fields[2], O_EDIT);
 
-    set_field_buffer(p_input_fields[0],        /* field to alter */
+    set_field_buffer(input_fields[0],        /* field to alter */
                      0,          /* number of buffer to alter */
                      "Select Protection Level and Stripe Size");  /* string value to set     */
 
-    form_opts_off(p_form, O_BS_OVERLOAD);
+    form_opts_off(form, O_BS_OVERLOAD);
 
     flush_stdscr();
 
     clear();
 
-    set_form_win(p_form,stdscr);
-    set_form_sub(p_form,stdscr);
-    post_form(p_form);
+    set_form_win(form,stdscr);
+    set_form_sub(form,stdscr);
+    post_form(form);
 
     mvaddstr(2, 1, "Default array configurations are shown.  To change");
     mvaddstr(3, 1, "setting hit \"c\" for options menu.  Highlight desired");
@@ -3151,14 +3198,14 @@ int configure_raid_parameters(i_container *i_con)
     mvaddstr(max_y - 4, 0, "Press Enter to Continue");
     mvaddstr(max_y - 2, 0, EXIT_KEY_LABEL CANCEL_KEY_LABEL);
 
-    form_driver(p_form,               /* form to pass input to */
+    form_driver(form,               /* form to pass input to */
                 REQ_FIRST_FIELD );     /* form request code */
 
     while (1)
     {
 
-        sprintf(raid_str,"RAID %s",p_cur_array_cap_entry->prot_level_str);
-        set_field_buffer(p_input_fields[1],        /* field to alter */
+        sprintf(raid_str,"RAID %s",cur_array_cap_entry->prot_level_str);
+        set_field_buffer(input_fields[1],        /* field to alter */
                          0,                       /* number of buffer to alter */
                          raid_str);              /* string value to set */
 
@@ -3167,7 +3214,7 @@ int configure_raid_parameters(i_container *i_con)
         else
             sprintf(stripe_str,"%d k",stripe_sz);
 
-        set_field_buffer(p_input_fields[2],     /* field to alter */
+        set_field_buffer(input_fields[2],     /* field to alter */
                          0,                    /* number of buffer to alter */
                          stripe_str);          /* string value to set */
 
@@ -3186,8 +3233,8 @@ int configure_raid_parameters(i_container *i_con)
         }
         else if (ch == 'c')
         {
-            p_cur_field = current_field(p_form);
-            cur_field_index = field_index(p_cur_field);
+            cur_field = current_field(form);
+            cur_field_index = field_index(cur_field);
 
             if (cur_field_index == 1)
             {
@@ -3210,7 +3257,7 @@ int configure_raid_parameters(i_container *i_con)
                 while (prot_level_list[index].is_valid_entry)
                 {
                     raid_item[index] = (ITEM *)NULL;
-                    sprintf(raid_menu_str[index].line,"RAID %s",prot_level_list[index].p_array_cap_entry->prot_level_str);
+                    sprintf(raid_menu_str[index].line,"RAID %s",prot_level_list[index].array_cap_entry->prot_level_str);
                     raid_item[index] = new_item(raid_menu_str[index].line,"");
                     userptr[index] = index;
                     set_item_userptr(raid_item[index],
@@ -3225,8 +3272,8 @@ int configure_raid_parameters(i_container *i_con)
                     raid_index = *retptr;
 
                     /* find recommended stripe size */
-                    p_cur_array_cap_entry = prot_level_list[raid_index].p_array_cap_entry;
-                    stripe_sz = iprtoh16(p_cur_array_cap_entry->recommended_stripe_size);
+                    cur_array_cap_entry = prot_level_list[raid_index].array_cap_entry;
+                    stripe_sz = iprtoh16(cur_array_cap_entry->recommended_stripe_size);
                 }
             }
             else if (cur_field_index == 2)
@@ -3236,7 +3283,7 @@ int configure_raid_parameters(i_container *i_con)
                 for (i=0; i<16; i++)
                 {
                     stripe_sz_mask = 1 << i;
-                    if ((stripe_sz_mask & iprtoh16(p_cur_array_cap_entry->supported_stripe_sizes))
+                    if ((stripe_sz_mask & iprtoh16(cur_array_cap_entry->supported_stripe_sizes))
                         == stripe_sz_mask)
                     {
                         index++;
@@ -3256,7 +3303,7 @@ int configure_raid_parameters(i_container *i_con)
                 {
                     stripe_sz_mask = 1 << i;
                     raid_item[index] = (ITEM *)NULL;
-                    if ((stripe_sz_mask & iprtoh16(p_cur_array_cap_entry->supported_stripe_sizes))
+                    if ((stripe_sz_mask & iprtoh16(cur_array_cap_entry->supported_stripe_sizes))
                         == stripe_sz_mask)
                     {
                         stripe_sz_list[index] = stripe_sz_mask;
@@ -3265,7 +3312,7 @@ int configure_raid_parameters(i_container *i_con)
                         else
                             sprintf(stripe_menu_str[index].line,"%d k",stripe_sz_mask);
 
-                        if (stripe_sz_mask == iprtoh16(p_cur_array_cap_entry->recommended_stripe_size))
+                        if (stripe_sz_mask == iprtoh16(cur_array_cap_entry->recommended_stripe_size))
                         {
                             sprintf(buffer,"%s - recommend",stripe_menu_str[index].line);
                             raid_item[index] = new_item(buffer, "");
@@ -3303,39 +3350,39 @@ int configure_raid_parameters(i_container *i_con)
         else if (IS_ENTER_KEY(ch))
         {
             /* set protection level and stripe size appropriately */
-            p_cur_raid_cmd->prot_level = p_cur_array_cap_entry->prot_level;
-            p_cur_raid_cmd->stripe_size = stripe_sz;
+            cur_raid_cmd->prot_level = cur_array_cap_entry->prot_level;
+            cur_raid_cmd->stripe_size = stripe_sz;
             goto leave;
         }
         else if (ch == KEY_RIGHT)
-            form_driver(p_form, REQ_NEXT_CHAR);
+            form_driver(form, REQ_NEXT_CHAR);
         else if (ch == KEY_LEFT)
-            form_driver(p_form, REQ_PREV_CHAR);
+            form_driver(form, REQ_PREV_CHAR);
         else if ((ch == KEY_BACKSPACE) || (ch == 127))
-            form_driver(p_form, REQ_DEL_PREV);
+            form_driver(form, REQ_DEL_PREV);
         else if (ch == KEY_DC)
-            form_driver(p_form, REQ_DEL_CHAR);
+            form_driver(form, REQ_DEL_CHAR);
         else if (ch == KEY_IC)
-            form_driver(p_form, REQ_INS_MODE);
+            form_driver(form, REQ_INS_MODE);
         else if (ch == KEY_EIC)
-            form_driver(p_form, REQ_OVL_MODE);
+            form_driver(form, REQ_OVL_MODE);
         else if (ch == KEY_HOME)
-            form_driver(p_form, REQ_BEG_FIELD);
+            form_driver(form, REQ_BEG_FIELD);
         else if (ch == KEY_END)
-            form_driver(p_form, REQ_END_FIELD);
+            form_driver(form, REQ_END_FIELD);
         else if (ch == '\t')
-            form_driver(p_form, REQ_NEXT_FIELD);
+            form_driver(form, REQ_NEXT_FIELD);
         else if (ch == KEY_UP)
-            form_driver(p_form, REQ_PREV_FIELD);
+            form_driver(form, REQ_PREV_FIELD);
         else if (ch == KEY_DOWN)
-            form_driver(p_form, REQ_NEXT_FIELD);
+            form_driver(form, REQ_NEXT_FIELD);
         else if (isascii(ch))
-            form_driver(p_form, ch);
+            form_driver(form, ch);
     }
     leave:
-        unpost_form(p_form);
-    free_form(p_form);
-    free_screen(NULL, NULL, p_input_fields);
+        unpost_form(form);
+    free_form(form);
+    free_screen(NULL, NULL, input_fields);
 
     flush_stdscr();
     return rc;
@@ -3360,18 +3407,17 @@ int confirm_raid_start(i_container *i_con)
      q=Cancel    f=PageDn   b=PageUp
      */
 
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_ioa *p_cur_ioa;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_ioa *cur_ioa;
     int rc, i, j;
     char *buffer = NULL;
     u32 num_lines = 0;
-    struct ipr_array_record *p_array_record;
-    struct ipr_record_common *p_common_record_saved;
-    struct ipr_record_common *p_common_record;
-    struct ipr_device_record *p_device_record_saved;
-    struct ipr_device_record *p_device_record;
-    struct ipr_device *p_ipr_device;
+    struct ipr_array_record *array_record;
+    struct ipr_common_record *common_record_saved;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record_saved;
+    struct ipr_dev_record *device_record;
+    struct ipr_dev *ipr_dev;
     int found;
 
     int buf_size = 150;
@@ -3383,27 +3429,27 @@ int confirm_raid_start(i_container *i_con)
 
     rc = RC_SUCCESS;
 
-    p_cur_raid_cmd = raid_cmd_head;
+    cur_raid_cmd = raid_cmd_head;
 
-    while(p_cur_raid_cmd)
+    while(cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
 
-            p_ipr_device = p_cur_raid_cmd->p_ipr_device;
+            ipr_dev = cur_raid_cmd->ipr_dev;
 
-            p_array_record = (struct ipr_array_record *)p_ipr_device->p_qac_entry;
+            array_record = (struct ipr_array_record *)ipr_dev->qac_entry;
 
-            if (p_array_record->common.record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+            if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
             {
                 /* swap in this raid cmd's image of qac data */
-                memcpy(p_cur_ioa->p_qac_data,
-                       p_cur_raid_cmd->p_qac_data,
+                memcpy(cur_ioa->qac_data,
+                       cur_raid_cmd->qac_data,
                        sizeof(struct ipr_array_query_data));
             }
 
-            buffer = print_device(p_ipr_device,buffer,"1",p_cur_ioa, 0);
+            buffer = print_device(ipr_dev,buffer,"1",cur_ioa, 0);
 
             buf_size += 100;
             out_str = realloc(out_str, buf_size);
@@ -3411,19 +3457,15 @@ int confirm_raid_start(i_container *i_con)
             memset(buffer, 0, strlen(buffer));
             num_lines++;
 
-            for (j = 0; j < p_cur_ioa->num_devices; j++)
+            for (j = 0; j < cur_ioa->num_devices; j++)
             {
-                p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-                p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+                device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
-                if ((p_device_record != NULL) &&
-                    (((p_device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-                      (p_device_record->array_id == p_cur_raid_cmd->array_id) &&
-                      (p_device_record->start_cand)) ||
-                     ((p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-                      (p_device_record->issue_cmd))))
+                if ((device_record != NULL) &&
+                    ((device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+                     (device_record->issue_cmd)))
                 {
-                    buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa, 0);
+                    buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
 
                     buf_size += 100;
                     out_str = realloc(out_str, buf_size);
@@ -3433,7 +3475,7 @@ int confirm_raid_start(i_container *i_con)
                 }
             }
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
     output->next = add_fn_out(output->next,1,strip_trailing_whitespace(out_str));
@@ -3447,113 +3489,113 @@ int confirm_raid_start(i_container *i_con)
         return rc;
 
     /* verify the devices are not in use */
-    p_cur_raid_cmd = raid_cmd_head;
-    while (p_cur_raid_cmd)
+    cur_raid_cmd = raid_cmd_head;
+    while (cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-            rc = is_array_in_use(p_cur_ioa, p_cur_raid_cmd->array_id);
+            cur_ioa = cur_raid_cmd->ipr_ioa;
+            rc = is_array_in_use(cur_ioa, cur_raid_cmd->array_id);
             if (rc != 0)
             {
                 rc = 19;  /* "Start Parity Protection failed." */
                 output = free_fn_out(output);
                 syslog(LOG_ERR, "Devices may have changed state. Command cancelled,"
-                       " please issue commands again if RAID still desired %s."
-                       IPR_EOL, p_cur_ioa->ioa.gen_name);
+                       " please issue commands again if RAID still desired %s.\n",
+                       cur_ioa->ioa.gen_name);
                 return rc;
             }
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
     /* now issue the start array command */
-    for (p_cur_raid_cmd = raid_cmd_head;
-         p_cur_raid_cmd != NULL; 
-         p_cur_raid_cmd = p_cur_raid_cmd->next)
+    for (cur_raid_cmd = raid_cmd_head;
+         cur_raid_cmd != NULL; 
+         cur_raid_cmd = cur_raid_cmd->next)
     {
-        if (p_cur_raid_cmd->do_cmd == 0)
+        if (cur_raid_cmd->do_cmd == 0)
             continue;
 
-        p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+        cur_ioa = cur_raid_cmd->ipr_ioa;
 
-        if (p_cur_ioa->num_raid_cmds > 0)
+        if (cur_ioa->num_raid_cmds > 0)
         {
-            p_array_record = (struct ipr_array_record *)
-                p_cur_raid_cmd->p_ipr_device->p_qac_entry;
+            array_record = (struct ipr_array_record *)
+                cur_raid_cmd->ipr_dev->qac_entry;
 
-            if (p_array_record->common.record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+            if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
             {
-                /* refresh qac data for ARRAY2 */
-                rc = ipr_query_array_config(p_cur_ioa->ioa.gen_name, 0, 0, 0,
-                                            p_cur_raid_cmd->p_qac_data);
+                /* refresh qac data for ARRAY */
+                rc = ipr_query_array_config(cur_ioa->ioa.gen_name, 0, 0, 0,
+                                            cur_raid_cmd->qac_data);
 
                 if (rc != 0)
                     continue;
 
                 /* scan through this raid command to determine which
                  devices should be part of this parity set */
-                p_common_record_saved = (struct ipr_record_common *)
-                    p_cur_raid_cmd->p_qac_data->data;
-                for (i = 0; i < p_cur_raid_cmd->p_qac_data->num_records; i++)
+                common_record_saved = (struct ipr_common_record *)
+                    cur_raid_cmd->qac_data->data;
+                for (i = 0; i < cur_raid_cmd->qac_data->num_records; i++)
                 {
-                    p_device_record_saved = (struct ipr_device_record *)p_common_record_saved;
-                    if (p_device_record_saved->issue_cmd)
+                    device_record_saved = (struct ipr_dev_record *)common_record_saved;
+                    if (device_record_saved->issue_cmd)
                     {
-                        p_common_record = (struct ipr_record_common *)
-                            p_cur_ioa->p_qac_data->data;
+                        common_record = (struct ipr_common_record *)
+                            cur_ioa->qac_data->data;
                         found = 0;
-                        for (j = 0; j < p_cur_ioa->p_qac_data->num_records; j++)
+                        for (j = 0; j < cur_ioa->qac_data->num_records; j++)
                         {
-                            p_device_record = (struct ipr_device_record *)p_common_record;
-                            if (p_device_record->resource_handle ==
-                                p_device_record_saved->resource_handle)
+                            device_record = (struct ipr_dev_record *)common_record;
+                            if (device_record->resource_handle ==
+                                device_record_saved->resource_handle)
                             {
-                                p_device_record->issue_cmd = 1;
+                                device_record->issue_cmd = 1;
                                 found = 1;
                                 break;
                             }
-                            p_common_record = (struct ipr_record_common *)
-                                ((unsigned long)p_common_record +
-                                 iprtoh16(p_common_record->record_len));
+                            common_record = (struct ipr_common_record *)
+                                ((unsigned long)common_record +
+                                 iprtoh16(common_record->record_len));
                         }
                         if (!found)
                         {
                             syslog(LOG_ERR,
                                    "Resource not found to start parity protection to %s"
-                                   "failed"IPR_EOL, p_cur_ioa->ioa.gen_name);
+                                   "failed\n", cur_ioa->ioa.gen_name);
                             break;
                         }
                     }
-                    p_common_record_saved = (struct ipr_record_common *)
-                        ((unsigned long)p_common_record_saved +
-                         iprtoh16(p_common_record_saved->record_len));
+                    common_record_saved = (struct ipr_common_record *)
+                        ((unsigned long)common_record_saved +
+                         iprtoh16(common_record_saved->record_len));
                 }
 
                 if (!found)
                     continue;
 
-                p_array_record->issue_cmd = 1;
-                p_cur_raid_cmd->array_id = p_array_record->array_id;
+                array_record->issue_cmd = 1;
+                cur_raid_cmd->array_id = array_record->array_id;
             }
             else
             {
-                if (p_cur_ioa->num_raid_cmds > 1)
+                if (cur_ioa->num_raid_cmds > 1)
                 {
                     /* need to only issue one start for this
                      adapter, only send start for the last
                      listed array, which contains data for
                      all arrays.  A positive value of num_raid_cmds
                      must be maintained for status screen */
-                    p_cur_ioa->num_raid_cmds--;
+                    cur_ioa->num_raid_cmds--;
                     continue;
                 }
             }
 
-            rc = ipr_start_array_protection(p_cur_ioa->ioa.gen_name,
-                                            p_cur_ioa->p_qac_data,
-                                            p_cur_raid_cmd->stripe_size,
-                                            p_cur_raid_cmd->prot_level);
+            rc = ipr_start_array_protection(cur_ioa->ioa.gen_name,
+                                            cur_ioa->qac_data,
+                                            cur_raid_cmd->stripe_size,
+                                            cur_raid_cmd->prot_level);
         }
     }
 
@@ -3581,14 +3623,14 @@ int raid_start_complete(i_container *i_con)
 
 
   struct ipr_cmd_status cmd_status;
-  struct ipr_cmd_status_record *p_record;
+  struct ipr_cmd_status_record *status_record;
   int done_bad;
   int not_done = 0;
   int rc, j;
   u32 percent_cmplt = 0;
-  struct ipr_ioa *p_cur_ioa;
+  struct ipr_ioa *cur_ioa;
   u32 num_starts = 0;
-  struct array_cmd_data *p_cur_raid_cmd;
+  struct array_cmd_data *cur_raid_cmd;
 
   char *title, *body, *complete;
   
@@ -3606,46 +3648,46 @@ int raid_start_complete(i_container *i_con)
       num_starts = 0;
       not_done = 0;
 
-      for (p_cur_ioa = p_head_ipr_ioa;
-	   p_cur_ioa != NULL;
-	   p_cur_ioa = p_cur_ioa->next)
+      for (cur_ioa = ipr_ioa_head;
+	   cur_ioa != NULL;
+	   cur_ioa = cur_ioa->next)
       {
-          if (p_cur_ioa->num_raid_cmds > 0) {
+          if (cur_ioa->num_raid_cmds > 0) {
 
-              rc = ipr_query_command_status(p_cur_ioa->ioa.gen_name, &cmd_status);
+              rc = ipr_query_command_status(cur_ioa->ioa.gen_name, &cmd_status);
 
               if (rc)   {
-                  p_cur_ioa->num_raid_cmds = 0;
+                  cur_ioa->num_raid_cmds = 0;
                   done_bad = 1;
                   continue;
               }
 
-              p_record = cmd_status.record;
+              status_record = cmd_status.record;
 
-              for (j=0; j < cmd_status.num_records; j++, p_record++)
+              for (j=0; j < cmd_status.num_records; j++, status_record++)
               {
-                  if (p_record->command_code == IPR_START_ARRAY_PROTECTION)
+                  if (status_record->command_code == IPR_START_ARRAY_PROTECTION)
                   {
-                      for (p_cur_raid_cmd = raid_cmd_head;
-                           p_cur_raid_cmd != NULL; 
-                           p_cur_raid_cmd = p_cur_raid_cmd->next)
+                      for (cur_raid_cmd = raid_cmd_head;
+                           cur_raid_cmd != NULL; 
+                           cur_raid_cmd = cur_raid_cmd->next)
                       {
-                          if ((p_cur_raid_cmd->p_ipr_ioa == p_cur_ioa) &&
-                              (p_cur_raid_cmd->array_id == p_record->array_id))
+                          if ((cur_raid_cmd->ipr_ioa == cur_ioa) &&
+                              (cur_raid_cmd->array_id == status_record->array_id))
                           {
                               num_starts++;
-                              if (p_record->status == IPR_CMD_STATUS_IN_PROGRESS)
+                              if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
                               {
-                                  if (p_record->percent_complete < percent_cmplt)
-                                      percent_cmplt = p_record->percent_complete;
+                                  if (status_record->percent_complete < percent_cmplt)
+                                      percent_cmplt = status_record->percent_complete;
                                   not_done = 1;
                               }
-                              else if (p_record->status != IPR_CMD_STATUS_SUCCESSFUL)
+                              else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
                               {
                                   done_bad = 1;
                                   syslog(LOG_ERR, "Start parity protect to %s failed.  "
-                                         "Check device configuration for proper format."IPR_EOL,
-                                         p_cur_ioa->ioa.gen_name);
+                                         "Check device configuration for proper format.\n",
+                                         cur_ioa->ioa.gen_name);
                                   rc = RC_FAILED;
                               }
                               break;
@@ -3688,14 +3730,13 @@ int raid_rebuild(i_container *i_con)
 
      */
     int rc, i, array_num;
-    struct ipr_record_common *p_common_record;
-    struct ipr_device_record *p_device_record;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
+    struct array_cmd_data *cur_raid_cmd;
     u8 array_id;
     char *buffer = NULL;
     int num_lines = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 len = 0;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
@@ -3709,29 +3750,26 @@ int raid_rebuild(i_container *i_con)
 
     check_current_config(true);
 
-    for(p_cur_ioa = p_head_ipr_ioa;
-        p_cur_ioa != NULL;
-        p_cur_ioa = p_cur_ioa->next)
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-        p_cur_ioa->num_raid_cmds = 0;
+        cur_ioa->num_raid_cmds = 0;
 
         for (i = 0;
-             i < p_cur_ioa->num_devices;
+             i < cur_ioa->num_devices;
              i++)
         {
-            p_common_record = p_cur_ioa->dev[i].p_qac_entry;
+            common_record = cur_ioa->dev[i].qac_entry;
 
-            if ((p_common_record != NULL) &&
-                ((p_common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
-                 (p_common_record->record_id == IPR_RECORD_ID_DEVICE2_RECORD)))
+            if ((common_record != NULL) &&
+                (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD))
             {
-                p_device_record = (struct ipr_device_record *)p_common_record;
+                device_record = (struct ipr_dev_record *)common_record;
 
-                if (p_device_record->rebuild_cand)
+                if (device_record->rebuild_cand)
                 {
                     /* now find matching resource to display device data */
-                    p_scsi_dev_data = p_cur_ioa->dev[i].p_scsi_dev_data;
-
                     if (raid_cmd_head)
                     {
                         raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
@@ -3746,16 +3784,16 @@ int raid_rebuild(i_container *i_con)
 
                     memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-                    array_id =  p_device_record->array_id;
+                    array_id =  device_record->array_id;
 
                     raid_cmd_tail->array_id = array_id;
                     raid_cmd_tail->array_num = array_num;
-                    raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-                    raid_cmd_tail->p_ipr_device = &p_cur_ioa->dev[i];
+                    raid_cmd_tail->ipr_ioa = cur_ioa;
+                    raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
 
                     i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
 
-                    buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa, 0);
+                    buffer = print_device(&cur_ioa->ioa,buffer,"%1",cur_ioa, 0);
 
                     buf_size += 150;
                     out_str = realloc(out_str, buf_size);
@@ -3785,12 +3823,12 @@ int raid_rebuild(i_container *i_con)
     free(out_str);
     output = free_fn_out(output);
 
-    p_cur_raid_cmd = raid_cmd_head;
-    while(p_cur_raid_cmd)
+    cur_raid_cmd = raid_cmd_head;
+    while(cur_raid_cmd)
     {
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
         free(raid_cmd_head);
-        raid_cmd_head = p_cur_raid_cmd;
+        raid_cmd_head = cur_raid_cmd;
     }
 
     return rc;
@@ -3814,16 +3852,16 @@ int confirm_raid_rebuild(i_container *i_con)
      q=Cancel
 
      */
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_device_record *p_device_record;
-    struct ipr_ioa *p_cur_ioa;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_dev_record *device_record;
+    struct ipr_ioa *cur_ioa;
     int rc;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
     char *buffer = NULL;
     u32 num_lines = 0;
     int found = 0;
-    char *p_char;
+    char *input;
     i_container *temp_i_con;
     fn_out *output = init_output();  
     mvaddstr(0,0,"CONFIRM RAID REBUILD FUNCTION CALLED");
@@ -3832,32 +3870,32 @@ int confirm_raid_rebuild(i_container *i_con)
 
     for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-        p_cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
-        if (p_cur_raid_cmd != NULL)
+        cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
+        if (cur_raid_cmd != NULL)
         {
-            p_char = temp_i_con->field_data;
+            input = temp_i_con->field_data;
 
-            if (strcmp(p_char, "1") == 0)
+            if (strcmp(input, "1") == 0)
             {
                 found = 1;
-                p_cur_raid_cmd->do_cmd = 1;
+                cur_raid_cmd->do_cmd = 1;
 
-                p_device_record = (struct ipr_device_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-                if (!p_device_record->issue_cmd)
+                device_record = (struct ipr_dev_record *)cur_raid_cmd->ipr_dev->qac_entry;
+                if (!device_record->issue_cmd)
                 {
-                    p_device_record->issue_cmd = 1;
-                    p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds++;
+                    device_record->issue_cmd = 1;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds++;
                 }
             }
             else
             {
-                p_cur_raid_cmd->do_cmd = 0;
+                cur_raid_cmd->do_cmd = 0;
 
-                p_device_record = (struct ipr_device_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-                if (p_device_record->issue_cmd)
+                device_record = (struct ipr_dev_record *)cur_raid_cmd->ipr_dev->qac_entry;
+                if (device_record->issue_cmd)
                 {
-                    p_device_record->issue_cmd = 0;
-                    p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds--;
+                    device_record->issue_cmd = 0;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds--;
                 }
             }
         }
@@ -3869,16 +3907,16 @@ int confirm_raid_rebuild(i_container *i_con)
         return INVALID_OPTION_STATUS;
     }
 
-    p_cur_raid_cmd = raid_cmd_head;
+    cur_raid_cmd = raid_cmd_head;
 
-    while(p_cur_raid_cmd)
+    while(cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-            p_device_record = (struct ipr_device_record *)p_cur_raid_cmd->p_ipr_device->p_qac_entry;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
+            device_record = (struct ipr_dev_record *)cur_raid_cmd->ipr_dev->qac_entry;
 
-            buffer = print_device(&p_cur_ioa->ioa,buffer,"1",p_cur_ioa, 0);
+            buffer = print_device(&cur_ioa->ioa,buffer,"1",cur_ioa, 0);
 
             buf_size += 150;
             out_str = realloc(out_str, buf_size);
@@ -3887,19 +3925,19 @@ int confirm_raid_rebuild(i_container *i_con)
             memset(buffer, 0, strlen(buffer));
             num_lines++;
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
     screen_driver(&n_confirm_raid_rebuild,output,i_con);
 
-    for (p_cur_ioa = p_head_ipr_ioa;
-         p_cur_ioa != NULL;
-         p_cur_ioa = p_cur_ioa->next)
+    for (cur_ioa = ipr_ioa_head;
+         cur_ioa != NULL;
+         cur_ioa = cur_ioa->next)
     {
-        if (p_cur_ioa->num_raid_cmds > 0)
+        if (cur_ioa->num_raid_cmds > 0)
         {
-            rc = ipr_rebuild_device_data(p_cur_ioa->ioa.gen_name,
-                                         p_cur_ioa->p_qac_data);
+            rc = ipr_rebuild_device_data(cur_ioa->ioa.gen_name,
+                                         cur_ioa->qac_data);
 
             if (rc != 0)
             {
@@ -3916,172 +3954,166 @@ int confirm_raid_rebuild(i_container *i_con)
 
 int raid_include(i_container *i_con)
 {
-  /*
-    Include Disk Units in Parity Protection
+    /*
+     Include Disk Units in Parity Protection
 
-    Select the subsystem that the disk unit will be included.
+     Select the subsystem that the disk unit will be included.
 
-    Type choice, press Enter.
-    1=Select Parity Array to Include Disk Unit
+     Type choice, press Enter.
+     1=Select Parity Array to Include Disk Unit
 
-    Parity  Serial                Resource
-    Option     Set   Number   Type  Model  Name
-    1   02127005  2782   001   /dev/ipr4
-    2   00103039  2748   001   /dev/ipr0
+     Parity  Serial                Resource
+     Option     Set   Number   Type  Model  Name
+     1   02127005  2782   001   /dev/ipr4
+     2   00103039  2748   001   /dev/ipr0
 
-    e=Exit   q=Cancel    f=PageDn   b=PageUp
+     e=Exit   q=Cancel    f=PageDn   b=PageUp
 
-  */
+     */
 
-  int i, j, array_num;
-  struct ipr_record_common *p_common_record;
-  struct ipr_array_record *p_array_record;
-  struct array_cmd_data *p_cur_raid_cmd;
-  u8 array_id;
-  char *buffer = NULL;
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  u32 len;
-  int include_allowed;
-  struct ipr_array2_record *p_array2_record;
-  struct ipr_supported_arrays *p_supported_arrays;
-  struct ipr_array_cap_entry *p_cur_array_cap_entry;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  int rc = RC_SUCCESS;
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"RAID INCLUDE FUNCTION CALLED");
+    int i, j, array_num;
+    struct ipr_common_record *common_record;
+    struct ipr_array_record *array_record;
+    struct array_cmd_data *cur_raid_cmd;
+    u8 array_id;
+    char *buffer = NULL;
+    int num_lines = 0;
+    struct ipr_ioa *cur_ioa;
+    u32 len;
+    int include_allowed;
+    struct ipr_supported_arrays *supported_arrays;
+    struct ipr_array_cap_entry *cur_array_cap_entry;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    int rc = RC_SUCCESS;
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"RAID INCLUDE FUNCTION CALLED");
 
-  i_con = free_i_con(i_con);
+    i_con = free_i_con(i_con);
 
-  array_num = 1;
+    array_num = 1;
 
-  check_current_config(false);
+    check_current_config(false);
 
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->next)
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-      p_cur_ioa->num_raid_cmds = 0;
+        cur_ioa->num_raid_cmds = 0;
 
-      for (i = 0;
-	   i < p_cur_ioa->num_devices;
-	   i++)
+        for (i = 0;
+             i < cur_ioa->num_devices;
+             i++)
         {
-	  p_common_record = p_cur_ioa->dev[i].p_qac_entry;
+            common_record = cur_ioa->dev[i].qac_entry;
 
-	  if ((p_common_record != NULL) &&
-	      ((p_common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
-	       (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)))
+            if ((common_record != NULL) &&
+                (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
             {
-	      if (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+                array_record = (struct ipr_array_record *)common_record;
+
+                supported_arrays = cur_ioa->supported_arrays;
+                cur_array_cap_entry =
+                    (struct ipr_array_cap_entry *)supported_arrays->data;
+                include_allowed = 0;
+                for (j = 0;
+                     j < iprtoh16(supported_arrays->num_entries);
+                     j++)
                 {
-		  p_array2_record = (struct ipr_array2_record *)
-		    p_common_record;
-
-		  p_supported_arrays = p_cur_ioa->p_supported_arrays;
-		  p_cur_array_cap_entry =
-		    (struct ipr_array_cap_entry *)p_supported_arrays->data;
-		  include_allowed = 0;
-		  for (j = 0;
-		       j < iprtoh16(p_supported_arrays->num_entries);
-		       j++)
+                    if (cur_array_cap_entry->prot_level ==
+                        array_record->raid_level)
                     {
-		      if (p_cur_array_cap_entry->prot_level ==
-			  p_array2_record->raid_level)
-                        {
-			  if (p_cur_array_cap_entry->include_allowed)
-			    include_allowed = 1;
-			  break;
-                        }
-
-		      p_cur_array_cap_entry = (struct ipr_array_cap_entry *)
-			((void *)p_cur_array_cap_entry +
-			 iprtoh16(p_supported_arrays->entry_length));
+                        if (cur_array_cap_entry->include_allowed)
+                            include_allowed = 1;
+                        break;
                     }
 
-		  if (!include_allowed)
-		    continue;
+                    cur_array_cap_entry = (struct ipr_array_cap_entry *)
+                        ((void *)cur_array_cap_entry +
+                         iprtoh16(supported_arrays->entry_length));
                 }
 
-	      p_array_record = (struct ipr_array_record *)p_common_record;
+                if (!include_allowed)
+                    continue;
 
-	      if (p_array_record->established)
+                array_record = (struct ipr_array_record *)common_record;
+
+                if (array_record->established)
                 {
-		  if (raid_cmd_head)
+                    if (raid_cmd_head)
                     {
-		      raid_cmd_tail->next =
-			(struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-		      raid_cmd_tail = raid_cmd_tail->next;
+                        raid_cmd_tail->next =
+                            (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_tail = raid_cmd_tail->next;
                     }
-		  else
+                    else
                     {
-		      raid_cmd_head = raid_cmd_tail =
-			(struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                        raid_cmd_head = raid_cmd_tail =
+                            (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
                     }
 
-		  raid_cmd_tail->next = NULL;
+                    raid_cmd_tail->next = NULL;
 
-		  memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+                    memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-		  array_id =  p_array_record->array_id;
+                    array_id =  array_record->array_id;
 
-		  raid_cmd_tail->array_id = array_id;
-		  raid_cmd_tail->array_num = array_num;
-		  raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-		  raid_cmd_tail->p_ipr_device = &p_cur_ioa->dev[i];
-		  raid_cmd_tail->p_qac_data = NULL;
+                    raid_cmd_tail->array_id = array_id;
+                    raid_cmd_tail->array_num = array_num;
+                    raid_cmd_tail->ipr_ioa = cur_ioa;
+                    raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
+                    raid_cmd_tail->qac_data = NULL;
 
-		  i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
-		  
-		  buffer = print_device(&p_cur_ioa->dev[i],buffer,"%1",p_cur_ioa, 0);
+                    i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
 
-		  buf_size += 150;
-		  out_str = realloc(out_str, buf_size);
-		  
-		  out_str = strcat(out_str,buffer);
-		  
-		  memset(buffer, 0, strlen(buffer));
-		  
-		  len = 0;
-		  num_lines++;
-		  array_num++;
+                    buffer = print_device(&cur_ioa->dev[i],buffer,"%1",cur_ioa, 0);
+
+                    buf_size += 150;
+                    out_str = realloc(out_str, buf_size);
+
+                    out_str = strcat(out_str,buffer);
+
+                    memset(buffer, 0, strlen(buffer));
+
+                    len = 0;
+                    num_lines++;
+                    array_num++;
                 }
             }
         }
     }
-  
-  if (array_num == 1)
-    s_out = screen_driver(&n_raid_include_fail,output,i_con);
-  
-  else
-    {
-      out_str = strip_trailing_whitespace(out_str);
-      output->next = add_fn_out(output->next,1,out_str);
 
-      s_out = screen_driver(&n_raid_include,output,i_con);
+    if (array_num == 1)
+        s_out = screen_driver(&n_raid_include_fail,output,i_con);
+
+    else
+    {
+        out_str = strip_trailing_whitespace(out_str);
+        output->next = add_fn_out(output->next,1,out_str);
+
+        s_out = screen_driver(&n_raid_include,output,i_con);
     }
 
-  rc = s_out->rc;
-  free(s_out);
-  free(out_str);
-  output = free_fn_out(output);
-  
-  p_cur_raid_cmd = raid_cmd_head;
-  while(p_cur_raid_cmd)
+    rc = s_out->rc;
+    free(s_out);
+    free(out_str);
+    output = free_fn_out(output);
+
+    cur_raid_cmd = raid_cmd_head;
+    while(cur_raid_cmd)
     {
-      if (p_cur_raid_cmd->p_qac_data)
-	{
-	  free(p_cur_raid_cmd->p_qac_data);
-	  p_cur_raid_cmd->p_qac_data = NULL;
-	}
-      p_cur_raid_cmd = p_cur_raid_cmd->next;
-      free(raid_cmd_head);
-      raid_cmd_head = p_cur_raid_cmd;
+        if (cur_raid_cmd->qac_data)
+        {
+            free(cur_raid_cmd->qac_data);
+            cur_raid_cmd->qac_data = NULL;
+        }
+        cur_raid_cmd = cur_raid_cmd->next;
+        free(raid_cmd_head);
+        raid_cmd_head = cur_raid_cmd;
     }
-  
-  return rc;
+
+    return rc;
 }
 
 int configure_raid_include(i_container *i_con)
@@ -4104,21 +4136,21 @@ int configure_raid_include(i_container *i_con)
      */
 
     int i, j, k, array_num;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_array_query_data *p_array_query_data;
-    struct ipr_record_common *p_common_record;
-    struct ipr_device_record *p_device_record;
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct ipr_array2_record *p_array2_record;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_array_query_data *qac_data;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_array_record *array_record;
     char *buffer = NULL;
     int num_lines = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 len = 0;
     int found = 0;
-    char *p_char;
-    struct ipr_device *p_ipr_device;
-    struct ipr_supported_arrays *p_supported_arrays;
-    struct ipr_array_cap_entry *p_cur_array_cap_entry;
+    char *input;
+    struct ipr_dev *ipr_dev;
+    struct ipr_supported_arrays *supported_arrays;
+    struct ipr_array_cap_entry *cur_array_cap_entry;
     u8 min_mult_array_devices = 1;
     u8 raid_level;
 
@@ -4134,11 +4166,11 @@ int configure_raid_include(i_container *i_con)
 
     for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-        p_cur_raid_cmd = (struct array_cmd_data *)i_con->data;
-        if (p_cur_raid_cmd != NULL)
+        cur_raid_cmd = (struct array_cmd_data *)i_con->data;
+        if (cur_raid_cmd != NULL)
         {
-            p_char = temp_i_con->field_data;
-            if (strcmp(p_char, "1") == 0)
+            input = temp_i_con->field_data;
+            if (strcmp(input, "1") == 0)
             {
                 found = 1;
                 break;
@@ -4156,87 +4188,92 @@ int configure_raid_include(i_container *i_con)
 
     array_num = 1;
 
-    p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-    p_ipr_device = p_cur_raid_cmd->p_ipr_device;
-    p_common_record = p_ipr_device->p_qac_entry;
+    cur_ioa = cur_raid_cmd->ipr_ioa;
+    ipr_dev = cur_raid_cmd->ipr_dev;
+    common_record = ipr_dev->qac_entry;
 
-    if (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+    if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)
     {
         /* save off raid level, this information will be used to find
          minimum multiple */
-        p_array2_record = (struct ipr_array2_record *)p_common_record;
-        raid_level = p_array2_record->raid_level;
+        array_record = (struct ipr_array_record *)common_record;
+        raid_level = array_record->raid_level;
 
 
         /* Get Query Array Config Data */
-        rc = ipr_query_array_config(p_cur_ioa->ioa.gen_name, 0, 1,
-                                    p_cur_raid_cmd->array_id,
-                                    p_array_query_data);
+        rc = ipr_query_array_config(cur_ioa->ioa.gen_name, 0, 1,
+                                    cur_raid_cmd->array_id,
+                                    qac_data);
 
         if (rc != 0)
-            free(p_array_query_data);
+            free(qac_data);
         else  {
-            p_cur_raid_cmd->p_qac_data = p_array_query_data;
-            p_common_record = (struct ipr_record_common *)p_array_query_data->data;
-            for (k = 0; k < p_array_query_data->num_records; k++)
+            cur_raid_cmd->qac_data = qac_data;
+            common_record = (struct ipr_common_record *)qac_data->data;
+            for (k = 0; k < qac_data->num_records; k++)
             {
-                if (p_common_record->record_id == IPR_RECORD_ID_DEVICE2_RECORD)
+                if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD)
                 {
-                    for (j = 0; j < p_cur_ioa->num_devices; j++)
+                    for (j = 0; j < cur_ioa->num_devices; j++)
                     {
-                        p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-                        p_device_record = (struct ipr_device_record *)p_common_record;
-                        if (p_scsi_dev_data->handle == p_device_record->resource_handle)
+                        scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+                        device_record = (struct ipr_dev_record *)common_record;
+
+                        if (scsi_dev_data == NULL)
+                            continue;
+
+                        if (scsi_dev_data->handle == device_record->resource_handle)
                         {
-                            p_cur_ioa->dev[j].p_qac_entry = p_common_record;
+                            cur_ioa->dev[j].qac_entry = common_record;
                         }
                     }
                 }
 
                 /* find minimum multiple for the raid level being used */
-                if (p_common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS)
+                if (common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS)
                 {
-                    p_supported_arrays = (struct ipr_supported_arrays *)p_common_record;
-                    p_cur_array_cap_entry = (struct ipr_array_cap_entry *)p_supported_arrays->data;
+                    supported_arrays = (struct ipr_supported_arrays *)common_record;
+                    cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
 
-                    for (i=0; i<iprtoh16(p_supported_arrays->num_entries); i++)
+                    for (i=0; i<iprtoh16(supported_arrays->num_entries); i++)
                     {
-                        if (p_cur_array_cap_entry->prot_level == raid_level)
+                        if (cur_array_cap_entry->prot_level == raid_level)
                         {
-                            min_mult_array_devices = p_cur_array_cap_entry->min_mult_array_devices;
+                            min_mult_array_devices = cur_array_cap_entry->min_mult_array_devices;
                         }
-                        p_cur_array_cap_entry = (struct ipr_array_cap_entry *)
-                            ((void *)p_cur_array_cap_entry + p_supported_arrays->entry_length);
+                        cur_array_cap_entry = (struct ipr_array_cap_entry *)
+                            ((void *)cur_array_cap_entry + supported_arrays->entry_length);
                     }
                 }
-                p_common_record = (struct ipr_record_common *)
-                    ((unsigned long)p_common_record + iprtoh16(p_common_record->record_len));
+                common_record = (struct ipr_common_record *)
+                    ((unsigned long)common_record + iprtoh16(common_record->record_len));
             }
         }
     }
 
-    for (j = 0; j < p_cur_ioa->num_devices; j++)
+    for (j = 0; j < cur_ioa->num_devices; j++)
     {
-        p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+        device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
-        if (p_device_record == NULL)
+        if (device_record == NULL)
             continue;
 
-        if (p_cur_ioa->dev[j].is_start_cand)
+        if (cur_ioa->dev[j].is_start_cand)
             continue;
 
-        if (p_device_record->include_cand)
+        if (device_record->include_cand)
         {
-            if (p_cur_ioa->dev[j].p_scsi_dev_data->opens != 0)
+            if ((cur_ioa->dev[j].scsi_dev_data) &&
+                (cur_ioa->dev[j].scsi_dev_data->opens != 0))
             {
-                syslog(LOG_ERR,"Include Device not allowed, device in use - %s"IPR_EOL,
-                       p_cur_ioa->dev[j].gen_name); 
+                syslog(LOG_ERR,"Include Device not allowed, device in use - %s\n",
+                       cur_ioa->dev[j].gen_name); 
                 continue;
             }
 
-            i_con = add_i_con(i_con,"\0",(char *)&p_cur_ioa->dev[j],list);
+            i_con = add_i_con(i_con,"\0",(char *)&cur_ioa->dev[j],list);
 
-            buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa, 0);
+            buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
 
             buf_size += 150;
             out_str = realloc(out_str, buf_size);
@@ -4252,10 +4289,10 @@ int configure_raid_include(i_container *i_con)
 
     if (array_num <= min_mult_array_devices)
     {
-        p_ipr_device = p_cur_raid_cmd->p_ipr_device;
-        p_common_record = p_ipr_device->p_qac_entry;
+        ipr_dev = cur_raid_cmd->ipr_dev;
+        common_record = ipr_dev->qac_entry;
 
-        if (!(p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD))
+        if (!(common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
             output->next = add_fn_out(output->next,1,catgets(catd,n_configure_raid_include_fail.text_set,4,"BANG"));
         else
             output->next = add_fn_out(output->next,1,catgets(catd,n_configure_raid_include_fail.text_set,5,"BANG"));
@@ -4280,8 +4317,8 @@ int configure_raid_include(i_container *i_con)
 
     for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-        p_char = temp_i_con->field_data;
-        if (strcmp(p_char, "1") == 0)
+        input = temp_i_con->field_data;
+        if (strcmp(input, "1") == 0)
             found++;
     }
     if (found % min_mult_array_devices != 0)
@@ -4295,33 +4332,33 @@ int configure_raid_include(i_container *i_con)
         found = 0;
         for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
         {
-            p_ipr_device = (struct ipr_device *)temp_i_con->data;
-            if (p_ipr_device != NULL)
+            ipr_dev = (struct ipr_dev *)temp_i_con->data;
+            if (ipr_dev != NULL)
             {
-                p_char = temp_i_con->field_data;
+                input = temp_i_con->field_data;
 
-                if (strcmp(p_char, "1") == 0)
+                if (strcmp(input, "1") == 0)
                 {
                     found = 1;
-                    p_cur_raid_cmd->do_cmd = 1;
+                    cur_raid_cmd->do_cmd = 1;
 
-                    p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-                    if (!p_device_record->issue_cmd)
+                    device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                    if (!device_record->issue_cmd)
                     {
-                        p_device_record->issue_cmd = 1;
-                        p_device_record->known_zeroed = 1;
-                        p_ipr_device->is_start_cand = 1;
-                        p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds++;
+                        device_record->issue_cmd = 1;
+                        device_record->known_zeroed = 1;
+                        ipr_dev->is_start_cand = 1;
+                        cur_raid_cmd->ipr_ioa->num_raid_cmds++;
                     }
                 }
                 else
                 {
-                    p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-                    if (p_device_record->issue_cmd)
+                    device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                    if (device_record->issue_cmd)
                     {
-                        p_device_record->issue_cmd = 0;
-                        p_device_record->known_zeroed = 0;
-                        p_ipr_device->is_start_cand = 0;
+                        device_record->issue_cmd = 0;
+                        device_record->known_zeroed = 0;
+                        ipr_dev->is_start_cand = 0;
                     }
                 }
             }
@@ -4358,17 +4395,17 @@ int confirm_raid_include(i_container *i_con)
 
      */
 
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_device_record *p_device_record;
+    struct scsi_dev_data *scsi_dev_data;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_dev_record *device_record;
     int i, j, found;
     u16 len;
     char *buffer = NULL;
     u32 num_lines = 0;
-    struct ipr_array_record *p_array_record;
-    struct ipr_array_query_data   *p_qac_data;
-    struct ipr_record_common *p_common_record;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_array_record *array_record;
+    struct ipr_array_query_data *qac_data;
+    struct ipr_common_record *common_record;
+    struct ipr_ioa *cur_ioa;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
     int rc = RC_SUCCESS;
@@ -4376,42 +4413,43 @@ int confirm_raid_include(i_container *i_con)
     fn_out *output = init_output();
     mvaddstr(0,0,"CONFIRM RAID INCLUDE FUNCTION CALLED");
 
-    p_cur_raid_cmd = raid_cmd_head;
+    cur_raid_cmd = raid_cmd_head;
 
-    while(p_cur_raid_cmd)
+    while(cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
 
-            p_array_record = (struct ipr_array_record *)
-                p_cur_raid_cmd->p_ipr_device->p_qac_entry;
+            array_record = (struct ipr_array_record *)
+                cur_raid_cmd->ipr_dev->qac_entry;
 
-            if (p_array_record->common.record_id ==
-                IPR_RECORD_ID_ARRAY2_RECORD)
+            if (array_record->common.record_id ==
+                IPR_RECORD_ID_ARRAY_RECORD)
             {
-                p_qac_data = p_cur_raid_cmd->p_qac_data;
+                qac_data = cur_raid_cmd->qac_data;
             }
             else
             {
-                p_qac_data = p_cur_ioa->p_qac_data;
+                qac_data = cur_ioa->qac_data;
             }
 
-            p_common_record = (struct ipr_record_common *)
-                p_qac_data->data;
+            common_record = (struct ipr_common_record *)
+                qac_data->data;
 
-            for (i = 0; i < p_qac_data->num_records; i++)
+            for (i = 0; i < qac_data->num_records; i++)
             {
-                p_device_record = (struct ipr_device_record *)p_common_record;
-                if (p_device_record->issue_cmd)
+                device_record = (struct ipr_dev_record *)common_record;
+                if (device_record->issue_cmd)
                 {
                     found = 0;
-                    for (j = 0; j < p_cur_ioa->num_devices; j++)
+                    for (j = 0; j < cur_ioa->num_devices; j++)
                     {
-                        p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
+                        scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+                        if (scsi_dev_data == NULL)
+                            continue;
 
-                        if (p_scsi_dev_data->handle ==
-                            p_device_record->resource_handle)
+                        if (scsi_dev_data->handle == device_record->resource_handle)
                         {
                             found = 1;
                             break;
@@ -4420,7 +4458,7 @@ int confirm_raid_include(i_container *i_con)
 
                     if (found)
                     {
-                        buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa, 0);
+                        buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
 
                         buf_size += 150;
                         out_str = realloc(out_str, buf_size);
@@ -4432,12 +4470,12 @@ int confirm_raid_include(i_container *i_con)
                     }
                 }
 
-                p_common_record = (struct ipr_record_common *)
-                    ((unsigned long)p_common_record +
-                     iprtoh16(p_common_record->record_len));
+                common_record = (struct ipr_common_record *)
+                    ((unsigned long)common_record +
+                     iprtoh16(common_record->record_len));
             }
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
     out_str = strip_trailing_whitespace(out_str);
@@ -4455,206 +4493,210 @@ int confirm_raid_include(i_container *i_con)
 
 int confirm_raid_include_device(i_container *i_con)
 {
-  /*
-    Confirm Initialize and Format Disk Unit        
+    /*
+     Confirm Initialize and Format Disk Unit        
 
-    Press 'c' to confirm your choice for 1=Initialize and format.
-    Press q to return to change your choice.
+     Press 'c' to confirm your choice for 1=Initialize and format.
+     Press q to return to change your choice.
 
-    Vendor   Product           Serial    PCI    PCI   SCSI  SCSI  SCSI
-    Option   ID        ID              Number    Bus    Dev    Bus   ID   Lun
-    IBM      DFHSS4W          0024A0B9    05     03      0     3    0
-    IBM      DFHSS4W          00D38D0F    05     03      0     5    0
-    IBM      DFHSS4W          00D32240    05     03      0     9    0
-    IBM      DFHSS4W          00034563    05     03      0     6    0
-    IBM      DFHSS4W          00D37A11    05     03      0     4    0
+     Vendor   Product           Serial    PCI    PCI   SCSI  SCSI  SCSI
+     Option   ID        ID              Number    Bus    Dev    Bus   ID   Lun
+     IBM      DFHSS4W          0024A0B9    05     03      0     3    0
+     IBM      DFHSS4W          00D38D0F    05     03      0     5    0
+     IBM      DFHSS4W          00D32240    05     03      0     9    0
+     IBM      DFHSS4W          00034563    05     03      0     6    0
+     IBM      DFHSS4W          00D37A11    05     03      0     4    0
 
-    c=Confirm   q=Cancel    f=PageDn   b=PageUp
+     c=Confirm   q=Cancel    f=PageDn   b=PageUp
 
-    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-
-    Confirm Initialize and Format Disk Unit        
-
-    Press 'c' to confirm your choice for 1=Initialize and format.
-    Press q to return to change your choice.
-
-    Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI
-    Option  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun
-    6607  0024A0B9    03      D01       05     03      0     3    0
-    6607  00D38D0F    03      D02       05     03      0     5    0
-    6607  00D32240    03      D03       05     03      0     9    0
-    6607  00034563    03      D04       05     03      0     6    0
-    6717  00D37A11    03      D05       05     03      0     4    0
-
-    c=Confirm   q=Cancel    f=PageDn   b=PageUp
+     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 
+     Confirm Initialize and Format Disk Unit        
 
-  */
-  char *buffer = NULL;
-  struct array_cmd_data *p_cur_raid_cmd;
-  struct scsi_dev_data *p_scsi_dev_data;
-  struct ipr_device_record *p_device_record;
-  struct devs_to_init_t *p_cur_dev_to_init;
-  u32 i, j, found;
-  u32 num_lines = 0;
-  u8 num_devs=0;
-  struct ipr_ioa *p_cur_ioa;
-  struct ipr_array_record *p_array_record;
-  struct ipr_array_query_data *p_qac_data;
-  struct ipr_record_common *p_common_record;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  int rc = RC_SUCCESS;
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  int format_include_cand();
-  int dev_include_complete(u8 num_devs);
-  mvaddstr(0,0,"CONFIRM RAID INCLUDE FUNCTION CALLED");
+     Press 'c' to confirm your choice for 1=Initialize and format.
+     Press q to return to change your choice.
 
-  p_cur_raid_cmd = raid_cmd_head;
-  
-  while(p_cur_raid_cmd)
+     Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI
+     Option  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun
+     6607  0024A0B9    03      D01       05     03      0     3    0
+     6607  00D38D0F    03      D02       05     03      0     5    0
+     6607  00D32240    03      D03       05     03      0     9    0
+     6607  00034563    03      D04       05     03      0     6    0
+     6717  00D37A11    03      D05       05     03      0     4    0
+
+     c=Confirm   q=Cancel    f=PageDn   b=PageUp
+
+
+
+     */
+    char *buffer = NULL;
+    struct array_cmd_data *cur_raid_cmd;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_dev_record *device_record;
+    struct devs_to_init_t *cur_dev_init;
+    u32 i, j, found;
+    u32 num_lines = 0;
+    u8 num_devs=0;
+    struct ipr_ioa *cur_ioa;
+    struct ipr_array_record *array_record;
+    struct ipr_array_query_data *qac_data;
+    struct ipr_common_record *common_record;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    int rc = RC_SUCCESS;
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    int format_include_cand();
+    int dev_include_complete(u8 num_devs);
+    mvaddstr(0,0,"CONFIRM RAID INCLUDE FUNCTION CALLED");
+
+    cur_raid_cmd = raid_cmd_head;
+
+    while(cur_raid_cmd)
     {
-      if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-	  p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-	  
-	  p_array_record = (struct ipr_array_record *)
-	    p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-	  
-	  if (p_array_record->common.record_id ==
-	      IPR_RECORD_ID_ARRAY2_RECORD)
+            cur_ioa = cur_raid_cmd->ipr_ioa;
+
+            array_record = (struct ipr_array_record *)
+                cur_raid_cmd->ipr_dev->qac_entry;
+
+            if (array_record->common.record_id ==
+                IPR_RECORD_ID_ARRAY_RECORD)
             {
-	      p_qac_data = p_cur_raid_cmd->p_qac_data;
+                qac_data = cur_raid_cmd->qac_data;
             }
-	  else
+            else
             {
-	      p_qac_data = p_cur_ioa->p_qac_data;
+                qac_data = cur_ioa->qac_data;
             }
-	  
-	  p_common_record = (struct ipr_record_common *)
-	    p_qac_data->data;
-	  
-	  for (i = 0; i < p_qac_data->num_records; i++)
+
+            common_record = (struct ipr_common_record *)
+                qac_data->data;
+
+            for (i = 0; i < qac_data->num_records; i++)
             {
-	      p_device_record = (struct ipr_device_record *)p_common_record;
-	      if (p_device_record->issue_cmd)
+                device_record = (struct ipr_dev_record *)common_record;
+                if (device_record->issue_cmd)
                 {
-		  found = 0;
-		  for (j = 0; j < p_cur_ioa->num_devices; j++)
+                    found = 0;
+                    for (j = 0; j < cur_ioa->num_devices; j++)
                     {
-		      p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-		      
-		      if (p_scsi_dev_data->handle ==
-			  p_device_record->resource_handle)
+                        scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+                        if (scsi_dev_data == NULL)
+                            continue;
+
+                        if (scsi_dev_data->handle ==
+                            device_record->resource_handle)
                         {
-			  found = 1;
-			  break;
+                            found = 1;
+                            break;
                         }
                     }
-		  
-		  if (found)
-                    {
-                      buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa, 0);
 
-		      buf_size += 100;
-		      out_str = realloc(out_str, buf_size);
-		      out_str = strcat(out_str,buffer);
-		      memset(buffer, 0, strlen(buffer));
-		      num_lines++;
+                    if (found)
+                    {
+                        buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
+
+                        buf_size += 100;
+                        out_str = realloc(out_str, buf_size);
+                        out_str = strcat(out_str,buffer);
+                        memset(buffer, 0, strlen(buffer));
+                        num_lines++;
                     }
                 }
-	      
-	      p_common_record = (struct ipr_record_common *)
-		((unsigned long)p_common_record +
-		 iprtoh16(p_common_record->record_len));
+
+                common_record = (struct ipr_common_record *)
+                    ((unsigned long)common_record +
+                     iprtoh16(common_record->record_len));
             }
         }
-      p_cur_raid_cmd = p_cur_raid_cmd->next;
-    }
-  
-  out_str = strip_trailing_whitespace(out_str);
-  output->next = add_fn_out(output->next,1,out_str);
-  free(out_str);
-  
-  s_out = screen_driver(&n_confirm_raid_include_device,output,i_con);
-  rc = s_out->rc;
-  free(s_out);
-
-  if (rc > 0)
-    {
-      output = free_fn_out(output);
-      return rc;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
-  /* now format each of the devices */
-  num_devs = format_include_cand();
-  
-  rc = dev_include_complete(num_devs);
-  
-  /* free up memory allocated for format */
-  p_cur_dev_to_init = dev_init_head;
-  while(p_cur_dev_to_init)
+    out_str = strip_trailing_whitespace(out_str);
+    output->next = add_fn_out(output->next,1,out_str);
+    free(out_str);
+
+    s_out = screen_driver(&n_confirm_raid_include_device,output,i_con);
+    rc = s_out->rc;
+    free(s_out);
+
+    if (rc > 0)
     {
-      p_cur_dev_to_init = p_cur_dev_to_init->next;
-      free(dev_init_head);
-      dev_init_head = p_cur_dev_to_init;
+        output = free_fn_out(output);
+        return rc;
     }
-  
-  output = free_fn_out(output);
-  return rc;
+
+    /* now format each of the devices */
+    num_devs = format_include_cand();
+
+    rc = dev_include_complete(num_devs);
+
+    /* free up memory allocated for format */
+    cur_dev_init = dev_init_head;
+    while(cur_dev_init)
+    {
+        cur_dev_init = cur_dev_init->next;
+        free(dev_init_head);
+        dev_init_head = cur_dev_init;
+    }
+
+    output = free_fn_out(output);
+    return rc;
 }
 
 int format_include_cand()
 {
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_ioa *p_cur_ioa;
+    struct scsi_dev_data *scsi_dev_data;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_ioa *cur_ioa;
     int num_devs = 0;
     int rc = 0;
-    struct ipr_array_record *p_array_record;
-    struct ipr_array_query_data *p_qac_data;
-    struct ipr_record_common *p_common_record;
-    struct ipr_device_record *p_device_record;
+    struct ipr_array_record *array_record;
+    struct ipr_array_query_data *qac_data;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
     int i, j, found, opens;
 
-    p_cur_raid_cmd = raid_cmd_head;
-    while (p_cur_raid_cmd)
+    cur_raid_cmd = raid_cmd_head;
+    while (cur_raid_cmd)
     {
-        if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-            p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
 
-            p_array_record = (struct ipr_array_record *)
-                p_cur_raid_cmd->p_ipr_device->p_qac_entry;
+            array_record = (struct ipr_array_record *)
+                cur_raid_cmd->ipr_dev->qac_entry;
 
-            if (p_array_record->common.record_id ==
-                IPR_RECORD_ID_ARRAY2_RECORD)
+            if (array_record->common.record_id ==
+                IPR_RECORD_ID_ARRAY_RECORD)
             {
-                p_qac_data = p_cur_raid_cmd->p_qac_data;
+                qac_data = cur_raid_cmd->qac_data;
             }
             else
             {
-                p_qac_data = p_cur_ioa->p_qac_data;
+                qac_data = cur_ioa->qac_data;
             }
 
-            p_common_record = (struct ipr_record_common *)
-                p_qac_data->data;
+            common_record = (struct ipr_common_record *)
+                qac_data->data;
 
-            for (i = 0; i < p_qac_data->num_records; i++)
+            for (i = 0; i < qac_data->num_records; i++)
             {
-                p_device_record = (struct ipr_device_record *)p_common_record;
-                if (p_device_record->issue_cmd)
+                device_record = (struct ipr_dev_record *)common_record;
+                if (device_record->issue_cmd)
                 {
                     found = 0;
-                    for (j = 0; j < p_cur_ioa->num_devices; j++)
+                    for (j = 0; j < cur_ioa->num_devices; j++)
                     {
-                        p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
+                        scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+                        if (scsi_dev_data == NULL)
+                            continue;
 
-                        if (p_scsi_dev_data->handle ==
-                            p_device_record->resource_handle)
+                        if (scsi_dev_data->handle ==
+                            device_record->resource_handle)
                         {
                             found = 1;
                             break;
@@ -4664,15 +4706,15 @@ int format_include_cand()
                     if (found)
                     {
                         /* get current "opens" data for this device to determine conditions to continue */
-                        opens = num_device_opens(p_scsi_dev_data->host,
-                                                 p_scsi_dev_data->channel,
-                                                 p_scsi_dev_data->id,
-                                                 p_scsi_dev_data->lun);
+                        opens = num_device_opens(scsi_dev_data->host,
+                                                 scsi_dev_data->channel,
+                                                 scsi_dev_data->id,
+                                                 scsi_dev_data->lun);
                         if (opens != 0)
                         {
-                            syslog(LOG_ERR,"Include Device not allowed, device in use - %s"IPR_EOL,
-                                   p_cur_ioa->dev[j].gen_name);
-                            p_device_record->issue_cmd = 0;
+                            syslog(LOG_ERR,"Include Device not allowed, device in use - %s\n",
+                                   cur_ioa->dev[j].gen_name);
+                            device_record->issue_cmd = 0;
                             continue;
                         }
 
@@ -4685,22 +4727,22 @@ int format_include_cand()
                             dev_init_head = dev_init_tail = (struct devs_to_init_t *)malloc(sizeof(struct devs_to_init_t));
 
                         memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
-                        dev_init_tail->p_ioa = p_cur_ioa;
-                        dev_init_tail->p_ipr_device = &p_cur_ioa->dev[j];
+                        dev_init_tail->ioa = cur_ioa;
+                        dev_init_tail->ipr_dev = &cur_ioa->dev[j];
                         dev_init_tail->do_init = 1;
 
                         /* Issue the format. Failure will be detected by query command status */
-                        rc = ipr_format_unit(dev_init_tail->p_ipr_device->gen_name);  //FIXME  Mandatory lock?
+                        rc = ipr_format_unit(dev_init_tail->ipr_dev->gen_name);  //FIXME  Mandatory lock?
 
                         num_devs++;
                     }
                 }
-                p_common_record = (struct ipr_record_common *)
-                    ((unsigned long)p_common_record +
-                     iprtoh16(p_common_record->record_len));
+                common_record = (struct ipr_common_record *)
+                    ((unsigned long)common_record +
+                     iprtoh16(common_record->record_len));
             }
         }
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
     return num_devs;
 }
@@ -4709,20 +4751,20 @@ int dev_include_complete(u8 num_devs)
 {
     int done_bad;
     struct ipr_cmd_status cmd_status;
-    struct ipr_cmd_status_record *p_record;
+    struct ipr_cmd_status_record *status_record;
     int not_done = 0;
     int rc, i, j;
-    struct devs_to_init_t *p_cur_dev_to_init;
+    struct devs_to_init_t *cur_dev_init;
     u32 percent_cmplt = 0;
     int num_includes = 0;
     int found;
-    struct ipr_ioa *p_cur_ioa;
-    struct array_cmd_data *p_cur_raid_cmd;
-    struct ipr_array_record *p_array_record;
-    struct ipr_record_common *p_common_record_saved;
-    struct ipr_device_record *p_device_record_saved;
-    struct ipr_record_common *p_common_record;
-    struct ipr_device_record *p_device_record;
+    struct ipr_ioa *cur_ioa;
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_array_record *array_record;
+    struct ipr_common_record *common_record_saved;
+    struct ipr_dev_record *device_record_saved;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
 
     char *title, *body, *complete;
 
@@ -4747,38 +4789,38 @@ int dev_include_complete(u8 num_devs)
         percent_cmplt = 100;
         done_bad = 0;
 
-        for (p_cur_dev_to_init = dev_init_head;
-             p_cur_dev_to_init != NULL;
-             p_cur_dev_to_init = p_cur_dev_to_init->next)
+        for (cur_dev_init = dev_init_head;
+             cur_dev_init != NULL;
+             cur_dev_init = cur_dev_init->next)
         {
-            if (p_cur_dev_to_init->do_init) {
-                rc = ipr_query_command_status(p_cur_dev_to_init->p_ipr_device->gen_name,
+            if (cur_dev_init->do_init) {
+                rc = ipr_query_command_status(cur_dev_init->ipr_dev->gen_name,
                                               &cmd_status);
 
                 if (rc != 0) {
-                    p_cur_dev_to_init->cmplt = 100;
+                    cur_dev_init->cmplt = 100;
                     continue;
                 }
 
                 if (cmd_status.num_records == 0)
-                    p_cur_dev_to_init->cmplt = 100;
+                    cur_dev_init->cmplt = 100;
                 else
                 {
-                    p_record = cmd_status.record;
-                    if (p_record->status == IPR_CMD_STATUS_SUCCESSFUL)
+                    status_record = cmd_status.record;
+                    if (status_record->status == IPR_CMD_STATUS_SUCCESSFUL)
                     {
-                        p_cur_dev_to_init->cmplt = 100;
+                        cur_dev_init->cmplt = 100;
                     }
-                    else if (p_record->status == IPR_CMD_STATUS_FAILED)
+                    else if (status_record->status == IPR_CMD_STATUS_FAILED)
                     {
-                        p_cur_dev_to_init->cmplt = 100;
+                        cur_dev_init->cmplt = 100;
                         done_bad = 1;
                     }
                     else
                     {
-                        p_cur_dev_to_init->cmplt = p_record->percent_complete;
-                        if (p_cur_dev_to_init->cmplt < percent_cmplt)
-                            percent_cmplt = p_cur_dev_to_init->cmplt;
+                        cur_dev_init->cmplt = status_record->percent_complete;
+                        if (cur_dev_init->cmplt < percent_cmplt)
+                            percent_cmplt = cur_dev_init->cmplt;
                         not_done = 1;
                     }
                 }
@@ -4807,73 +4849,73 @@ int dev_include_complete(u8 num_devs)
     sleep(5);
 
     /* now issue the start array command with "known to be zero" */
-    for (p_cur_raid_cmd = raid_cmd_head;
-         p_cur_raid_cmd != NULL; 
-         p_cur_raid_cmd = p_cur_raid_cmd->next)
+    for (cur_raid_cmd = raid_cmd_head;
+         cur_raid_cmd != NULL; 
+         cur_raid_cmd = cur_raid_cmd->next)
     {
-        if (p_cur_raid_cmd->do_cmd == 0)
+        if (cur_raid_cmd->do_cmd == 0)
             continue;
 
-        p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+        cur_ioa = cur_raid_cmd->ipr_ioa;
 
-        if (p_cur_ioa->num_raid_cmds > 0)
+        if (cur_ioa->num_raid_cmds > 0)
         {
-            p_array_record = (struct ipr_array_record *)
-                p_cur_raid_cmd->p_ipr_device->p_qac_entry;
+            array_record = (struct ipr_array_record *)
+                cur_raid_cmd->ipr_dev->qac_entry;
 
-            if (p_array_record->common.record_id == IPR_RECORD_ID_ARRAY2_RECORD)
+            if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
             {
-                /* refresh qac data for ARRAY2 */
-                rc = ipr_query_array_config(p_cur_ioa->ioa.gen_name, 0, 1,
-                                            p_cur_raid_cmd->array_id,
-                                            p_cur_ioa->p_qac_data);
+                /* refresh qac data for ARRAY */
+                rc = ipr_query_array_config(cur_ioa->ioa.gen_name, 0, 1,
+                                            cur_raid_cmd->array_id,
+                                            cur_ioa->qac_data);
 
                 if (rc != 0)
                     continue;
 
                 /* scan through this raid command to determine which
                  devices should be part of this parity set */
-                p_common_record_saved = (struct ipr_record_common *)p_cur_raid_cmd->p_qac_data->data;
-                for (i = 0; i < p_cur_raid_cmd->p_qac_data->num_records; i++)
+                common_record_saved = (struct ipr_common_record *)cur_raid_cmd->qac_data->data;
+                for (i = 0; i < cur_raid_cmd->qac_data->num_records; i++)
                 {
-                    p_device_record_saved = (struct ipr_device_record *)p_common_record_saved;
-                    if (p_device_record_saved->issue_cmd)
+                    device_record_saved = (struct ipr_dev_record *)common_record_saved;
+                    if (device_record_saved->issue_cmd)
                     {
-                        p_common_record = (struct ipr_record_common *)
-                            p_cur_ioa->p_qac_data->data;
+                        common_record = (struct ipr_common_record *)
+                            cur_ioa->qac_data->data;
                         found = 0;
-                        for (j = 0; j < p_cur_ioa->p_qac_data->num_records; j++)
+                        for (j = 0; j < cur_ioa->qac_data->num_records; j++)
                         {
-                            p_device_record = (struct ipr_device_record *)p_common_record;
-                            if (p_device_record->resource_handle ==
-                                p_device_record_saved->resource_handle)
+                            device_record = (struct ipr_dev_record *)common_record;
+                            if (device_record->resource_handle ==
+                                device_record_saved->resource_handle)
                             {
-                                p_device_record->issue_cmd = 1;
-                                p_device_record->known_zeroed = 1;
+                                device_record->issue_cmd = 1;
+                                device_record->known_zeroed = 1;
                                 found = 1;
                                 break;
                             }
-                            p_common_record = (struct ipr_record_common *)
-                                ((unsigned long)p_common_record +
-                                 iprtoh16(p_common_record->record_len));
+                            common_record = (struct ipr_common_record *)
+                                ((unsigned long)common_record +
+                                 iprtoh16(common_record->record_len));
                         }
                         if (!found)
                         {
-                            syslog(LOG_ERR,"Resource not found to include device to %s failed"IPR_EOL, p_cur_ioa->ioa.gen_name);
+                            syslog(LOG_ERR,"Resource not found to include device to %s failed\n", cur_ioa->ioa.gen_name);
                             break;
                         }
                     }
-                    p_common_record_saved = (struct ipr_record_common *)
-                        ((unsigned long)p_common_record_saved +
-                         iprtoh16(p_common_record_saved->record_len));
+                    common_record_saved = (struct ipr_common_record *)
+                        ((unsigned long)common_record_saved +
+                         iprtoh16(common_record_saved->record_len));
                 }
 
                 if (!found)
                     continue;
             }
 
-            rc = ipr_add_array_device(p_cur_ioa->ioa.gen_name,
-                                      p_cur_ioa->p_qac_data);
+            rc = ipr_add_array_device(cur_ioa->ioa.gen_name,
+                                      cur_ioa->qac_data);
 
             if (rc != 0)
                 rc = 26;
@@ -4892,41 +4934,41 @@ int dev_include_complete(u8 num_devs)
         done_bad = 0;
         num_includes = 0;
 
-        for (p_cur_ioa = p_head_ipr_ioa;
-             p_cur_ioa != NULL;
-             p_cur_ioa = p_cur_ioa->next)
+        for (cur_ioa = ipr_ioa_head;
+             cur_ioa != NULL;
+             cur_ioa = cur_ioa->next)
         {
-            if (p_cur_ioa->num_raid_cmds > 0) {
-                rc = ipr_query_command_status(p_cur_ioa->ioa.gen_name,
+            if (cur_ioa->num_raid_cmds > 0) {
+                rc = ipr_query_command_status(cur_ioa->ioa.gen_name,
                                               &cmd_status);
 
                 if (rc) {
-                    p_cur_ioa->num_raid_cmds = 0;
+                    cur_ioa->num_raid_cmds = 0;
                     done_bad = 1;
                     continue;
                 }
 
-                p_record = cmd_status.record;
+                status_record = cmd_status.record;
 
-                for (j=0; j < cmd_status.num_records; j++, p_record++)
+                for (j=0; j < cmd_status.num_records; j++, status_record++)
                 {
-                    if (p_record->command_code == IPR_ADD_ARRAY_DEVICE)
+                    if (status_record->command_code == IPR_ADD_ARRAY_DEVICE)
                     {
-                        for (p_cur_raid_cmd = raid_cmd_head;
-                             p_cur_raid_cmd != NULL; 
-                             p_cur_raid_cmd = p_cur_raid_cmd->next)
+                        for (cur_raid_cmd = raid_cmd_head;
+                             cur_raid_cmd != NULL; 
+                             cur_raid_cmd = cur_raid_cmd->next)
                         {
-                            if ((p_cur_raid_cmd->p_ipr_ioa = p_cur_ioa) &&
-                                (p_cur_raid_cmd->array_id == p_record->array_id))
+                            if ((cur_raid_cmd->ipr_ioa = cur_ioa) &&
+                                (cur_raid_cmd->array_id == status_record->array_id))
                             {
                                 num_includes++;
-                                if (p_record->status == IPR_CMD_STATUS_IN_PROGRESS)
+                                if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
                                 {
-                                    if (p_record->percent_complete < percent_cmplt)
-                                        percent_cmplt = p_record->percent_complete;
+                                    if (status_record->percent_complete < percent_cmplt)
+                                        percent_cmplt = status_record->percent_complete;
                                     not_done = 1;
                                 }
-                                else if (p_record->status != IPR_CMD_STATUS_SUCCESSFUL)
+                                else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
                                 {
                                     rc = 26; /* "Include failed" */
                                 }
@@ -4941,18 +4983,18 @@ int dev_include_complete(u8 num_devs)
         if (!not_done)
         {
             /* Call ioctl() to re-read partition table to handle change in size */
-            for (p_cur_raid_cmd = raid_cmd_head;
-                 p_cur_raid_cmd != NULL; 
-                 p_cur_raid_cmd = p_cur_raid_cmd->next)
+            for (cur_raid_cmd = raid_cmd_head;
+                 cur_raid_cmd != NULL; 
+                 cur_raid_cmd = cur_raid_cmd->next)
             {
-                if (p_cur_raid_cmd->do_cmd)
+                if (cur_raid_cmd->do_cmd)
                 {
-                    p_common_record =
-                        p_cur_raid_cmd->p_ipr_device->p_qac_entry;
-                    if ((p_common_record != NULL) &&
-                        (p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD))
+                    common_record =
+                        cur_raid_cmd->ipr_dev->qac_entry;
+                    if ((common_record != NULL) &&
+                        (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
                     {
-                        rc = ipr_re_read_partition(p_cur_raid_cmd->p_ipr_device->gen_name);
+                        rc = ipr_re_read_partition(cur_raid_cmd->ipr_dev->gen_name);
                     }
                 }
             }
@@ -5035,69 +5077,68 @@ int concurrent_add_device(i_container *i_con)
 
 int concurrent_remove_device(i_container *i_con)
 {
-  int rc, j;
-  int len = 0;
-  char *buffer = NULL;
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  struct scsi_dev_data *p_scsi_dev_data;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  struct screen_output *s_out;
-  fn_out *output = init_output();
-  mvaddstr(0,0,"CONCURRENT REMOVE DEVICE FUNCTION CALLED");
-  
-  rc = RC_SUCCESS;
-  i_con = free_i_con(i_con);
+    int rc, j;
+    int len = 0;
+    char *buffer = NULL;
+    int num_lines = 0;
+    struct ipr_ioa *cur_ioa;
+    struct scsi_dev_data *scsi_dev_data;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    struct screen_output *s_out;
+    fn_out *output = init_output();
+    mvaddstr(0,0,"CONCURRENT REMOVE DEVICE FUNCTION CALLED");
 
-  check_current_config(false);
-    
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->next)
+    rc = RC_SUCCESS;
+    i_con = free_i_con(i_con);
+
+    check_current_config(false);
+
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-      for (j = 0; j < p_cur_ioa->num_devices; j++)
-	{
-	  p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-	  if (p_scsi_dev_data->type == IPR_TYPE_ADAPTER)
-	    {
-	      continue;
-	    }
-	  
-          buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1",p_cur_ioa, 0);
-	  i_con = add_i_con(i_con,"\0", (char *)p_cur_ioa->dev[j].p_scsi_dev_data, list);
-	  
-	  buf_size += 150;
-	  out_str = realloc(out_str, buf_size);
-	  
-	  out_str = strcat(out_str,buffer);
-	  
-	  memset(buffer, 0, strlen(buffer));
-	  
-	  len = 0;
-	  num_lines++;
-	}
+        for (j = 0; j < cur_ioa->num_devices; j++)
+        {
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+            if ((scsi_dev_data == NULL) ||
+                (scsi_dev_data->type == IPR_TYPE_ADAPTER))
+                continue;
+
+            buffer = print_device(&cur_ioa->dev[j],buffer,"%1",cur_ioa, 0);
+            i_con = add_i_con(i_con,"\0", (char *)cur_ioa->dev[j].scsi_dev_data, list);
+
+            buf_size += 150;
+            out_str = realloc(out_str, buf_size);
+
+            out_str = strcat(out_str,buffer);
+
+            memset(buffer, 0, strlen(buffer));
+
+            len = 0;
+            num_lines++;
+        }
     }
-    
-  i_con = add_i_con(i_con,"1",NULL,list);
+
+    i_con = add_i_con(i_con,"1",NULL,list);
 
 
-  if (num_lines == 0)
+    if (num_lines == 0)
     {
-      buffer = realloc(buffer, 32);
-      sprintf(buffer,"\nNo devices found");
-      out_str = strcat(out_str,buffer);
+        buffer = realloc(buffer, 32);
+        sprintf(buffer,"\nNo devices found");
+        out_str = strcat(out_str,buffer);
     }
-    
-  strip_trailing_whitespace(out_str);
-    
-  output->next = add_fn_out(output->next,1,out_str);
-  
-  s_out = screen_driver(&n_concurrent_remove_device,output,i_con);
-  rc = s_out->rc;
-  free(s_out);
-  output = free_fn_out(output);
-  return rc;  
+
+    strip_trailing_whitespace(out_str);
+
+    output->next = add_fn_out(output->next,1,out_str);
+
+    s_out = screen_driver(&n_concurrent_remove_device,output,i_con);
+    rc = s_out->rc;
+    free(s_out);
+    output = free_fn_out(output);
+    return rc;  
 }
 
 int issue_concurrent_maintenance(i_container *i_con)
@@ -5147,8 +5188,9 @@ int reclaim_cache(i_container* i_con)
      */
 
     int rc;
-    struct ipr_ioa *p_cur_ioa;
-    struct ipr_reclaim_query_data *p_reclaim_buffer, *p_cur_reclaim_buffer;
+    struct ipr_ioa *cur_ioa;
+    struct ipr_reclaim_query_data *reclaim_buffer;
+    struct ipr_reclaim_query_data *cur_reclaim_buffer;
     int num_needed = 0;
     char *buffer = NULL;
     int buf_size = 100;
@@ -5163,23 +5205,23 @@ int reclaim_cache(i_container* i_con)
     /* empty the linked list that contains field pointers */
     i_con = free_i_con(i_con);
 
-    p_reclaim_buffer = (struct ipr_reclaim_query_data*)malloc(sizeof(struct ipr_reclaim_query_data) * num_ioas);
+    reclaim_buffer = (struct ipr_reclaim_query_data*)malloc(sizeof(struct ipr_reclaim_query_data) * num_ioas);
 
-    for (p_cur_ioa = p_head_ipr_ioa, p_cur_reclaim_buffer = p_reclaim_buffer; p_cur_ioa != NULL; p_cur_ioa = p_cur_ioa->next, p_cur_reclaim_buffer++)
+    for (cur_ioa = ipr_ioa_head, cur_reclaim_buffer = reclaim_buffer; cur_ioa != NULL; cur_ioa = cur_ioa->next, cur_reclaim_buffer++)
     {
-        rc = ipr_reclaim_cache_store(p_cur_ioa,
+        rc = ipr_reclaim_cache_store(cur_ioa,
                                      IPR_RECLAIM_QUERY,
-                                     p_cur_reclaim_buffer);
+                                     cur_reclaim_buffer);
 
         if (rc != 0) {
-            p_cur_ioa->p_reclaim_data = NULL;
+            cur_ioa->reclaim_data = NULL;
             continue;
         }
 
-        p_cur_ioa->p_reclaim_data = p_cur_reclaim_buffer;
+        cur_ioa->reclaim_data = cur_reclaim_buffer;
 
-        if (p_cur_reclaim_buffer->reclaim_known_needed ||
-            p_cur_reclaim_buffer->reclaim_unknown_needed)
+        if (cur_reclaim_buffer->reclaim_known_needed ||
+            cur_reclaim_buffer->reclaim_unknown_needed)
         {
             num_needed++;
         }
@@ -5187,15 +5229,15 @@ int reclaim_cache(i_container* i_con)
 
     if (num_needed)
     {
-        p_cur_ioa = p_head_ipr_ioa;
+        cur_ioa = ipr_ioa_head;
 
-        while(p_cur_ioa)
+        while(cur_ioa)
         {
-            if ((p_cur_ioa->p_reclaim_data) &&
-                (p_cur_ioa->p_reclaim_data->reclaim_known_needed ||
-                 p_cur_ioa->p_reclaim_data->reclaim_unknown_needed))
+            if ((cur_ioa->reclaim_data) &&
+                (cur_ioa->reclaim_data->reclaim_known_needed ||
+                 cur_ioa->reclaim_data->reclaim_unknown_needed))
             {
-                buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa, 0);
+                buffer = print_device(&cur_ioa->ioa,buffer,"%1",cur_ioa, 0);
 
                 buf_size += 100;
                 out_str = realloc(out_str, buf_size);
@@ -5203,10 +5245,10 @@ int reclaim_cache(i_container* i_con)
 
                 memset(buffer, 0, strlen(buffer));
                 ioa_num++;
-                i_con = add_i_con(i_con, "\0",(char *)p_cur_ioa,list);
+                i_con = add_i_con(i_con, "\0",(char *)cur_ioa,list);
             }
-            p_cur_reclaim_buffer++;
-            p_cur_ioa = p_cur_ioa->next;
+            cur_reclaim_buffer++;
+            cur_ioa = cur_ioa->next;
         }
     }
 
@@ -5253,8 +5295,8 @@ int confirm_reclaim(i_container *i_con)
     q=Cancel    c=Confirm reclaim
   */
 
-  struct ipr_ioa *p_cur_ioa, *p_reclaim_ioa;
-  struct scsi_dev_data *p_scsi_dev_data;
+  struct ipr_ioa *cur_ioa, *reclaim_ioa;
+  struct scsi_dev_data *scsi_dev_data;
   struct ipr_query_res_state res_state;
   int j, rc;
   char *buffer = NULL;
@@ -5273,8 +5315,8 @@ int confirm_reclaim(i_container *i_con)
 
   while (current != NULL)
     {
-      p_cur_ioa = (struct ipr_ioa *) current->data;
-      if (p_cur_ioa != NULL)
+      cur_ioa = (struct ipr_ioa *) current->data;
+      if (cur_ioa != NULL)
 	{
 	  if (strcmp(current->field_data, "1") == 0)
 	    {
@@ -5284,9 +5326,9 @@ int confirm_reclaim(i_container *i_con)
 		  ioa_num++;
 		  break;
 		}
-	      else if (p_cur_ioa->p_reclaim_data->reclaim_known_needed ||  p_cur_ioa->p_reclaim_data->reclaim_unknown_needed)
+	      else if (cur_ioa->reclaim_data->reclaim_known_needed ||  cur_ioa->reclaim_data->reclaim_unknown_needed)
 		{
-		  p_reclaim_ioa = p_cur_ioa;
+		  reclaim_ioa = cur_ioa;
 		  ioa_num++;
 		}
 	    }
@@ -5310,14 +5352,15 @@ int confirm_reclaim(i_container *i_con)
 
   check_current_config(false);
 
-  for (j = 0; j < p_reclaim_ioa->num_devices; j++)
+  for (j = 0; j < reclaim_ioa->num_devices; j++)
   {
-      p_scsi_dev_data = p_reclaim_ioa->dev[j].p_scsi_dev_data;
-      if (p_scsi_dev_data->type != IPR_TYPE_DISK)  //FIXME correct check?
+      scsi_dev_data = reclaim_ioa->dev[j].scsi_dev_data;
+      if ((scsi_dev_data == NULL) ||
+          (scsi_dev_data->type != IPR_TYPE_DISK))  //FIXME correct check?
           continue;
 
       /* Do a query resource state to see whether or not the device will be affected by the operation */
-      rc = ipr_query_resource_state(p_reclaim_ioa->dev[j].gen_name, &res_state);
+      rc = ipr_query_resource_state(reclaim_ioa->dev[j].gen_name, &res_state);
 
       if (rc != 0)
           res_state.not_oper = 1;
@@ -5326,7 +5369,7 @@ int confirm_reclaim(i_container *i_con)
       if (!res_state.read_write_prot)
           continue;
 
-      buffer = print_device(&p_reclaim_ioa->dev[j],buffer,"%1",p_reclaim_ioa, 0);
+      buffer = print_device(&reclaim_ioa->dev[j],buffer,"%1",reclaim_ioa, 0);
 
       buf_size += 150;
       out_str = realloc(out_str, buf_size);
@@ -5337,7 +5380,7 @@ int confirm_reclaim(i_container *i_con)
 
   i_con = free_i_con(i_con);
   /* Save the chosen IOA for later use */
-  add_i_con(i_con, "\0", p_reclaim_ioa, list);
+  add_i_con(i_con, "\0", reclaim_ioa, list);
 
   output->next = add_fn_out(output->next,1,out_str);
 
@@ -5405,7 +5448,7 @@ int reclaim_result(i_container *i_con)
      */
 
     int rc;
-    struct ipr_ioa *p_reclaim_ioa;
+    struct ipr_ioa *reclaim_ioa;
     char* out_str;
     int max_y,max_x;
     struct screen_output *s_out;
@@ -5414,16 +5457,16 @@ int reclaim_result(i_container *i_con)
     int action;
 
     out_str = calloc (13, sizeof(char));
-    p_reclaim_ioa = (struct ipr_ioa *) i_con->data;
+    reclaim_ioa = (struct ipr_ioa *) i_con->data;
 
     action = IPR_RECLAIM_PERFORM;
 
-    if (p_reclaim_ioa->p_reclaim_data->reclaim_unknown_needed)
+    if (reclaim_ioa->reclaim_data->reclaim_unknown_needed)
         action |= IPR_RECLAIM_UNKNOWN_PERM;
 
-    rc = ipr_reclaim_cache_store(p_reclaim_ioa,
+    rc = ipr_reclaim_cache_store(reclaim_ioa,
                                  action,
-                                 p_reclaim_ioa->p_reclaim_data);
+                                 reclaim_ioa->reclaim_data);
 
     if (rc != 0) {
         free(out_str);
@@ -5436,35 +5479,35 @@ int reclaim_result(i_container *i_con)
     move(max_y-1,0);printw("Please wait - reclaim in progress");
     refresh();
 
-    memset(p_reclaim_ioa->p_reclaim_data, 0, sizeof(struct ipr_reclaim_query_data));
-    rc = ipr_reclaim_cache_store(p_reclaim_ioa,
+    memset(reclaim_ioa->reclaim_data, 0, sizeof(struct ipr_reclaim_query_data));
+    rc = ipr_reclaim_cache_store(reclaim_ioa,
                                  IPR_RECLAIM_QUERY,
-                                 p_reclaim_ioa->p_reclaim_data);
+                                 reclaim_ioa->reclaim_data);
 
     if (rc == 0)
     {
-        if (p_reclaim_ioa->p_reclaim_data->reclaim_known_performed)
+        if (reclaim_ioa->reclaim_data->reclaim_known_performed)
         {
-            if (p_reclaim_ioa->p_reclaim_data->num_blocks_needs_multiplier)
+            if (reclaim_ioa->reclaim_data->num_blocks_needs_multiplier)
             {
-                sprintf(out_str, "%12d", iprtoh16(p_reclaim_ioa->p_reclaim_data->num_blocks) *
+                sprintf(out_str, "%12d", iprtoh16(reclaim_ioa->reclaim_data->num_blocks) *
                         IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER);
             }
             else
             {
-                sprintf(out_str, "%12d", iprtoh16(p_reclaim_ioa->p_reclaim_data->num_blocks));
+                sprintf(out_str, "%12d", iprtoh16(reclaim_ioa->reclaim_data->num_blocks));
             }
             mvaddstr(8, 0, "Press Enter to continue.");
         }
-        else if (p_reclaim_ioa->p_reclaim_data->reclaim_unknown_performed)
+        else if (reclaim_ioa->reclaim_data->reclaim_unknown_performed)
         {
             output->cat_offset = 3;
         }
     }
 
-    rc = ipr_reclaim_cache_store(p_reclaim_ioa,
+    rc = ipr_reclaim_cache_store(reclaim_ioa,
                                  IPR_RECLAIM_RESET,
-                                 p_reclaim_ioa->p_reclaim_data);
+                                 reclaim_ioa->reclaim_data);
 
     if (rc != 0)
         rc = (EXIT_FLAG | 37);
@@ -5531,19 +5574,19 @@ int configure_af_device(i_container *i_con, int action_code)
      */
 
     int rc, j;
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct ipr_device_record *p_device_record;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_dev_record *device_record;
     int can_init;
     int dev_type;
     int change_size;
     char *buffer = NULL;
     int num_devs = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 len=0;
-    struct devs_to_init_t *p_cur_dev_to_init;
+    struct devs_to_init_t *cur_dev_init;
     u8 ioctl_buffer[IOCTL_BUFFER_SIZE];
-    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-    struct ipr_block_desc *p_block_desc;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_block_desc *block_desc;
     int status;
     u8 length;
 
@@ -5560,33 +5603,34 @@ int configure_af_device(i_container *i_con, int action_code)
 
     check_current_config(false);
 
-    for (p_cur_ioa = p_head_ipr_ioa;
-         p_cur_ioa != NULL;
-         p_cur_ioa = p_cur_ioa->next)
+    for (cur_ioa = ipr_ioa_head;
+         cur_ioa != NULL;
+         cur_ioa = cur_ioa->next)
     {
-        if ((p_cur_ioa->p_qac_data) &&
-            (p_cur_ioa->p_qac_data->num_records == 0))
+        if ((cur_ioa->qac_data) &&
+            (cur_ioa->qac_data->num_records == 0))
             continue;
 
-        for (j = 0; j < p_cur_ioa->num_devices; j++)
+        for (j = 0; j < cur_ioa->num_devices; j++)
         {
             can_init = 1;
-            p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
             /* If not a DASD, disallow format */
-            if ((p_scsi_dev_data->type != IPR_TYPE_DISK) ||
-                (ipr_is_hot_spare(&p_cur_ioa->dev[j])))
+            if ((scsi_dev_data == NULL) ||
+                (scsi_dev_data->type != IPR_TYPE_DISK) ||
+                (ipr_is_hot_spare(&cur_ioa->dev[j])))
                 continue;
 
             /* If Advanced Function DASD */
-            if (ipr_is_af_dasd_device(&p_cur_ioa->dev[j]))
+            if (ipr_is_af_dasd_device(&cur_ioa->dev[j]))
             {
                 if (action_code == IPR_INCLUDE)
                     continue;
 
-                p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
-                if (!p_device_record ||
-                    (p_device_record->common.record_id != IPR_RECORD_ID_DEVICE2_RECORD))
+                device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
+                if (!device_record ||
+                    (device_record->common.record_id != IPR_RECORD_ID_DEVICE_RECORD))
                 {
                     continue;
                 }
@@ -5595,26 +5639,26 @@ int configure_af_device(i_container *i_con, int action_code)
                 change_size  = IPR_512_BLOCK;
 
                 /* We allow the user to format the drive if nobody is using it */
-                if (p_cur_ioa->dev[j].p_scsi_dev_data->opens != 0)
+                if (cur_ioa->dev[j].scsi_dev_data->opens != 0)
                 {
-                    syslog(LOG_ERR, "Format not allowed to %s, device in use"IPR_EOL, p_cur_ioa->dev[j].gen_name); 
+                    syslog(LOG_ERR, "Format not allowed to %s, device in use\n", cur_ioa->dev[j].gen_name); 
                     continue;
                 }
 
-                if (ipr_is_array_member(&p_cur_ioa->dev[j]))
+                if (ipr_is_array_member(&cur_ioa->dev[j]))
                 {
-                    if (p_device_record->no_cfgte_vol)
+                    if (device_record->no_cfgte_vol)
                         can_init = 1;
                     else
                         can_init = 0;
                 }
                 else
                 {
-                    can_init = is_format_allowed(&p_cur_ioa->dev[j]);
+                    can_init = is_format_allowed(&cur_ioa->dev[j]);
 
                 }
             }
-            else if (p_scsi_dev_data->type == IPR_TYPE_DISK)
+            else if (scsi_dev_data->type == IPR_TYPE_DISK)
             {
                 if (action_code == IPR_REMOVE)
                     continue;
@@ -5627,13 +5671,13 @@ int configure_af_device(i_container *i_con, int action_code)
                  concurrently it will be read write protected, but the system may still
                  have a use count for it. We need to allow the format to get the device
                  into a state where the system can use it */
-                if (p_cur_ioa->dev[j].p_scsi_dev_data->opens != 0)
+                if (cur_ioa->dev[j].scsi_dev_data->opens != 0)
                 {
-                    syslog(LOG_ERR, "Format not allowed to %s, device in use"IPR_EOL, p_cur_ioa->dev[j].gen_name); 
+                    syslog(LOG_ERR, "Format not allowed to %s, device in use\n", cur_ioa->dev[j].gen_name); 
                     continue;
                 }
 
-                if (is_af_blocked(&p_cur_ioa->dev[j], 0))
+                if (is_af_blocked(&cur_ioa->dev[j], 0))
                 {
                     /* error log is posted in is_af_blocked() routine */
                     continue;
@@ -5641,49 +5685,49 @@ int configure_af_device(i_container *i_con, int action_code)
 
                 /* check if mode select with 522 block size will work, will be
                  set back to 512 if successfull otherwise will not be candidate. */
-                p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
                 memset(ioctl_buffer, 0, 255);
 
-                p_mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+                mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
 
-                p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr + 1);
+                block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
 
                 /* Setup block size */
-                p_block_desc->block_length[0] = 0x00;
-                p_block_desc->block_length[1] = 0x02;
-                p_block_desc->block_length[2] = 0x0a;
+                block_desc->block_length[0] = 0x00;
+                block_desc->block_length[1] = 0x02;
+                block_desc->block_length[2] = 0x0a;
 
                 length = sizeof(struct ipr_block_desc) +
                     sizeof(struct ipr_mode_parm_hdr);
 
-                status = ipr_mode_select(p_cur_ioa->dev[j].gen_name,
+                status = ipr_mode_select(cur_ioa->dev[j].gen_name,
                                          &ioctl_buffer, length);
 
                 if (status)
                     continue;
                 else  {
-                    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                    mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
                     memset(ioctl_buffer, 0, 255);
 
-                    p_mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+                    mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
 
-                    p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr + 1);
+                    block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
 
-                    p_block_desc->block_length[0] = 0x00;
-                    p_block_desc->block_length[1] = 0x02;
-                    p_block_desc->block_length[2] = 0x00;
+                    block_desc->block_length[0] = 0x00;
+                    block_desc->block_length[1] = 0x02;
+                    block_desc->block_length[2] = 0x00;
 
                     length = sizeof(struct ipr_block_desc) +
                         sizeof(struct ipr_mode_parm_hdr);
 
-                    status = ipr_mode_select(p_cur_ioa->dev[j].gen_name,
+                    status = ipr_mode_select(cur_ioa->dev[j].gen_name,
                                              &ioctl_buffer, length);
 
                     if (status)
                         continue;
                 }
 
-                can_init = is_format_allowed(&p_cur_ioa->dev[j]);
+                can_init = is_format_allowed(&cur_ioa->dev[j]);
             }
             else
                 continue;
@@ -5700,12 +5744,12 @@ int configure_af_device(i_container *i_con, int action_code)
 
                 memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
 
-                dev_init_tail->p_ioa = p_cur_ioa;
+                dev_init_tail->ioa = cur_ioa;
                 dev_init_tail->dev_type = dev_type;
                 dev_init_tail->change_size = change_size;
-                dev_init_tail->p_ipr_device = &p_cur_ioa->dev[j];
+                dev_init_tail->ipr_dev = &cur_ioa->dev[j];
 
-                buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1",p_cur_ioa, 0);
+                buffer = print_device(&cur_ioa->dev[j],buffer,"%1",cur_ioa, 0);
 
                 i_con = add_i_con(i_con,"\0",dev_field,list);
 
@@ -5738,12 +5782,12 @@ int configure_af_device(i_container *i_con, int action_code)
     free(out_str);
     output = free_fn_out(output);
 
-    p_cur_dev_to_init = dev_init_head;
-    while(p_cur_dev_to_init)
+    cur_dev_init = dev_init_head;
+    while(cur_dev_init)
     {
-        p_cur_dev_to_init = p_cur_dev_to_init->next;
+        cur_dev_init = cur_dev_init->next;
         free(dev_init_head);
-        dev_init_head = p_cur_dev_to_init;
+        dev_init_head = cur_dev_init;
     }
 
     return rc;
@@ -5771,459 +5815,458 @@ int remove_hot_spare(i_container *i_con)
 
 int hot_spare(i_container *i_con, int action)
 {
-/*                    Configure a hot spare device
+    /*                    Configure a hot spare device
 
-Select the subsystems which disk units will be configured as hot spares
+     Select the subsystems which disk units will be configured as hot spares
 
-Type choice, press Enter.
-  1=Select subsystem
+     Type choice, press Enter.
+     1=Select subsystem
 
-         Vendor    Product            Serial     PCI    PCI
-Option    ID         ID               Number     Bus    Dev
-         IBM       2780001           3AFB348C     05     03
-         IBM       5703001           A775915E     04     01
+     Vendor    Product            Serial     PCI    PCI
+     Option    ID         ID               Number     Bus    Dev
+     IBM       2780001           3AFB348C     05     03
+     IBM       5703001           A775915E     04     01
 
 
-e=Exit   q=Cancel    f=PageDn   b=PageUp
-*/
-  int rc, array_num, i;
-  struct ipr_record_common *p_common_record;
-  struct ipr_array_record *p_array_record;
-  struct ipr_device_record *p_device_record;
-  struct array_cmd_data *p_cur_raid_cmd;
-  char *buffer = NULL;
-  int num_lines = 0;
-  struct ipr_ioa *p_cur_ioa;
-  u32 len;
-  int found = 0;
-  char *p_char;
-  struct scsi_dev_data *p_scsi_dev_data;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  i_container *temp_i_con;
-  struct screen_output *s_out;
-  fn_out *output = init_output();  
-  mvaddstr(0,0,"BUS CONFIG FUNCTION CALLED");
-  
-  i_con = free_i_con(i_con);
+     e=Exit   q=Cancel    f=PageDn   b=PageUp
+     */
+    int rc, array_num, i;
+    struct ipr_common_record *common_record;
+    struct ipr_array_record *array_record;
+    struct ipr_dev_record *device_record;
+    struct array_cmd_data *cur_raid_cmd;
+    char *buffer = NULL;
+    int num_lines = 0;
+    struct ipr_ioa *cur_ioa;
+    u32 len;
+    int found = 0;
+    char *input;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    i_container *temp_i_con;
+    struct screen_output *s_out;
+    fn_out *output = init_output();  
+    mvaddstr(0,0,"BUS CONFIG FUNCTION CALLED");
 
-  rc = RC_SUCCESS;
+    i_con = free_i_con(i_con);
 
-  array_num = 1;
+    rc = RC_SUCCESS;
 
-  check_current_config(false);
+    array_num = 1;
 
-  for(p_cur_ioa = p_head_ipr_ioa;
-      p_cur_ioa != NULL;
-      p_cur_ioa = p_cur_ioa->next)
+    check_current_config(false);
+
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
-      p_cur_ioa->num_raid_cmds = 0;
+        cur_ioa->num_raid_cmds = 0;
 
-      for (i = 0;
-	   i < p_cur_ioa->num_devices;
-	   i++)
+        for (i = 0;
+             i < cur_ioa->num_devices;
+             i++)
         {
-	  p_common_record = p_cur_ioa->dev[i].p_qac_entry;
+            common_record = cur_ioa->dev[i].qac_entry;
 
-	  if (p_common_record == NULL)
-	    continue;
+            if (common_record == NULL)
+                continue;
 
-	  p_array_record = (struct ipr_array_record *)p_common_record;
-	  p_device_record = (struct ipr_device_record *)p_common_record;
+            array_record = (struct ipr_array_record *)common_record;
+            device_record = (struct ipr_dev_record *)common_record;
 
-	  if (((p_common_record->record_id == IPR_RECORD_ID_ARRAY2_RECORD) &&
-	       (!p_array_record->established) &&
-	       (action == IPR_ADD_HOT_SPARE)) ||
-	      ((p_common_record->record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-	       (p_device_record->is_hot_spare) &&
-	       (action == IPR_RMV_HOT_SPARE)))
+            if (((common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) &&
+                 (!array_record->established) &&
+                 (action == IPR_ADD_HOT_SPARE)) ||
+                ((common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+                 (device_record->is_hot_spare) &&
+                 (action == IPR_RMV_HOT_SPARE)))
             {
-	      if (raid_cmd_head)
+                if (raid_cmd_head)
                 {
-		  raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-		  raid_cmd_tail = raid_cmd_tail->next;
+                    raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                    raid_cmd_tail = raid_cmd_tail->next;
                 }
-	      else
+                else
                 {
-		  raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                    raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
                 }
 
-	      raid_cmd_tail->next = NULL;
+                raid_cmd_tail->next = NULL;
 
-	      memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+                memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-	      raid_cmd_tail->array_id = 0;
-	      raid_cmd_tail->array_num = array_num;
-	      raid_cmd_tail->p_ipr_ioa = p_cur_ioa;
-	      raid_cmd_tail->p_ipr_device = NULL;
+                raid_cmd_tail->array_id = 0;
+                raid_cmd_tail->array_num = array_num;
+                raid_cmd_tail->ipr_ioa = cur_ioa;
+                raid_cmd_tail->ipr_dev = NULL;
 
-	      i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
-	      
-	      p_scsi_dev_data = p_cur_ioa->ioa.p_scsi_dev_data;
+                i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
 
-	      buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa, 0);
-      
-              buf_size += 150;
-	      out_str = realloc(out_str, buf_size);
-	      
-	      out_str = strcat(out_str,buffer);
-	      memset(buffer, 0, strlen(buffer));
+                buffer = print_device(&cur_ioa->ioa,buffer,"%1",cur_ioa, 0);
 
-	      len = 0;
-	      num_lines++;
-	      array_num++;
-	      break;
+                buf_size += 150;
+                out_str = realloc(out_str, buf_size);
+
+                out_str = strcat(out_str,buffer);
+                memset(buffer, 0, strlen(buffer));
+
+                len = 0;
+                num_lines++;
+                array_num++;
+                break;
             }
         }
     }
 
-  if (array_num == 1)
+    if (array_num == 1)
     {
-      if (action == IPR_ADD_HOT_SPARE)
-	s_out = screen_driver(&n_add_hot_spare_fail,output,i_con);
-      else
-	s_out = screen_driver(&n_remove_hot_spare_fail,output,i_con);
+        if (action == IPR_ADD_HOT_SPARE)
+            s_out = screen_driver(&n_add_hot_spare_fail,output,i_con);
+        else
+            s_out = screen_driver(&n_remove_hot_spare_fail,output,i_con);
 
-      rc = EXIT_FLAG;
-      goto leave;
-    }
-  
-  if (action == IPR_RMV_HOT_SPARE)
-    output->cat_offset = 3;
-
-  output->next = add_fn_out(output->next,1,out_str);
-  s_out = screen_driver(&n_hot_spare,output,i_con);
-  rc = s_out->rc;
-  i_con = s_out->i_con;
-
-  free(s_out);
-
-  if (rc > 0)
-    {
-      rc = EXIT_FLAG;
-      goto leave;
-    }
-  
-  found = 0;
-  
-  p_cur_raid_cmd = raid_cmd_head;
-  
-  for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-    {
-      p_cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
-      if (p_cur_raid_cmd != NULL)
-	{
-	  p_char = temp_i_con->field_data;
-	  if (strcmp(p_char, "1") == 0)
-	    {
-	      do
-		{
-		  rc = select_hot_spare(temp_i_con, action);
-		} while (rc & REFRESH_FLAG);
-	      
-	      if (rc > 0)
-		goto leave;
-	      
-	      found = 1;
-	      if (!p_cur_raid_cmd->do_cmd)
-		{
-		  p_cur_raid_cmd->do_cmd = 1;
-		  p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds++;
-		}
-	    }
-	  else
-	    {
-	      if (p_cur_raid_cmd->do_cmd)
-		{
-		  p_cur_raid_cmd->do_cmd = 0;
-		  p_cur_raid_cmd->p_ipr_ioa->num_raid_cmds--;
-		}
-	    }
-	}
-    }
-  
-  if (found)
-    {
-      /* Go to verification screen */
-      rc = confirm_hot_spare(action);
-      goto leave;
-    }
-  else
-    {
-      rc = REFRESH_FLAG | INVALID_OPTION_STATUS;
+        rc = EXIT_FLAG;
+        goto leave;
     }
 
- leave:
+    if (action == IPR_RMV_HOT_SPARE)
+        output->cat_offset = 3;
 
-  if (rc & CANCEL_FLAG)
+    output->next = add_fn_out(output->next,1,out_str);
+    s_out = screen_driver(&n_hot_spare,output,i_con);
+    rc = s_out->rc;
+    i_con = s_out->i_con;
+
+    free(s_out);
+
+    if (rc > 0)
     {
-      s_status.index = (rc & ~CANCEL_FLAG);
-      rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
-    }
-  i_con = free_i_con(i_con);
-  free(out_str);
-  output = free_fn_out(output); 
-  
-  p_cur_raid_cmd = raid_cmd_head;
-  while(p_cur_raid_cmd)
-    {
-      p_cur_raid_cmd = p_cur_raid_cmd->next;
-      free(raid_cmd_head);
-      raid_cmd_head = p_cur_raid_cmd;
+        rc = EXIT_FLAG;
+        goto leave;
     }
 
-  return rc;
+    found = 0;
+
+    cur_raid_cmd = raid_cmd_head;
+
+    for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
+    {
+        cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
+        if (cur_raid_cmd != NULL)
+        {
+            input = temp_i_con->field_data;
+            if (strcmp(input, "1") == 0)
+            {
+                do
+                {
+                    rc = select_hot_spare(temp_i_con, action);
+                } while (rc & REFRESH_FLAG);
+
+                if (rc > 0)
+                    goto leave;
+
+                found = 1;
+                if (!cur_raid_cmd->do_cmd)
+                {
+                    cur_raid_cmd->do_cmd = 1;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds++;
+                }
+            }
+            else
+            {
+                if (cur_raid_cmd->do_cmd)
+                {
+                    cur_raid_cmd->do_cmd = 0;
+                    cur_raid_cmd->ipr_ioa->num_raid_cmds--;
+                }
+            }
+        }
+    }
+
+    if (found)
+    {
+        /* Go to verification screen */
+        rc = confirm_hot_spare(action);
+        goto leave;
+    }
+    else
+    {
+        rc = REFRESH_FLAG | INVALID_OPTION_STATUS;
+    }
+
+    leave:
+
+        if (rc & CANCEL_FLAG)
+        {
+            s_status.index = (rc & ~CANCEL_FLAG);
+            rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
+        }
+    i_con = free_i_con(i_con);
+    free(out_str);
+    output = free_fn_out(output); 
+
+    cur_raid_cmd = raid_cmd_head;
+    while(cur_raid_cmd)
+    {
+        cur_raid_cmd = cur_raid_cmd->next;
+        free(raid_cmd_head);
+        raid_cmd_head = cur_raid_cmd;
+    }
+
+    return rc;
 }
 
 int select_hot_spare(i_container *i_con, int action)
 {
-  struct array_cmd_data *p_cur_raid_cmd;
-  int rc, j, found;
-  char *buffer = NULL;
-  int num_devs = 0;
-  struct ipr_ioa *p_cur_ioa;
-  char *p_char;
-  u32 len;
-  struct ipr_device *p_ipr_device;
-  struct scsi_dev_data *p_scsi_dev_data;
-  struct ipr_device_record *p_device_record;
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  i_container *temp_i_con,*i_con2=NULL;
-  struct screen_output *s_out;
-  fn_out *output = init_output();  
-  mvaddstr(0,0,"SELECT HOT SPARE FUNCTION CALLED");
-  
-  p_cur_raid_cmd = (struct array_cmd_data *) i_con->data;
-  
-  rc = RC_SUCCESS;
-  
-  p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+    struct array_cmd_data *cur_raid_cmd;
+    int rc, j, found;
+    char *buffer = NULL;
+    int num_devs = 0;
+    struct ipr_ioa *cur_ioa;
+    char *input;
+    u32 len;
+    struct ipr_dev *ipr_dev;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_dev_record *device_record;
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+    i_container *temp_i_con,*i_con2=NULL;
+    struct screen_output *s_out;
+    fn_out *output = init_output();  
+    mvaddstr(0,0,"SELECT HOT SPARE FUNCTION CALLED");
 
-  for (j = 0; j < p_cur_ioa->num_devices; j++)
+    cur_raid_cmd = (struct array_cmd_data *) i_con->data;
+
+    rc = RC_SUCCESS;
+
+    cur_ioa = cur_raid_cmd->ipr_ioa;
+
+    for (j = 0; j < cur_ioa->num_devices; j++)
     {
-      p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-      p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+        scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+        device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
-      if ((p_scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
-	  (p_device_record != NULL) &&
-	  (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-	  (((p_device_record->add_hot_spare_cand) && (action == IPR_ADD_HOT_SPARE)) ||
-	   ((p_device_record->rmv_hot_spare_cand) && (action == IPR_RMV_HOT_SPARE))))
+        if ((scsi_dev_data == NULL) ||
+            (device_record == NULL))
+            continue;
+
+        if ((scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
+            (device_record != NULL) &&
+            (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+            (((device_record->add_hot_spare_cand) && (action == IPR_ADD_HOT_SPARE)) ||
+             ((device_record->rmv_hot_spare_cand) && (action == IPR_RMV_HOT_SPARE))))
         {
-	  i_con2 = add_i_con(i_con2,"\0",(char *)&p_cur_ioa->dev[j],list);
+            i_con2 = add_i_con(i_con2,"\0",(char *)&cur_ioa->dev[j],list);
 
-          buffer = print_device(&p_cur_ioa->dev[j],buffer,"%1",p_cur_ioa, 0);
-	  
-	  buf_size += 150;
-	  out_str = realloc(out_str, buf_size);
-	  
-	  out_str = strcat(out_str,buffer);
-	  
-	  memset(buffer, 0, strlen(buffer));
+            buffer = print_device(&cur_ioa->dev[j],buffer,"%1",cur_ioa, 0);
 
-	  len = 0;
-	  num_devs++;
+            buf_size += 150;
+            out_str = realloc(out_str, buf_size);
+
+            out_str = strcat(out_str,buffer);
+
+            memset(buffer, 0, strlen(buffer));
+
+            len = 0;
+            num_devs++;
         }
     }
-  
-  if (num_devs)
-    {
-      output->next = add_fn_out(output->next,1,out_str);
-      
-      if (action == IPR_RMV_HOT_SPARE)
-	output->cat_offset = 3;
-      
-      s_out = screen_driver(&n_select_hot_spare,output,i_con2);
-      rc = s_out->rc;
-      i_con2 = s_out->i_con;
 
-      if (rc > 0)
-	goto leave;
-      
-      found = 0;
-      
-      for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-	{
-	  p_ipr_device = (struct ipr_device *)temp_i_con->data;
-	  if (p_ipr_device != NULL)
-	    {
-	      p_char = temp_i_con->field_data;
-	      if (strcmp(p_char, "1") == 0)
-		{
-		  found = 1;
-		  p_device_record = (struct ipr_device_record *)p_ipr_device->p_qac_entry;
-		  p_device_record->issue_cmd = 1;
-		}
-	    }
-	}
-      
-      if (found)
-	rc = RC_SUCCESS;
-	
-      else
-	{
-	  s_status.index = INVALID_OPTION_STATUS;
-	  rc = REFRESH_FLAG;
-	}
+    if (num_devs)
+    {
+        output->next = add_fn_out(output->next,1,out_str);
+
+        if (action == IPR_RMV_HOT_SPARE)
+            output->cat_offset = 3;
+
+        s_out = screen_driver(&n_select_hot_spare,output,i_con2);
+        rc = s_out->rc;
+        i_con2 = s_out->i_con;
+
+        if (rc > 0)
+            goto leave;
+
+        found = 0;
+
+        for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
+        {
+            ipr_dev = (struct ipr_dev *)temp_i_con->data;
+            if (ipr_dev != NULL)
+            {
+                input = temp_i_con->field_data;
+                if (strcmp(input, "1") == 0)
+                {
+                    found = 1;
+                    device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                    device_record->issue_cmd = 1;
+                }
+            }
+        }
+
+        if (found)
+            rc = RC_SUCCESS;
+
+        else
+        {
+            s_status.index = INVALID_OPTION_STATUS;
+            rc = REFRESH_FLAG;
+        }
     }
 
-  else
+    else
     {
-      rc = 52 | CANCEL_FLAG; /* "No devices available for the selected hot spare operation"  */
+        rc = 52 | CANCEL_FLAG; /* "No devices available for the selected hot spare operation"  */
     }
 
- leave:
-  i_con2 = free_i_con(i_con2);
-  free(s_out);
-  free(out_str);
-  output = free_fn_out(output);
-  return rc;
+    leave:
+        i_con2 = free_i_con(i_con2);
+    free(s_out);
+    free(out_str);
+    output = free_fn_out(output);
+    return rc;
 }
 
 int confirm_hot_spare(int action)
 {
- 
-  /*
-             Confirm Enable Hot Spare        
 
-ATTENTION: Existing data on these disk units will not be preserved.
+    /*
+     Confirm Enable Hot Spare        
 
-
-Press Enter to continue.              
-Press q=Cancel to return and change your choice.
-
-               Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI
-Option  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun
-        6607  0024A0B9    03      D01       05     03      0     3    0
-        6607  00D38D0F    03      D02       05     03      0     5    0
-        6607  00D32240    03      D03       05     03      0     9    0
-        6607  00034563    03      D04       05     03      0     6    0
-        6717  00D37A11    03      D05       05     03      0     4    0
-
- q=Cancel    f=PageDn   b=PageUp
+     ATTENTION: Existing data on these disk units will not be preserved.
 
 
+     Press Enter to continue.              
+     Press q=Cancel to return and change your choice.
 
-*/
-  struct scsi_dev_data *p_scsi_dev_data;
-  struct array_cmd_data *p_cur_raid_cmd;
-  struct ipr_device_record *p_device_record;
-  struct ipr_ioa *p_cur_ioa;
-  int rc, j;
-  char *buffer = NULL;
-  u32 num_lines = 0;
-  int hot_spare_complete(int action);
-  int buf_size = 150;
-  char *out_str = calloc(buf_size,sizeof(char));
-  
-  struct screen_output *s_out;
-  fn_out *output = init_output();  
-  mvaddstr(0,0,"CONFIRM HOT SPARE FUNCTION CALLED");
+     Serial    Frame    Card     PCI    PCI   SCSI  SCSI  SCSI
+     Option  Type   Number     ID    Position   Bus    Dev    Bus   ID   Lun
+     6607  0024A0B9    03      D01       05     03      0     3    0
+     6607  00D38D0F    03      D02       05     03      0     5    0
+     6607  00D32240    03      D03       05     03      0     9    0
+     6607  00034563    03      D04       05     03      0     6    0
+     6717  00D37A11    03      D05       05     03      0     4    0
 
-  rc = RC_SUCCESS;
-  
-  p_cur_raid_cmd = raid_cmd_head;
-  
-  while(p_cur_raid_cmd)
+     q=Cancel    f=PageDn   b=PageUp
+
+
+
+     */
+    struct array_cmd_data *cur_raid_cmd;
+    struct ipr_dev_record *device_record;
+    struct ipr_ioa *cur_ioa;
+    int rc, j;
+    char *buffer = NULL;
+    u32 num_lines = 0;
+    int hot_spare_complete(int action);
+    int buf_size = 150;
+    char *out_str = calloc(buf_size,sizeof(char));
+
+    struct screen_output *s_out;
+    fn_out *output = init_output();  
+    mvaddstr(0,0,"CONFIRM HOT SPARE FUNCTION CALLED");
+
+    rc = RC_SUCCESS;
+
+    cur_raid_cmd = raid_cmd_head;
+
+    while(cur_raid_cmd)
     {
-      if (p_cur_raid_cmd->do_cmd)
+        if (cur_raid_cmd->do_cmd)
         {
-	  p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+            cur_ioa = cur_raid_cmd->ipr_ioa;
 
-	  for (j = 0; j < p_cur_ioa->num_devices; j++)
+            for (j = 0; j < cur_ioa->num_devices; j++)
             {
-	      p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-	      p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
+                device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
-	      if ((p_device_record != NULL) &&
-		  (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD) &&
-		  (p_device_record->issue_cmd))
+                if ((device_record != NULL) &&
+                    (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
+                    (device_record->issue_cmd))
                 {
-                  buffer = print_device(&p_cur_ioa->dev[j],buffer,"1",p_cur_ioa, 0);
+                    buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
 
-		  buf_size += 150;
-		  out_str = realloc(out_str, buf_size);
-		  
-		  out_str = strcat(out_str,buffer);
+                    buf_size += 150;
+                    out_str = realloc(out_str, buf_size);
 
-		  memset(buffer, 0, strlen(buffer));
-		  num_lines++;
+                    out_str = strcat(out_str,buffer);
+
+                    memset(buffer, 0, strlen(buffer));
+                    num_lines++;
                 }
             }
         }
-      p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
     }
 
-  output->next = add_fn_out(output->next,1,out_str);
-  
-  if (action == IPR_RMV_HOT_SPARE)
-    output->cat_offset = 3;
+    output->next = add_fn_out(output->next,1,out_str);
 
-  s_out = screen_driver(&n_confirm_hot_spare,output,NULL);
-  rc = s_out->rc;
-  free(s_out);
-  
-  if(rc > 0)
-    goto leave;
+    if (action == IPR_RMV_HOT_SPARE)
+        output->cat_offset = 3;
 
-  /* verify the devices are not in use */
-  p_cur_raid_cmd = raid_cmd_head;
-  while (p_cur_raid_cmd)
+    s_out = screen_driver(&n_confirm_hot_spare,output,NULL);
+    rc = s_out->rc;
+    free(s_out);
+
+    if(rc > 0)
+        goto leave;
+
+    /* verify the devices are not in use */
+    cur_raid_cmd = raid_cmd_head;
+    while (cur_raid_cmd)
     {
-      if (p_cur_raid_cmd->do_cmd)
-	{
-	  p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
-	  if (rc != 0)
-	    {
-	      if (action == IPR_ADD_HOT_SPARE)
-		rc = 55 | EXIT_FLAG; /* "Configure a hot spare device failed"  */
-	      else if (action == IPR_RMV_HOT_SPARE)
-		rc = 56 | EXIT_FLAG; /* "Unconfigure a hot spare device failed"  */
-	      
-	      syslog(LOG_ERR, "Devices may have changed state. Command cancelled, "
-		     "please issue commands again if RAID still desired %s."
-		     IPR_EOL, p_cur_ioa->ioa.gen_name);
-	      goto leave;
-	    }
-	}
-      p_cur_raid_cmd = p_cur_raid_cmd->next;
+        if (cur_raid_cmd->do_cmd)
+        {
+            cur_ioa = cur_raid_cmd->ipr_ioa;
+            if (rc != 0)
+            {
+                if (action == IPR_ADD_HOT_SPARE)
+                    rc = 55 | EXIT_FLAG; /* "Configure a hot spare device failed"  */
+                else if (action == IPR_RMV_HOT_SPARE)
+                    rc = 56 | EXIT_FLAG; /* "Unconfigure a hot spare device failed"  */
+
+                syslog(LOG_ERR, "Devices may have changed state. Command cancelled, "
+                       "please issue commands again if RAID still desired %s.\n",
+                       cur_ioa->ioa.gen_name);
+                goto leave;
+            }
+        }
+        cur_raid_cmd = cur_raid_cmd->next;
     }
-  
-  rc = hot_spare_complete(action);
-  
- leave:
-  free(out_str);
-  output = free_fn_out(output);
-  return rc;
+
+    rc = hot_spare_complete(action);
+
+    leave:
+        free(out_str);
+    output = free_fn_out(output);
+    return rc;
 }
 
 int hot_spare_complete(int action)
 {
     int rc;
-    struct ipr_ioa *p_cur_ioa;
-    struct array_cmd_data *p_cur_raid_cmd;
+    struct ipr_ioa *cur_ioa;
+    struct array_cmd_data *cur_raid_cmd;
 
     /* now issue the start array command with "known to be zero" */
-    for (p_cur_raid_cmd = raid_cmd_head;
-         p_cur_raid_cmd != NULL; 
-         p_cur_raid_cmd = p_cur_raid_cmd->next)
+    for (cur_raid_cmd = raid_cmd_head;
+         cur_raid_cmd != NULL; 
+         cur_raid_cmd = cur_raid_cmd->next)
     {
-        if (p_cur_raid_cmd->do_cmd == 0)
+        if (cur_raid_cmd->do_cmd == 0)
             continue;
 
-        p_cur_ioa = p_cur_raid_cmd->p_ipr_ioa;
+        cur_ioa = cur_raid_cmd->ipr_ioa;
 
-        if (p_cur_ioa->num_raid_cmds > 0)
+        if (cur_ioa->num_raid_cmds > 0)
         {
             flush_stdscr();
 
             if (action == IPR_ADD_HOT_SPARE)
-                rc = ipr_add_hot_spare(p_cur_ioa->ioa.gen_name,
-                                       p_cur_ioa->p_qac_data);
+                rc = ipr_add_hot_spare(cur_ioa->ioa.gen_name,
+                                       cur_ioa->qac_data);
             else
-                rc = ipr_remove_hot_spare(p_cur_ioa->ioa.gen_name,
-                                          p_cur_ioa->p_qac_data);
+                rc = ipr_remove_hot_spare(cur_ioa->ioa.gen_name,
+                                          cur_ioa->qac_data);
 
             if (rc != 0)
             {
@@ -6266,8 +6309,8 @@ int battery_maint(i_container *i_con)
      */
 
     int rc;
-    struct ipr_reclaim_query_data *p_reclaim_buffer, *p_cur_reclaim_buffer;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_reclaim_query_data *reclaim_buffer, *cur_reclaim_buffer;
+    struct ipr_ioa *cur_ioa;
     int num_needed = 0;
     int ioa_num = 0;
     char *buffer = NULL;
@@ -6280,24 +6323,24 @@ int battery_maint(i_container *i_con)
 
     i_con = free_i_con(i_con);
 
-    p_reclaim_buffer = (struct ipr_reclaim_query_data*)malloc(sizeof(struct ipr_reclaim_query_data) * num_ioas);
+    reclaim_buffer = (struct ipr_reclaim_query_data*)malloc(sizeof(struct ipr_reclaim_query_data) * num_ioas);
 
-    for (p_cur_ioa = p_head_ipr_ioa, p_cur_reclaim_buffer = p_reclaim_buffer;
-         p_cur_ioa != NULL;
-         p_cur_ioa = p_cur_ioa->next, p_cur_reclaim_buffer++)
+    for (cur_ioa = ipr_ioa_head, cur_reclaim_buffer = reclaim_buffer;
+         cur_ioa != NULL;
+         cur_ioa = cur_ioa->next, cur_reclaim_buffer++)
     {
-        rc = ipr_reclaim_cache_store(p_cur_ioa,
+        rc = ipr_reclaim_cache_store(cur_ioa,
                                      IPR_RECLAIM_QUERY | IPR_RECLAIM_EXTENDED_INFO,
-                                     p_cur_reclaim_buffer);
+                                     cur_reclaim_buffer);
 
         if (rc != 0) {
-             p_cur_ioa->p_reclaim_data = NULL;
+             cur_ioa->reclaim_data = NULL;
             continue;
         }
 
-        p_cur_ioa->p_reclaim_data = p_cur_reclaim_buffer;
+        cur_ioa->reclaim_data = cur_reclaim_buffer;
 
-        if (p_cur_reclaim_buffer->rechargeable_battery_type)
+        if (cur_reclaim_buffer->rechargeable_battery_type)
         {
             num_needed++;
         }
@@ -6305,14 +6348,14 @@ int battery_maint(i_container *i_con)
 
     if (num_needed)
     {
-        p_cur_ioa = p_head_ipr_ioa;
+        cur_ioa = ipr_ioa_head;
 
-        while(p_cur_ioa)
+        while(cur_ioa)
         {
-            if ((p_cur_ioa->p_reclaim_data) &&
-                (p_cur_ioa->p_reclaim_data->rechargeable_battery_type))
+            if ((cur_ioa->reclaim_data) &&
+                (cur_ioa->reclaim_data->rechargeable_battery_type))
             {
-                buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa, 0);
+                buffer = print_device(&cur_ioa->ioa,buffer,"%1",cur_ioa, 0);
 
                 buf_size += 100;
                 out_str = realloc(out_str, buf_size);
@@ -6321,10 +6364,10 @@ int battery_maint(i_container *i_con)
                 memset(buffer, 0, strlen(buffer));
                 len = 0;
                 ioa_num++;
-                i_con = add_i_con(i_con, "\0",(char *)p_cur_ioa,list); 
+                i_con = add_i_con(i_con, "\0",(char *)cur_ioa,list); 
             }
-            p_cur_reclaim_buffer++;
-            p_cur_ioa = p_cur_ioa->next;
+            cur_reclaim_buffer++;
+            cur_ioa = cur_ioa->next;
         }
     }
     else
@@ -6348,32 +6391,32 @@ int battery_fork(i_container *i_con)
 {
   int rc = 0;
   int force_error = 0;
-  struct ipr_ioa *p_cur_ioa;
-  char *p_char;
+  struct ipr_ioa *cur_ioa;
+  char *input;
 
   i_container *temp_i_con;
   mvaddstr(0,0,"CONFIRM FORCE BATTERY ERROR FUNCTION CALLED");
 
   for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-      p_cur_ioa = (struct ipr_ioa *)temp_i_con->data;
-      if (p_cur_ioa != NULL)
+      cur_ioa = (struct ipr_ioa *)temp_i_con->data;
+      if (cur_ioa != NULL)
 	{
-	  p_char = temp_i_con->field_data;
+	  input = temp_i_con->field_data;
 
-	  if (strcmp(p_char, "2") == 0)
+	  if (strcmp(input, "2") == 0)
 	    {
 	      force_error++;
-	      p_cur_ioa->ioa.is_reclaim_cand = 1;
+	      cur_ioa->ioa.is_reclaim_cand = 1;
 	    }
-	  else if (strcmp(p_char, "5") == 0)
+	  else if (strcmp(input, "5") == 0)
 	    {
-	      rc = show_battery_info(temp_i_con);/*p_cur_ioa);*/
+	      rc = show_battery_info(temp_i_con);/*cur_ioa);*/
 	      return rc;
    	    }
 	  else
 	    {
-	      p_cur_ioa->ioa.is_reclaim_cand = 0;
+	      cur_ioa->ioa.is_reclaim_cand = 0;
 	    }
 	}
     }
@@ -6418,7 +6461,7 @@ int confirm_force_battery_error(i_container *i_con)
   */
 
   int rc;
-  struct ipr_ioa *p_cur_ioa;
+  struct ipr_ioa *cur_ioa;
   int ioa_num = 0;
   char *buffer = NULL;
 
@@ -6430,14 +6473,14 @@ int confirm_force_battery_error(i_container *i_con)
 
   rc = RC_SUCCESS;
 
-  p_cur_ioa = p_head_ipr_ioa;
+  cur_ioa = ipr_ioa_head;
 
-  while(p_cur_ioa)
+  while(cur_ioa)
     {
-      if ((p_cur_ioa->p_reclaim_data) &&
-	  (p_cur_ioa->ioa.is_reclaim_cand))
+      if ((cur_ioa->reclaim_data) &&
+	  (cur_ioa->ioa.is_reclaim_cand))
         {
-          buffer = print_device(&p_cur_ioa->ioa,buffer,"2",p_cur_ioa, 0);
+          buffer = print_device(&cur_ioa->ioa,buffer,"2",cur_ioa, 0);
 	  
 	  buf_size += 100;
 	  out_str = realloc(out_str, buf_size);
@@ -6447,7 +6490,7 @@ int confirm_force_battery_error(i_container *i_con)
 	  ioa_num++;
 	}
 
-      p_cur_ioa = p_cur_ioa->next;
+      cur_ioa = cur_ioa->next;
     }
 
   output->next = add_fn_out(output->next,1,out_str);
@@ -6463,7 +6506,7 @@ int confirm_force_battery_error(i_container *i_con)
 int force_battery_error(i_container *i_con)
 {
     int rc, reclaim_rc;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
 
     struct ipr_reclaim_query_data reclaim_buffer;
     struct screen_output *s_out;
@@ -6472,14 +6515,14 @@ int force_battery_error(i_container *i_con)
 
     reclaim_rc = rc = RC_SUCCESS;
 
-    p_cur_ioa = p_head_ipr_ioa; /* Scott's bug fix 1 */
+    cur_ioa = ipr_ioa_head; /* Scott's bug fix 1 */
 
-    while(p_cur_ioa)
+    while(cur_ioa)
     {
-        if ((p_cur_ioa->p_reclaim_data) &&
-            (p_cur_ioa->ioa.is_reclaim_cand))
+        if ((cur_ioa->reclaim_data) &&
+            (cur_ioa->ioa.is_reclaim_cand))
         {
-            rc = ipr_reclaim_cache_store(p_cur_ioa,
+            rc = ipr_reclaim_cache_store(cur_ioa,
                                          IPR_RECLAIM_FORCE_BATTERY_ERROR,
                                          &reclaim_buffer);
 
@@ -6494,12 +6537,12 @@ int force_battery_error(i_container *i_con)
                 /* "Attempting to force the selected battery packs into an
                  error state failed." */
                 syslog(LOG_ERR,
-                       "Battery Force Error to %s failed. %m"IPR_EOL,
-                       p_cur_ioa->ioa.gen_name);
+                       "Battery Force Error to %s failed. %m\n",
+                       cur_ioa->ioa.gen_name);
                 reclaim_rc = 43; 
             }
         }
-        p_cur_ioa = p_cur_ioa->next;
+        cur_ioa = cur_ioa->next;
     }
 
     if (reclaim_rc != RC_SUCCESS)
@@ -6535,10 +6578,10 @@ int show_battery_info(i_container *i_con)
     e=Exit         q=Cancel
   */
 
-  struct ipr_ioa *p_ioa = (struct ipr_ioa *) i_con->data;
+  struct ipr_ioa *ioa = (struct ipr_ioa *) i_con->data;
   int rc;
-  struct ipr_reclaim_query_data *p_reclaim_data =
-    p_ioa->p_reclaim_data;
+  struct ipr_reclaim_query_data *reclaim_data =
+    ioa->reclaim_data;
   char *buffer;
     
   buffer = malloc(100);
@@ -6546,20 +6589,20 @@ int show_battery_info(i_container *i_con)
   fn_out *output = init_output();
   mvaddstr(0,0,"SHOW BATTERY INFO FUNCTION CALLED");
 
-  output->next = add_fn_out(output->next,1,p_ioa->ioa.gen_name);
+  output->next = add_fn_out(output->next,1,ioa->ioa.gen_name);
     
   sprintf(buffer,"%-8s", "00000000"); /* FIXME */
   output->next = add_fn_out(output->next,2,buffer);
 
-  sprintf(buffer,"%X", p_ioa->ccin);
+  sprintf(buffer,"%X", ioa->ccin);
   output->next = add_fn_out(output->next,3,buffer);
 
-  output->next = add_fn_out(output->next,4,p_ioa->pci_address);
+  output->next = add_fn_out(output->next,4,ioa->pci_address);
   
-  sprintf(buffer,"%d", p_ioa->host_num);
+  sprintf(buffer,"%d", ioa->host_num);
   output->next = add_fn_out(output->next,6,buffer);
   
-  switch (p_reclaim_data->rechargeable_battery_type)
+  switch (reclaim_data->rechargeable_battery_type)
     {
     case IPR_BATTERY_TYPE_NICD:
       sprintf(buffer,catgets(catd,n_show_battery_info.text_set,4,"Nickel Cadmium (NiCd)"));
@@ -6577,7 +6620,7 @@ int show_battery_info(i_container *i_con)
 
   output->next = add_fn_out(output->next,7,buffer);
 	
-  switch (p_reclaim_data->rechargeable_battery_error_state)
+  switch (reclaim_data->rechargeable_battery_error_state)
     {
     case IPR_BATTERY_NO_ERROR_STATE:
       sprintf(buffer,catgets(catd,n_show_battery_info.text_set,8,"No battery warning"));
@@ -6595,16 +6638,16 @@ int show_battery_info(i_container *i_con)
     
   output->next = add_fn_out(output->next,8,buffer);
     
-  sprintf(buffer,"%d",p_reclaim_data->raw_power_on_time);
+  sprintf(buffer,"%d",reclaim_data->raw_power_on_time);
   output->next = add_fn_out(output->next,9,buffer);
 
-  sprintf(buffer,"%d",p_reclaim_data->adjusted_power_on_time);
+  sprintf(buffer,"%d",reclaim_data->adjusted_power_on_time);
   output->next = add_fn_out(output->next,10,buffer);
 
-  sprintf(buffer,"%d",p_reclaim_data->estimated_time_to_battery_warning);
+  sprintf(buffer,"%d",reclaim_data->estimated_time_to_battery_warning);
   output->next = add_fn_out(output->next,11,buffer);
 
-  sprintf(buffer,"%d",p_reclaim_data->estimated_time_to_battery_failure);
+  sprintf(buffer,"%d",reclaim_data->estimated_time_to_battery_failure);
   output->next = add_fn_out(output->next,12,buffer);
 
   s_out = screen_driver(&n_show_battery_info,output,i_con);
@@ -6634,12 +6677,12 @@ int bus_config(i_container *i_con)
      e=Exit   q=Cancel    f=PageDn   b=PageUp
      */
     int rc, config_num;
-    struct array_cmd_data *p_cur_raid_cmd;
+    struct array_cmd_data *cur_raid_cmd;
     char *buffer = NULL;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u8 ioctl_buffer[255];
-    struct ipr_mode_parm_hdr *p_mode_parm_header;
-    struct ipr_mode_page_28_header *p_modepage_28_header;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_mode_page_28_header *modepage_28_hdr;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
 
@@ -6654,25 +6697,25 @@ int bus_config(i_container *i_con)
 
     check_current_config(false);
 
-    for(p_cur_ioa = p_head_ipr_ioa;
-        p_cur_ioa != NULL;
-        p_cur_ioa = p_cur_ioa->next)
+    for(cur_ioa = ipr_ioa_head;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next)
     {
         /* mode sense page28 to focal point */
-        p_mode_parm_header = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-        rc = ipr_mode_sense(p_cur_ioa->ioa.gen_name, 0x28, p_mode_parm_header);
+        mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+        rc = ipr_mode_sense(cur_ioa->ioa.gen_name, 0x28, mode_parm_hdr);
 
         if (rc != 0)
             continue;
 
-        p_modepage_28_header = (struct ipr_mode_page_28_header *) (p_mode_parm_header + 1);
+        modepage_28_hdr = (struct ipr_mode_page_28_header *) (mode_parm_hdr + 1);
 
-        if (p_modepage_28_header->num_dev_entries == 0)
+        if (modepage_28_hdr->num_dev_entries == 0)
             continue;
 
-        i_con = add_i_con(i_con,"\0",(char *)p_cur_ioa,list);
+        i_con = add_i_con(i_con,"\0",(char *)cur_ioa,list);
 
-        buffer = print_device(&p_cur_ioa->ioa,buffer,"%1",p_cur_ioa, 0);
+        buffer = print_device(&cur_ioa->ioa,buffer,"%1",cur_ioa, 0);
 
         buf_size += 150;
         out_str = realloc(out_str, buf_size);
@@ -6699,12 +6742,12 @@ int bus_config(i_container *i_con)
     free(out_str);
     output = free_fn_out(output);
 
-    p_cur_raid_cmd = raid_cmd_head;
-    while(p_cur_raid_cmd)
+    cur_raid_cmd = raid_cmd_head;
+    while(cur_raid_cmd)
     {
-        p_cur_raid_cmd = p_cur_raid_cmd->next;
+        cur_raid_cmd = cur_raid_cmd->next;
         free(raid_cmd_head);
-        raid_cmd_head = p_cur_raid_cmd;
+        raid_cmd_head = cur_raid_cmd;
     }	
 
     return rc;
@@ -6734,13 +6777,13 @@ int change_bus_attr(i_container *i_con)
      e=Exit   q=Cancel
      */
 #define DSP_FIELD_START_ROW 9
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     int rc, j, i;
-    FORM *p_form;
-    FORM *p_fields_form;
-    FIELD **p_input_fields, *p_cur_field;
-    FIELD *p_title_fields[3];
-    WINDOW *p_field_pad;
+    FORM *form;
+    FORM *fields_form;
+    FIELD **input_fields, *cur_field;
+    FIELD *title_fields[3];
+    WINDOW *field_pad;
     int cur_field_index;
     char buffer[100];
     int input_field_index = 0;
@@ -6748,11 +6791,11 @@ int change_bus_attr(i_container *i_con)
     u8 ioctl_buffer0[255];
     u8 ioctl_buffer1[255];
     u8 ioctl_buffer2[255];
-    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-    struct ipr_page_28 *p_page_28_sense;
-    struct ipr_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_page_28 *page_28_sense;
+    struct ipr_page_28 *page_28_cur, *page_28_chg, *page_28_dflt;
     struct ipr_page_28 page_28_ipr;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct scsi_dev_data *scsi_dev_data;
     char scsi_id_str[5][16];
     char max_xfer_rate_str[5][16];
     int  ch;
@@ -6764,13 +6807,13 @@ int change_bus_attr(i_container *i_con)
     int is_reset_req;
     i_container *temp_i_con;
     int found = 0;
-    char *p_char;
+    char *input;
     int length;
-    int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
-                      struct ipr_page_28 *p_page_28_cur,
-                      struct ipr_page_28 *p_page_28_chg,
-                      struct ipr_page_28 *p_page_28_dflt,
-                      struct ipr_page_28 *p_page_28_ipr,
+    int bus_attr_menu(struct ipr_ioa *cur_ioa,
+                      struct ipr_page_28 *page_28_cur,
+                      struct ipr_page_28 *page_28_chg,
+                      struct ipr_page_28 *page_28_dflt,
+                      struct ipr_page_28 *page_28_ipr,
                       int cur_field_index,
                       int offset);
 
@@ -6787,11 +6830,11 @@ int change_bus_attr(i_container *i_con)
 
     for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
-        p_cur_ioa = (struct ipr_ioa *)temp_i_con->data;
-        if (p_cur_ioa != NULL)
+        cur_ioa = (struct ipr_ioa *)temp_i_con->data;
+        if (cur_ioa != NULL)
         {
-            p_char = temp_i_con->field_data;
-            if (strcmp(p_char, "1") == 0)
+            input = temp_i_con->field_data;
+            if (strcmp(input, "1") == 0)
             {
                 found = 1;
                 break;
@@ -6811,191 +6854,193 @@ int change_bus_attr(i_container *i_con)
     memset(ioctl_buffer2,0,sizeof(ioctl_buffer2));
 
     /* mode sense page28 to get current parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer0;
-    rc = ipr_mode_sense(p_cur_ioa->ioa.gen_name, 0x28, p_mode_parm_hdr);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer0;
+    rc = ipr_mode_sense(cur_ioa->ioa.gen_name, 0x28, mode_parm_hdr);
 
     if (rc != 0)
         return 46 | EXIT_FLAG; /* "Change SCSI Bus configurations failed" */	
 
-    p_page_28_sense = (struct ipr_page_28 *)p_mode_parm_hdr;
-    p_page_28_cur = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    page_28_sense = (struct ipr_page_28 *)mode_parm_hdr;
+    page_28_cur = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer1;
-    p_page_28_chg = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer1;
+    page_28_chg = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
-    p_page_28_dflt = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
+    page_28_dflt = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* determine changable and default values */
     for (j = 0;
-         j < p_page_28_cur->page_hdr.num_dev_entries;
+         j < page_28_cur->page_hdr.num_dev_entries;
          j++)
     {
-        p_page_28_chg->attr[j].qas_capability = 0;
-        p_page_28_chg->attr[j].scsi_id = 0; //FIXME!!! need to allow dart (by
+        page_28_chg->attr[j].qas_capability = 0;
+        page_28_chg->attr[j].scsi_id = 0; //FIXME!!! need to allow dart (by
                                             // vend/prod & subsystem id)
-        p_page_28_chg->attr[j].bus_width = 1;
-        p_page_28_chg->attr[j].max_xfer_rate = 1;
+        page_28_chg->attr[j].bus_width = 1;
+        page_28_chg->attr[j].max_xfer_rate = 1;
 
-        p_page_28_dflt->attr[j].qas_capability = 0;
-        p_page_28_dflt->attr[j].scsi_id = p_page_28_cur->attr[j].scsi_id;
-        p_page_28_dflt->attr[j].bus_width = 16;
-        p_page_28_dflt->attr[j].max_xfer_rate = 320;  //FIXME!!! check backplane
+        page_28_dflt->attr[j].qas_capability = 0;
+        page_28_dflt->attr[j].scsi_id = page_28_cur->attr[j].scsi_id;
+        page_28_dflt->attr[j].bus_width = 16;
+        page_28_dflt->attr[j].max_xfer_rate = 320;  //FIXME!!! check backplane
     }
 
     /* Title */
-    p_title_fields[0] =
+    title_fields[0] =
         new_field(1, max_x - start_x,   /* new field size */ 
                   0, 0,       /* upper left corner */
                   0,           /* number of offscreen rows */
                   0);               /* number of working buffers */
 
-    p_title_fields[1] =
+    title_fields[1] =
         new_field(1, 1,   /* new field size */ 
                   1, 0,       /* upper left corner */
                   0,           /* number of offscreen rows */
                   0);               /* number of working buffers */
 
-    p_title_fields[2] = NULL;
+    title_fields[2] = NULL;
 
-    set_field_just(p_title_fields[0], JUSTIFY_CENTER);
+    set_field_just(title_fields[0], JUSTIFY_CENTER);
 
-    set_field_buffer(p_title_fields[0],        /* field to alter */
+    set_field_buffer(title_fields[0],        /* field to alter */
                      0,          /* number of buffer to alter */
                      "Change SCSI Bus Configuration");  /* string value to set     */
 
-    field_opts_off(p_title_fields[0], O_ACTIVE);
+    field_opts_off(title_fields[0], O_ACTIVE);
 
-    p_form = new_form(p_title_fields);
+    form = new_form(title_fields);
 
-    p_input_fields = malloc(sizeof(FIELD *));
+    input_fields = malloc(sizeof(FIELD *));
 
     /* Loop for each device bus entry */
     for (j = 0,
          num_lines = 0;
-         j < p_page_28_cur->page_hdr.num_dev_entries;
+         j < page_28_cur->page_hdr.num_dev_entries;
          j++)
     {
-        p_input_fields = realloc(p_input_fields,
+        input_fields = realloc(input_fields,
                                  sizeof(FIELD *) * (input_field_index + 1));
-        p_input_fields[input_field_index] =
+        input_fields[input_field_index] =
             new_field(1, 6,
                       num_lines, 2,
                       0, 0);
 
-        field_opts_off(p_input_fields[input_field_index], O_ACTIVE);
+        field_opts_off(input_fields[input_field_index], O_ACTIVE);
         memset(buffer, 0, 100);
         sprintf(buffer,"BUS %d",
-                p_page_28_cur->attr[j].res_addr.bus);
+                page_28_cur->attr[j].res_addr.bus);
 
-        set_field_buffer(p_input_fields[input_field_index++],
+        set_field_buffer(input_fields[input_field_index++],
                          0,
                          buffer);
 
         num_lines++;
-        if (p_page_28_chg->attr[j].qas_capability)
+        if (page_28_chg->attr[j].qas_capability)
         {
             /* options are ENABLED(10)/DISABLED(01) */
-            p_input_fields = realloc(p_input_fields,
+            input_fields = realloc(input_fields,
                                      sizeof(FIELD *) * (input_field_index + 2));
-            p_input_fields[input_field_index] =
+            input_fields[input_field_index] =
                 new_field(1, 38,
                           num_lines, 4,
                           0, 0);
 
-            field_opts_off(p_input_fields[input_field_index], O_ACTIVE);
-            set_field_buffer(p_input_fields[input_field_index++],
+            field_opts_off(input_fields[input_field_index], O_ACTIVE);
+            set_field_buffer(input_fields[input_field_index++],
                              0,
                              "QAS Capability . . . . . . . . . . . :");
 
-            p_input_fields[input_field_index++] =
+            input_fields[input_field_index++] =
                 new_field(1, 9,   /* new field size */ 
                           num_lines, 44,       /*  */
                           0,           /* number of offscreen rows */
                           0);          /* number of working buffers */
             num_lines++;
         }
-        if (p_page_28_chg->attr[j].scsi_id)
+        if (page_28_chg->attr[j].scsi_id)
         {
             /* options are based on current scsi ids currently in use
              value must be 15 or less */
-            p_input_fields = realloc(p_input_fields,
+            input_fields = realloc(input_fields,
                                      sizeof(FIELD *) * (input_field_index + 2));
-            p_input_fields[input_field_index] =
+            input_fields[input_field_index] =
                 new_field(1, 38,
                           num_lines, 4,
                           0, 0);
 
-            field_opts_off(p_input_fields[input_field_index], O_ACTIVE);
-            set_field_buffer(p_input_fields[input_field_index++],
+            field_opts_off(input_fields[input_field_index], O_ACTIVE);
+            set_field_buffer(input_fields[input_field_index++],
                              0,
                              "Host SCSI ID . . . . . . . . . . . . :");
 
-            p_input_fields[input_field_index++] =
+            input_fields[input_field_index++] =
                 new_field(1, 3,   /* new field size */ 
                           num_lines, 44,       /*  */
                           0,           /* number of offscreen rows */
                           0);          /* number of working buffers */
             num_lines++;
         }
-        if (p_page_28_chg->attr[j].bus_width)
+        if (page_28_chg->attr[j].bus_width)
         {
             /* check if 8 bit bus is allowable with current configuration before
              enabling option */
             for (i=0;
-                 i < p_cur_ioa->num_devices;
+                 i < cur_ioa->num_devices;
                  i++)
             {
-                p_scsi_dev_data = p_cur_ioa->dev[i].p_scsi_dev_data;
-                if ((p_scsi_dev_data->id & 0xF8) &&
-                    (p_page_28_cur->attr[j].res_addr.bus ==  p_scsi_dev_data->channel))
+                scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+
+                if ((scsi_dev_data) &&
+                    (scsi_dev_data->id & 0xF8) &&
+                    (page_28_cur->attr[j].res_addr.bus ==  scsi_dev_data->channel))
                 {
-                    p_page_28_chg->attr[j].bus_width = 0;
+                    page_28_chg->attr[j].bus_width = 0;
                     break;
                 }
             }
         }
-        if (p_page_28_chg->attr[j].bus_width)
+        if (page_28_chg->attr[j].bus_width)
         {
             /* options for "Wide Enabled" (bus width), No(8) or Yes(16) bits wide */
-            p_input_fields = realloc(p_input_fields,
+            input_fields = realloc(input_fields,
                                      sizeof(FIELD *) * (input_field_index + 2));
-            p_input_fields[input_field_index] =
+            input_fields[input_field_index] =
                 new_field(1, 38,
                           num_lines, 4,
                           0, 0);
 
-            field_opts_off(p_input_fields[input_field_index], O_ACTIVE);
-            set_field_buffer(p_input_fields[input_field_index++],
+            field_opts_off(input_fields[input_field_index], O_ACTIVE);
+            set_field_buffer(input_fields[input_field_index++],
                              0,
                              "Wide Enabled . . . . . . . . . . . . :");
 
-            p_input_fields[input_field_index++] =
+            input_fields[input_field_index++] =
                 new_field(1, 4,   /* new field size */ 
                           num_lines, 44,       /*  */
                           0,           /* number of offscreen rows */
                           0);          /* number of working buffers */
             num_lines++;
         }
-        if (p_page_28_chg->attr[j].max_xfer_rate)
+        if (page_28_chg->attr[j].max_xfer_rate)
         {
             /* options are 5, 10, 20, 40, 80, 160, 320 */
-            p_input_fields = realloc(p_input_fields,
+            input_fields = realloc(input_fields,
                                      sizeof(FIELD *) * (input_field_index + 2));
-            p_input_fields[input_field_index] =
+            input_fields[input_field_index] =
                 new_field(1, 38,
                           num_lines, 4,
                           0, 0);
 
-            field_opts_off(p_input_fields[input_field_index], O_ACTIVE);
-            set_field_buffer(p_input_fields[input_field_index++],
+            field_opts_off(input_fields[input_field_index], O_ACTIVE);
+            set_field_buffer(input_fields[input_field_index++],
                              0,
                              "Maximum Bus Throughput . . . . . . . :");
 
-            p_input_fields[input_field_index++] =
+            input_fields[input_field_index++] =
                 new_field(1, 9,   /* new field size */ 
                           num_lines, 44,       /*  */
                           0,           /* number of offscreen rows */
@@ -7004,29 +7049,29 @@ int change_bus_attr(i_container *i_con)
         }
     }
 
-    p_input_fields[input_field_index] = NULL;
+    input_fields[input_field_index] = NULL;
 
-    p_fields_form = new_form(p_input_fields);
-    scale_form(p_fields_form, &form_rows, &form_cols);
-    p_field_pad = newpad(form_rows, form_cols);
-    set_form_win(p_fields_form, p_field_pad);
-    set_form_sub(p_fields_form, p_field_pad); /*???*/
-    set_current_field(p_fields_form, p_input_fields[0]);
+    fields_form = new_form(input_fields);
+    scale_form(fields_form, &form_rows, &form_cols);
+    field_pad = newpad(form_rows, form_cols);
+    set_form_win(fields_form, field_pad);
+    set_form_sub(fields_form, field_pad); /*???*/
+    set_current_field(fields_form, input_fields[0]);
     for (i = 0; i < input_field_index; i++)
     {
-        field_opts_off(p_input_fields[i], O_EDIT);
+        field_opts_off(input_fields[i], O_EDIT);
     }
 
-    form_opts_off(p_fields_form, O_BS_OVERLOAD);
+    form_opts_off(fields_form, O_BS_OVERLOAD);
 
     flush_stdscr();
     clear();
 
-    set_form_win(p_form,stdscr);
-    set_form_sub(p_form,stdscr);
+    set_form_win(form,stdscr);
+    set_form_sub(form,stdscr);
 
-    post_form(p_form);
-    post_form(p_fields_form);
+    post_form(form);
+    post_form(fields_form);
 
     field_start_row = DSP_FIELD_START_ROW;
     field_end_row = max_y - 4;
@@ -7048,19 +7093,19 @@ int change_bus_attr(i_container *i_con)
 
     memset(buffer, 0, 100);
     sprintf(buffer,"%s",
-            p_cur_ioa->ioa.gen_name);
+            cur_ioa->ioa.gen_name);
     mvaddstr(8, 0, buffer);
 
     refresh();
     pad_start_row = 0;
-    pnoutrefresh(p_field_pad,
+    pnoutrefresh(field_pad,
                  pad_start_row, 0,
                  field_start_row, 0,
                  field_end_row,
                  max_x);
     doupdate();
 
-    form_driver(p_fields_form,
+    form_driver(fields_form,
                 REQ_FIRST_FIELD);
 
     while(1)
@@ -7069,116 +7114,116 @@ int change_bus_attr(i_container *i_con)
         input_field_index = 0;
         for (j = 0,
              num_lines = 0;
-             j < p_page_28_cur->page_hdr.num_dev_entries;
+             j < page_28_cur->page_hdr.num_dev_entries;
              j++)
         {
             num_lines++;
             input_field_index++;
-            if (p_page_28_chg->attr[j].qas_capability)
+            if (page_28_chg->attr[j].qas_capability)
             {
                 input_field_index++;
                 if ((num_lines >= pad_start_row) &&
                     (num_lines < (pad_start_row + field_num_rows)))
                 {
-                    field_opts_on(p_input_fields[input_field_index],
+                    field_opts_on(input_fields[input_field_index],
                                   O_ACTIVE);
                 }
                 else
                 {
-                    field_opts_off(p_input_fields[input_field_index],
+                    field_opts_off(input_fields[input_field_index],
                                    O_ACTIVE);
                 }
-                if (p_page_28_cur->attr[j].qas_capability ==
+                if (page_28_cur->attr[j].qas_capability ==
                     IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL)
                 {
                     if (page_28_ipr.attr[j].qas_capability)
-                        set_field_buffer(p_input_fields[input_field_index++],
+                        set_field_buffer(input_fields[input_field_index++],
                                          0,
                                          "Disable");
                     else
-                        set_field_buffer(p_input_fields[input_field_index++],
+                        set_field_buffer(input_fields[input_field_index++],
                                          0,
                                          "Disabled");
                 }
                 else
                 {
                     if (page_28_ipr.attr[j].qas_capability)
-                        set_field_buffer(p_input_fields[input_field_index++],
+                        set_field_buffer(input_fields[input_field_index++],
                                          0,
                                          "Enable");
                     else
-                        set_field_buffer(p_input_fields[input_field_index++],
+                        set_field_buffer(input_fields[input_field_index++],
                                          0,
                                          "Enabled");
                 }
                 num_lines++;
             }
-            if (p_page_28_chg->attr[j].scsi_id)
+            if (page_28_chg->attr[j].scsi_id)
             {
                 input_field_index++;
                 if ((num_lines >= pad_start_row) &&
                     (num_lines < (pad_start_row + field_num_rows)))
                 {
-                    field_opts_on(p_input_fields[input_field_index],
+                    field_opts_on(input_fields[input_field_index],
                                   O_ACTIVE);
                 }
                 else
                 {
-                    field_opts_off(p_input_fields[input_field_index],
+                    field_opts_off(input_fields[input_field_index],
                                    O_ACTIVE);
                 }
-                sprintf(scsi_id_str[j],"%d",p_page_28_cur->attr[j].scsi_id);
-                set_field_buffer(p_input_fields[input_field_index++],
+                sprintf(scsi_id_str[j],"%d",page_28_cur->attr[j].scsi_id);
+                set_field_buffer(input_fields[input_field_index++],
                                  0,
                                  scsi_id_str[j]);
                 num_lines++;
             }
-            if (p_page_28_chg->attr[j].bus_width)
+            if (page_28_chg->attr[j].bus_width)
             {
                 input_field_index++;
                 if ((num_lines >= pad_start_row) &&
                     (num_lines < (pad_start_row + field_num_rows)))
                 {
-                    field_opts_on(p_input_fields[input_field_index],
+                    field_opts_on(input_fields[input_field_index],
                                   O_ACTIVE);
                 }
                 else
                 {
-                    field_opts_off(p_input_fields[input_field_index],
+                    field_opts_off(input_fields[input_field_index],
                                    O_ACTIVE);
                 }
-                if (p_page_28_cur->attr[j].bus_width == 16)
+                if (page_28_cur->attr[j].bus_width == 16)
                 {
-                    set_field_buffer(p_input_fields[input_field_index++],
+                    set_field_buffer(input_fields[input_field_index++],
                                      0,
                                      "Yes");
                 }
                 else
                 {
-                    set_field_buffer(p_input_fields[input_field_index++],
+                    set_field_buffer(input_fields[input_field_index++],
                                      0,
                                      "No");
                 }
                 num_lines++;
             }
-            if (p_page_28_chg->attr[j].max_xfer_rate)
+            if (page_28_chg->attr[j].max_xfer_rate)
             {
                 input_field_index++;
                 if ((num_lines >= pad_start_row) &&
                     (num_lines < (pad_start_row + field_num_rows)))
                 {
-                    field_opts_on(p_input_fields[input_field_index],
+                    field_opts_on(input_fields[input_field_index],
                                   O_ACTIVE);
                 }
                 else
                 {
-                    field_opts_off(p_input_fields[input_field_index],
+                    field_opts_off(input_fields[input_field_index],
                                    O_ACTIVE);
                 }
                 sprintf(max_xfer_rate_str[j],"%d MB/s",
-                        (iprtoh32(p_page_28_cur->attr[j].max_xfer_rate) *
-                         p_page_28_cur->attr[j].bus_width)/(10 * 8));
-                set_field_buffer(p_input_fields[input_field_index++],
+                        (iprtoh32(page_28_cur->attr[j].max_xfer_rate) *
+                         page_28_cur->attr[j].bus_width)/(10 * 8));
+                set_field_buffer(input_fields[input_field_index++],
                                  0,
                                  max_xfer_rate_str[j]);
                 num_lines++;
@@ -7187,13 +7232,13 @@ int change_bus_attr(i_container *i_con)
 
         if (form_adjust)
         {
-            form_driver(p_fields_form,
+            form_driver(fields_form,
                         REQ_NEXT_FIELD);
             form_adjust = 0;
             refresh();
         }
 
-        prefresh(p_field_pad,
+        prefresh(field_pad,
                  pad_start_row, 0,
                  field_start_row, 0,
                  field_end_row,
@@ -7215,13 +7260,13 @@ int change_bus_attr(i_container *i_con)
         {
             if (!confirm)
             {
-                p_cur_field = current_field(p_fields_form);
-                cur_field_index = field_index(p_cur_field);
+                cur_field = current_field(fields_form);
+                cur_field_index = field_index(cur_field);
 
-                rc = bus_attr_menu(p_cur_ioa,
-                                   p_page_28_cur,
-                                   p_page_28_chg,
-                                   p_page_28_dflt,
+                rc = bus_attr_menu(cur_ioa,
+                                   page_28_cur,
+                                   page_28_chg,
+                                   page_28_dflt,
                                    &page_28_ipr,
                                    cur_field_index,
                                    pad_start_row);
@@ -7232,7 +7277,7 @@ int change_bus_attr(i_container *i_con)
             else
             {
                 clear();
-                set_field_buffer(p_title_fields[0],
+                set_field_buffer(title_fields[0],
                                  0,
                                  "Processing Change SCSI Bus Configuration");
                 mvaddstr(max_y - 2, 1, "Please wait for next screen");
@@ -7240,23 +7285,23 @@ int change_bus_attr(i_container *i_con)
                 refresh();
 
                 /* issue mode select and reset if necessary */
-                p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)p_page_28_sense; 
-                length = p_mode_parm_hdr->length + 1;
-                p_mode_parm_hdr->length = 0;
+                mode_parm_hdr = (struct ipr_mode_parm_hdr *)page_28_sense; 
+                length = mode_parm_hdr->length + 1;
+                mode_parm_hdr->length = 0;
 
-                rc = ipr_mode_select(p_cur_ioa->ioa.gen_name, p_page_28_sense, length);
+                rc = ipr_mode_select(cur_ioa->ioa.gen_name, page_28_sense, length);
 
                 if (rc != 0)
                     return 46 | EXIT_FLAG; /* "Change SCSI Bus configurations failed" */
 
-                ipr_save_page_28(p_cur_ioa,
-                                 p_page_28_cur,
-                                 p_page_28_chg,
+                ipr_save_page_28(cur_ioa,
+                                 page_28_cur,
+                                 page_28_chg,
                                  &page_28_ipr);
 
                 if (is_reset_req)
                 {
-                    ipr_reset_adapter(p_cur_ioa);
+                    ipr_reset_adapter(cur_ioa);
                 }
 
                 rc = 45 | EXIT_FLAG;
@@ -7272,14 +7317,14 @@ int change_bus_attr(i_container *i_con)
                 clear();
                 for (j = 0,
                      is_reset_req = 0;
-                     j < p_page_28_cur->page_hdr.num_dev_entries;
+                     j < page_28_cur->page_hdr.num_dev_entries;
                      j++)
                 {
                     if (page_28_ipr.attr[j].scsi_id)
                         is_reset_req = 1;
                 }
 
-                set_field_buffer(p_title_fields[0],
+                set_field_buffer(title_fields[0],
                                  0,
                                  "Confirm Change SCSI Bus Configuration");
                 mvaddstr(2, 0, "Confirming this action will result in the following configuration to");
@@ -7299,7 +7344,7 @@ int change_bus_attr(i_container *i_con)
 
                 memset(buffer, 0, 100);
                 sprintf(buffer,"%s",
-                        p_cur_ioa->ioa.gen_name);
+                        cur_ioa->ioa.gen_name);
                 mvaddstr(8, 0, buffer);
 
                 doupdate();
@@ -7343,17 +7388,17 @@ int change_bus_attr(i_container *i_con)
             }
         }
         else if (ch == '\t')
-            form_driver(p_fields_form, REQ_NEXT_FIELD);
+            form_driver(fields_form, REQ_NEXT_FIELD);
         else if (ch == KEY_UP)
-            form_driver(p_fields_form, REQ_PREV_FIELD);
+            form_driver(fields_form, REQ_PREV_FIELD);
         else if (ch == KEY_DOWN)
-            form_driver(p_fields_form, REQ_NEXT_FIELD);
+            form_driver(fields_form, REQ_NEXT_FIELD);
     }
 
     leave:
 
-        free_form(p_form);
-    free_screen(NULL, NULL, p_input_fields);
+        free_form(form);
+    free_screen(NULL, NULL, input_fields);
 
     flush_stdscr();
     return rc;
@@ -7393,15 +7438,15 @@ int init_device(i_container *i_con)
      */
     int rc, j;
     struct ipr_query_res_state res_state;
-    struct scsi_dev_data *p_scsi_dev_data;
-    struct ipr_device_record *p_device_record;
+    struct scsi_dev_data *scsi_dev_data;
+    struct ipr_dev_record *device_record;
     int can_init;
     int dev_type;
     char *buffer = NULL;
     int num_devs = 0;
-    struct ipr_ioa *p_cur_ioa;
+    struct ipr_ioa *cur_ioa;
     u32 len=0;
-    struct devs_to_init_t *p_cur_dev_to_init;
+    struct devs_to_init_t *cur_dev_init;
     int buf_size = 150;
     char *out_str = calloc(buf_size,sizeof(char));
     struct screen_output *s_out;
@@ -7414,54 +7459,55 @@ int init_device(i_container *i_con)
 
     check_current_config(false);
 
-    for (p_cur_ioa = p_head_ipr_ioa;
-         p_cur_ioa != NULL;
-         p_cur_ioa = p_cur_ioa->next)
+    for (cur_ioa = ipr_ioa_head;
+         cur_ioa != NULL;
+         cur_ioa = cur_ioa->next)
     {
-        for (j = 0; j < p_cur_ioa->num_devices; j++)
+        for (j = 0; j < cur_ioa->num_devices; j++)
         {
             can_init = 1;
-            p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
+            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
             /* If not a DASD, disallow format */
-            if ((p_scsi_dev_data->type != IPR_TYPE_DISK) ||
-                (ipr_is_hot_spare(&p_cur_ioa->dev[j])))
+            if ((scsi_dev_data == NULL) ||
+                (scsi_dev_data->type != IPR_TYPE_DISK) ||
+                (ipr_is_hot_spare(&cur_ioa->dev[j])))
                 continue;
 
             /* If Advanced Function DASD */
-            if (ipr_is_af_dasd_device(&p_cur_ioa->dev[j]))
+            if (ipr_is_af_dasd_device(&cur_ioa->dev[j]))
             {
                 dev_type = IPR_AF_DASD_DEVICE;
 
-                p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
-                if (p_device_record &&
-                    (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE2_RECORD))
+                device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
+                if (device_record &&
+                    (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD))
                 {
                     /* We allow the user to format the drive if nobody is using it */
-                    if (p_cur_ioa->dev[j].p_scsi_dev_data->opens != 0)
+                    if (cur_ioa->dev[j].scsi_dev_data->opens != 0)
                     {
                         syslog(LOG_ERR,
-                               "Format not allowed to %s, device in use"IPR_EOL,
-                               p_cur_ioa->dev[j].gen_name); 
+                               "Format not allowed to %s, device in use\n",
+                               cur_ioa->dev[j].gen_name); 
                         continue;
                     }
 
-                    if (ipr_is_array_member(&p_cur_ioa->dev[j]))
+                    if (ipr_is_array_member(&cur_ioa->dev[j]))
                     {
-                        if (p_device_record->no_cfgte_vol)
+                        if (device_record->no_cfgte_vol)
                             can_init = 1;
                         else
                             can_init = 0;
                     }
                     else
                     {
-                        can_init = is_format_allowed(&p_cur_ioa->dev[j]);
+                        can_init = is_format_allowed(&cur_ioa->dev[j]);
                     }
                 }
                 else
                 {
                     /* Do a query resource state */
-                    rc = ipr_query_resource_state(p_cur_ioa->dev[j].gen_name,
+                    rc = ipr_query_resource_state(cur_ioa->dev[j].gen_name,
                                                   &res_state);
 
                     if (rc != 0)
@@ -7472,13 +7518,13 @@ int init_device(i_container *i_con)
                      concurrently it will be read write protected, but the system may still
                      have a use count for it. We need to allow the format to get the device
                      into a state where the system can use it */
-                    if ((p_cur_ioa->dev[j].p_scsi_dev_data->opens != 0) && (!res_state.read_write_prot))
+                    if ((cur_ioa->dev[j].scsi_dev_data->opens != 0) && (!res_state.read_write_prot))
                     {
-                        syslog(LOG_ERR, "Format not allowed to %s, device in use"IPR_EOL, p_cur_ioa->dev[j].gen_name); 
+                        syslog(LOG_ERR, "Format not allowed to %s, device in use\n", cur_ioa->dev[j].gen_name); 
                         continue;
                     }
 
-                    if (ipr_is_array_member(&p_cur_ioa->dev[j]))
+                    if (ipr_is_array_member(&cur_ioa->dev[j]))
                     {
                         /* If the device is an array member, only allow a format to it */
                         /* if it is read/write protected by the IOA */
@@ -7494,23 +7540,23 @@ int init_device(i_container *i_con)
                     }
                     else
                     {
-                        can_init = is_format_allowed(&p_cur_ioa->dev[j]);
+                        can_init = is_format_allowed(&cur_ioa->dev[j]);
                     }
                 }
             }
-            else if (p_scsi_dev_data->type == IPR_TYPE_DISK)
+            else if (scsi_dev_data->type == IPR_TYPE_DISK)
             {
                 /* We allow the user to format the drive if nobody is using it */
-                if (p_cur_ioa->dev[j].p_scsi_dev_data->opens != 0)
+                if (cur_ioa->dev[j].scsi_dev_data->opens != 0)
                 {
                     syslog(LOG_ERR,
-                           "Format not allowed to %s, device in use"IPR_EOL,
-                           p_cur_ioa->dev[j].gen_name); 
+                           "Format not allowed to %s, device in use\n",
+                           cur_ioa->dev[j].gen_name); 
                     continue;
                 }
 
                 dev_type = IPR_JBOD_DASD_DEVICE;
-                can_init = is_format_allowed(&p_cur_ioa->dev[j]);
+                can_init = is_format_allowed(&cur_ioa->dev[j]);
             }
             else
                 continue;
@@ -7527,13 +7573,13 @@ int init_device(i_container *i_con)
 
                 memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
 
-                dev_init_tail->p_ioa = p_cur_ioa;
+                dev_init_tail->ioa = cur_ioa;
                 dev_init_tail->dev_type = dev_type;
-                dev_init_tail->p_ipr_device = &p_cur_ioa->dev[j];
+                dev_init_tail->ipr_dev = &cur_ioa->dev[j];
                 dev_init_tail->change_size = 0;
 
-                buffer = print_device(&p_cur_ioa->dev[j], buffer,"%1",p_cur_ioa, 0);
-                i_con = add_i_con(i_con,"\0",(char *)&p_cur_ioa->dev[j],list);
+                buffer = print_device(&cur_ioa->dev[j], buffer,"%1",cur_ioa, 0);
+                i_con = add_i_con(i_con,"\0",(char *)&cur_ioa->dev[j],list);
 
                 buf_size += 150*sizeof(char);
                 out_str = realloc(out_str, buf_size);
@@ -7560,12 +7606,12 @@ int init_device(i_container *i_con)
     rc = s_out->rc;
     free(s_out);
 
-    p_cur_dev_to_init = dev_init_head;
-    while(p_cur_dev_to_init)
+    cur_dev_init = dev_init_head;
+    while(cur_dev_init)
     {
-        p_cur_dev_to_init = p_cur_dev_to_init->next;
+        cur_dev_init = cur_dev_init->next;
         free(dev_init_head);
-        dev_init_head = p_cur_dev_to_init;
+        dev_init_head = cur_dev_init;
     }
 
     free(out_str);
@@ -7613,9 +7659,9 @@ int confirm_init_device(i_container *i_con)
 
   */
   int found;
-  char  *p_char;
+  char  *input;
   char *buffer = NULL;
-  struct devs_to_init_t *p_cur_dev_to_init;
+  struct devs_to_init_t *cur_dev_init;
   u32 num_devs = 0;
   int rc = RC_SUCCESS;
   i_container *temp_i_con, *i_num_devs;
@@ -7628,21 +7674,21 @@ int confirm_init_device(i_container *i_con)
   
   temp_i_con = copy_i_con(i_con);
 
-  p_cur_dev_to_init = dev_init_head;
+  cur_dev_init = dev_init_head;
   
   for (; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
       if (temp_i_con->data != NULL)
 	{
-	  p_char = strip_trailing_whitespace(temp_i_con->field_data);
+	  input = strip_trailing_whitespace(temp_i_con->field_data);
 	  
-	  if (strcmp(p_char, "1") == 0)
+	  if (strcmp(input, "1") == 0)
 	    {
 	      found = 1;
-	      p_cur_dev_to_init->do_init = 1;
+	      cur_dev_init->do_init = 1;
 	    }
 	  
-	  p_cur_dev_to_init = p_cur_dev_to_init->next;
+	  cur_dev_init = cur_dev_init->next;
 	}
     }
 
@@ -7652,13 +7698,13 @@ int confirm_init_device(i_container *i_con)
       return INVALID_OPTION_STATUS;
     }
 
-  p_cur_dev_to_init = dev_init_head;
+  cur_dev_init = dev_init_head;
 
-  while(p_cur_dev_to_init)
+  while(cur_dev_init)
     {
-      if (p_cur_dev_to_init->do_init)
+      if (cur_dev_init->do_init)
         {
-          buffer = print_device(p_cur_dev_to_init->p_ipr_device,buffer,"1",p_cur_dev_to_init->p_ioa, 0);
+          buffer = print_device(cur_dev_init->ipr_dev,buffer,"1",cur_dev_init->ioa, 0);
 	  	  
 	  buf_size += 150*sizeof(char);
 	  out_str = realloc(out_str, buf_size);
@@ -7667,7 +7713,7 @@ int confirm_init_device(i_container *i_con)
 	  memset(buffer, 0, strlen(buffer));
 	  num_devs++;
         }
-      p_cur_dev_to_init = p_cur_dev_to_init->next;
+      cur_dev_init = cur_dev_init->next;
     }
 
   /*  i_num_devs = free_i_con(i_num_devs);*/
@@ -7682,11 +7728,11 @@ int confirm_init_device(i_container *i_con)
   output = free_fn_out(output);
   return rc;
 }
-int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
-                  struct ipr_page_28 *p_page_28_cur,  
-                  struct ipr_page_28 *p_page_28_chg,
-                  struct ipr_page_28 *p_page_28_dflt,
-                  struct ipr_page_28 *p_page_28_ipr,
+int bus_attr_menu(struct ipr_ioa *cur_ioa,
+                  struct ipr_page_28 *page_28_cur,  
+                  struct ipr_page_28 *page_28_chg,
+                  struct ipr_page_28 *page_28_dflt,
+                  struct ipr_page_28 *page_28_ipr,
                   int cur_field_index,
                   int offset)
 {
@@ -7696,7 +7742,7 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
     int num_menu_items;
     int menu_index;
     ITEM **menu_item = NULL;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct scsi_dev_data *scsi_dev_data;
     int *userptr;
     int *retptr;
     int rc = RC_SUCCESS;
@@ -7705,7 +7751,7 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
     input_field_index = 1;
     start_row = DSP_FIELD_START_ROW - offset;
     for (j = 0;
-         j < p_page_28_cur->page_hdr.num_dev_entries;
+         j < page_28_cur->page_hdr.num_dev_entries;
          j++)
     {
         /* start_row represents the row in which the top most
@@ -7713,7 +7759,7 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
          same line as the field in which the menu is opened for*/
         start_row++;
         input_field_index += 1;
-        if ((p_page_28_chg->attr[j].qas_capability) &&
+        if ((page_28_chg->attr[j].qas_capability) &&
             (input_field_index == cur_field_index))
         {
             num_menu_items = 2;
@@ -7734,11 +7780,11 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
 
             rc = display_menu(menu_item, start_row, menu_index, &retptr);
             if ((rc == RC_SUCCESS) &&
-                (p_page_28_cur->attr[j].qas_capability != *retptr))
+                (page_28_cur->attr[j].qas_capability != *retptr))
             {
-                p_page_28_cur->attr[j].qas_capability = *retptr;
-                p_page_28_ipr->attr[j].qas_capability =
-                    p_page_28_chg->attr[j].qas_capability;
+                page_28_cur->attr[j].qas_capability = *retptr;
+                page_28_ipr->attr[j].qas_capability =
+                    page_28_chg->attr[j].qas_capability;
             }
             i=0;
             while (menu_item[i] != NULL)
@@ -7748,13 +7794,13 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item = NULL;
             break;
         }
-        else if (p_page_28_chg->attr[j].qas_capability)
+        else if (page_28_chg->attr[j].qas_capability)
         {
             input_field_index += 2;
             start_row++;
         }
 
-        if ((p_page_28_chg->attr[j].scsi_id) &&
+        if ((page_28_chg->attr[j].scsi_id) &&
             (input_field_index == cur_field_index))
         {
             num_menu_items = 16;
@@ -7768,12 +7814,15 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
                  scsi_id++, found = 0)
             {
                 for (i=0;
-                     i < p_cur_ioa->num_devices;
+                     i < cur_ioa->num_devices;
                      i++)
                 {
-                    p_scsi_dev_data = p_cur_ioa->dev[i].p_scsi_dev_data;
-                    if ((scsi_id == p_scsi_dev_data->id) &&
-                        (p_page_28_cur->attr[j].res_addr.bus == p_scsi_dev_data->channel))
+                    scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
+                    if (scsi_dev_data == NULL)
+                        continue;
+
+                    if ((scsi_id == scsi_dev_data->id) &&
+                        (page_28_cur->attr[j].res_addr.bus == scsi_dev_data->channel))
                     {
                         found = 1;
                         break;
@@ -7848,11 +7897,11 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item[menu_index] = (ITEM *)NULL;
             rc = display_menu(menu_item, start_row, menu_index, &retptr);
             if ((rc == RC_SUCCESS) &&
-                (p_page_28_cur->attr[j].scsi_id != *retptr))
+                (page_28_cur->attr[j].scsi_id != *retptr))
             {
-                p_page_28_cur->attr[j].scsi_id = *retptr;
-                p_page_28_ipr->attr[j].scsi_id =
-                    p_page_28_chg->attr[j].scsi_id;
+                page_28_cur->attr[j].scsi_id = *retptr;
+                page_28_ipr->attr[j].scsi_id =
+                    page_28_chg->attr[j].scsi_id;
             }
             i=0;
             while (menu_item[i] != NULL)
@@ -7862,13 +7911,13 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item = NULL;
             break;
         }
-        else if (p_page_28_chg->attr[j].scsi_id)
+        else if (page_28_chg->attr[j].scsi_id)
         {
             input_field_index += 2;
             start_row++;
         }
 
-        if ((p_page_28_chg->attr[j].bus_width) &&
+        if ((page_28_chg->attr[j].bus_width) &&
             (input_field_index == cur_field_index))
         {
             num_menu_items = 2;
@@ -7882,7 +7931,7 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
                              (char *)&userptr[menu_index]);
 
             menu_index++;
-            if (p_page_28_dflt->attr[j].bus_width == 16)
+            if (page_28_dflt->attr[j].bus_width == 16)
             {
                 menu_item[menu_index] = new_item("Yes","");
                 userptr[menu_index] = 16;
@@ -7893,11 +7942,11 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item[menu_index] = (ITEM *)NULL;
             rc = display_menu(menu_item, start_row, menu_index, &retptr);
             if ((rc == RC_SUCCESS) &&
-                (p_page_28_cur->attr[j].bus_width != *retptr))
+                (page_28_cur->attr[j].bus_width != *retptr))
             {
-                p_page_28_cur->attr[j].bus_width = *retptr;
-                p_page_28_ipr->attr[j].bus_width =
-                    p_page_28_chg->attr[j].bus_width;
+                page_28_cur->attr[j].bus_width = *retptr;
+                page_28_ipr->attr[j].bus_width =
+                    page_28_chg->attr[j].bus_width;
             }
             i=0;
             while (menu_item[i] != NULL)
@@ -7907,13 +7956,13 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item = NULL;
             break;
         }
-        else if (p_page_28_chg->attr[j].bus_width)
+        else if (page_28_chg->attr[j].bus_width)
         {
             input_field_index += 2;
             start_row++;
         }
 
-        if ((p_page_28_chg->attr[j].max_xfer_rate) &&
+        if ((page_28_chg->attr[j].max_xfer_rate) &&
             (input_field_index == cur_field_index))
         {
             num_menu_items = 7;
@@ -7921,8 +7970,8 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             userptr = malloc(sizeof(int) * num_menu_items);
 
             menu_index = 0;
-            switch (((iprtoh32(p_page_28_dflt->attr[j].max_xfer_rate)) *
-                     p_page_28_cur->attr[j].bus_width)/(10 * 8))
+            switch (((iprtoh32(page_28_dflt->attr[j].max_xfer_rate)) *
+                     page_28_cur->attr[j].bus_width)/(10 * 8))
             {
                 case 320:
                     menu_item[menu_index] = new_item("320 MB/s","");
@@ -7978,13 +8027,13 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item[menu_index] = (ITEM *)NULL;
             rc = display_menu(menu_item, start_row, menu_index, &retptr);
             if ((rc == RC_SUCCESS) &&
-                (iprtoh32(p_page_28_cur->attr[j].max_xfer_rate) !=
-                 ((*retptr) * 8)/p_page_28_cur->attr[j].bus_width))
+                (iprtoh32(page_28_cur->attr[j].max_xfer_rate) !=
+                 ((*retptr) * 8)/page_28_cur->attr[j].bus_width))
             {
-                p_page_28_cur->attr[j].max_xfer_rate =
-                    htoipr32(((*retptr) * 8)/p_page_28_cur->attr[j].bus_width);
-                p_page_28_ipr->attr[j].max_xfer_rate =
-                    p_page_28_chg->attr[j].max_xfer_rate;
+                page_28_cur->attr[j].max_xfer_rate =
+                    htoipr32(((*retptr) * 8)/page_28_cur->attr[j].bus_width);
+                page_28_ipr->attr[j].max_xfer_rate =
+                    page_28_chg->attr[j].max_xfer_rate;
             }
             i=0;
             while (menu_item[i] != NULL)
@@ -7994,7 +8043,7 @@ int bus_attr_menu(struct ipr_ioa *p_cur_ioa,
             menu_item = NULL;
             break;
         }
-        else if (p_page_28_chg->attr[j].max_xfer_rate)
+        else if (page_28_chg->attr[j].max_xfer_rate)
         {
             input_field_index += 2;
             start_row++;
@@ -8008,190 +8057,190 @@ int display_menu(ITEM **menu_item,
 		 int menu_index_max,
 		 int **userptrptr)
 {
-  ITEM *p_cur_item;
-  MENU *p_menu;
-  WINDOW *p_box1_win, *p_box2_win, *p_field_win;
-  int menu_rows, menu_cols, menu_rows_disp;
-  int menu_index;
-  int use_box2 = 0;
-  int cur_item_index;
-  int ch, i;
-  int rc = RC_SUCCESS;
-  int max_y,max_x;
+    ITEM *cur_item;
+    MENU *menu;
+    WINDOW *box1_win, *box2_win, *field_win;
+    int menu_rows, menu_cols, menu_rows_disp;
+    int menu_index;
+    int use_box2 = 0;
+    int cur_item_index;
+    int ch, i;
+    int rc = RC_SUCCESS;
+    int max_y,max_x;
 
-  getmaxyx(stdscr,max_y,max_x);
-    
-  p_menu = new_menu(menu_item);
-  scale_menu(p_menu, &menu_rows, &menu_cols);
-  menu_rows_disp = menu_rows;
+    getmaxyx(stdscr,max_y,max_x);
 
-  /* check if fits in current screen, + 1 is added for
+    menu = new_menu(menu_item);
+    scale_menu(menu, &menu_rows, &menu_cols);
+    menu_rows_disp = menu_rows;
+
+    /* check if fits in current screen, + 1 is added for
      bottom border, +1 is added for buffer */
-  if ((menu_start_row + menu_rows + 1 + 1) > max_y)
+    if ((menu_start_row + menu_rows + 1 + 1) > max_y)
     {
-      menu_start_row = max_y - (menu_rows + 1 + 1);
-      if (menu_start_row < (8 + 1))
-	{
-	  /* size is adjusted by 2 to allow for top
-	     and bottom border, add +1 for buffer */
-	  menu_rows_disp = max_y - (8 + 2 + 1);
-	  menu_start_row = (8 + 1);
-	}
-    }
-    
-  if (menu_rows > menu_rows_disp)
-    {
-      set_menu_format(p_menu, menu_rows_disp, 1);
-      use_box2 = 1;
+        menu_start_row = max_y - (menu_rows + 1 + 1);
+        if (menu_start_row < (8 + 1))
+        {
+            /* size is adjusted by 2 to allow for top
+             and bottom border, add +1 for buffer */
+            menu_rows_disp = max_y - (8 + 2 + 1);
+            menu_start_row = (8 + 1);
+        }
     }
 
-  set_menu_mark(p_menu, "*");
-  scale_menu(p_menu, &menu_rows, &menu_cols);
-  p_box1_win = newwin(menu_rows + 2, menu_cols + 2, menu_start_row - 1, 54);
-  p_field_win = newwin(menu_rows, menu_cols, menu_start_row, 55);
-  set_menu_win(p_menu, p_field_win);
-  post_menu(p_menu);
-  box(p_box1_win,ACS_VLINE,ACS_HLINE);
-  if (use_box2)
+    if (menu_rows > menu_rows_disp)
     {
-      p_box2_win = newwin(menu_rows + 2, 3, menu_start_row - 1, 54 + menu_cols + 1);
-      box(p_box2_win,ACS_VLINE,ACS_HLINE);
-
-      /* initialize scroll bar */
-      for (i = 0;
-	   i < menu_rows_disp/2;
-	   i++)
-	{
-	  mvwaddstr(p_box2_win, i + 1, 1, "#");
-	}
-
-      /* put down arrows in */
-      for (i = menu_rows_disp;
-	   i > (menu_rows_disp - menu_rows_disp/2);
-	   i--)
-	{
-	  mvwaddstr(p_box2_win, i, 1, "v");
-	}
-    }
-  wnoutrefresh(p_box1_win);
-
-  menu_index = 0;
-  while (1)
-    {
-      if (use_box2)
-	wnoutrefresh(p_box2_win);
-      wnoutrefresh(p_field_win);
-      doupdate();
-      ch = getch();
-      if (IS_ENTER_KEY(ch))
-	{
-	  p_cur_item = current_item(p_menu);
-	  cur_item_index = item_index(p_cur_item);
-	  *userptrptr = item_userptr(menu_item[cur_item_index]);
-	  break;
-	}
-      else if ((ch == KEY_DOWN) || (ch == '\t'))
-	{
-	  if (use_box2 &&
-	      (menu_index < (menu_index_max - 1)))
-	    {
-	      menu_index++;
-	      if (menu_index == menu_rows_disp)
-		{
-		  /* put up arrows in */
-		  for (i = 0;
-		       i < menu_rows_disp/2;
-		       i++)
-		    {
-		      mvwaddstr(p_box2_win, i + 1, 1, "^");
-		    }
-		}
-	      if (menu_index == (menu_index_max - 1))
-		{
-		  /* remove down arrows */
-		  for (i = menu_rows_disp;
-		       i > (menu_rows_disp - menu_rows_disp/2);
-		       i--)
-		    {
-		      mvwaddstr(p_box2_win, i, 1, "#");
-		    }
-		}
-	    }
-
-	  menu_driver(p_menu,REQ_DOWN_ITEM);
-	}
-      else if (ch == KEY_UP)
-	{
-	  if (use_box2 &&
-	      (menu_index != 0))
-	    {
-	      menu_index--;
-	      if (menu_index == (menu_index_max - menu_rows_disp - 1))
-		{
-		  /* put down arrows in */
-		  for (i = menu_rows_disp;
-		       i > (menu_rows_disp - menu_rows_disp/2);
-		       i--)
-		    {
-		      mvwaddstr(p_box2_win, i, 1, "v");
-		    }
-		}
-	      if (menu_index == 0)
-		{
-		  /* remove up arrows */
-		  for (i = 0;
-		       i < menu_rows_disp/2;
-		       i++)
-		    {
-		      mvwaddstr(p_box2_win, i + 1, 1, "#");
-		    }
-		}
-	    }
-	  menu_driver(p_menu,REQ_UP_ITEM);
-	}
-      else if (IS_EXIT_KEY(ch))
-	{
-	  rc = EXIT_FLAG;
-	  break;
-	}
-      else if (IS_CANCEL_KEY(ch))
-	{
-	  rc = CANCEL_FLAG;
-	  break;
-	}
+        set_menu_format(menu, menu_rows_disp, 1);
+        use_box2 = 1;
     }
 
-  unpost_menu(p_menu);
-  free_menu(p_menu);
-  wclear(p_field_win);
-  wrefresh(p_field_win);
-  delwin(p_field_win);
-  wclear(p_box1_win);
-  wrefresh(p_box1_win);
-  delwin(p_box1_win);
-  if (use_box2)
+    set_menu_mark(menu, "*");
+    scale_menu(menu, &menu_rows, &menu_cols);
+    box1_win = newwin(menu_rows + 2, menu_cols + 2, menu_start_row - 1, 54);
+    field_win = newwin(menu_rows, menu_cols, menu_start_row, 55);
+    set_menu_win(menu, field_win);
+    post_menu(menu);
+    box(box1_win,ACS_VLINE,ACS_HLINE);
+    if (use_box2)
     {
-      wclear(p_box2_win);
-      wrefresh(p_box2_win);
-      delwin(p_box2_win);
+        box2_win = newwin(menu_rows + 2, 3, menu_start_row - 1, 54 + menu_cols + 1);
+        box(box2_win,ACS_VLINE,ACS_HLINE);
+
+        /* initialize scroll bar */
+        for (i = 0;
+             i < menu_rows_disp/2;
+             i++)
+        {
+            mvwaddstr(box2_win, i + 1, 1, "#");
+        }
+
+        /* put down arrows in */
+        for (i = menu_rows_disp;
+             i > (menu_rows_disp - menu_rows_disp/2);
+             i--)
+        {
+            mvwaddstr(box2_win, i, 1, "v");
+        }
     }
-    
-  return rc;
+    wnoutrefresh(box1_win);
+
+    menu_index = 0;
+    while (1)
+    {
+        if (use_box2)
+            wnoutrefresh(box2_win);
+        wnoutrefresh(field_win);
+        doupdate();
+        ch = getch();
+        if (IS_ENTER_KEY(ch))
+        {
+            cur_item = current_item(menu);
+            cur_item_index = item_index(cur_item);
+            *userptrptr = item_userptr(menu_item[cur_item_index]);
+            break;
+        }
+        else if ((ch == KEY_DOWN) || (ch == '\t'))
+        {
+            if (use_box2 &&
+                (menu_index < (menu_index_max - 1)))
+            {
+                menu_index++;
+                if (menu_index == menu_rows_disp)
+                {
+                    /* put up arrows in */
+                    for (i = 0;
+                         i < menu_rows_disp/2;
+                         i++)
+                    {
+                        mvwaddstr(box2_win, i + 1, 1, "^");
+                    }
+                }
+                if (menu_index == (menu_index_max - 1))
+                {
+                    /* remove down arrows */
+                    for (i = menu_rows_disp;
+                         i > (menu_rows_disp - menu_rows_disp/2);
+                         i--)
+                    {
+                        mvwaddstr(box2_win, i, 1, "#");
+                    }
+                }
+            }
+
+            menu_driver(menu,REQ_DOWN_ITEM);
+        }
+        else if (ch == KEY_UP)
+        {
+            if (use_box2 &&
+                (menu_index != 0))
+            {
+                menu_index--;
+                if (menu_index == (menu_index_max - menu_rows_disp - 1))
+                {
+                    /* put down arrows in */
+                    for (i = menu_rows_disp;
+                         i > (menu_rows_disp - menu_rows_disp/2);
+                         i--)
+                    {
+                        mvwaddstr(box2_win, i, 1, "v");
+                    }
+                }
+                if (menu_index == 0)
+                {
+                    /* remove up arrows */
+                    for (i = 0;
+                         i < menu_rows_disp/2;
+                         i++)
+                    {
+                        mvwaddstr(box2_win, i + 1, 1, "#");
+                    }
+                }
+            }
+            menu_driver(menu,REQ_UP_ITEM);
+        }
+        else if (IS_EXIT_KEY(ch))
+        {
+            rc = EXIT_FLAG;
+            break;
+        }
+        else if (IS_CANCEL_KEY(ch))
+        {
+            rc = CANCEL_FLAG;
+            break;
+        }
+    }
+
+    unpost_menu(menu);
+    free_menu(menu);
+    wclear(field_win);
+    wrefresh(field_win);
+    delwin(field_win);
+    wclear(box1_win);
+    wrefresh(box1_win);
+    delwin(box1_win);
+    if (use_box2)
+    {
+        wclear(box2_win);
+        wrefresh(box2_win);
+        delwin(box2_win);
+    }
+
+    return rc;
 }
 
 int send_dev_inits(i_container *i_con) /*(u8 num_devs)*/
 {
     u8 num_devs = (u32) i_con->data; /* passed from i_num_devs in confirm_init_device */
-    struct devs_to_init_t *p_cur_dev_to_init;
+    struct devs_to_init_t *cur_dev_init;
     int rc;
     struct ipr_query_res_state res_state;
     u8 ioctl_buffer[IOCTL_BUFFER_SIZE];
     u8 ioctl_buffer2[IOCTL_BUFFER_SIZE];
-    struct ipr_control_mode_page *p_control_mode_page;
-    struct ipr_control_mode_page *p_control_mode_page_changeable;
-    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-    struct ipr_block_desc *p_block_desc;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct ipr_control_mode_page *control_mode_page;
+    struct ipr_control_mode_page *control_mode_page_changeable;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_block_desc *block_desc;
+    struct scsi_dev_data *scsi_dev_data;
     int status;
     int opens;
     u8 remaining_devs = num_devs;
@@ -8205,252 +8254,264 @@ int send_dev_inits(i_container *i_con) /*(u8 num_devs)*/
     mvaddstr(max_y-1,0,catgets(catd,n_dev_init_complete.text_set,4,"Please wait for the next screen."));
     refresh();
 
-    for (p_cur_dev_to_init = dev_init_head;
-         p_cur_dev_to_init != NULL;
-         p_cur_dev_to_init = p_cur_dev_to_init->next)
+    for (cur_dev_init = dev_init_head;
+         cur_dev_init != NULL;
+         cur_dev_init = cur_dev_init->next)
     {
-        if ((p_cur_dev_to_init->do_init) &&
-            (p_cur_dev_to_init->dev_type == IPR_AF_DASD_DEVICE)) {
+        if ((cur_dev_init->do_init) &&
+            (cur_dev_init->dev_type == IPR_AF_DASD_DEVICE)) {
 
-            rc = ipr_query_resource_state(p_cur_dev_to_init->p_ipr_device->gen_name,
+            rc = ipr_query_resource_state(cur_dev_init->ipr_dev->gen_name,
                                          &res_state);
 
             if (rc != 0) {
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
-            p_scsi_dev_data = p_cur_dev_to_init->p_ipr_device->p_scsi_dev_data;
-            opens = num_device_opens(p_scsi_dev_data->host,
-                                     p_scsi_dev_data->channel,
-                                     p_scsi_dev_data->id,
-                                     p_scsi_dev_data->lun);
+            scsi_dev_data = cur_dev_init->ipr_dev->scsi_dev_data;
+            if (scsi_dev_data == NULL) {
+                cur_dev_init->do_init = 0;
+                remaining_devs--;
+                continue;
+            }
+
+            opens = num_device_opens(scsi_dev_data->host,
+                                     scsi_dev_data->channel,
+                                     scsi_dev_data->id,
+                                     scsi_dev_data->lun);
 
             if ((opens != 0) && (!res_state.read_write_prot))
             {
                 syslog(LOG_ERR,
-                       "Cannot obtain exclusive access to %s"IPR_EOL,
-                       p_cur_dev_to_init->p_ipr_device->gen_name);
-                p_cur_dev_to_init->do_init = 0;
+                       "Cannot obtain exclusive access to %s\n",
+                       cur_dev_init->ipr_dev->gen_name);
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Mode sense */
-            rc = ipr_mode_sense(p_cur_dev_to_init->p_ipr_device->gen_name, 0x0a, ioctl_buffer);
+            rc = ipr_mode_sense(cur_dev_init->ipr_dev->gen_name, 0x0a, ioctl_buffer);
 
             if (rc != 0)
             {
-                syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
-                       p_cur_dev_to_init->p_ipr_device->gen_name);
-                iprlog_location(p_cur_dev_to_init->p_ioa);
-                p_cur_dev_to_init->do_init = 0;
+                syslog(LOG_ERR, "Mode Sense to %s failed. %m\n",
+                       cur_dev_init->ipr_dev->gen_name);
+                iprlog_location(cur_dev_init->ioa);
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Mode sense - changeable parms */
-            rc = ipr_mode_sense(p_cur_dev_to_init->p_ipr_device->gen_name, 0x4a, ioctl_buffer2);
+            rc = ipr_mode_sense(cur_dev_init->ipr_dev->gen_name, 0x4a, ioctl_buffer2);
 
             if (rc != 0)
             {
-                syslog(LOG_ERR, "Mode Sense to %s failed. %m"IPR_EOL,
-                       p_cur_dev_to_init->p_ipr_device->gen_name);
-                iprlog_location(p_cur_dev_to_init->p_ioa);
-                p_cur_dev_to_init->do_init = 0;
+                syslog(LOG_ERR, "Mode Sense to %s failed. %m\n",
+                       cur_dev_init->ipr_dev->gen_name);
+                iprlog_location(cur_dev_init->ioa);
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-            p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr + 1);
-            if ((p_block_desc->block_length[0] == 0x00) &&
-                (p_block_desc->block_length[1] == 0x02) &&
-                (p_block_desc->block_length[2] == 0x08))
+            block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
+            if ((block_desc->block_length[0] == 0x00) &&
+                (block_desc->block_length[1] == 0x02) &&
+                (block_desc->block_length[2] == 0x08))
                 /* block size is 520 */
                 is_520_block = 1;
 
-            p_control_mode_page = (struct ipr_control_mode_page *)
-                (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+            control_mode_page = (struct ipr_control_mode_page *)
+                (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
 
-            p_control_mode_page_changeable = (struct ipr_control_mode_page *)
-                (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+            control_mode_page_changeable = (struct ipr_control_mode_page *)
+                (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
             /* Turn off QERR since some drives do not like QERR
              and IMMED bit at the same time. */
-            IPR_SET_MODE(p_control_mode_page_changeable->qerr,
-                         p_control_mode_page->qerr, 0);
+            IPR_SET_MODE(control_mode_page_changeable->qerr,
+                         control_mode_page->qerr, 0);
 
-            length = p_mode_parm_hdr->length + 1;
-            p_mode_parm_hdr->length = 0;
-            p_mode_parm_hdr->medium_type = 0;
-            p_mode_parm_hdr->device_spec_parms = 0;
-            p_control_mode_page->header.parms_saveable = 0;
-            rc = ipr_mode_select(p_cur_dev_to_init->p_ipr_device->gen_name, ioctl_buffer, length);
+            length = mode_parm_hdr->length + 1;
+            mode_parm_hdr->length = 0;
+            mode_parm_hdr->medium_type = 0;
+            mode_parm_hdr->device_spec_parms = 0;
+            control_mode_page->header.parms_saveable = 0;
+            rc = ipr_mode_select(cur_dev_init->ipr_dev->gen_name, ioctl_buffer, length);
 
             if (rc != 0)
             {
-                syslog(LOG_ERR, "Mode Select %s to disable qerr failed. %m"IPR_EOL,
-                       p_cur_dev_to_init->p_ipr_device->gen_name);
-                iprlog_location(p_cur_dev_to_init->p_ioa);
-                p_cur_dev_to_init->do_init = 0;
+                syslog(LOG_ERR, "Mode Select %s to disable qerr failed. %m\n",
+                       cur_dev_init->ipr_dev->gen_name);
+                iprlog_location(cur_dev_init->ioa);
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Issue mode select to change block size */
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
             memset(ioctl_buffer, 0, 255);
 
-            p_mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+            mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
 
-            p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr + 1);
+            block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
 
             /* Setup block size */
-            p_block_desc->block_length[0] = 0x00;
-            p_block_desc->block_length[1] = 0x02;
+            block_desc->block_length[0] = 0x00;
+            block_desc->block_length[1] = 0x02;
 
-            if (p_cur_dev_to_init->change_size == IPR_512_BLOCK)
-                p_block_desc->block_length[2] = 0x00;
+            if (cur_dev_init->change_size == IPR_512_BLOCK)
+                block_desc->block_length[2] = 0x00;
             else if (is_520_block)
-                p_block_desc->block_length[2] = 0x08;
+                block_desc->block_length[2] = 0x08;
             else
-                p_block_desc->block_length[2] = 0x0a;
+                block_desc->block_length[2] = 0x0a;
 
-            rc = ipr_mode_select(p_cur_dev_to_init->p_ipr_device->gen_name,
+            rc = ipr_mode_select(cur_dev_init->ipr_dev->gen_name,
                                  ioctl_buffer,
                                  sizeof(struct ipr_block_desc) +
                                  sizeof(struct ipr_mode_parm_hdr));
 
             if (rc != 0)
             {
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Issue the format. Failure will be detected by query command status */
-            rc = ipr_format_unit(p_cur_dev_to_init->p_ipr_device->gen_name);  //FIXME  Mandatory lock?
+            rc = ipr_format_unit(cur_dev_init->ipr_dev->gen_name);  //FIXME  Mandatory lock?
         }
-        else if ((p_cur_dev_to_init->do_init) &&
-                 (p_cur_dev_to_init->dev_type == IPR_JBOD_DASD_DEVICE))
+        else if ((cur_dev_init->do_init) &&
+                 (cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE))
         {
-            p_scsi_dev_data = p_cur_dev_to_init->p_ipr_device->p_scsi_dev_data;
-            opens = num_device_opens(p_scsi_dev_data->host,
-                                     p_scsi_dev_data->channel,
-                                     p_scsi_dev_data->id,
-                                     p_scsi_dev_data->lun);
+            scsi_dev_data = cur_dev_init->ipr_dev->scsi_dev_data;
+            if (scsi_dev_data == NULL) {
+                cur_dev_init->do_init = 0;
+                remaining_devs--;
+                continue;
+            }
+
+            opens = num_device_opens(scsi_dev_data->host,
+                                     scsi_dev_data->channel,
+                                     scsi_dev_data->id,
+                                     scsi_dev_data->lun);
 
             if (opens != 0)
             {
                 syslog(LOG_ERR,
-                       "Cannot obtain exclusive access to %s"IPR_EOL,
-                       p_cur_dev_to_init->p_ipr_device->gen_name);
-                p_cur_dev_to_init->do_init = 0;
+                       "Cannot obtain exclusive access to %s\n",
+                       cur_dev_init->ipr_dev->gen_name);
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Issue mode sense to get the control mode page */
-            status = ipr_mode_sense(p_cur_dev_to_init->p_ipr_device->gen_name,
+            status = ipr_mode_sense(cur_dev_init->ipr_dev->gen_name,
                                     0x0a, &ioctl_buffer);
 
             if (status)
             {
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Issue mode sense to get the control mode page */
-            status = ipr_mode_sense(p_cur_dev_to_init->p_ipr_device->gen_name,
+            status = ipr_mode_sense(cur_dev_init->ipr_dev->gen_name,
                                     0x4a, &ioctl_buffer2);
 
             if (status)
             {
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer2;
 
-            p_control_mode_page_changeable = (struct ipr_control_mode_page *)
-                (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+            control_mode_page_changeable = (struct ipr_control_mode_page *)
+                (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-            p_control_mode_page = (struct ipr_control_mode_page *)
-                (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+            control_mode_page = (struct ipr_control_mode_page *)
+                (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
             /* Turn off QERR since some drives do not like QERR
              and IMMED bit at the same time. */
-            IPR_SET_MODE(p_control_mode_page_changeable->qerr,
-                         p_control_mode_page->qerr, 0);
+            IPR_SET_MODE(control_mode_page_changeable->qerr,
+                         control_mode_page->qerr, 0);
 
             /* Issue mode select to set page x0A */
-            length = p_mode_parm_hdr->length + 1;
+            length = mode_parm_hdr->length + 1;
 
-            p_mode_parm_hdr->length = 0;
-            p_control_mode_page->header.parms_saveable = 0;
-            p_mode_parm_hdr->medium_type = 0;
-            p_mode_parm_hdr->device_spec_parms = 0;
+            mode_parm_hdr->length = 0;
+            control_mode_page->header.parms_saveable = 0;
+            mode_parm_hdr->medium_type = 0;
+            mode_parm_hdr->device_spec_parms = 0;
 
-            status = ipr_mode_select(p_cur_dev_to_init->p_ipr_device->gen_name,
+            status = ipr_mode_select(cur_dev_init->ipr_dev->gen_name,
                                      &ioctl_buffer, length);
 
             if (status)
             {
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Issue mode select to setup block size */
-            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
             memset(ioctl_buffer, 0, 255);
 
-            p_mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
+            mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
 
-            p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr + 1);
+            block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
 
             /* Setup block size */
-            p_block_desc->block_length[0] = 0x00;
-            p_block_desc->block_length[1] = 0x02;
+            block_desc->block_length[0] = 0x00;
+            block_desc->block_length[1] = 0x02;
 
-            if (p_cur_dev_to_init->change_size == IPR_522_BLOCK)
-                p_block_desc->block_length[2] = 0x0a;
+            if (cur_dev_init->change_size == IPR_522_BLOCK)
+                block_desc->block_length[2] = 0x0a;
             else
-                p_block_desc->block_length[2] = 0x00;
+                block_desc->block_length[2] = 0x00;
 
             length = sizeof(struct ipr_block_desc) +
                 sizeof(struct ipr_mode_parm_hdr);
 
-            status = ipr_mode_select(p_cur_dev_to_init->p_ipr_device->gen_name,
+            status = ipr_mode_select(cur_dev_init->ipr_dev->gen_name,
                                      &ioctl_buffer, length);
 
             if (status)
             {
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
 
             /* Issue format */
-            status = ipr_format_unit(p_cur_dev_to_init->p_ipr_device->gen_name);  //FIXME  Mandatory lock?    
+            status = ipr_format_unit(cur_dev_init->ipr_dev->gen_name);  //FIXME  Mandatory lock?    
 
             if (status)
             {
                 /* Send a device reset to cleanup any old state */
-                rc = ipr_reset_device(p_cur_dev_to_init->p_ipr_device->gen_name);
+                rc = ipr_reset_device(cur_dev_init->ipr_dev->gen_name);
 
-                p_cur_dev_to_init->do_init = 0;
+                cur_dev_init->do_init = 0;
                 remaining_devs--;
                 continue;
             }
@@ -8475,16 +8536,16 @@ int dev_init_complete(u8 num_devs)
 {
     int done_bad;
     struct ipr_cmd_status cmd_status;
-    struct ipr_cmd_status_record *p_record;
+    struct ipr_cmd_status_record *status_record;
     int not_done = 0;
     int rc;
-    struct devs_to_init_t *p_cur_dev_to_init;
+    struct devs_to_init_t *cur_dev_init;
     u32 percent_cmplt = 0;
     u8 ioctl_buffer[255];
     struct sense_data_t sense_data;
-    struct ipr_ioa *p_ioa;
-    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-    struct ipr_block_desc *p_block_desc;
+    struct ipr_ioa *ioa;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_block_desc *block_desc;
 
     char *title, *body, *complete;
 
@@ -8502,48 +8563,48 @@ int dev_init_complete(u8 num_devs)
         percent_cmplt = 100;
         done_bad = 0;
 
-        for (p_cur_dev_to_init = dev_init_head;
-             p_cur_dev_to_init != NULL;
-             p_cur_dev_to_init = p_cur_dev_to_init->next)
+        for (cur_dev_init = dev_init_head;
+             cur_dev_init != NULL;
+             cur_dev_init = cur_dev_init->next)
         {
-            if ((p_cur_dev_to_init->do_init) &&
-                (p_cur_dev_to_init->dev_type == IPR_AF_DASD_DEVICE))
+            if ((cur_dev_init->do_init) &&
+                (cur_dev_init->dev_type == IPR_AF_DASD_DEVICE))
             {
-                rc = ipr_query_command_status(p_cur_dev_to_init->p_ipr_device->gen_name,
+                rc = ipr_query_command_status(cur_dev_init->ipr_dev->gen_name,
                                               &cmd_status);
                 if (rc) {
-                    p_cur_dev_to_init->cmplt = 100;
+                    cur_dev_init->cmplt = 100;
                     continue;
                 }
 
                 if (cmd_status.num_records == 0)
-                    p_cur_dev_to_init->cmplt = 100;
+                    cur_dev_init->cmplt = 100;
                 else
                 {
-                    p_record = cmd_status.record;
-                    if (p_record->status == IPR_CMD_STATUS_SUCCESSFUL)
+                    status_record = cmd_status.record;
+                    if (status_record->status == IPR_CMD_STATUS_SUCCESSFUL)
                     {
-                        p_cur_dev_to_init->cmplt = 100;
+                        cur_dev_init->cmplt = 100;
                     }
-                    else if (p_record->status == IPR_CMD_STATUS_FAILED)
+                    else if (status_record->status == IPR_CMD_STATUS_FAILED)
                     {
-                        p_cur_dev_to_init->cmplt = 100;
+                        cur_dev_init->cmplt = 100;
                         done_bad = 1;
                     }
                     else
                     {
-                        p_cur_dev_to_init->cmplt = p_record->percent_complete;
-                        if (p_record->percent_complete < percent_cmplt)
-                            percent_cmplt = p_record->percent_complete;
+                        cur_dev_init->cmplt = status_record->percent_complete;
+                        if (status_record->percent_complete < percent_cmplt)
+                            percent_cmplt = status_record->percent_complete;
                         not_done = 1;
                     }
                 }
             }
-            else if ((p_cur_dev_to_init->do_init) &&
-                     (p_cur_dev_to_init->dev_type == IPR_JBOD_DASD_DEVICE))
+            else if ((cur_dev_init->do_init) &&
+                     (cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE))
             {
                 /* Send Test Unit Ready to find percent complete in sense data. */
-                rc = ipr_test_unit_ready(p_cur_dev_to_init->p_ipr_device->gen_name,
+                rc = ipr_test_unit_ready(cur_dev_init->ipr_dev->gen_name,
                                          &sense_data);
 
                 if (rc < 0)
@@ -8553,82 +8614,82 @@ int dev_init_complete(u8 num_devs)
                     ((sense_data.error_code & 0x7F) == 0x70) &&
                     ((sense_data.sense_key & 0x0F) == 0x02))
                 {
-                    p_cur_dev_to_init->cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
-                    if (p_cur_dev_to_init->cmplt < percent_cmplt)
-                        percent_cmplt = p_cur_dev_to_init->cmplt;
+                    cur_dev_init->cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
+                    if (cur_dev_init->cmplt < percent_cmplt)
+                        percent_cmplt = cur_dev_init->cmplt;
                     not_done = 1;
                 }
                 else
                 {
-                    p_cur_dev_to_init->cmplt = 100;
+                    cur_dev_init->cmplt = 100;
                 }
             }
         }
 
         if (!not_done)
         {
-            p_cur_dev_to_init = dev_init_head;
-            while(p_cur_dev_to_init)
+            cur_dev_init = dev_init_head;
+            while(cur_dev_init)
             {
-                if (p_cur_dev_to_init->do_init)
+                if (cur_dev_init->do_init)
                 {
-                    p_ioa = p_cur_dev_to_init->p_ioa;
+                    ioa = cur_dev_init->ioa;
 
-                    if (p_cur_dev_to_init->dev_type == IPR_AF_DASD_DEVICE)
+                    if (cur_dev_init->dev_type == IPR_AF_DASD_DEVICE)
                     {
                         /* check if evaluate device is necessary */
                         /* issue mode sense */
-                        rc = ipr_mode_sense(p_cur_dev_to_init->p_ipr_device->gen_name, 0, ioctl_buffer);
+                        rc = ipr_mode_sense(cur_dev_init->ipr_dev->gen_name, 0, ioctl_buffer);
 
                         if (rc == 0)
                         {
-                            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-                            if (p_mode_parm_hdr->block_desc_len > 0)
+                            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                            if (mode_parm_hdr->block_desc_len > 0)
                             {
-                                p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr+1);
+                                block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
 
-                                if((p_block_desc->block_length[1] == 0x02) && 
-                                   (p_block_desc->block_length[2] == 0x00))
+                                if((block_desc->block_length[1] == 0x02) && 
+                                   (block_desc->block_length[2] == 0x00))
                                 {
-                                    p_cur_dev_to_init->change_size = IPR_512_BLOCK;
+                                    cur_dev_init->change_size = IPR_512_BLOCK;
                                 }
                             }
                         }
                     }
-                    else if (p_cur_dev_to_init->dev_type == IPR_JBOD_DASD_DEVICE)
+                    else if (cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE)
                     {
                         /* Check if evaluate device capabilities needs to be issued */
                         memset(ioctl_buffer, 0, 255);
 
                         /* Issue mode sense to get the block size */
-                        rc = ipr_mode_sense(p_cur_dev_to_init->p_ipr_device->gen_name,
-                                            0x00, p_mode_parm_hdr);
+                        rc = ipr_mode_sense(cur_dev_init->ipr_dev->gen_name,
+                                            0x00, mode_parm_hdr);
 
                         if (rc == 0) {
-                            p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                            mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-                            if (p_mode_parm_hdr->block_desc_len > 0)
+                            if (mode_parm_hdr->block_desc_len > 0)
                             {
-                                p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr+1);
+                                block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
 
-                                if ((p_block_desc->block_length[1] != 0x02) ||
-                                    (p_block_desc->block_length[2] != 0x00))
+                                if ((block_desc->block_length[1] != 0x02) ||
+                                    (block_desc->block_length[2] != 0x00))
                                 {
-                                    p_cur_dev_to_init->change_size = IPR_522_BLOCK;
-                                    remove_device(p_cur_dev_to_init->p_ipr_device->p_scsi_dev_data);
+                                    cur_dev_init->change_size = IPR_522_BLOCK;
+                                    remove_device(cur_dev_init->ipr_dev->scsi_dev_data);
                                 }
                             }
                         }
                     }
 
-                    if (p_cur_dev_to_init->change_size != 0)
+                    if (cur_dev_init->change_size != 0)
                     {
                         /* send evaluate device down */
-                        evaluate_device(p_cur_dev_to_init->p_ipr_device,
-                                        p_ioa, p_cur_dev_to_init->change_size);
+                        evaluate_device(cur_dev_init->ipr_dev,
+                                        ioa, cur_dev_init->change_size);
                     }
                 }
-                p_cur_dev_to_init = p_cur_dev_to_init->next;
+                cur_dev_init = cur_dev_init->next;
             }
 
             check_current_config(false);
@@ -8731,8 +8792,8 @@ int ibm_storage_log_tail(i_container *i_con)
       len += sprintf(cmnd + len, FAILSAFE_EDITOR);
       closelog();
       openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-      syslog(LOG_ERR, "Error encountered concatenating log files..."IPR_EOL);
-      syslog(LOG_ERR, "Using failsafe editor..."IPR_EOL);
+      syslog(LOG_ERR, "Error encountered concatenating log files...\n");
+      syslog(LOG_ERR, "Using failsafe editor...\n");
       closelog();
       openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
       sleep(3);
@@ -8767,7 +8828,7 @@ int ibm_storage_log(i_container *i_con)
   char cmnd[MAX_CMD_LENGTH];
   int rc, i;
   struct dirent **log_files;
-  struct dirent **pp_dirent;
+  struct dirent **dirent;
   int num_dir_entries;
   int len;
 
@@ -8778,7 +8839,7 @@ int ibm_storage_log(i_container *i_con)
   num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
   rc = system("rm -rf /tmp/.ipr.err; mkdir /tmp/.ipr.err");
   if (num_dir_entries)
-    pp_dirent = log_files;
+    dirent = log_files;
 
   if (rc != 0)
     {
@@ -8787,8 +8848,8 @@ int ibm_storage_log(i_container *i_con)
       /* Probably have a read-only root file system */
       for (i = 0; i < num_dir_entries; i++)
 	{
-	  len += sprintf(cmnd + len, "%s ", (*pp_dirent)->d_name);
-	  pp_dirent++;
+	  len += sprintf(cmnd + len, "%s ", (*dirent)->d_name);
+	  dirent++;
 	}
 
       len += sprintf(cmnd + len," | grep ipr-err | ");
@@ -8800,8 +8861,8 @@ int ibm_storage_log(i_container *i_con)
       len += sprintf(cmnd + len, FAILSAFE_EDITOR);
       closelog();
       openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-      syslog(LOG_ERR, "Error encountered concatenating log files..."IPR_EOL);
-      syslog(LOG_ERR, "Using failsafe editor..."IPR_EOL);
+      syslog(LOG_ERR, "Error encountered concatenating log files...\n");
+      syslog(LOG_ERR, "Using failsafe editor...\n");
       closelog();
       openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
       sleep(3);
@@ -8810,7 +8871,7 @@ int ibm_storage_log(i_container *i_con)
     {
       for (i = 0; i < num_dir_entries; i++)
 	{
-	  len = sprintf(cmnd,"cd %s; zcat -f %s | grep ipr-err |", log_root_dir, (*pp_dirent)->d_name);
+	  len = sprintf(cmnd,"cd %s; zcat -f %s | grep ipr-err |", log_root_dir, (*dirent)->d_name);
 	  len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr-err//g\"");
 	  len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr-err//g\"");
 	  len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr-err//g\"");
@@ -8818,7 +8879,7 @@ int ibm_storage_log(i_container *i_con)
 	  len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
 	  len += sprintf(cmnd + len, ">> /tmp/.ipr.err/errors");
 	  system(cmnd);
-	  pp_dirent++;
+	  dirent++;
 	}
 
       sprintf(cmnd, "%s /tmp/.ipr.err/errors", editor);
@@ -8842,7 +8903,7 @@ int kernel_log(i_container *i_con)
   char cmnd[MAX_CMD_LENGTH];
   int rc, i;
   struct dirent **log_files;
-  struct dirent **pp_dirent;
+  struct dirent **dirent;
   int num_dir_entries;
   int len;
 
@@ -8852,7 +8913,7 @@ int kernel_log(i_container *i_con)
   
   num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
   if (num_dir_entries)
-    pp_dirent = log_files;
+    dirent = log_files;
 
   rc = system("rm -rf /tmp/.ipr.err; mkdir /tmp/.ipr.err");
 
@@ -8864,16 +8925,16 @@ int kernel_log(i_container *i_con)
       /* Probably have a read-only root file system */
       for (i = 0; i < num_dir_entries; i++)
 	{
-	  len += sprintf(cmnd + len, "%s ", (*pp_dirent)->d_name);
-	  pp_dirent++;
+	  len += sprintf(cmnd + len, "%s ", (*dirent)->d_name);
+	  dirent++;
 	}
 
       len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
       len += sprintf(cmnd + len, "| %s", FAILSAFE_EDITOR);
       closelog();
       openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-      syslog(LOG_ERR, "Error encountered concatenating log files..."IPR_EOL);
-      syslog(LOG_ERR, "Using failsafe editor..."IPR_EOL);
+      syslog(LOG_ERR, "Error encountered concatenating log files...\n");
+      syslog(LOG_ERR, "Using failsafe editor...\n");
       openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
       sleep(3);
     }
@@ -8883,9 +8944,9 @@ int kernel_log(i_container *i_con)
 	{
 	  sprintf(cmnd,
 		  "cd %s; zcat -f %s | sed \"s/\\^M//g\" >> /tmp/.ipr.err/errors",
-		  log_root_dir, (*pp_dirent)->d_name);
+		  log_root_dir, (*dirent)->d_name);
 	  system(cmnd);
-	  pp_dirent++;
+	  dirent++;
 	}
 
       sprintf(cmnd, "%s /tmp/.ipr.err/errors", editor);
@@ -8909,7 +8970,7 @@ int iprconfig_log(i_container *i_con)
   char cmnd[MAX_CMD_LENGTH];
   int rc, i;
   struct dirent **log_files;
-  struct dirent **pp_dirent;
+  struct dirent **dirent;
   int num_dir_entries;
   int len;
 
@@ -8920,7 +8981,7 @@ int iprconfig_log(i_container *i_con)
   num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
   rc = system("rm -rf /tmp/.ipr.err; mkdir /tmp/.ipr.err");
   if (num_dir_entries)
-    pp_dirent = log_files;
+    dirent = log_files;
 
   if (rc != 0)
     {
@@ -8929,16 +8990,16 @@ int iprconfig_log(i_container *i_con)
       /* Probably have a read-only root file system */
       for (i = 0; i < num_dir_entries; i++)
 	{
-	  len += sprintf(cmnd + len, "%s ", (*pp_dirent)->d_name);
-	  pp_dirent++;
+	  len += sprintf(cmnd + len, "%s ", (*dirent)->d_name);
+	  dirent++;
 	}
 
       len += sprintf(cmnd + len," | grep iprconfig | ");
       len += sprintf(cmnd + len, FAILSAFE_EDITOR);
       closelog();
       openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-      syslog(LOG_ERR, "Error encountered concatenating log files..."IPR_EOL);
-      syslog(LOG_ERR, "Using failsafe editor..."IPR_EOL);
+      syslog(LOG_ERR, "Error encountered concatenating log files...\n");
+      syslog(LOG_ERR, "Using failsafe editor...\n");
       openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
       sleep(3);
     }
@@ -8946,10 +9007,10 @@ int iprconfig_log(i_container *i_con)
     {
       for (i = 0; i < num_dir_entries; i++)
 	{
-	  len = sprintf(cmnd,"cd %s; zcat -f %s | grep iprconfig ", log_root_dir, (*pp_dirent)->d_name);
+	  len = sprintf(cmnd,"cd %s; zcat -f %s | grep iprconfig ", log_root_dir, (*dirent)->d_name);
 	  len += sprintf(cmnd + len, ">> /tmp/.ipr.err/errors");
 	  system(cmnd);
-	  pp_dirent++;
+	  dirent++;
 	}
 
       sprintf(cmnd, "%s /tmp/.ipr.err/errors", editor);
@@ -8989,24 +9050,24 @@ int kernel_root(i_container *i_con)
 int confirm_kernel_root(i_container *i_con)
 {
   int rc;
-  DIR *p_dir;
-  char *p_char;
+  DIR *dir;
+  char *input;
   struct screen_output *s_out;
   fn_out *output = init_output();
   mvaddstr(0,0,"CONFIRM KERNEL ROOT FUNCTION CALLED");
   
-  p_char = i_con->field_data;
-  p_dir = opendir(p_char);
+  input = i_con->field_data;
+  dir = opendir(input);
 
-  if (p_dir == NULL)
+  if (dir == NULL)
     {
       output = free_fn_out(output);
       return 59; /* "Invalid directory" */
     }
   else
     {
-      closedir(p_dir);
-      if (strcmp(log_root_dir, p_char) == 0)
+      closedir(dir);
+      if (strcmp(log_root_dir, input) == 0)
 	{
 	  output = free_fn_out(output);
 	  return 61; /*"Root directory unchanged"*/
@@ -9055,13 +9116,13 @@ int set_default_editor(i_container *i_con)
 int confirm_set_default_editor(i_container *i_con)
 {
   int rc;
-  char *p_char;
+  char *input;
   struct screen_output *s_out;
   fn_out *output = init_output();
   mvaddstr(0,0,"CONFIRM SET DEFAULT EDITOR FUNCTION CALLED");
 
-  p_char = i_con->field_data;
-  if (strcmp(editor, p_char) == 0)
+  input = i_con->field_data;
+  if (strcmp(editor, input) == 0)
     {
       output = free_fn_out(output);
       return 63; /*"Editor unchanged"*/
@@ -9121,8 +9182,8 @@ int ibm_boot_log(i_container *i_con)
       len += sprintf(cmnd + len, FAILSAFE_EDITOR);
       closelog();
       openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-      syslog(LOG_ERR, "Error encountered concatenating log files..."IPR_EOL);
-      syslog(LOG_ERR, "Using failsafe editor..."IPR_EOL);
+      syslog(LOG_ERR, "Error encountered concatenating log files...\n");
+      syslog(LOG_ERR, "Using failsafe editor...\n");
       closelog();
       openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
       sleep(3);
@@ -9148,53 +9209,53 @@ int ibm_boot_log(i_container *i_con)
 }
 
 
-int select_log_file(const struct dirent *p_dir_entry)
+int select_log_file(const struct dirent *dir_entry)
 {
-  if (p_dir_entry)
+  if (dir_entry)
     {
-      if (strstr(p_dir_entry->d_name, "messages") == p_dir_entry->d_name)
+      if (strstr(dir_entry->d_name, "messages") == dir_entry->d_name)
 	return 1;
     }
   return 0;
 }
 
 
-int compare_log_file(const void *pp_f, const void *pp_s)
+int compare_log_file(const void *log_file1, const void *log_file2)
 {
-  char *p_first_start_num, *p_first_end_num;
-  char *p_second_start_num, *p_second_end_num;
-  struct dirent **pp_first, **pp_second;
+  char *first_start_num, *first_end_num;
+  char *second_start_num, *second_end_num;
+  struct dirent **first_dir, **second_dir;
   char name1[100], name2[100];
   int first, second;
 
-  pp_first = (struct dirent **)pp_f;
-  pp_second = (struct dirent **)pp_s;
+  first_dir = (struct dirent **)log_file1;
+  second_dir = (struct dirent **)log_file2;
 
-  if (strcmp((*pp_first)->d_name, "messages") == 0)
+  if (strcmp((*first_dir)->d_name, "messages") == 0)
     return 1;
-  if (strcmp((*pp_second)->d_name, "messages") == 0)
+  if (strcmp((*second_dir)->d_name, "messages") == 0)
     return -1;
 
-  strcpy(name1, (*pp_first)->d_name);
-  strcpy(name2, (*pp_second)->d_name);
-  p_first_start_num = strchr(name1, '.');
-  p_first_end_num = strrchr(name1, '.');
-  p_second_start_num = strchr(name2, '.');
-  p_second_end_num = strrchr(name2, '.');
+  strcpy(name1, (*first_dir)->d_name);
+  strcpy(name2, (*second_dir)->d_name);
+  first_start_num = strchr(name1, '.');
+  first_end_num = strrchr(name1, '.');
+  second_start_num = strchr(name2, '.');
+  second_end_num = strrchr(name2, '.');
 
-  if (p_first_start_num == p_first_end_num)
+  if (first_start_num == first_end_num)
     {
       /* Not compressed */
-      p_first_end_num = name1 + strlen(name1);
-      p_second_end_num = name2 + strlen(name2);
+      first_end_num = name1 + strlen(name1);
+      second_end_num = name2 + strlen(name2);
     }
   else
     {
-      *p_first_end_num = '\0';
-      *p_second_end_num = '\0';
+      *first_end_num = '\0';
+      *second_end_num = '\0';
     }
-  first = strtoul(p_first_start_num, NULL, 10);
-  second = strtoul(p_second_start_num, NULL, 10);
+  first = strtoul(first_start_num, NULL, 10);
+  second = strtoul(second_start_num, NULL, 10);
 
   if (first > second)
     return -1;
@@ -9223,8 +9284,8 @@ int driver_config(i_container *i_con)
      */
 #define DEBUG_INDEX 2
     int rc;
-    FORM *p_fields_form;
-    FIELD *p_input_fields[6], *p_cur_field;
+    FORM *fields_form;
+    FIELD *input_fields[6], *cur_field;
     ITEM **menu_item;
     int cur_field_index;
     struct ipr_driver_cfg driver_cfg;
@@ -9251,39 +9312,39 @@ int driver_config(i_container *i_con)
         return 58 | EXIT_FLAG; /* "Change Device Driver Configurations failed" */;
 
     /* Title */
-    p_input_fields[0] =
+    input_fields[0] =
         new_field(1, max_x - start_x, 
                   0, 0, 0, 0);
-    set_field_just(p_input_fields[0], JUSTIFY_CENTER);
-    set_field_buffer(p_input_fields[0], 0,
+    set_field_just(input_fields[0], JUSTIFY_CENTER);
+    set_field_buffer(input_fields[0], 0,
                      "Change Driver Configuration");
-    field_opts_off(p_input_fields[0], O_ACTIVE);
+    field_opts_off(input_fields[0], O_ACTIVE);
 
-    p_input_fields[1] = new_field(1, 38, DSP_FIELD_START_ROW, 4,
+    input_fields[1] = new_field(1, 38, DSP_FIELD_START_ROW, 4,
                                   0, 0);
-    field_opts_off(p_input_fields[1], O_ACTIVE | O_EDIT);
-    set_field_buffer(p_input_fields[1], 0,
+    field_opts_off(input_fields[1], O_ACTIVE | O_EDIT);
+    set_field_buffer(input_fields[1], 0,
                      "Verbosity  . . . . . . . . . . . . . :");
 
-    p_input_fields[DEBUG_INDEX] = new_field(1, 3, DSP_FIELD_START_ROW, 44,
+    input_fields[DEBUG_INDEX] = new_field(1, 3, DSP_FIELD_START_ROW, 44,
                                             0, 0);
-    field_opts_off(p_input_fields[DEBUG_INDEX], O_EDIT);
+    field_opts_off(input_fields[DEBUG_INDEX], O_EDIT);
 
-    p_input_fields[5] = NULL;
+    input_fields[5] = NULL;
 
-    p_fields_form = new_form(p_input_fields);
+    fields_form = new_form(input_fields);
 
-    set_current_field(p_fields_form, p_input_fields[2]);
+    set_current_field(fields_form, input_fields[2]);
 
-    form_opts_off(p_fields_form, O_BS_OVERLOAD);
+    form_opts_off(fields_form, O_BS_OVERLOAD);
 
     flush_stdscr();
     clear();
 
-    set_form_win(p_fields_form,stdscr);
-    set_form_sub(p_fields_form,stdscr);
+    set_form_win(fields_form,stdscr);
+    set_form_sub(fields_form,stdscr);
 
-    post_form(p_fields_form);
+    post_form(fields_form);
 
     mvaddstr(2, 1, "Current Driver configurations are shown.  To change");
     mvaddstr(3, 1, "setting hit \"c\" for options menu.  Highlight desired");
@@ -9295,7 +9356,7 @@ int driver_config(i_container *i_con)
     refresh();
     doupdate();
 
-    form_driver(p_fields_form,
+    form_driver(fields_form,
                 REQ_FIRST_FIELD);
 
     while(1)
@@ -9305,13 +9366,13 @@ int driver_config(i_container *i_con)
         else
             sprintf(debug_level_str,"OFF");
 
-        set_field_buffer(p_input_fields[DEBUG_INDEX],
+        set_field_buffer(input_fields[DEBUG_INDEX],
                          0,
                          debug_level_str);
 
         if (form_adjust)
         {
-            form_driver(p_fields_form,
+            form_driver(fields_form,
                         REQ_NEXT_FIELD);
             form_adjust = 0;
             refresh();
@@ -9332,8 +9393,8 @@ int driver_config(i_container *i_con)
         }
         else if (ch == 'c')
         {
-            p_cur_field = current_field(p_fields_form);
-            cur_field_index = field_index(p_cur_field);
+            cur_field = current_field(fields_form);
+            cur_field_index = field_index(cur_field);
             if (cur_field_index == DEBUG_INDEX)
             {
                 menu_item = malloc(sizeof(ITEM **) *
@@ -9380,23 +9441,23 @@ int driver_config(i_container *i_con)
 
             if (rc != 0)
             {
-                syslog(LOG_ERR, "Write driver configuration failed. %m"IPR_EOL);
+                syslog(LOG_ERR, "Write driver configuration failed. %m\n");
                 return 58 | EXIT_FLAG; /* "Change Device Driver Configurations failed" */
             }
             goto leave;
         }
         else if (ch == '\t')
-            form_driver(p_fields_form, REQ_NEXT_FIELD);
+            form_driver(fields_form, REQ_NEXT_FIELD);
         else if (ch == KEY_UP)
-            form_driver(p_fields_form, REQ_PREV_FIELD);
+            form_driver(fields_form, REQ_PREV_FIELD);
         else if (ch == KEY_DOWN)
-            form_driver(p_fields_form, REQ_NEXT_FIELD);
+            form_driver(fields_form, REQ_NEXT_FIELD);
     }
 
     leave:
 
-        free_form(p_fields_form);
-    free_screen(NULL, NULL, p_input_fields);
+        free_form(fields_form);
+    free_screen(NULL, NULL, input_fields);
 
     if (rc == RC_SUCCESS)
         rc = 57 | EXIT_FLAG; /* "Change Device Driver Configurations completed successfully" */
@@ -9405,39 +9466,44 @@ int driver_config(i_container *i_con)
     return rc;
 }
 
-char *strip_trailing_whitespace(char *p_str)
+char *strip_trailing_whitespace(char *str)
 {
   int len;
-  char *p_tmp;
+  char *tmp;
 
-  len = strlen(p_str);
+  len = strlen(str);
 
   if (len == 0)
-    return p_str;
+    return str;
 
-  p_tmp = p_str + len - 1;
-  while(*p_tmp == ' ' || *p_tmp == '\n')
-    p_tmp--;
-  p_tmp++;
-  *p_tmp = '\0';
-  return p_str;
+  tmp = str + len - 1;
+  while(*tmp == ' ' || *tmp == '\n')
+    tmp--;
+  tmp++;
+  *tmp = '\0';
+  return str;
 }
 
-char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
-                   struct ipr_ioa *p_cur_ioa, int type)
+char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
+                   struct ipr_ioa *cur_ioa, int type)
 {
     u16 len = 0;
-    struct scsi_dev_data *p_scsi_dev_data = p_ipr_dev->p_scsi_dev_data;
+    struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
     int i, rc;
     struct ipr_query_res_state res_state;
     u8 ioctl_buffer[255];
     int status;
     int format_req = 0;
-     struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-    struct ipr_block_desc *p_block_desc;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_block_desc *block_desc;
     struct sense_data_t sense_data;
-    char *dev_name = p_ipr_dev->dev_name;
-    char *gen_name = p_ipr_dev->gen_name;
+    char *dev_name = ipr_dev->dev_name;
+    char *gen_name = ipr_dev->gen_name;
+    int tab_stop = 0;
+    char *vendor_id, *product_id;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
+    struct ipr_array_record *array_record;
 
     if (body)
         len = strlen(body);
@@ -9447,28 +9513,29 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
         len += sprintf(body + len, " %s  %-6s %s.%d/",
                        option,
                        &dev_name[5],
-                       p_cur_ioa->pci_address,
-                       p_cur_ioa->host_num);
+                       cur_ioa->pci_address,
+                       cur_ioa->host_num);
     else
         len += sprintf(body + len, " %s  %-6s %s.%d/",
                        option,
                        &gen_name[5],
-                       p_cur_ioa->pci_address,
-                       p_cur_ioa->host_num);
+                       cur_ioa->pci_address,
+                       cur_ioa->host_num);
 
 
-    if (p_scsi_dev_data->type == IPR_TYPE_ADAPTER)
+    if ((scsi_dev_data) &&
+        (scsi_dev_data->type == IPR_TYPE_ADAPTER))
     {
         if (type == 0)
             len += sprintf(body + len,"            %-8s %-16s ",
-                           p_scsi_dev_data->vendor_id,
-                           p_scsi_dev_data->product_id);
+                           scsi_dev_data->vendor_id,
+                           scsi_dev_data->product_id);
         else
             len += sprintf(body + len,"            %-25s ","SCSI Adapter");
 
-        if (p_cur_ioa->ioa_dead)
+        if (cur_ioa->ioa_dead)
             len += sprintf(body + len, "Not Operational\n");
-        else if (p_cur_ioa->nr_ioa_microcode)
+        else if (cur_ioa->nr_ioa_microcode)
         { 
             len += sprintf(body + len, "Not Ready\n");
         } 
@@ -9479,11 +9546,36 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
     }
     else
     {
-        int tab_stop  = sprintf(body + len,"%d:%d:%d ",
-                                p_scsi_dev_data->channel,
-                                p_scsi_dev_data->id,
-                                p_scsi_dev_data->lun);
+        if (scsi_dev_data) {
+            tab_stop  = sprintf(body + len,"%d:%d:%d ",
+                                scsi_dev_data->channel,
+                                scsi_dev_data->id,
+                                scsi_dev_data->lun);
 
+            vendor_id = scsi_dev_data->vendor_id;
+            product_id = scsi_dev_data->product_id;
+        }
+        else if (ipr_dev->qac_entry) {
+            common_record = ipr_dev->qac_entry;
+            if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
+                device_record = (struct ipr_dev_record *)common_record;
+                tab_stop  = sprintf(body + len,"%d:%d:%d ",
+                                    device_record->last_resource_addr.bus,
+                                    device_record->last_resource_addr.target,
+                                    device_record->last_resource_addr.lun);
+                vendor_id = array_record->vendor_id;
+                product_id = array_record->product_id;
+            } else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+                array_record = (struct ipr_array_record *)common_record;
+                tab_stop  = sprintf(body + len,"%d:%d:%d ",
+                                    array_record->last_resource_addr.bus,
+                                    array_record->last_resource_addr.target,
+                                    array_record->last_resource_addr.lun);
+                vendor_id = array_record->vendor_id;
+                product_id = array_record->product_id;
+            }
+        }
+        
         len += tab_stop;
 
         for (i=0;i<12-tab_stop;i++)
@@ -9493,28 +9585,28 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
 
         if (type == 0) {
             len += sprintf(body + len, "%-8s %-16s ",
-                           p_scsi_dev_data->vendor_id,
-                           p_scsi_dev_data->product_id);
+                           vendor_id,
+                           product_id);
         }
         else {
-            if (ipr_is_hot_spare(p_ipr_dev))
+            if (ipr_is_hot_spare(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "Hot Spare");
-            else if (ipr_is_volume_set(p_ipr_dev))
+            else if (ipr_is_volume_set(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "RAID #");
-            else if (ipr_is_array_member(p_ipr_dev))
+            else if (ipr_is_array_member(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "  RAID # Array Member");
-            else if (ipr_is_af_dasd_device(p_ipr_dev))
+            else if (ipr_is_af_dasd_device(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
             else
                 len += sprintf(body + len, "%-25s ", "Physical Disk");
         }
 
-        if (ipr_is_af(p_ipr_dev))
+        if (ipr_is_af(ipr_dev))
         {
             memset(&res_state, 0, sizeof(res_state));
 
             /* Do a query resource state */
-            rc = ipr_query_resource_state(p_ipr_dev->gen_name, &res_state);
+            rc = ipr_query_resource_state(ipr_dev->gen_name, &res_state);
 
             if (rc != 0)
                 res_state.not_oper = 1;
@@ -9526,26 +9618,26 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
             format_req = 0;
 
             /* Issue mode sense/mode select to determine if device needs to be formatted */
-            status = ipr_mode_sense(p_ipr_dev->gen_name, 0x0a, &ioctl_buffer);
+            status = ipr_mode_sense(ipr_dev->gen_name, 0x0a, &ioctl_buffer);
 
             if (status)
                 res_state.not_oper = 1;
             else {
-                p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
+                mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 
-                if (p_mode_parm_hdr->block_desc_len > 0)
+                if (mode_parm_hdr->block_desc_len > 0)
                 {
-                    p_block_desc = (struct ipr_block_desc *)(p_mode_parm_hdr+1);
+                    block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
 
-                    if ((p_block_desc->block_length[1] != 0x02) ||
-                        (p_block_desc->block_length[2] != 0x00))
+                    if ((block_desc->block_length[1] != 0x02) ||
+                        (block_desc->block_length[2] != 0x00))
                     {
                         format_req = 1;
                     }
                     else
                     {
                         /* check device with test unit ready */
-                        rc = ipr_test_unit_ready(p_ipr_dev->gen_name, &sense_data);
+                        rc = ipr_test_unit_ready(ipr_dev->gen_name, &sense_data);
 
                         if ((rc < 0) || (rc == CHECK_CONDITION))
                             format_req = 1;
@@ -9554,12 +9646,16 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
             }
         }
 
-        if (res_state.not_oper)
+        if (!scsi_dev_data)
+            sprintf(body + len, "Missing\n");
+        if (!scsi_dev_data->online)
+            sprintf(body + len, "Offline\n");
+        else if (res_state.not_oper)
             sprintf(body + len, "Not Operational\n");
         else if (res_state.not_ready ||
                  (res_state.read_write_prot && (iprtoh32(res_state.failing_dev_ioasc) == 0x02040200u)))
             sprintf(body + len, "Not ready\n");
-        else if ((res_state.read_write_prot) || (is_rw_protected(p_ipr_dev)))
+        else if ((res_state.read_write_prot) || (is_rw_protected(ipr_dev)))
             sprintf(body + len, "R/W Protected\n");
         else if (res_state.prot_dev_failed)
             sprintf(body + len, "DPY/Failed\n");
@@ -9575,9 +9671,9 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
             sprintf(body + len, "Format Required\n");
         else
         {
-            if (ipr_is_array_member(p_ipr_dev))
+            if (ipr_is_array_member(ipr_dev))
                 sprintf(body + len, "DPY/Active\n");
-            else if (ipr_is_hot_spare(p_ipr_dev))
+            else if (ipr_is_hot_spare(ipr_dev))
                 sprintf(body + len, "HS/Active\n");
             else
                 sprintf(body + len, "Operational\n");
@@ -9586,31 +9682,33 @@ char *print_device(struct ipr_device *p_ipr_dev, char *body, char *option,
     return body;
 }
 
-int is_format_allowed(struct ipr_device *p_ipr_dev)
+int is_format_allowed(struct ipr_dev *ipr_dev)
 {
   return 1;
 }
 
-int is_rw_protected(struct ipr_device *p_ipr_dev)
+int is_rw_protected(struct ipr_dev *ipr_dev)
 {
   return 0;  //FIXME
 }
 
-void evaluate_device(struct ipr_device *p_ipr_device, struct ipr_ioa *p_ioa, int change_size)
+void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa, int change_size)
 {
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct scsi_dev_data *scsi_dev_data;
     struct ipr_res_addr res_addr;
     int device_converted;
     int timeout = 60;
 
     /* send evaluate device down */
-    p_scsi_dev_data = p_ipr_device->p_scsi_dev_data;
+    scsi_dev_data = ipr_dev->scsi_dev_data;
+    if (scsi_dev_data == NULL)
+        return;
 
-    ipr_evaluate_device(p_ioa->ioa.gen_name, p_scsi_dev_data->handle);
+    ipr_evaluate_device(ioa->ioa.gen_name, scsi_dev_data->handle);
 
-    res_addr.bus = p_scsi_dev_data->channel;
-    res_addr.target = p_scsi_dev_data->id;
-    res_addr.lun = p_scsi_dev_data->lun;
+    res_addr.bus = scsi_dev_data->channel;
+    res_addr.target = scsi_dev_data->id;
+    res_addr.lun = scsi_dev_data->lun;
 
     device_converted = 0;
 
@@ -9656,83 +9754,66 @@ int flush_line()
 }
 
 /*not needed after screen_driver can do menus */
-void free_screen(struct panel_l *p_panel, struct window_l *p_win, FIELD **p_fields)
+void free_screen(struct panel_l *panel, struct window_l *win, FIELD **fields)
 {
-    struct panel_l *p_cur_panel;
-    struct window_l *p_cur_win;
+    struct panel_l *cur_panel;
+    struct window_l *cur_win;
     int i;
 
-    p_cur_panel = p_panel;
-    while(p_cur_panel)
+    cur_panel = panel;
+    while(cur_panel)
     {
-        p_panel = p_panel->next;
-        del_panel(p_cur_panel->p_panel);
-        free(p_cur_panel);
-        p_cur_panel = p_panel;
+        panel = panel->next;
+        del_panel(cur_panel->panel);
+        free(cur_panel);
+        cur_panel = panel;
     }
-    p_cur_win = p_win;
-    while(p_cur_win)
+    cur_win = win;
+    while(cur_win)
     {
-        p_win = p_win->next;
-        delwin(p_cur_win->p_win);
-        free(p_cur_win);
-        p_cur_win = p_win;
+        win = win->next;
+        delwin(cur_win->win);
+        free(cur_win);
+        cur_win = win;
     }
 
-    if (p_fields)
+    if (fields)
     {
-        for (i = 0; p_fields[i] != NULL; i++)
+        for (i = 0; fields[i] != NULL; i++)
         {
-            free_field(p_fields[i]);
+            free_field(fields[i]);
         }
     }
 }
 
-int is_array_in_use(struct ipr_ioa *p_cur_ioa,
+int is_array_in_use(struct ipr_ioa *cur_ioa,
                     u8 array_id)
 {
     int j, opens;
-    struct ipr_device_record *p_device_record;
-    struct ipr_array2_record *p_array2_record;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct ipr_dev_record *device_record;
+    struct ipr_array_record *array_record;
+    struct scsi_dev_data *scsi_dev_data;
 
-    for (j = 0; j < p_cur_ioa->num_devices; j++)
+    for (j = 0; j < cur_ioa->num_devices; j++)
     {
-        p_device_record = (struct ipr_device_record *)p_cur_ioa->dev[j].p_qac_entry;
-        p_array2_record = (struct ipr_array2_record *)p_cur_ioa->dev[j].p_qac_entry;
+        device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
+        array_record = (struct ipr_array_record *)cur_ioa->dev[j].qac_entry;
 
-        if (p_device_record == NULL)
+        if (device_record == NULL)
             continue;
 
-        if (p_device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD)
+        if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
         {
-            if ((array_id == p_device_record->array_id) &&
-                ((p_device_record->start_cand) ||
-                 (p_device_record->stop_cand)))
+            if (array_id == array_record->array_id)
             {
-                p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-                opens = num_device_opens(p_scsi_dev_data->host,
-                                         p_scsi_dev_data->channel,
-                                         p_scsi_dev_data->id,
-                                         p_scsi_dev_data->lun);
+                scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
+                if (scsi_dev_data == NULL)
+                    continue;
 
-                if (opens != 0)
-                    return 1;
-            }
-        }
-        /* there is no need to check the devices for an array2 start candidate
-         as the devices are not accessible to linux.  for stop candidate the
-         status of the volume set must be checked as this is the linux
-         accessible device which may be in use */
-        else if (p_array2_record->common.record_id == IPR_RECORD_ID_ARRAY2_RECORD)
-        {
-            if (array_id == p_array2_record->array_id)
-            {
-                p_scsi_dev_data = p_cur_ioa->dev[j].p_scsi_dev_data;
-                opens = num_device_opens(p_scsi_dev_data->host,
-                                         p_scsi_dev_data->channel,
-                                         p_scsi_dev_data->id,
-                                         p_scsi_dev_data->lun);
+                opens = num_device_opens(scsi_dev_data->host,
+                                         scsi_dev_data->channel,
+                                         scsi_dev_data->id,
+                                         scsi_dev_data->lun);
 
                 if (opens != 0)
                     return 1;

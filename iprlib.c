@@ -9,18 +9,18 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.5 2004/01/29 17:36:29 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.6 2004/01/30 16:49:52 manderso Exp $
  */
 
 #ifndef iprlib_h
 #include "iprlib.h"
 #endif
 
-struct ipr_array_query_data *p_ipr_array_query_data = NULL;
-struct scsi_dev_data *p_scsi_dev_table = NULL;
+struct ipr_array_query_data *ipr_qac_data = NULL;
+struct scsi_dev_data *scsi_dev_table = NULL;
 u32 num_ioas = 0;
-struct ipr_ioa *p_head_ipr_ioa = NULL;
-struct ipr_ioa *p_last_ipr_ioa = NULL;
+struct ipr_ioa *ipr_ioa_head = NULL;
+struct ipr_ioa *ipr_ioa_tail = NULL;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -261,9 +261,9 @@ struct unsupported_af_dasd unsupported_af[] =
 void tool_init(char *tool_name)
 {
     int ccin;
-    struct ipr_ioa *p_ipr_ioa;
+    struct ipr_ioa *ipr_ioa;
     struct sysfs_driver *sysfs_ipr_driver;
-    struct dlist *ipr_devices;
+    struct dlist *ipr_devs;
     char *pci_address;
 
     struct sysfs_class *sysfs_host_class;
@@ -283,19 +283,19 @@ void tool_init(char *tool_name)
         return;
     }
 
-    ipr_devices = sysfs_get_driver_devices(sysfs_ipr_driver);
+    ipr_devs = sysfs_get_driver_devices(sysfs_ipr_driver);
 
-    if (ipr_devices != NULL) {
-        dlist_for_each_data(ipr_devices, pci_address, char) {
+    if (ipr_devs != NULL) {
+        dlist_for_each_data(ipr_devs, pci_address, char) {
 
-            p_ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
-            memset(p_ipr_ioa,0,sizeof(struct ipr_ioa));
+            ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
+            memset(ipr_ioa,0,sizeof(struct ipr_ioa));
 
             /* PCI address */
-            strcpy(p_ipr_ioa->pci_address, pci_address);
+            strcpy(ipr_ioa->pci_address, pci_address);
 
             /* driver version */
-            strcpy(p_ipr_ioa->driver_version,"2");  //FIXME pick up version from modinfo?
+            strcpy(ipr_ioa->driver_version,"2");  //FIXME pick up version from modinfo?
 
             sysfs_host_class = sysfs_open_class("scsi_host");
             class_devices = sysfs_get_class_devices(sysfs_host_class);
@@ -304,8 +304,8 @@ void tool_init(char *tool_name)
                 sysfs_pci_device = sysfs_get_device_parent(sysfs_host_device);
 
                 if (strcmp(pci_address, sysfs_pci_device->name) == 0) {
-                    strcpy(p_ipr_ioa->host_name, sysfs_host_device->name);
-                    sscanf(p_ipr_ioa->host_name, "host%d", &p_ipr_ioa->host_num);
+                    strcpy(ipr_ioa->host_name, sysfs_host_device->name);
+                    sscanf(ipr_ioa->host_name, "host%d", &ipr_ioa->host_num);
                     break;
                 }
             }
@@ -317,28 +317,28 @@ void tool_init(char *tool_name)
                 sysfs_device_device = sysfs_get_classdev_device(class_device);
                 sysfs_host_device = sysfs_get_device_parent(sysfs_device_device);
 
-                if ((strcmp(p_ipr_ioa->host_name, sysfs_host_device->name) == 0) && 
+                if ((strcmp(ipr_ioa->host_name, sysfs_host_device->name) == 0) && 
                     (strstr(sysfs_device_device->name, ":255:255:255"))) {
 
                     sysfs_model_attr = sysfs_get_device_attr(sysfs_device_device, "model");
                     sscanf(sysfs_model_attr->value, "%4X", &ccin);
-                    p_ipr_ioa->ccin = ccin;
+                    ipr_ioa->ccin = ccin;
                     break;
                 }
             }
             sysfs_close_class(sysfs_device_class);
 
-            p_ipr_ioa->next = NULL;
-            p_ipr_ioa->num_raid_cmds = 0;
+            ipr_ioa->next = NULL;
+            ipr_ioa->num_raid_cmds = 0;
 
-            if (p_last_ipr_ioa)
+            if (ipr_ioa_tail)
             {
-                p_last_ipr_ioa->next = p_ipr_ioa;
-                p_last_ipr_ioa = p_ipr_ioa;
+                ipr_ioa_tail->next = ipr_ioa;
+                ipr_ioa_tail = ipr_ioa;
             }
             else
             {
-                p_last_ipr_ioa = p_head_ipr_ioa = p_ipr_ioa;
+                ipr_ioa_tail = ipr_ioa_head = ipr_ioa;
             }
 
             num_ioas++;
@@ -351,29 +351,35 @@ void tool_init(char *tool_name)
 }
 
 /* Try to dynamically add this device */
-int scan_device(struct scsi_dev_data *p_scsi_dev_data)
+int scan_device(struct scsi_dev_data *scsi_dev_data)
 {
     char cmd[200];
 
+    if (!scsi_dev_data)
+        return -1;
+
     sprintf(cmd, "echo \"scsi add-single-device %d %d %d %d\" > /proc/scsi/scsi",
-            p_scsi_dev_data->host,
-            p_scsi_dev_data->channel,
-            p_scsi_dev_data->id,
-            p_scsi_dev_data->lun);
+            scsi_dev_data->host,
+            scsi_dev_data->channel,
+            scsi_dev_data->id,
+            scsi_dev_data->lun);
     system(cmd);
     return 0;
 }
 
 /* Try to dynamically remove this device */
-int remove_device(struct scsi_dev_data *p_scsi_dev_data)
+int remove_device(struct scsi_dev_data *scsi_dev_data)
 {
     char cmd[200];
 
+    if (!scsi_dev_data)
+        return -1;
+
     sprintf(cmd, "echo \"scsi remove-single-device %d %d %d %d\" > /proc/scsi/scsi",
-            p_scsi_dev_data->host,
-            p_scsi_dev_data->channel,
-            p_scsi_dev_data->id,
-            p_scsi_dev_data->lun);
+            scsi_dev_data->host,
+            scsi_dev_data->channel,
+            scsi_dev_data->id,
+            scsi_dev_data->lun);
     system(cmd);
     return 0;
 }
@@ -437,14 +443,14 @@ int ipr_query_array_config(char *file, bool allow_rebuild_refresh,
     return rc;
 }
 
-int ipr_start_array(char *file, struct ipr_array_query_data *p_qac_data,
+int ipr_start_array(char *file, struct ipr_array_query_data *qac_data,
                     int stripe_size, int prot_level, int hot_spare)
 {
     int fd;
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(p_qac_data->resp_len);
+    int length = iprtoh16(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -465,7 +471,7 @@ int ipr_start_array(char *file, struct ipr_array_query_data *p_qac_data,
     cdb[7] = (length & 0xff00) >> 8;
     cdb[8] = length & 0xff;
 
-    rc = sg_ioctl(fd, cdb, p_qac_data,
+    rc = sg_ioctl(fd, cdb, qac_data,
                   length, SG_DXFER_TO_DEV,
                   &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -476,24 +482,24 @@ int ipr_start_array(char *file, struct ipr_array_query_data *p_qac_data,
     return rc;
 }
 
-int ipr_start_array_protection(char *file, struct ipr_array_query_data *p_qac_data,
+int ipr_start_array_protection(char *file, struct ipr_array_query_data *qac_data,
                                int stripe_size, int prot_level)
 {
-    return ipr_start_array(file, p_qac_data, stripe_size, prot_level, 0);
+    return ipr_start_array(file, qac_data, stripe_size, prot_level, 0);
 }
 
-int ipr_add_hot_spare(char *file, struct ipr_array_query_data *p_qac_data)
+int ipr_add_hot_spare(char *file, struct ipr_array_query_data *qac_data)
 {
-    return ipr_start_array(file, p_qac_data, 0, 0, 1);
+    return ipr_start_array(file, qac_data, 0, 0, 1);
 }
 
-int ipr_stop_array(char *file, struct ipr_array_query_data *p_qac_data, int hot_spare)
+int ipr_stop_array(char *file, struct ipr_array_query_data *qac_data, int hot_spare)
 {
     int fd;
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(p_qac_data->resp_len);
+    int length = iprtoh16(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -511,7 +517,7 @@ int ipr_stop_array(char *file, struct ipr_array_query_data *p_qac_data, int hot_
     cdb[7] = (length & 0xff00) >> 8;
     cdb[8] = length & 0xff;
 
-    rc = sg_ioctl(fd, cdb, p_qac_data,
+    rc = sg_ioctl(fd, cdb, qac_data,
                   length, SG_DXFER_TO_DEV,
                   &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -522,23 +528,23 @@ int ipr_stop_array(char *file, struct ipr_array_query_data *p_qac_data, int hot_
     return rc;
 }
 
-int ipr_stop_array_protection(char *file, struct ipr_array_query_data *p_qac_data)
+int ipr_stop_array_protection(char *file, struct ipr_array_query_data *qac_data)
 {
-    return ipr_stop_array(file, p_qac_data, 0);
+    return ipr_stop_array(file, qac_data, 0);
 }
 
-int ipr_remove_hot_spare(char *file, struct ipr_array_query_data *p_qac_data)
+int ipr_remove_hot_spare(char *file, struct ipr_array_query_data *qac_data)
 {
-    return ipr_stop_array(file, p_qac_data, 1);
+    return ipr_stop_array(file, qac_data, 1);
 }
 
-int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *p_qac_data)
+int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *qac_data)
 {
     int fd;
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(p_qac_data->resp_len);
+    int length = iprtoh16(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -553,7 +559,7 @@ int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *p_qac_data)
     cdb[7] = (length & 0xff00) >> 8;
     cdb[8] = length & 0xff;
 
-    rc = sg_ioctl(fd, cdb, p_qac_data,
+    rc = sg_ioctl(fd, cdb, qac_data,
                   length, SG_DXFER_TO_DEV,
                   &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -564,13 +570,13 @@ int ipr_rebuild_device_data(char *file, struct ipr_array_query_data *p_qac_data)
     return rc;
 }
 
-int ipr_add_array_device(char *file, struct ipr_array_query_data *p_qac_data)
+int ipr_add_array_device(char *file, struct ipr_array_query_data *qac_data)
 {
     int fd;
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc;
-    int length = iprtoh16(p_qac_data->resp_len);
+    int length = iprtoh16(qac_data->resp_len);
 
     fd = open(file, O_RDWR);
     if (fd <= 1)
@@ -585,7 +591,7 @@ int ipr_add_array_device(char *file, struct ipr_array_query_data *p_qac_data)
     cdb[7] = (length & 0xff00) >> 8;
     cdb[8] = length & 0xff;
 
-    rc = sg_ioctl(fd, cdb, p_qac_data,
+    rc = sg_ioctl(fd, cdb, qac_data,
                   length, SG_DXFER_TO_DEV,
                   &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -668,7 +674,7 @@ int ipr_mode_sense(char *file, u8 page, void *buff)
     struct sense_data_t sense_data;
     int rc, loop;
     u8 length = IPR_MODE_SENSE_LENGTH;
-    char *p_char;
+    char *hex;
     char buffer[128];
 
     fd = open(file, O_RDWR);
@@ -692,11 +698,11 @@ int ipr_mode_sense(char *file, u8 page, void *buff)
         syslog(LOG_ERR, "Mode Sense to %s failed. %m\n", file);
 
         if (rc == CHECK_CONDITION) {
-            p_char = (u8 *)&sense_data;
+            hex = (u8 *)&sense_data;
 
             length = 0;
             for (loop = 0; loop < 18; loop++)
-                length += sprintf(buffer + length,"%.2x ", p_char[loop + 8]);
+                length += sprintf(buffer + length,"%.2x ", hex[loop + 8]);
 
             syslog(LOG_ERR, "sense data = %s\n", buffer);
         }
@@ -977,9 +983,9 @@ int ipr_format_unit(char *file)
     u8 cdb[IPR_CCB_CDB_LEN];
     struct sense_data_t sense_data;
     int rc, loop;
-    u8 *p_defect_list_hdr;
+    u8 *defect_list_hdr;
     int length = IPR_DEFECT_LIST_HDR_LEN;
-    char *p_char;
+    char *hex;
     char buffer[128];
 
     fd = open(file, O_RDWR);
@@ -991,27 +997,27 @@ int ipr_format_unit(char *file)
 
     memset(cdb, 0, IPR_CCB_CDB_LEN);
 
-    p_defect_list_hdr = calloc(1, IPR_DEFECT_LIST_HDR_LEN);
+    defect_list_hdr = calloc(1, IPR_DEFECT_LIST_HDR_LEN);
 
     cdb[0] = FORMAT_UNIT;
     cdb[1] = IPR_FORMAT_DATA; /* lun = 0, fmtdata = 1, cmplst = 0, defect list format = 0 */
     cdb[4] = 1;
 
-    p_defect_list_hdr[1] = IPR_FORMAT_IMMED; /* FOV = 0, DPRY = 0, DCRT = 0, STPF = 0, IP = 0, DSP = 0, Immed = 1, VS = 0 */
+    defect_list_hdr[1] = IPR_FORMAT_IMMED; /* FOV = 0, DPRY = 0, DCRT = 0, STPF = 0, IP = 0, DSP = 0, Immed = 1, VS = 0 */
 
-    rc = sg_ioctl(fd, cdb, p_defect_list_hdr,
+    rc = sg_ioctl(fd, cdb, defect_list_hdr,
                   length, SG_DXFER_TO_DEV,
                   &sense_data, IPR_FORMAT_UNIT_TIMEOUT);
 
-    free(p_defect_list_hdr);
+    free(defect_list_hdr);
 
     if (rc != 0) {
         syslog(LOG_ERR, "Format Unit to %s failed. %m\n", file);
-        p_char = (u8 *)&sense_data;
+        hex = (u8 *)&sense_data;
 
         length = 0;
         for (loop = 0; loop < 18; loop++)
-            length += sprintf(buffer + length,"%.2x ", p_char[loop + 8]);
+            length += sprintf(buffer + length,"%.2x ", hex[loop + 8]);
 
         syslog(LOG_ERR, "sense data = %s\n", buffer);
     }
@@ -1093,15 +1099,15 @@ int ipr_inquiry(char *file, u8 page, void *buff, u8 length)
 }
 
 #define IPR_MAX_XFER 0x8000
-const int cdb_size[] ={6, 10, 10, 0, 0, 12, 16, 16};
+const int cdb_size[] ={6, 10, 10, 0, 16, 12, 16, 16};
 int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
-             void *p_data, u32 xfer_len, u32 data_direction,
-             struct sense_data_t *p_sense_data,
+             void *data, u32 xfer_len, u32 data_direction,
+             struct sense_data_t *sense_data,
              u32 timeout_in_sec)
 {
     int rc;
     sg_io_hdr_t io_hdr_t;
-    sg_iovec_t *p_iovec;
+    sg_iovec_t *iovec;
     int iovec_count;
     int i;
     int buff_len, segment_size;
@@ -1111,35 +1117,34 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
     if (xfer_len > IPR_MAX_XFER)
     {
         iovec_count = xfer_len/IPR_MAX_XFER + 1;
-        p_iovec = malloc(iovec_count * sizeof(sg_iovec_t));
+        iovec = malloc(iovec_count * sizeof(sg_iovec_t));
 
         buff_len = xfer_len;
         segment_size = IPR_MAX_XFER;
 
         for (i = 0; (i < iovec_count) && (buff_len != 0); i++)
         {
-            
-            p_iovec[i].iov_base = malloc(IPR_MAX_XFER);
-            memcpy(p_iovec[i].iov_base, p_data + IPR_MAX_XFER * i, IPR_MAX_XFER);
-            p_iovec[i].iov_len = segment_size;
+            iovec[i].iov_base = malloc(IPR_MAX_XFER);
+            memcpy(iovec[i].iov_base, data + IPR_MAX_XFER * i, IPR_MAX_XFER);
+            iovec[i].iov_len = segment_size;
 
             buff_len -= segment_size;
             if (buff_len < segment_size)
                 segment_size = buff_len;
         }
         iovec_count = i;
-        dxferp = (void *)p_iovec;
+        dxferp = (void *)iovec;
     }
     else
     {
         iovec_count = 0;
-        dxferp = p_data;
+        dxferp = data;
     }
 
     for (i = 0; i < 2; i++)
     {
         memset(&io_hdr_t, 0, sizeof(io_hdr_t));
-        memset(p_sense_data, 0, sizeof(struct sense_data_t));
+        memset(sense_data, 0, sizeof(struct sense_data_t));
 
         io_hdr_t.interface_id = 'S';
         io_hdr_t.cmd_len = cdb_size[(cdb[0] >> 5) & 0x7];
@@ -1147,7 +1152,7 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
         io_hdr_t.flags = 0;
         io_hdr_t.pack_id = 0;
         io_hdr_t.usr_ptr = 0;
-        io_hdr_t.sbp = (unsigned char *)p_sense_data;
+        io_hdr_t.sbp = (unsigned char *)sense_data;
         io_hdr_t.mx_sb_len = sizeof(struct sense_data_t);
         io_hdr_t.timeout = timeout_in_sec * 1000;
         io_hdr_t.cmdp = cdb;
@@ -1160,22 +1165,22 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
         if ((rc == 0) && (io_hdr_t.masked_status == CHECK_CONDITION))
             rc = CHECK_CONDITION;
 
-        if ((rc != CHECK_CONDITION) || (p_sense_data->sense_key != UNIT_ATTENTION))
+        if ((rc != CHECK_CONDITION) || (sense_data->sense_key != UNIT_ATTENTION))
             break;
     }
 
     if (iovec_count)
     {
         for (i = 0; i < iovec_count; i++)
-            free(p_iovec[i].iov_base);
-        free(p_iovec);
+            free(iovec[i].iov_base);
+        free(iovec);
     }
 
     return rc;
 };
 
-#define MAX_SG_DEVS 128  //FIXME!!!
-#define MAX_SD_DEVS 128
+#define MAX_SG_DEVS 255  //FIXME!!!
+#define MAX_SD_DEVS 255
 static void make_dev_name(char * fname, const char * leadin, int k, 
                           int do_numeric)
 {
@@ -1245,7 +1250,7 @@ int get_sd_proc_data(char *sd_name, int *major_num, int *minor_num)
     return 1;
 }
 
-void get_sg_ioctl_data(struct sg_map_info *p_sg_map_info, int num_devs)
+void get_sg_ioctl_data(struct sg_map_info *sg_map_info, int num_devs)
 {
     int sg_index, sd_index, fd, rc;
     int num_sg_devices = 0;
@@ -1269,30 +1274,30 @@ void get_sg_ioctl_data(struct sg_map_info *p_sg_map_info, int num_devs)
          (sg_index < MAX_SG_DEVS) && (num_sg_devices < num_devs);
          sg_index++)
     {
-        temp = &p_sg_map_info[num_sg_devices];
+        temp = &sg_map_info[num_sg_devices];
 
-        memset(p_sg_map_info[num_sg_devices].gen_name, 0, sizeof(p_sg_map_info[num_sg_devices].gen_name));
-        make_dev_name(p_sg_map_info[num_sg_devices].gen_name, "/dev/sg", sg_index, 1);
-        fd = open(p_sg_map_info[num_sg_devices].gen_name, O_RDONLY | O_NONBLOCK);
+        memset(sg_map_info[num_sg_devices].gen_name, 0, sizeof(sg_map_info[num_sg_devices].gen_name));
+        make_dev_name(sg_map_info[num_sg_devices].gen_name, "/dev/sg", sg_index, 1);
+        fd = open(sg_map_info[num_sg_devices].gen_name, O_RDONLY | O_NONBLOCK);
 
         if (fd < 0)
         {
             if (errno == ENOENT)
             {
-                mknod(p_sg_map_info[num_sg_devices].gen_name,
+                mknod(sg_map_info[num_sg_devices].gen_name,
                       S_IFCHR|0660,
                       makedev(21,sg_index));
 
                 /* change permissions and owner to be identical to
                  /dev/sg0's */
                 stat("/dev/sg0", &sda_stat);
-                chown(p_sg_map_info[num_sg_devices].gen_name,
+                chown(sg_map_info[num_sg_devices].gen_name,
                       sda_stat.st_uid,
                       sda_stat.st_gid);
-                chmod(p_sg_map_info[num_sg_devices].gen_name,
+                chmod(sg_map_info[num_sg_devices].gen_name,
                       sda_stat.st_mode);
 
-                fd = open(p_sg_map_info[num_sg_devices].gen_name, O_RDONLY | O_NONBLOCK);
+                fd = open(sg_map_info[num_sg_devices].gen_name, O_RDONLY | O_NONBLOCK);
                 if (fd < 0)
                     continue;
             }
@@ -1300,15 +1305,15 @@ void get_sg_ioctl_data(struct sg_map_info *p_sg_map_info, int num_devs)
                 continue;
         }
 
-        rc = ioctl(fd, SG_GET_SCSI_ID, &p_sg_map_info[num_sg_devices].sg_dat);
+        rc = ioctl(fd, SG_GET_SCSI_ID, &sg_map_info[num_sg_devices].sg_dat);
 
         close(fd);
         if ((rc >= 0) &&
-            (p_sg_map_info[num_sg_devices].sg_dat.scsi_type == IPR_TYPE_DISK))
+            (sg_map_info[num_sg_devices].sg_dat.scsi_type == IPR_TYPE_DISK))
         {
             temp_max_sd_devs = 0;
 
-            memset(p_sg_map_info[num_sg_devices].dev_name, 0, sizeof(p_sg_map_info[num_sg_devices].dev_name));
+            memset(sg_map_info[num_sg_devices].dev_name, 0, sizeof(sg_map_info[num_sg_devices].dev_name));
             for (sd_index = 0; sd_index < max_sd_devs; sd_index++)
             {
                 if (used_sd[sd_index])
@@ -1358,12 +1363,12 @@ void get_sg_ioctl_data(struct sg_map_info *p_sg_map_info, int num_devs)
                     continue;
                 }
 
-                if ((p_sg_map_info[num_sg_devices].sg_dat.host_no == ((dev_idlun.dev_id >> 24) & 0xFF)) &&
-                    (p_sg_map_info[num_sg_devices].sg_dat.channel == ((dev_idlun.dev_id >> 16) & 0xFF)) &&
-                    (p_sg_map_info[num_sg_devices].sg_dat.scsi_id == (dev_idlun.dev_id & 0xFF)) &&
-                    (p_sg_map_info[num_sg_devices].sg_dat.lun     == ((dev_idlun.dev_id >>  8) & 0xFF)))
+                if ((sg_map_info[num_sg_devices].sg_dat.host_no == ((dev_idlun.dev_id >> 24) & 0xFF)) &&
+                    (sg_map_info[num_sg_devices].sg_dat.channel == ((dev_idlun.dev_id >> 16) & 0xFF)) &&
+                    (sg_map_info[num_sg_devices].sg_dat.scsi_id == (dev_idlun.dev_id & 0xFF)) &&
+                    (sg_map_info[num_sg_devices].sg_dat.lun     == ((dev_idlun.dev_id >>  8) & 0xFF)))
                 {
-                    strcpy(p_sg_map_info[num_sg_devices].dev_name, tmp_dev_name);
+                    strcpy(sg_map_info[num_sg_devices].dev_name, tmp_dev_name);
                     temp_max_sd_devs = max_sd_devs;
                     used_sd[sd_index] = 1;
                     break;
@@ -1372,16 +1377,18 @@ void get_sg_ioctl_data(struct sg_map_info *p_sg_map_info, int num_devs)
             max_sd_devs = temp_max_sd_devs;
             num_sg_devices++;
         } else if (rc >= 0) {
-            strcpy(p_sg_map_info[num_sg_devices].dev_name, "");
+            strcpy(sg_map_info[num_sg_devices].dev_name, "");
             num_sg_devices++;
         }
     }
     return;
 }
 
-int get_scsi_dev_data(struct scsi_dev_data *p_scsi_dev_data)
+int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 {
     int num_devs = 0;
+    struct scsi_dev_data *scsi_dev_data;
+    struct scsi_dev_data *scsi_dev_base = *scsi_dev_ref;
     struct sysfs_class *sysfs_device_class;
     struct dlist *class_devices;
     struct sysfs_class_device *class_device;
@@ -1392,174 +1399,189 @@ int get_scsi_dev_data(struct scsi_dev_data *p_scsi_dev_data)
     sysfs_device_class = sysfs_open_class("scsi_device");
     class_devices = sysfs_get_class_devices(sysfs_device_class);
     dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
+
+        scsi_dev_base = realloc(scsi_dev_base,
+                                sizeof(struct scsi_dev_data) * (num_devs + 1));
+        scsi_dev_data = &scsi_dev_base[num_devs];
+
         sysfs_device_device = sysfs_get_classdev_device(class_device);
         if (sysfs_device_device)
             sscanf(sysfs_device_device->name,"%d:%d:%d:%d",
-                   &p_scsi_dev_data->host,
-                   &p_scsi_dev_data->channel,
-                   &p_scsi_dev_data->id,
-                   &p_scsi_dev_data->lun);
-        else
+                   &scsi_dev_data->host,
+                   &scsi_dev_data->channel,
+                   &scsi_dev_data->id,
+                   &scsi_dev_data->lun);
+        else {
+            *scsi_dev_ref = scsi_dev_base;
             return -1;
+        }
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "type");
         if (sysfs_attr)
-            sscanf(sysfs_attr->value, "%d", &p_scsi_dev_data->type);
+            sscanf(sysfs_attr->value, "%d", &scsi_dev_data->type);
 
 //FIXME WHERE TO GET OPENS!!!
 /*
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "opens");
-        sscanf(sysfs_attr->value "%d", &p_scsi_dev_data->opens);
-*/      p_scsi_dev_data->opens = 0;
+        sscanf(sysfs_attr->value "%d", &scsi_dev_data->opens);
+*/      scsi_dev_data->opens = 0;
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "online");
         if (sysfs_attr)
-            sscanf(sysfs_attr->value, "%d", &p_scsi_dev_data->online);
+            sscanf(sysfs_attr->value, "%d", &scsi_dev_data->online);
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "queue_depth");
         if (sysfs_attr)
-            sscanf(sysfs_attr->value, "%d", &p_scsi_dev_data->qdepth);
+            sscanf(sysfs_attr->value, "%d", &scsi_dev_data->qdepth);
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "adapter_handle");
         if (sysfs_attr)
-            sscanf(sysfs_attr->value, "%d", &p_scsi_dev_data->handle);
+            sscanf(sysfs_attr->value, "%d", &scsi_dev_data->handle);
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "vendor");
         if (sysfs_attr)
-            ipr_strncpy_0(p_scsi_dev_data->vendor_id, sysfs_attr->value, IPR_VENDOR_ID_LEN);
+            ipr_strncpy_0(scsi_dev_data->vendor_id, sysfs_attr->value, IPR_VENDOR_ID_LEN);
 
         sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "model");
         if (sysfs_attr)
-            ipr_strncpy_0(p_scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
+            ipr_strncpy_0(scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
 
-        p_scsi_dev_data++;
         num_devs++;
     }
     sysfs_close_class(sysfs_device_class);
 
+    *scsi_dev_ref = scsi_dev_base;
     return num_devs;
 }
 
-void get_ioa_name(struct ipr_ioa *p_cur_ioa,
-                  struct sg_map_info *p_sg_map_info,
+void get_ioa_name(struct ipr_ioa *cur_ioa,
+                  struct sg_map_info *sg_map_info,
                   int num_sg_devices)
 {
     int i;
     int host_no;
 
-    sscanf(p_cur_ioa->host_name, "host%d", &host_no);
+    sscanf(cur_ioa->host_name, "host%d", &host_no);
 
-    for (i = 0; i < num_sg_devices; i++, p_sg_map_info++) {
-        if ((p_sg_map_info->sg_dat.host_no == host_no)   &&
-            (p_sg_map_info->sg_dat.channel == 255) &&
-            (p_sg_map_info->sg_dat.scsi_id == 255) &&
-            (p_sg_map_info->sg_dat.lun     == 255) &&
-            (p_sg_map_info->sg_dat.scsi_type == IPR_TYPE_ADAPTER)) {
+    for (i = 0; i < num_sg_devices; i++, sg_map_info++) {
+        if ((sg_map_info->sg_dat.host_no == host_no)   &&
+            (sg_map_info->sg_dat.channel == 255) &&
+            (sg_map_info->sg_dat.scsi_id == 255) &&
+            (sg_map_info->sg_dat.lun     == 255) &&
+            (sg_map_info->sg_dat.scsi_type == IPR_TYPE_ADAPTER)) {
 
-            strcpy(p_cur_ioa->ioa.dev_name, p_sg_map_info->dev_name);
-            strcpy(p_cur_ioa->ioa.gen_name, p_sg_map_info->gen_name);
+            strcpy(cur_ioa->ioa.dev_name, sg_map_info->dev_name);
+            strcpy(cur_ioa->ioa.gen_name, sg_map_info->gen_name);
         }
     }
 }
 
 void check_current_config(bool allow_rebuild_refresh)
 {
-    struct sg_map_info *p_sg_map_info;
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct sg_map_info *sg_map_info;
+    struct scsi_dev_data *scsi_dev_data;
     int  num_sg_devices, rc, device_count, j, k;
-    struct ipr_ioa *p_cur_ioa;
-    struct ipr_array_query_data  *p_cur_array_query_data;
-    struct ipr_record_common *p_common_record;
-    struct ipr_device_record *p_device_record;
+    struct ipr_ioa *cur_ioa;
+    struct ipr_array_query_data  *cur_qac_data;
+    struct ipr_common_record *common_record;
+    struct ipr_dev_record *device_record;
+    struct ipr_array_record *array_record;
+    int *qac_entry_ref;
 
-    /* Allocate memory on init */
-    if (p_scsi_dev_table == NULL)
+    if (ipr_qac_data == NULL)
     {
-        p_scsi_dev_table = (struct scsi_dev_data *)
-            malloc(sizeof(struct scsi_dev_data) * MAX_SG_DEVS);
-    }
-    p_scsi_dev_data = p_scsi_dev_table;
-
-    if (p_ipr_array_query_data == NULL)
-    {
-        p_ipr_array_query_data =
+        ipr_qac_data =
             (struct ipr_array_query_data *)
             malloc(sizeof(struct ipr_array_query_data) * num_ioas);
     }
 
-    p_sg_map_info = (struct sg_map_info *)malloc(sizeof(struct sg_map_info) * MAX_SG_DEVS);
-
     /* Get sg data via sg proc file system */
-    num_sg_devices = get_scsi_dev_data(p_scsi_dev_data);
-    get_sg_ioctl_data(p_sg_map_info, num_sg_devices);
+    num_sg_devices = get_scsi_dev_data(&scsi_dev_table);
 
-    for(p_cur_ioa = p_head_ipr_ioa,
-        p_cur_array_query_data = p_ipr_array_query_data;
-        p_cur_ioa != NULL;
-        p_cur_ioa = p_cur_ioa->next,
-        p_cur_array_query_data++)
+    sg_map_info = (struct sg_map_info *)malloc(sizeof(struct sg_map_info) * num_sg_devices);
+    get_sg_ioctl_data(sg_map_info, num_sg_devices);
+
+    for(cur_ioa = ipr_ioa_head,
+        cur_qac_data = ipr_qac_data;
+        cur_ioa != NULL;
+        cur_ioa = cur_ioa->next,
+        cur_qac_data++)
     {
-        get_ioa_name(p_cur_ioa, p_sg_map_info, num_sg_devices);
+        get_ioa_name(cur_ioa, sg_map_info, num_sg_devices);
 
-        p_cur_ioa->num_devices = 0;
+        cur_ioa->num_devices = 0;
 
         /* Get Query Array Config Data */
-        rc = ipr_query_array_config(p_cur_ioa->ioa.gen_name,
+        rc = ipr_query_array_config(cur_ioa->ioa.gen_name,
                                     allow_rebuild_refresh,
-                                    0, 0, p_cur_array_query_data);
+                                    0, 0, cur_qac_data);
 
         if (rc != 0)
-        {
-            p_cur_array_query_data->num_records = 0;
-        }
+            cur_qac_data->num_records = 0;
 
-        p_cur_ioa->p_qac_data = p_cur_array_query_data;
+        cur_ioa->qac_data = cur_qac_data;
 
         device_count = 0;
-        memset(p_cur_ioa->dev, 0, IPR_MAX_IOA_DEVICES * sizeof(struct ipr_device));
+        memset(cur_ioa->dev, 0, IPR_MAX_IOA_DEVICES * sizeof(struct ipr_dev));
+        qac_entry_ref = calloc(1, sizeof(int) * cur_qac_data->num_records);
 
         /* now assemble data pertaining to each individual device */
-        for (j = 0; j < num_sg_devices; j++, p_scsi_dev_data++)
+        for (j = 0, scsi_dev_data = scsi_dev_table;
+             j < num_sg_devices; j++, scsi_dev_data++)
         {
-            if (p_scsi_dev_data->host != p_cur_ioa->host_num)
+            if (scsi_dev_data->host != cur_ioa->host_num)
                 continue;
 
-            if ((p_scsi_dev_data->type == IPR_TYPE_DISK) ||
-                (p_scsi_dev_data->type == IPR_TYPE_AF_DISK))
+            if ((scsi_dev_data->type == IPR_TYPE_DISK) ||
+                (scsi_dev_data->type == IPR_TYPE_AF_DISK))
             {
-                p_cur_ioa->dev[device_count].p_scsi_dev_data = p_scsi_dev_data;
-                p_cur_ioa->dev[device_count].p_qac_entry = NULL;
-                strcpy(p_cur_ioa->dev[device_count].dev_name, "");
-                strcpy(p_cur_ioa->dev[device_count].gen_name, "");
+                cur_ioa->dev[device_count].scsi_dev_data = scsi_dev_data;
+                cur_ioa->dev[device_count].qac_entry = NULL;
+                strcpy(cur_ioa->dev[device_count].dev_name, "");
+                strcpy(cur_ioa->dev[device_count].gen_name, "");
 
                 /* find array config data matching resource entry */
-                p_common_record = (struct ipr_record_common *)p_cur_array_query_data->data;
-                for (k = 0; k < p_cur_array_query_data->num_records; k++)
-                {
-                    p_device_record = (struct ipr_device_record *)p_common_record;
-                    if ((p_device_record->resource_addr.bus    == p_scsi_dev_data->channel) &&
-                        (p_device_record->resource_addr.target == p_scsi_dev_data->id) &&
-                        (p_device_record->resource_addr.lun    == p_scsi_dev_data->lun))
-                    {
-                        p_cur_ioa->dev[device_count].p_qac_entry = p_common_record;
-                        break;
-                    }
+                common_record = (struct ipr_common_record *)cur_qac_data->data;
 
-                    p_common_record = (struct ipr_record_common *)
-                        ((unsigned long)p_common_record + iprtoh16(p_common_record->record_len));
+                for (k = 0; k < cur_qac_data->num_records; k++)
+                {
+                    if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
+                        device_record = (struct ipr_dev_record *)common_record;
+                        if ((device_record->resource_addr.bus    == scsi_dev_data->channel) &&
+                            (device_record->resource_addr.target == scsi_dev_data->id) &&
+                            (device_record->resource_addr.lun    == scsi_dev_data->lun))
+                        {
+                            cur_ioa->dev[device_count].qac_entry = common_record;
+                            qac_entry_ref[k]++;
+                            break;
+                        }
+                    } else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+                        array_record = (struct ipr_array_record *)common_record;
+                        if ((array_record->resource_addr.bus    == scsi_dev_data->channel) &&
+                            (array_record->resource_addr.target == scsi_dev_data->id) &&
+                            (array_record->resource_addr.lun    == scsi_dev_data->lun))
+                        {
+                            cur_ioa->dev[device_count].qac_entry = common_record;
+                            qac_entry_ref[k]++;
+                            break;
+                        }
+                    }                    
+
+                    common_record = (struct ipr_common_record *)
+                        ((unsigned long)common_record + iprtoh16(common_record->record_len));
                 }
 
                 /* find sg_map_info matching resource entry */
                 for (k = 0; k < num_sg_devices; k++)
                 {
-                    if ((p_scsi_dev_data->host    == p_sg_map_info[k].sg_dat.host_no) &&
-                        (p_scsi_dev_data->channel == p_sg_map_info[k].sg_dat.channel) &&
-                        (p_scsi_dev_data->id      == p_sg_map_info[k].sg_dat.scsi_id) &&
-                        (p_scsi_dev_data->lun     == p_sg_map_info[k].sg_dat.lun))
+                    if ((scsi_dev_data->host    == sg_map_info[k].sg_dat.host_no) &&
+                        (scsi_dev_data->channel == sg_map_info[k].sg_dat.channel) &&
+                        (scsi_dev_data->id      == sg_map_info[k].sg_dat.scsi_id) &&
+                        (scsi_dev_data->lun     == sg_map_info[k].sg_dat.lun))
                     {
                         /* copy device name to main structure */
-                        strcpy(p_cur_ioa->dev[device_count].dev_name, p_sg_map_info[k].dev_name);
-                        strcpy(p_cur_ioa->dev[device_count].gen_name, p_sg_map_info[k].gen_name);
+                        strcpy(cur_ioa->dev[device_count].dev_name, sg_map_info[k].dev_name);
+                        strcpy(cur_ioa->dev[device_count].gen_name, sg_map_info[k].gen_name);
 
                         break;
                     }
@@ -1567,42 +1589,73 @@ void check_current_config(bool allow_rebuild_refresh)
 
                 device_count++;
             }
-            else if (p_scsi_dev_data->type == IPR_TYPE_ADAPTER)
+            else if (scsi_dev_data->type == IPR_TYPE_ADAPTER)
             {
-                p_cur_ioa->ioa.p_scsi_dev_data = p_scsi_dev_data;
+                cur_ioa->ioa.scsi_dev_data = scsi_dev_data;
             }
         }
 
-        p_cur_ioa->num_devices = device_count;
+        /* now scan qac device and array entries to see which ones have
+         not been referenced */
+        common_record = (struct ipr_common_record *)cur_qac_data->data;
+
+        for (k = 0; k < cur_qac_data->num_records; k++) {
+            if (qac_entry_ref[k] > 1)
+                syslog(LOG_ERR,
+                       "Query Array Config entry referenced more than once\n");
+
+            if (common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS) {
+                cur_ioa->supported_arrays = (struct ipr_supported_arrays *)common_record;
+                continue;
+            }
+
+            if (qac_entry_ref[k])
+                continue;
+
+            if ((common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
+                (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
+
+                /* add phantom qac entry to ioa device list */
+                cur_ioa->dev[device_count].scsi_dev_data = NULL;
+                cur_ioa->dev[device_count].qac_entry = common_record;
+
+                strcpy(cur_ioa->dev[device_count].dev_name, "");
+                strcpy(cur_ioa->dev[device_count].gen_name, "");
+                device_count++;
+            }
+
+            common_record = (struct ipr_common_record *)
+                ((unsigned long)common_record + iprtoh16(common_record->record_len));
+        }
+
+        cur_ioa->num_devices = device_count;
     }
-    free(p_sg_map_info);
+    free(sg_map_info);
 }
 
 int num_device_opens(int host_num, int channel, int id, int lun)
 {
-    struct scsi_dev_data *p_scsi_dev_data;
+    struct scsi_dev_data *scsi_dev_base;
     int opens = 0;
     int k, num_sg_devices;
 
-    p_scsi_dev_data = (struct scsi_dev_data *)malloc(sizeof(struct scsi_dev_data) * MAX_SG_DEVS);
-
     /* Get sg data via sg proc file system */
-    num_sg_devices = get_scsi_dev_data(p_scsi_dev_data);
+    num_sg_devices = get_scsi_dev_data(&scsi_dev_base);
 
     /* find usage counts in scsi_dev_data */
     for (k=0; k < num_sg_devices; k++)
     {
-        if ((host_num == p_scsi_dev_data[k].host) &&
-            (channel  == p_scsi_dev_data[k].channel) &&
-            (id       == p_scsi_dev_data[k].id) &&
-            (lun      == p_scsi_dev_data[k].lun))
+        if ((host_num == scsi_dev_base[k].host) &&
+            (channel  == scsi_dev_base[k].channel) &&
+            (id       == scsi_dev_base[k].id) &&
+            (lun      == scsi_dev_base[k].lun))
         {
-            opens = p_scsi_dev_data[k].opens;
+            opens = scsi_dev_base[k].opens;
             break;
         }
     }
 
-    free(p_scsi_dev_data);
+    free(scsi_dev_base);
     return opens;
 }
 
@@ -1645,15 +1698,14 @@ void ipr_config_file_hdr(char *file_name)
     fd = fopen(file_name, "w");
     if (fd == NULL)
     {
-	syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, file_name);
+	syslog(LOG_ERR, "Could not open %s. %m\n", file_name);
 	return;
     }
 
-    fprintf(fd,"# DO NOT EDIT! Software generated configuration file for"IPR_EOL"# ipr SCSI device subsystem"IPR_EOL);
-    fprintf(fd, IPR_EOL);
-    fprintf(fd,"# Use iprconfig to configure"IPR_EOL);
-    fprintf(fd,"# See \"man iprconfig\" for more information"IPR_EOL);
-    fprintf(fd, IPR_EOL);
+    fprintf(fd,"# DO NOT EDIT! Software generated configuration file for\n");
+    fprintf(fd,"# ipr SCSI device subsystem\n\n");
+    fprintf(fd,"# Use iprconfig to configure\n");
+    fprintf(fd,"# See \"man iprconfig\" for more information\n\n");
     fclose(fd);
 }
 
@@ -1684,7 +1736,7 @@ void  ipr_config_file_entry(char *usr_file_name,
     temp_fd = fopen(temp_file_name, "w");
     if (temp_fd == NULL)
     {
-        syslog(LOG_ERR, "Could not open %s. %m"IPR_EOL, temp_file_name);
+        syslog(LOG_ERR, "Could not open %s. %m\n", temp_file_name);
         return;
     }
 
@@ -1707,14 +1759,14 @@ void  ipr_config_file_entry(char *usr_file_name,
                         if (!update)
                             fprintf(temp_fd, "# ");
 
-                        fprintf(temp_fd,"%s %s"IPR_EOL,field,value);
+                        fprintf(temp_fd,"%s %s\n",field,value);
                     }
                 }
 
                 if (strstr(line, field))
                 {
                     if (update)
-                        sprintf(line,"%s %s"IPR_EOL,field,value);
+                        sprintf(line,"%s %s\n",field,value);
 
                     field_found = 1;
                 }
@@ -1728,13 +1780,13 @@ void  ipr_config_file_entry(char *usr_file_name,
     {
         if (!category_found)
         {
-            fprintf(temp_fd,IPR_EOL"%s"IPR_EOL, category);
+            fprintf(temp_fd,"\n%s\n", category);
         }
 
         if (!update)
             fprintf(temp_fd, "# ");
 
-        fprintf(temp_fd,"%s %s"IPR_EOL, field, value);
+        fprintf(temp_fd,"%s %s\n", field, value);
     }
 
     sprintf(line,"mv %s %s", temp_file_name, file_name);
@@ -1786,7 +1838,7 @@ int  ipr_config_file_read(char *usr_file_name,
                         str_ptr += strlen(field);
                         while (str_ptr[0] == ' ')
                             str_ptr++;
-                        sprintf(value,"%s"IPR_EOL,str_ptr);
+                        sprintf(value,"%s\n",str_ptr);
                         rc = RC_SUCCESS;
                         break;
                     }
@@ -1816,10 +1868,10 @@ int ipr_config_file_valid(char *usr_file_name)
     return RC_SUCCESS;
 }
 
-void ipr_save_page_28(struct ipr_ioa *p_ioa,
-                      struct ipr_page_28 *p_page_28_cur,
-                      struct ipr_page_28 *p_page_28_chg,
-                      struct ipr_page_28 *p_page_28_ipr)
+void ipr_save_page_28(struct ipr_ioa *ioa,
+                      struct ipr_page_28 *page_28_cur,
+                      struct ipr_page_28 *page_28_chg,
+                      struct ipr_page_28 *page_28_ipr)
 {
     char file_name[64];
     char category[16];
@@ -1830,21 +1882,21 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
 
     /* gets Host Address to create file_name */
     sprintf(file_name,"%x_%s",
-            p_ioa->ccin, p_ioa->pci_address);
+            ioa->ccin, ioa->pci_address);
 
     for (i = 0;
-         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i < page_28_cur->page_hdr.num_dev_entries;
          i++)
     {
-        if (p_page_28_chg->attr[i].qas_capability)
+        if (page_28_chg->attr[i].qas_capability)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    p_page_28_cur->attr[i].qas_capability);
+                    page_28_cur->attr[i].qas_capability);
 
-            if (p_page_28_ipr->attr[i].qas_capability)
+            if (page_28_ipr->attr[i].qas_capability)
                 update_entry = 1;
             else
                 update_entry = 0;
@@ -1856,15 +1908,15 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
                                   update_entry);
         }
 
-        if (p_page_28_chg->attr[i].scsi_id)
+        if (page_28_chg->attr[i].scsi_id)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    p_page_28_cur->attr[i].scsi_id);
+                    page_28_cur->attr[i].scsi_id);
 
-            if (p_page_28_ipr->attr[i].scsi_id)
+            if (page_28_ipr->attr[i].scsi_id)
                 update_entry = 1;
             else
                 update_entry = 0;
@@ -1876,15 +1928,15 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
                                   update_entry);
         }
 
-        if (p_page_28_chg->attr[i].bus_width)
+        if (page_28_chg->attr[i].bus_width)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    p_page_28_cur->attr[i].bus_width);
+                    page_28_cur->attr[i].bus_width);
 
-            if (p_page_28_ipr->attr[i].bus_width)
+            if (page_28_ipr->attr[i].bus_width)
                 update_entry = 1;
             else
                 update_entry = 0;
@@ -1896,16 +1948,16 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
                                   update_entry);
         }
 
-        if (p_page_28_chg->attr[i].max_xfer_rate)
+        if (page_28_chg->attr[i].max_xfer_rate)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    (iprtoh32(p_page_28_cur->attr[i].max_xfer_rate) *
-                     (p_page_28_cur->attr[i].bus_width / 8))/10);
+                    (iprtoh32(page_28_cur->attr[i].max_xfer_rate) *
+                     (page_28_cur->attr[i].bus_width / 8))/10);
 
-            if (p_page_28_ipr->attr[i].max_xfer_rate)
+            if (page_28_ipr->attr[i].max_xfer_rate)
                 update_entry = 1;
             else
                 update_entry = 0;
@@ -1917,13 +1969,13 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
                                   update_entry);
         }
 
-        if (p_page_28_chg->attr[i].min_time_delay)
+        if (page_28_chg->attr[i].min_time_delay)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
             sprintf(value_str,"%d",
-                    p_page_28_cur->attr[i].min_time_delay);
+                    page_28_cur->attr[i].min_time_delay);
 
             ipr_config_file_entry(file_name,
                                   category,
@@ -1934,7 +1986,7 @@ void ipr_save_page_28(struct ipr_ioa *p_ioa,
     }
 }
 
-void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
+void ipr_set_page_28(struct ipr_ioa *cur_ioa,
                      int limited_config,
                      int reset_scheduled)
 {
@@ -1942,9 +1994,9 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
     char current_mode_settings[255];
     char changeable_mode_settings[255];
     char default_mode_settings[255];
-    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
-    struct ipr_pagewh_28 *p_page_28_sense;
-    struct ipr_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
+    struct ipr_pagewh_28 *page_28_sense;
+    struct ipr_page_28 *page_28_cur, *page_28_chg, *page_28_dflt;
     int is_reset_req = 0;
     char value_str[64];
     char file_name[64];
@@ -1958,56 +2010,56 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
     memset(default_mode_settings,0,sizeof(default_mode_settings));
 
     /* mode sense page28 to get current parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
-    rc = ipr_mode_sense(p_cur_ioa->ioa.gen_name, 0x28, p_mode_parm_hdr);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
+    rc = ipr_mode_sense(cur_ioa->ioa.gen_name, 0x28, mode_parm_hdr);
 
     if (rc != 0)
         return;
 
-    p_page_28_sense = (struct ipr_pagewh_28 *)p_mode_parm_hdr;
-    p_page_28_cur = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    page_28_sense = (struct ipr_pagewh_28 *)mode_parm_hdr;
+    page_28_cur = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* now issue mode sense to get changeable parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
-    p_page_28_chg = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
+    page_28_chg = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get default parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
-    p_page_28_dflt = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
+    page_28_dflt = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* determine changable and default values */
     for (i = 0;
-         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i < page_28_cur->page_hdr.num_dev_entries;
          i++)
     {
-        p_page_28_chg->attr[i].qas_capability = 0;
-        p_page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
+        page_28_chg->attr[i].qas_capability = 0;
+        page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
                                             // vend/prod & subsystem id)
-        p_page_28_chg->attr[i].bus_width = 1;
-        p_page_28_chg->attr[i].max_xfer_rate = 1;
+        page_28_chg->attr[i].bus_width = 1;
+        page_28_chg->attr[i].max_xfer_rate = 1;
 
-        p_page_28_dflt->attr[i].qas_capability = 0;
-        p_page_28_dflt->attr[i].scsi_id = p_page_28_cur->attr[i].scsi_id;
-        p_page_28_dflt->attr[i].bus_width = 16;
-        p_page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME!!!  create backplane table check
+        page_28_dflt->attr[i].qas_capability = 0;
+        page_28_dflt->attr[i].scsi_id = page_28_cur->attr[i].scsi_id;
+        page_28_dflt->attr[i].bus_width = 16;
+        page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME!!!  create backplane table check
     }
 
     /* extract data from saved file to send in mode select */
     sprintf(file_name,"%x_%s",
-            p_cur_ioa->ccin, p_cur_ioa->pci_address);
+            cur_ioa->ccin, cur_ioa->pci_address);
 
     for (i = 0;
-         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i < page_28_cur->page_hdr.num_dev_entries;
          i++)
     {
-        if (p_page_28_chg->attr[i].qas_capability)
+        if (page_28_chg->attr[i].qas_capability)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
 
             rc = ipr_config_file_read(file_name,
                                       category,
@@ -2016,15 +2068,15 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
             if (rc == RC_SUCCESS)
             {
                 sscanf(value_str,"%d", &new_value);
-                p_page_28_cur->attr[i].qas_capability = new_value;
+                page_28_cur->attr[i].qas_capability = new_value;
             }
         }
 
-        if (p_page_28_chg->attr[i].scsi_id)
+        if (page_28_chg->attr[i].scsi_id)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
 
             rc = ipr_config_file_read(file_name,
                                       category,
@@ -2033,19 +2085,19 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
             if (rc == RC_SUCCESS)
             {
                 sscanf(value_str,"%d", &new_value);
-                if (p_page_28_cur->attr[i].scsi_id != new_value)
+                if (page_28_cur->attr[i].scsi_id != new_value)
                 {
                     is_reset_req = 1;
-                    p_page_28_cur->attr[i].scsi_id = new_value;
+                    page_28_cur->attr[i].scsi_id = new_value;
                 }
             }
         }
 
-        if (p_page_28_chg->attr[i].bus_width)
+        if (page_28_chg->attr[i].bus_width)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
 
             rc = ipr_config_file_read(file_name,
                                       category,
@@ -2054,22 +2106,22 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
             if (rc == RC_SUCCESS)
             {
                 sscanf(value_str,"%d", &new_value);
-                p_page_28_cur->attr[i].bus_width = new_value;
+                page_28_cur->attr[i].bus_width = new_value;
             }
         }
 
-        if (p_page_28_chg->attr[i].max_xfer_rate)
+        if (page_28_chg->attr[i].max_xfer_rate)
         {
-            if (limited_config & (1 << p_page_28_cur->attr[i].res_addr.bus))
+            if (limited_config & (1 << page_28_cur->attr[i].res_addr.bus))
             {
-                max_xfer_rate = ((iprtoh32(p_page_28_cur->attr[i].max_xfer_rate)) *
-                     p_page_28_cur->attr[i].bus_width)/(10 * 8);
+                max_xfer_rate = ((iprtoh32(page_28_cur->attr[i].max_xfer_rate)) *
+                     page_28_cur->attr[i].bus_width)/(10 * 8);
 
                 if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate)
                 {
-                    p_page_28_cur->attr[i].max_xfer_rate =
+                    page_28_cur->attr[i].max_xfer_rate =
                         htoipr32(IPR_LIMITED_MAX_XFER_RATE * 10 /
-                                 (p_page_28_cur->attr[i].bus_width / 8));
+                                 (page_28_cur->attr[i].bus_width / 8));
                 }
 
                 if (limited_config & IPR_SAVE_LIMITED_CONFIG)
@@ -2077,10 +2129,10 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
                     /* update config file to indicate present restriction */
                     sprintf(category,"[%s%d]",
                             IPR_CATEGORY_BUS,
-                            p_page_28_cur->attr[i].res_addr.bus);
+                            page_28_cur->attr[i].res_addr.bus);
                     sprintf(value_str,"%d",
-                            (iprtoh32(p_page_28_cur->attr[i].max_xfer_rate) *
-                             (p_page_28_cur->attr[i].bus_width / 8))/10);
+                            (iprtoh32(page_28_cur->attr[i].max_xfer_rate) *
+                             (page_28_cur->attr[i].bus_width / 8))/10);
 
                     ipr_config_file_entry(file_name,
                                           category,
@@ -2093,7 +2145,7 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
             {
                 sprintf(category,"[%s%d]",
                         IPR_CATEGORY_BUS,
-                        p_page_28_cur->attr[i].res_addr.bus);
+                        page_28_cur->attr[i].res_addr.bus);
 
                 rc = ipr_config_file_read(file_name,
                                           category,
@@ -2104,27 +2156,27 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
                 {
                     sscanf(value_str,"%d", &new_value);
 
-                    max_xfer_rate = ((iprtoh32(p_page_28_dflt->attr[i].max_xfer_rate)) *
-                                     p_page_28_cur->attr[i].bus_width)/(10 * 8);
+                    max_xfer_rate = ((iprtoh32(page_28_dflt->attr[i].max_xfer_rate)) *
+                                     page_28_cur->attr[i].bus_width)/(10 * 8);
 
                     if (new_value <= max_xfer_rate)
                     {
-                        p_page_28_cur->attr[i].max_xfer_rate =
+                        page_28_cur->attr[i].max_xfer_rate =
                             htoipr32(new_value * 10 /
-                                     (p_page_28_cur->attr[i].bus_width / 8));
+                                     (page_28_cur->attr[i].bus_width / 8));
                     }
                     else
                     {
-                        p_page_28_cur->attr[i].max_xfer_rate =
-                            p_page_28_dflt->attr[i].max_xfer_rate;
+                        page_28_cur->attr[i].max_xfer_rate =
+                            page_28_dflt->attr[i].max_xfer_rate;
 
                         /* update config file to indicate present restriction */
                         sprintf(category,"[%s%d]",
                                 IPR_CATEGORY_BUS,
-                                p_page_28_cur->attr[i].res_addr.bus);
+                                page_28_cur->attr[i].res_addr.bus);
                         sprintf(value_str,"%d",
-                                (iprtoh32(p_page_28_cur->attr[i].max_xfer_rate) *
-                                 (p_page_28_cur->attr[i].bus_width / 8))/10);
+                                (iprtoh32(page_28_cur->attr[i].max_xfer_rate) *
+                                 (page_28_cur->attr[i].bus_width / 8))/10);
 
                         ipr_config_file_entry(file_name,
                                               category,
@@ -2135,17 +2187,17 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
                 }
                 else
                 {
-                    p_page_28_cur->attr[i].max_xfer_rate =
-                        p_page_28_dflt->attr[i].max_xfer_rate;
+                    page_28_cur->attr[i].max_xfer_rate =
+                        page_28_dflt->attr[i].max_xfer_rate;
                 }
             }
         }
 
-        if (p_page_28_chg->attr[i].min_time_delay)
+        if (page_28_chg->attr[i].min_time_delay)
         {
             sprintf(category,"[%s%d]",
                     IPR_CATEGORY_BUS,
-                    p_page_28_cur->attr[i].res_addr.bus);
+                    page_28_cur->attr[i].res_addr.bus);
 
             rc = ipr_config_file_read(file_name,
                                       category,
@@ -2154,41 +2206,41 @@ void ipr_set_page_28(struct ipr_ioa *p_cur_ioa,
             if (rc == RC_SUCCESS)
             {
                 sscanf(value_str,"%d", &new_value);
-                p_page_28_cur->attr[i].min_time_delay = new_value;
+                page_28_cur->attr[i].min_time_delay = new_value;
             }
             else
             {
-                p_page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
+                page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
             }
         }
     }
 
     /* issue mode sense and reset if necessary */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)p_page_28_sense; 
-    length = p_mode_parm_hdr->length + 1;
-    p_mode_parm_hdr->length = 0;
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)page_28_sense; 
+    length = mode_parm_hdr->length + 1;
+    mode_parm_hdr->length = 0;
 
-    rc = ipr_mode_select(p_cur_ioa->ioa.gen_name, p_page_28_sense, length);
+    rc = ipr_mode_select(cur_ioa->ioa.gen_name, page_28_sense, length);
 
     if (rc != 0)
         return;
 
     if ((is_reset_req) &&
         (!reset_scheduled))
-        ipr_reset_adapter(p_cur_ioa);
+        ipr_reset_adapter(cur_ioa);
 }
 
-void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
+void ipr_set_page_28_init(struct ipr_ioa *cur_ioa,
                           int limited_config)
 {
     int rc, i;
     char current_mode_settings[255];
     char changeable_mode_settings[255];
     char default_mode_settings[255];
-    struct ipr_mode_parm_hdr *p_mode_parm_hdr;
+    struct ipr_mode_parm_hdr *mode_parm_hdr;
     int issue_mode_select = 0;
-    struct ipr_pagewh_28 *p_page_28_sense;
-    struct ipr_page_28 *p_page_28_cur, *p_page_28_chg, *p_page_28_dflt;
+    struct ipr_pagewh_28 *page_28_sense;
+    struct ipr_page_28 *page_28_cur, *page_28_chg, *page_28_dflt;
     struct ipr_page_28 page_28_ipr;
     u32 max_xfer_rate;
     int length;
@@ -2198,66 +2250,66 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
     memset(default_mode_settings,0,sizeof(default_mode_settings));
 
     /* Mode sense page28 to get current parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
-    rc = ipr_mode_sense(p_cur_ioa->ioa.gen_name, 0x28, p_mode_parm_hdr);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
+    rc = ipr_mode_sense(cur_ioa->ioa.gen_name, 0x28, mode_parm_hdr);
 
     if (rc != 0)
         return;
 
-    p_page_28_sense = (struct ipr_pagewh_28 *)p_mode_parm_hdr;
-    p_page_28_cur = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    page_28_sense = (struct ipr_pagewh_28 *)mode_parm_hdr;
+    page_28_cur = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get changeable parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
-    p_page_28_chg = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)changeable_mode_settings;
+    page_28_chg = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* Now issue mode sense to get default parms */
-    p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
-    p_page_28_dflt = (struct ipr_page_28 *)
-        (((u8 *)(p_mode_parm_hdr+1)) + p_mode_parm_hdr->block_desc_len);
+    mode_parm_hdr = (struct ipr_mode_parm_hdr *)default_mode_settings;
+    page_28_dflt = (struct ipr_page_28 *)
+        (((u8 *)(mode_parm_hdr+1)) + mode_parm_hdr->block_desc_len);
 
     /* determine changable and default values */
     for (i = 0;
-         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i < page_28_cur->page_hdr.num_dev_entries;
          i++)
     {
-        p_page_28_chg->attr[i].qas_capability = 0;
-        p_page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
+        page_28_chg->attr[i].qas_capability = 0;
+        page_28_chg->attr[i].scsi_id = 0; //FIXME!!! need to allow dart (by
                                             // vend/prod & subsystem id)
-        p_page_28_chg->attr[i].bus_width = 1;
-        p_page_28_chg->attr[i].max_xfer_rate = 1;
+        page_28_chg->attr[i].bus_width = 1;
+        page_28_chg->attr[i].max_xfer_rate = 1;
 
-        p_page_28_dflt->attr[i].qas_capability = 0;
-        p_page_28_dflt->attr[i].scsi_id = p_page_28_cur->attr[i].scsi_id;
-        p_page_28_dflt->attr[i].bus_width = 16;
-        p_page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME  check backplane table
+        page_28_dflt->attr[i].qas_capability = 0;
+        page_28_dflt->attr[i].scsi_id = page_28_cur->attr[i].scsi_id;
+        page_28_dflt->attr[i].bus_width = 16;
+        page_28_dflt->attr[i].max_xfer_rate = 320;  //FIXME  check backplane table
     }
 
     for (i = 0;
-         i < p_page_28_cur->page_hdr.num_dev_entries;
+         i < page_28_cur->page_hdr.num_dev_entries;
          i++)
     {
-        if (p_page_28_chg->attr[i].min_time_delay)
-            p_page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
+        if (page_28_chg->attr[i].min_time_delay)
+            page_28_cur->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
 
-        if ((limited_config & (1 << p_page_28_cur->attr[i].res_addr.bus)))
+        if ((limited_config & (1 << page_28_cur->attr[i].res_addr.bus)))
         {
-            max_xfer_rate = ((iprtoh32(p_page_28_cur->attr[i].max_xfer_rate)) *
-                             p_page_28_cur->attr[i].bus_width)/(10 * 8);
+            max_xfer_rate = ((iprtoh32(page_28_cur->attr[i].max_xfer_rate)) *
+                             page_28_cur->attr[i].bus_width)/(10 * 8);
 
             if (IPR_LIMITED_MAX_XFER_RATE < max_xfer_rate)
             {
-                p_page_28_cur->attr[i].max_xfer_rate =
+                page_28_cur->attr[i].max_xfer_rate =
                     htoipr32(IPR_LIMITED_MAX_XFER_RATE * 10 /
-                             (p_page_28_cur->attr[i].bus_width / 8));
+                             (page_28_cur->attr[i].bus_width / 8));
             }
         }
         else
         {
-            p_page_28_cur->attr[i].max_xfer_rate =
-                p_page_28_dflt->attr[i].max_xfer_rate;
+            page_28_cur->attr[i].max_xfer_rate =
+                page_28_dflt->attr[i].max_xfer_rate;
         }
 
         issue_mode_select++;
@@ -2266,11 +2318,11 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
     /* Issue mode select */
     if (issue_mode_select)
     {
-        p_mode_parm_hdr = (struct ipr_mode_parm_hdr *)p_page_28_sense; 
-        length = p_mode_parm_hdr->length + 1;
-        p_mode_parm_hdr->length = 0;
+        mode_parm_hdr = (struct ipr_mode_parm_hdr *)page_28_sense; 
+        length = mode_parm_hdr->length + 1;
+        mode_parm_hdr->length = 0;
 
-        rc = ipr_mode_select(p_cur_ioa->ioa.gen_name, p_page_28_sense, length);
+        rc = ipr_mode_select(cur_ioa->ioa.gen_name, page_28_sense, length);
 
         /* Zero out user page 28 page, this data is used to indicate
          that no values are being changed, this routine is called
@@ -2278,19 +2330,19 @@ void ipr_set_page_28_init(struct ipr_ioa *p_cur_ioa,
          exist */
         memset(&page_28_ipr, 0, sizeof(struct ipr_pagewh_28));
 
-        ipr_save_page_28(p_cur_ioa, p_page_28_cur, p_page_28_chg,
+        ipr_save_page_28(cur_ioa, page_28_cur, page_28_chg,
                          &page_28_ipr);
     }
 }
 
-void iprlog_location(struct ipr_ioa *p_ioa)
+void iprlog_location(struct ipr_ioa *ioa)
 {
   syslog(LOG_ERR, 
 	 "  PCI Address: %s, Host num: %d",
-	 p_ioa->pci_address, p_ioa->host_num); /* FIXME */
+	 ioa->pci_address, ioa->host_num); /* FIXME */
 }
 
-bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)
+bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 {
     int i, j, rc;
     struct ipr_std_inq_data std_inq_data;
@@ -2299,7 +2351,7 @@ bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)
 
     /* Zero out inquiry data */
     memset(&std_inq_data, 0, sizeof(std_inq_data));
-    rc = ipr_inquiry(p_ipr_device->gen_name, IPR_STD_INQUIRY,
+    rc = ipr_inquiry(ipr_dev->gen_name, IPR_STD_INQUIRY,
                      &std_inq_data, sizeof(std_inq_data));
 
     if (rc != 0)
@@ -2307,7 +2359,7 @@ bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)
 
     /* Issue page 3 inquiry */
     memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
-    rc = ipr_inquiry(p_ipr_device->gen_name, 0x03,
+    rc = ipr_inquiry(ipr_dev->gen_name, 0x03,
                      &dasd_page3_inq, sizeof(dasd_page3_inq));
 
     if (rc != 0)
@@ -2397,7 +2449,7 @@ bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)
                 if (!silent)
                     syslog(LOG_ERR,"Disk %s needs updated microcode "
                            "before transitioning to 522 bytes/sector "
-                           "format.", p_ipr_device->gen_name);
+                           "format.", ipr_dev->gen_name);
                 return true;
             }
             else
@@ -2409,7 +2461,7 @@ bool is_af_blocked(struct ipr_device *p_ipr_device, int silent)
         {
             if (!silent)
                 syslog(LOG_ERR,"Disk %s not supported for transition "
-                       "to 522 bytes/sector format.", p_ipr_device->gen_name);
+                       "to 522 bytes/sector format.", ipr_dev->gen_name);
             return true;
         }
     }   
