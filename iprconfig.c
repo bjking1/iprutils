@@ -301,7 +301,7 @@ static char *ipr_end_list(char *body)
 
 static struct screen_output *screen_driver(s_node *screen, int header_lines, i_container *i_con)
 {
-	WINDOW *w_pad,*w_page_header;              /* windows to hold text */
+	WINDOW *w_pad = NULL,*w_page_header = NULL; /* windows to hold text */
 	FIELD **fields = NULL;                     /* field list for forms */
 	FORM *form = NULL;                       /* form for input fields */
 	int rc = 0;                            /* the status of the screen */
@@ -4636,6 +4636,7 @@ int process_conc_maint(i_container *i_con, int action)
 	else
 		n_screen = &n_wait_conc_add;
 
+	processing();
 	for (k = 0; k < 2; k++) {
 		buffer[k] = __body_init_status(n_screen->header, &header_lines, k);
 		buffer[k] = print_device(ipr_dev, buffer[k], "1", ioa, k);
@@ -4845,11 +4846,12 @@ int start_conc_maint(i_container *i_con, int action)
 					get_res_addr(&ioa->dev[l], &res_addr);
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
-						if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
-							break;
-						if (format_in_prog(&ioa->dev[l]))
-							break;
-						if (action == IPR_CONC_ADD)
+						if (action == IPR_CONC_REMOVE) {
+							if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
+								break;
+							if (format_in_prog(&ioa->dev[l]))
+								break;
+						} else if (ioa->dev[l].scsi_dev_data)
 							break;
 						print_dev(k, &ioa->dev[l], buffer, "%1", ioa, k);
 						i_con = add_i_con(i_con,"\0", &ioa->dev[l]);
