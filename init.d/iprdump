@@ -1,77 +1,92 @@
-#!/bin/bash
+#! /bin/sh
+# Copyright (C) 2004 IBM Corporation
 #
-#       /etc/rc.d/init.d/iprdumpd
+# Author: Brian King <brking@us.ibm.com> 2004
 #
-# Runs the iprdump utility for the ipr device driver
+# iprdump
 #
-# chkconfig:  2345 20 90
-# description: Starts the iprdump daemon which is used to gather \
-#   data for failure analysis in  the event of a severe failure  \
-#   of the ipr driver and its supported hardware.
-# processname: iprdump
+# System startup script for the ipr dump facility
+#
+### BEGIN INIT INFO
+# Provides: iprdump
+# Required-Start:    $local_fs $syslog $iprinit
+# Should-Start:      $remote_fs
+# Required-Stop:     $local_fs $syslog $remote_fs $iprinit
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start the ipr dump daemon
+# Description:       Start the ipr dump daemon
+### END INIT INFO
 
-prog="iprdump"
-RETVAL=0
-
-. /etc/init.d/functions
+IPRDUMP=/sbin/iprdump
+test -x $IPRDUMP || exit 5
+. /lib/lsb/init-functions
 
 start() {
-        echo -n $"Starting $prog: "
-        daemon $prog
-        RETVAL=$?
-        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/iprdump
-        echo
-        return $RETVAL
+    echo -n "Starting ipr dump daemon"
+    start_daemon $IPRDUMP
+
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
 }
 
 stop() {
-       echo -n $"Stopping $prog: "
-       killproc $prog
-       RETVAL=$?
-       [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/iprdump
-       echo
-       return $RETVAL
-}
+    echo -n "Shutting down ipr dump daemon"
+    killproc $IPRDUMP
 
-rhstatus() {
-       status $prog
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
 }
 
 restart() {
-       stop
-       start
+    $0 stop
+    $0 start
 }
 
 reload() {
-       echo -n $"Reloading $prog: "
-       killproc $prog -HUP
-       RETVAL=$?
-       echo
-       return $RETVAL
+    echo -n "Reload ipr dump daemon"
+    $0 stop  &&  $0 start
+}
+
+status() {
+    echo -n "Checking for iprdump daemon: "
+
+    pidofproc $IPRDUMP
+
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
 }
 
 case "$1" in
-  start)
-        start
-        ;;
-  stop)
-        stop
-        ;;
-  restart)
-        restart
-        ;;
-  reload)
-        reload
-        ;;
-  status)
-        rhstatus
-        ;;
-  condrestart)
-        [ -f /var/lock/subsys/iprdump ] && restart || :
-        ;;
-  *)
-        echo "Usage: $0 {start|stop|status|restart|condrestart}"
-        exit 1
+    start)
+	start
+	;;
+    stop)
+	stop
+	;;
+    restart)
+	restart
+	;;
+    reload)
+	reload
+	;;
+    status)
+	status
+	;;
+    *)
+	echo "Usage: $0 {start|stop|status|restart|reload}"
+	exit 1
+	;;
 esac
-
-exit $?

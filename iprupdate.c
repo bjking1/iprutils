@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.7 2004/02/20 16:12:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.8 2004/02/23 19:54:30 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -25,157 +25,33 @@
 
 static void update_ioa_fw(struct ipr_ioa *ioa, int force)
 {
-	int fd, rc;
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	u32 fw_version;
-	struct ipr_ioa_ucode_header *image_hdr;
-	char ucode_path[100], ucode_file[100], *tmp;
-	struct stat ucode_stats;
+	int rc;
+	struct ipr_fw_images *list;
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "fw_version");
-	sscanf(attr->value, "%8X", &fw_version);
-	sysfs_close_class_device(class_device);
+	rc = get_ioa_firmware_image_list(ioa, &list);
 
-	if (fw_version > ioa->msl && !force)
-		return;
-
-	rc = get_latest_ioa_fw_image(ioa, ucode_path);
-
-	if (rc) {
+	if (rc < 1) {
 		syslog(LOG_ERR, "Could not find firmware file for IBM %04X.\n", ioa->ccin);
 		return;
 	}
 
-	fd = open(ucode_path, O_RDONLY);
-
-	if (fd < 0) {
-		syslog(LOG_ERR, "Could not open firmware file %s.\n", ucode_path);
-		return;
-	}
-
-	rc = fstat(fd, &ucode_stats);
-
-	if (rc != 0) {
-		syslog(LOG_ERR, "Error accessing IOA firmware file: %s.\n", ucode_path);
-		close(fd);
-		return;
-	}
-
-	image_hdr = mmap(NULL, ucode_stats.st_size, PROT_READ, MAP_SHARED, fd, 0);
-
-	if (image_hdr == MAP_FAILED) {
-		syslog(LOG_ERR, "Error mapping IOA firmware file: %s.\n", ucode_path);
-		close(fd);
-		return;
-	}
-
-	if (ntohl(image_hdr->rev_level) > fw_version || force) {
-		ioa_info(ioa, "Updating adapter microcode from %08X to %08X.\n",
-			 fw_version, ntohl(image_hdr->rev_level));
-
-		tmp = strrchr(ucode_path, '/');
-		tmp++;
-		sprintf(ucode_file, "%s\n", tmp);
-		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-		attr = sysfs_get_classdev_attr(class_device, "update_fw");
-		rc = sysfs_write_attribute(attr, ucode_file, strlen(ucode_file));
-		sysfs_close_class_device(class_device);
-
-		if (rc != 0)
-			ioa_err(ioa, "Microcode update failed. rc=%d\n", rc);
-		else {
-			/* Write buffer was successful. Now we need to see if all our devices
-			 are available. The IOA may have been in braindead prior to the ucode
-			 download, in which case the upper layer scsi device drivers do not
-			 know anything about our devices. */
-			check_current_config(false);
-		}
-	}
+	ipr_update_ioa_fw(ioa, list, force);
+	free(list);
 }
 
 static void update_disk_fw(struct ipr_dev *dev, int force)
 {
-	int rc = 0;
-	struct stat ucode_stats;
-	char ucode_file[50];
-	int fd, img_size, img_off;
-	struct ipr_dasd_ucode_header *img_hdr;
-	struct ipr_dasd_inquiry_page3 page3_inq;
-	void *buffer;
-	char level[5];
+	int rc;
+	struct ipr_fw_images *list;
 
-	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+	rc = get_dasd_firmware_image_list(dev, &list);
 
-	if (rc != 0) {
-		scsi_dbg(dev, "Inquiry failed\n");
-		return;
+	if (rc > 0) {
+		ipr_update_disk_fw(dev, list, force);
+		free(list);
 	}
 
-	if (memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8) == 0)
-		img_off = 0;
-	else if (memcmp(dev->scsi_dev_data->vendor_id, "IBM     ", 8) == 0)
-		img_off = sizeof(struct ipr_dasd_ucode_header);
-	else
-		return;
-
-	rc = get_lastest_dasd_fw_image(dev, ucode_file, level);
-
-	if (rc == IPR_DASD_UCODE_NOT_FOUND)
-		return;
-	if (rc == IPR_DASD_UCODE_NO_HDR)
-		img_off = 0;
-
-	fd = open(ucode_file, O_RDONLY);
-
-	if (fd < 0) {
-		syslog_dbg(LOG_ERR, "Could not open firmware file %s.\n", ucode_file);
-		return;
-	}
-
-	rc = fstat(fd, &ucode_stats);
-
-	if (rc != 0) {
-		syslog(LOG_ERR, "Error accessing firmware file: %s.\n", ucode_file);
-		close(fd);
-		return;
-	}
-
-	img_hdr = mmap(NULL, ucode_stats.st_size,
-			      PROT_READ, MAP_SHARED, fd, 0);
-
-	if (img_hdr == MAP_FAILED) {
-		syslog(LOG_ERR, "Error reading firmware file: %s.\n", ucode_file);
-		close(fd);
-		return;
-	}
-
-	if (memcmp(img_hdr->load_id, page3_inq.load_id, 4) &&
-	    !memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8)) {
-		syslog(LOG_ERR, "Firmware file corrupt: %s.\n", ucode_file);
-		munmap(img_hdr, ucode_stats.st_size);
-		close(fd);
-		return;
-	}
-
-	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
-		scsi_info(dev, "Updating disk microcode using %s "
-			 "from %c%c%c%c to %c%c%c%c\n", ucode_file,
-			 page3_inq.release_level[0], page3_inq.release_level[1],
-			 page3_inq.release_level[2], page3_inq.release_level[3],
-			 level[0], level[1], level[2], level[3]);
-
-		buffer = (void *)img_hdr + img_off;
-		img_size = ucode_stats.st_size - img_off;
-
-		rc = ipr_write_buffer(dev, buffer, img_size);
-	}
-
-	if (munmap(img_hdr, ucode_stats.st_size))
-		syslog(LOG_ERR, "munmap failed.\n");
-
-	close(fd);
+	return;
 }
 
 int main(int argc, char *argv[])

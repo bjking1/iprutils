@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 1.0.0
+Version: 2.0.0
 Release: 1
 License: IPL
 Group: Hardware/SCSI
@@ -22,17 +22,20 @@ make
 %install
 cd iprutils
 make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
-install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
-install init.d/iprdump $RPM_BUILD_ROOT/etc/rc.d/init.d/iprdump
-install init.d/iprupdate $RPM_BUILD_ROOT/etc/rc.d/init.d/iprupdate
+install -d $RPM_BUILD_ROOT/etc/init.d
+install init.d/iprdump $RPM_BUILD_ROOT/etc/init.d/iprdump
+install init.d/iprinit $RPM_BUILD_ROOT/etc/init.d/iprinit
+install init.d/iprupdate $RPM_BUILD_ROOT/etc/init.d/iprupdate
 
 %post
-/sbin/chkconfig --add iprdump
-/sbin/chkconfig --add iprupdate
+/usr/lib/lsb/install_initd $RPM_BUILD_ROOT/etc/init.d/iprdump
+/usr/lib/lsb/install_initd $RPM_BUILD_ROOT/etc/init.d/iprinit
+/usr/lib/lsb/install_initd $RPM_BUILD_ROOT/etc/init.d/iprupdate
 
 %preun
-/sbin/chkconfig --del iprdump
-/sbin/chkconfig --del iprupdate
+/usr/lib/lsb/remove_initd $RPM_BUILD_ROOT/etc/init.d/iprdump
+/usr/lib/lsb/remove_initd $RPM_BUILD_ROOT/etc/init.d/iprinit
+/usr/lib/lsb/remove_initd $RPM_BUILD_ROOT/etc/init.d/iprupdate
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -43,10 +46,11 @@ rm -rf $RPM_BUILD_ROOT
 /sbin/iprconfig
 /sbin/iprupdate
 /sbin/iprdump
-/sbin/iprtrace
+/sbin/iprinit
 /sbin/iprdbg
 %{_mandir}/man8/iprdump.8.gz
 %{_mandir}/man8/iprconfig.8.gz
 %{_mandir}/man8/iprupdate.8.gz
-/etc/rc.d/init.d/iprupdate
-/etc/rc.d/init.d/iprdump
+/etc/init.d/iprdump
+/etc/init.d/iprinit
+/etc/init.d/iprupdate

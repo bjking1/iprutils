@@ -53,7 +53,7 @@ utils: ./*.c ./*.h
 	tar -zcpf iprutils-$(UTILS_VER)-src.tgz --directory ../ --exclude CVS iprutils
 
 clean:
-	rm -f iprupdate iprconfig iprdump iprinit iprdbg iprupdate.ps iprupdate.pdf iprlib.o
+	rm -f iprupdate iprconfig iprdump iprinit iprdbg iprupdate.ps iprupdate.pdf *.o
 	rm -f iprconfig.ps iprconfig.pdf iprdump.pdf iprdump.ps *.tgz *.rpm
 	rm -rf docs
 	rm -f text.cat
@@ -63,7 +63,7 @@ install: all
 	install --mode=755 iprconfig $(INSTALL_MOD_PATH)/sbin/iprconfig
 	install --mode=755 iprupdate $(INSTALL_MOD_PATH)/sbin/iprupdate
 	install --mode=755 iprdump $(INSTALL_MOD_PATH)/sbin/iprdump
-	install --mode=755 iprtrace $(INSTALL_MOD_PATH)/sbin/iprtrace
+	install --mode=755 iprinit $(INSTALL_MOD_PATH)/sbin/iprinit
 	install --mode=700 iprdbg $(INSTALL_MOD_PATH)/sbin/iprdbg
 	install -d $(INSTALL_MOD_PATH)/usr/share/man/man8
 	install docs/iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz

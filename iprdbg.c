@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.6 2004/02/20 16:12:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.7 2004/02/23 19:54:29 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -70,16 +70,99 @@ struct ipr_flit {
 	struct ipr_flit_entry flit_entry[IPR_MAX_FLIT_ENTRIES];
 };              
 
-int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
-                int *buffer, int len);
-
-int format_flit(struct ipr_flit *p_flit);
-
 #define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 #define iprprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 #define iprloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 
-FILE *outfile;
+static FILE *outfile;
+
+static int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
+		       int *buffer, int len)
+{
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	int rc;
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_DEBUG;
+	cdb[1] = cmd;
+	cdb[2] = (ioa_adx >> 24) & 0xff;
+	cdb[3] = (ioa_adx >> 16) & 0xff;
+	cdb[4] = (ioa_adx >> 8) & 0xff;
+	cdb[5] = ioa_adx & 0xff;
+	cdb[6] = (mask >> 24) & 0xff;
+	cdb[7] = (mask >> 16) & 0xff;
+	cdb[8] = (mask >> 8) & 0xff;
+	cdb[9] = mask & 0xff;
+	cdb[10] = (len >> 24) & 0xff;
+	cdb[11] = (len >> 16) & 0xff;
+	cdb[12] = (len >> 8) & 0xff;
+	cdb[13] = len & 0xff;
+
+	if (cmd == IPRDBG_WRITE) {
+		rc = sg_ioctl(fd, cdb, buffer,
+			      len, SG_DXFER_TO_DEV,
+			      &sense_data, IPR_INTERNAL_TIMEOUT);
+	} else {
+		rc = sg_ioctl(fd, cdb, buffer,
+			      len, SG_DXFER_FROM_DEV,
+			      &sense_data, IPR_INTERNAL_TIMEOUT);
+	}
+
+	if (rc != 0)
+		fprintf(stderr, "Debug IOCTL failed. %d\n", errno);
+
+	return rc;
+}
+
+static int format_flit(struct ipr_flit *flit)
+{
+    int num_entries = ntohl(flit->num_entries) - 1;
+    struct ipr_flit_entry *flit_entry;
+
+    signed int len;
+    u8 filename[IPR_FLIT_FILENAME_LEN+1];
+    u8 time[IPR_FLIT_TIMESTAMP_LEN+1];
+    u8 buf1[IPR_FLIT_FILENAME_LEN+1];
+    u8 buf2[IPR_FLIT_FILENAME_LEN+1];
+    u8 lid_name[IPR_FLIT_FILENAME_LEN+1];
+    u8 path[IPR_FLIT_FILENAME_LEN+1];
+    int num_args, i;
+
+    for (i = 0, flit_entry = flit->flit_entry;
+         (i < num_entries) && (*flit_entry->timestamp);
+         flit_entry++, i++) {
+        snprintf(time, IPR_FLIT_TIMESTAMP_LEN, flit_entry->timestamp);
+        time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
+
+        snprintf(filename, IPR_FLIT_FILENAME_LEN, flit_entry->filename);
+        filename[IPR_FLIT_FILENAME_LEN] = '\0';
+
+        num_args = sscanf(filename, "%184s " "%184s " "%184s "
+                          "%184s ", buf1, buf2, lid_name, path);
+
+        if (num_args != 4) {
+            syslog(LOG_ERR, "Cannot parse flit\n");
+            return 1;
+        }
+
+        len = strlen(path);
+
+        iprprint("LID Name:   %s  (%8X)\n", lid_name, ntohl(flit_entry->load_name));
+        iprprint("Time Stamp: %s\n", time);
+        iprprint("LID Path:   %s\n", lid_name);
+        iprprint("Text Segment:  Address %08X,  Length %8X\n",
+               ntohl(flit_entry->text_ptr), ntohl(flit_entry->text_len));
+        iprprint("Data Segment:  Address %08X,  Length %8X\n",
+               ntohl(flit_entry->data_ptr), ntohl(flit_entry->data_len));
+        iprprint("BSS Segment:   Address %08X,  Length %8X\n",
+               ntohl(flit_entry->bss_ptr), ntohl(flit_entry->bss_len));
+        iprprint("\n");
+    }
+
+    return 0;
+} 
 
 int main(int argc, char *argv[])
 {
@@ -122,10 +205,10 @@ int main(int argc, char *argv[])
 
 		if (ioa_num == i)
 			return 0;
-		if (num_args != 0 || ioa_num > num_ioas)
+		if (num_args != 1 || ioa_num > num_ioas)
 			return -EINVAL;
 
-		for (ioa = ipr_ioa_head, i = 0; i < ioa_num; ioa = ioa->next, i++) {}
+		for (ioa = ipr_ioa_head, i = 1; i < ioa_num; ioa = ioa->next, i++) {}
 	} else
 		ioa = ipr_ioa_head;
 
@@ -142,7 +225,8 @@ int main(int argc, char *argv[])
 	closelog();
 	openlog("iprdbg", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
-	printf("\nATTENTION: This utility is for adapter developers only! Use at your own risk!\n");
+	printf("\nATTENTION: This utility is for adapter developers only!"
+	       "Use at your own risk!\n");
 	printf("\nUse \"quit\" to exit the program.\n\n");
 
 	memset(cmd, 0, sizeof(cmd));
@@ -334,94 +418,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
-                int *buffer, int len)
-{
-    u8 cdb[IPR_CCB_CDB_LEN];
-    struct sense_data_t sense_data;
-    int rc;
-
-    memset(cdb, 0, IPR_CCB_CDB_LEN);
-
-    cdb[0] = IPR_IOA_DEBUG;
-    cdb[1] = cmd;
-    cdb[2] = (ioa_adx >> 24) & 0xff;
-    cdb[3] = (ioa_adx >> 16) & 0xff;
-    cdb[4] = (ioa_adx >> 8) & 0xff;
-    cdb[5] = ioa_adx & 0xff;
-    cdb[6] = (mask >> 24) & 0xff;
-    cdb[7] = (mask >> 16) & 0xff;
-    cdb[8] = (mask >> 8) & 0xff;
-    cdb[9] = mask & 0xff;
-    cdb[10] = (len >> 24) & 0xff;
-    cdb[11] = (len >> 16) & 0xff;
-    cdb[12] = (len >> 8) & 0xff;
-    cdb[13] = len & 0xff;
-
-    if (cmd == IPRDBG_WRITE) {
-	    rc = sg_ioctl(fd, cdb, buffer,
-			  len, SG_DXFER_TO_DEV,
-			  &sense_data, IPR_INTERNAL_TIMEOUT);
-    } else {
-	    rc = sg_ioctl(fd, cdb, buffer,
-			  len, SG_DXFER_FROM_DEV,
-			  &sense_data, IPR_INTERNAL_TIMEOUT);
-    }
-
-    if (rc != 0)
-        fprintf(stderr, "Debug IOCTL failed. %d\n", errno);
-
-    return rc;
-}
-
-int format_flit(struct ipr_flit *flit)
-{
-    int num_entries = ntohl(flit->num_entries) - 1;
-    struct ipr_flit_entry *flit_entry;
-
-    signed int len;
-    u8 filename[IPR_FLIT_FILENAME_LEN+1];
-    u8 time[IPR_FLIT_TIMESTAMP_LEN+1];
-    u8 buf1[IPR_FLIT_FILENAME_LEN+1];
-    u8 buf2[IPR_FLIT_FILENAME_LEN+1];
-    u8 lid_name[IPR_FLIT_FILENAME_LEN+1];
-    u8 path[IPR_FLIT_FILENAME_LEN+1];
-    int num_args, i;
-
-    for (i = 0, flit_entry = flit->flit_entry;
-         (i < num_entries) && (*flit_entry->timestamp);
-         flit_entry++, i++) {
-        snprintf(time, IPR_FLIT_TIMESTAMP_LEN, flit_entry->timestamp);
-        time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
-
-        snprintf(filename, IPR_FLIT_FILENAME_LEN, flit_entry->filename);
-        filename[IPR_FLIT_FILENAME_LEN] = '\0';
-
-        num_args = sscanf(filename, "%184s "
-                          "%184s "
-                          "%184s "
-                          "%184s ",
-                          buf1, buf2, lid_name, path);
-
-        if (num_args != 4) {
-            syslog(LOG_ERR, "Cannot parse flit\n");
-            return 1;
-        }
-
-        len = strlen(path);
-
-        iprprint("LID Name:   %s  (%8X)\n", lid_name, ntohl(flit_entry->load_name));
-        iprprint("Time Stamp: %s\n", time);
-        iprprint("LID Path:   %s\n", lid_name);
-        iprprint("Text Segment:  Address %08X,  Length %8X\n",
-               ntohl(flit_entry->text_ptr), ntohl(flit_entry->text_len));
-        iprprint("Data Segment:  Address %08X,  Length %8X\n",
-               ntohl(flit_entry->data_ptr), ntohl(flit_entry->data_len));
-        iprprint("BSS Segment:   Address %08X,  Length %8X\n",
-               ntohl(flit_entry->bss_ptr), ntohl(flit_entry->bss_len));
-        iprprint("\n");
-    }
-
-    return 0;
-} 

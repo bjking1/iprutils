@@ -9,7 +9,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.19 2004/02/20 16:12:42 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.20 2004/02/23 19:54:30 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -40,7 +40,6 @@
 #include <sysfs/libsysfs.h>
 #include <linux/byteorder/swab.h>
 #include <asm/byteorder.h>
-#include <libiberty.h>
 #include <sys/mman.h>
 
 #define IPR_DASD_UCODE_USRLIB 0
@@ -74,7 +73,6 @@
 #define IPR_DEFECT_LIST_HDR_LEN              4
 #define IPR_FORMAT_DATA                      0x10
 #define IPR_FORMAT_IMMED                     2
-#define  IPR_PERI_TYPE_SES                   0x0D
 #define IPR_ARRAY_CMD_TIMEOUT                (2 * 60)     /* 2 minutes */
 #define IPR_INTERNAL_DEV_TIMEOUT             (2 * 60)     /* 2 minutes */
 #define IPR_FORMAT_UNIT_TIMEOUT              (3 * 60 * 60) /* 3 hours */
@@ -108,7 +106,6 @@
 #define  IPR_READ_CAPACITY_16                0x10
 #define IPR_SERVICE_ACTION_IN                0x9E
 #define IPR_QUERY_RESOURCE_STATE             0xC2
-#define IPR_QUERY_IOA_CONFIG                 0xC5
 #define IPR_QUERY_COMMAND_STATUS             0xCB
 #define IPR_SUSPEND_DEV_BUS                  0xC8u
 #define IPR_EVALUATE_DEVICE                  0xE4
@@ -154,10 +151,11 @@ cur_val = new_val;                                      \
 }                                                       \
 }
 
-#define IPR_RECORD_ID_SUPPORTED_ARRAYS       ___constant_swab16((u16)0)
-#define IPR_RECORD_ID_COMP_RECORD            ___constant_swab16((u16)3)
-#define IPR_RECORD_ID_ARRAY_RECORD           ___constant_swab16((u16)4)
-#define IPR_RECORD_ID_DEVICE_RECORD          ___constant_swab16((u16)5)
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
+#define IPR_RECORD_ID_SUPPORTED_ARRAYS       __constant_be16_to_cpu((u16)0)
+#define IPR_RECORD_ID_COMP_RECORD            __constant_be16_to_cpu((u16)3)
+#define IPR_RECORD_ID_ARRAY_RECORD           __constant_be16_to_cpu((u16)4)
+#define IPR_RECORD_ID_DEVICE_RECORD          __constant_be16_to_cpu((u16)5)
 
 extern struct ipr_array_query_data *ipr_array_query_data;
 extern u32 num_ioas;
@@ -413,8 +411,6 @@ struct ipr_array_cap_entry {
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8   include_allowed:1;
 	u8   reserved:7;
-	u16  reserved2;
-	u8   reserved3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8   reserved:7;
 	u8   include_allowed:1;
@@ -662,6 +658,7 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 	struct ipr_res_addr res_addr;
 
 #if defined (__BIG_ENDIAN_BITFIELD)
+	u8 qas_capability:2;
 	u8 enable_target_mode:1;
 	u8 term_power_absent:1;
 	u8 target_mode_supported:1;
@@ -1163,9 +1160,7 @@ int ipr_send_diagnostics(struct ipr_dev *, void *, int);
 int ipr_get_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
 void ipr_modify_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
 int ipr_set_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *, int);
-int get_lastest_dasd_fw_image(struct ipr_dev *, char *, char *);
 int ipr_write_buffer(struct ipr_dev *, void *, int);
-int get_latest_ioa_fw_image(struct ipr_ioa *, char *);
 int enable_af(struct ipr_dev *);
 int get_max_bus_speed(struct ipr_ioa *, int);
 int ipr_get_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
@@ -1174,6 +1169,9 @@ int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int ipr_set_dasd_timeouts(struct ipr_dev *);
 int ipr_setup_page0x20(struct ipr_dev *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
+int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
+void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
+void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

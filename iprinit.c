@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.6 2004/02/20 16:12:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.7 2004/02/23 19:54:29 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -15,7 +15,6 @@
 #include <scsi/sg.h>
 #include <scsi/scsi.h>
 #include <sys/stat.h>
-#include <libiberty.h>
 
 #ifndef iprlib_h
 #include "iprlib.h"
@@ -60,21 +59,35 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 
 static int setup_page0x01(struct ipr_dev *dev)
 {
-	struct ipr_mode_pages mode_pages;
-	struct ipr_rw_err_mode_page *page;
+	struct ipr_mode_pages mode_pages, ch_mode_pages;
+	struct ipr_rw_err_mode_page *page, *ch_page;
 	int len;
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
+	memset(&ch_mode_pages, 0, sizeof(ch_mode_pages));
 
 	if (ipr_mode_sense(dev, 0x01, &mode_pages))
+		return -EIO;
+	if (ipr_mode_sense(dev, 0x41, &ch_mode_pages))
 		return -EIO;
 
 	page = (struct ipr_rw_err_mode_page *)(((u8 *)&mode_pages) +
 					       mode_pages.hdr.block_desc_len +
 					       sizeof(mode_pages.hdr));
+	ch_page = (struct ipr_rw_err_mode_page *)(((u8 *)&ch_mode_pages) +
+						  ch_mode_pages.hdr.block_desc_len +
+						  sizeof(ch_mode_pages.hdr));
+
+	IPR_SET_MODE(ch_page->awre, page->awre, 1);
+	IPR_SET_MODE(ch_page->arre, page->arre, 1);
 
 	page->awre = 1;
 	page->arre = 1;
+
+	if (page->awre != 1)
+		goto error;
+	if (page->arre != 1)
+		goto error;
 
 	len = mode_pages.hdr.length + 1;
 	mode_pages.hdr.length = 0;
@@ -83,6 +96,7 @@ static int setup_page0x01(struct ipr_dev *dev)
 	page->hdr.parms_saveable = 0;
 
 	if (mode_select(dev, &mode_pages, len)) {
+error:
 		syslog(LOG_ERR, "Failed to setup mode page 0x01 for %s.\n",
 		       dev->scsi_dev_data->sysfs_device_name);
 		return -EIO;
@@ -137,10 +151,8 @@ static int setup_page0x0a(struct ipr_dev *dev)
 
 	IPR_SET_MODE(ch_page->queue_algorithm_modifier,
 		     page->queue_algorithm_modifier, 1);
-	IPR_SET_MODE(ch_page->qerr,
-		     page->qerr, 1);
-	IPR_SET_MODE(ch_page->dque,
-		     page->dque, 0);
+	IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
+	IPR_SET_MODE(ch_page->dque, page->dque, 0);
 
 	if (page->queue_algorithm_modifier != 1)
 		return -EIO;
@@ -224,7 +236,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
 
-	if (page0x0a_setup(dev))
+	if (runtime && page0x0a_setup(dev))
 		return;
 	if (setup_page0x0a(dev)) {
 		syslog_dbg(LOG_DEBUG, "Failed to enable TCQing for %s.\n",
@@ -344,24 +356,15 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	tool_init("iprinit");
-	check_current_config(false);
-
-	for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
-		init_ioa(ioa);
-
-	if (!daemonize)
-		return 0;
-
-	runtime = 1;
-
-	while (1) {
-		sleep(60);
+	do {
 		tool_init("iprinit");
 		check_current_config(false);
 		for (ioa = ipr_ioa_head; ioa; ioa = ioa->next)
 			init_ioa(ioa);
-	};
+		runtime = 1;
+		if (daemonize)
+			sleep(60);
+	} while(daemonize);
 
 	return 0;
 }

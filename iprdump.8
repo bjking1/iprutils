@@ -7,10 +7,10 @@ iprdump - IBM Power RAID adapter dump utility
 .B iprdump
 is used to gather information in the event of an adapter failure.
 The dump data will by default be saved in the /var/log/ directory with the
-prefix iprdump.# where # will be the dump ID of the file. The ipr driver
-will make a log in the system error log when a dump is taken. The iprdump
-utility can be started at any time and will properly handle adapters being
-dynamically added and removed from the system.
+prefix iprdump.# where # will be the dump ID of the file. The ipr dump
+utility will make a log in the system error log when a dump is taken. 
+The iprdump utility can be started at any time and will properly handle 
+adapters being dynamically added and removed from the system.
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -18,7 +18,7 @@ Print the version number of
 .B iprdump
 .TP
 .B \-d <directory>
-Assign directory where dump data is to be stored.  Default is /var/log/.
+Directory where dump data is to be stored.  Default is /var/log/.
 .SH AUTHOR
 Originally written by Michael Anderson <mjanders@us.ibm.com>. Rewritten
 for the 2.6 kernel by Brian King <brking@us.ibm.com>.

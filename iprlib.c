@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.18 2004/02/20 16:12:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.19 2004/02/23 19:54:29 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -950,9 +950,8 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0) {
-		if (errno != EINVAL) {
-			syslog(LOG_ERR, "Reclaim Cache Store to %s failed. %m\n", file);
-		}
+		if (errno != EINVAL)
+			ioa_cmd_err(ioa, &sense_data, "Reclaim Cache", rc);
 	}
 	else if ((action & IPR_RECLAIM_PERFORM) == IPR_RECLAIM_PERFORM)
 		ipr_reset_adapter(ioa);
@@ -1341,8 +1340,7 @@ static int set_supported_devs(struct ipr_dev *dev,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0)
-		syslog(LOG_ERR, "Set supported devices to %s failed.\n",
-		       dev->scsi_dev_data->sysfs_device_name);
+		ioa_cmd_err(dev->ioa, &sense_data, "Set supported devices", rc);
 
 	close(fd);
 	return rc;
@@ -1572,6 +1570,7 @@ static void get_sd_names(int num_devs)
 				    sysfs_device_device->name)) {
 				sprintf(scsi_dev_table[i].dev_name, "/dev/%s",
 					class_device->name);
+/* xxx check if file exists and create if it doesn't */
 				break;
 			}
 		}
@@ -2093,8 +2092,7 @@ int ipr_set_dasd_timeouts(struct ipr_dev *dev)
 		      &sense_data, SET_DASD_TIMEOUTS_TIMEOUT);
 
 	if (rc != 0)
-		syslog(LOG_ERR, "Set DASD timeouts to %s failed.\n",
-		       dev->scsi_dev_data->sysfs_device_name);
+		scsi_cmd_err(dev, &sense_data, "Set DASD timeouts", rc);
 
 	close(fd);
 	return rc;
@@ -2132,12 +2130,9 @@ int ipr_setup_page0x20(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (ipr_mode_select(dev, &mode_pages, len)) {
-		/* xxx cleanup these logs to use new macros */
-		syslog(LOG_ERR, "Failed to setup mode page 0x20 for %s.\n",
-		       dev->scsi_dev_data->sysfs_device_name);
+	if (ipr_mode_select(dev, &mode_pages, len))
 		return -EIO;
-	}
+
 	return 0;
 }
 
@@ -2302,12 +2297,77 @@ void ipr_modify_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 	}
 }
 
+static struct unsupported_af_dasd *
+get_unsupp_af(struct ipr_std_inq_data *inq,
+	      struct ipr_dasd_inquiry_page3 *page3)
+{
+	int i, j;
+
+	for (i=0; i < ARRAY_SIZE(unsupported_af); i++) {
+		for (j = 0; j < IPR_VENDOR_ID_LEN; j++) {
+			if (unsupported_af[i].compare_vendor_id_byte[j] &&
+			    unsupported_af[i].vendor_id[j] != inq->vpids.vendor_id[j])
+				break;
+		}
+
+		if (j != IPR_VENDOR_ID_LEN)
+			continue;
+
+		for (j = 0; j < IPR_PROD_ID_LEN; j++) {
+			if (unsupported_af[i].compare_product_id_byte[j] &&
+			    unsupported_af[i].product_id[j] != inq->vpids.product_id[j])
+				break;
+		}
+
+		if (j != IPR_PROD_ID_LEN)
+			continue;
+
+		for (j = 0; j < 4; j++) {
+			if (unsupported_af[i].lid_mask[j] &&
+			    unsupported_af[i].lid[j] != page3->load_id[j])
+				break;
+		}
+
+		if (j != 4)
+			continue;
+
+		return &unsupported_af[i];
+	}
+	return NULL;
+}
+
+static bool disk_needs_msl(struct unsupported_af_dasd *unsupp_af,
+			   struct ipr_std_inq_data *inq)
+{
+	u32 ros_rcv_ram_rsvd, min_ucode_level;
+	int j;
+
+	if (unsupp_af->supported_with_min_ucode_level) {
+		min_ucode_level = 0;
+		ros_rcv_ram_rsvd = 0;
+
+		for (j = 0; j < 4; j++) {
+			if (unsupp_af->min_ucode_mask[j]) {
+				min_ucode_level = (min_ucode_level << 8) |
+					unsupp_af->min_ucode_level[j];
+				ros_rcv_ram_rsvd = (ros_rcv_ram_rsvd << 8) |
+					inq->ros_rsvd_ram_rsvd[j];
+			}
+		}
+
+		if (min_ucode_level > ros_rcv_ram_rsvd)
+			return true;
+	}
+
+	return false;
+}
+
 bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 {
-	int i, j, rc;
+	int rc;
 	struct ipr_std_inq_data std_inq_data;
 	struct ipr_dasd_inquiry_page3 dasd_page3_inq;
-	u32 ros_rcv_ram_rsvd, min_ucode_level;
+	struct unsupported_af_dasd *unsupp_af;
 
 	/* Zero out inquiry data */
 	memset(&std_inq_data, 0, sizeof(std_inq_data));
@@ -2325,68 +2385,29 @@ bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 	if (rc != 0)
 		return false;
 
-	for (i=0; i < ARRAY_SIZE(unsupported_af); i++) {
-		for (j = 0; j < IPR_VENDOR_ID_LEN; j++) {
-			if (unsupported_af[i].compare_vendor_id_byte[j] &&
-			    unsupported_af[i].vendor_id[j] != std_inq_data.vpids.vendor_id[j])
-				break;
-		}
+	unsupp_af = get_unsupp_af(&std_inq_data, &dasd_page3_inq);
 
-		if (j != IPR_VENDOR_ID_LEN)
-			continue;
+	if (!unsupp_af)
+		return false;
 
-		for (j = 0; j < IPR_PROD_ID_LEN; j++) {
-			if (unsupported_af[i].compare_product_id_byte[j] &&
-			    unsupported_af[i].product_id[j] != std_inq_data.vpids.product_id[j])
-				break;
-		}
-
-		if (j != IPR_PROD_ID_LEN)
-			continue;
-
-		for (j = 0; j < 4; j++) {
-			if (unsupported_af[i].lid_mask[j] &&
-			    unsupported_af[i].lid[j] != dasd_page3_inq.load_id[j])
-				break;
-		}
-
-		if (j != 4)
-			continue;
-
-		/* If we make it this far, we have a match into the table.  Now,
-		 determine if we need a certain level of microcode or if this
-		 disk is not supported all together. */
-		if (unsupported_af[i].supported_with_min_ucode_level) {
-			/* Check microcode level in std inquiry data */
-			/* If it's less than the minimum required level, we will
-			 tell the user to upgrade microcode. */
-			min_ucode_level = 0;
-			ros_rcv_ram_rsvd = 0;
-
-			for (j = 0; j < 4; j++) {
-				if (unsupported_af[i].min_ucode_mask[j]) {
-					min_ucode_level = (min_ucode_level << 8) |
-						unsupported_af[i].min_ucode_level[j];
-					ros_rcv_ram_rsvd = (ros_rcv_ram_rsvd << 8) |
-						std_inq_data.ros_rsvd_ram_rsvd[j];
-				}
-			}
-
-			if (min_ucode_level > ros_rcv_ram_rsvd) {
-				if (!silent)
-					syslog(LOG_ERR,"Disk %s needs updated microcode "
-					       "before transitioning to 522 bytes/sector "
-					       "format.", ipr_dev->gen_name);
-				return true;
-			} else
-				return false;
-		} else {/* disk is not supported at all */
+	/* If we make it this far, we have a match into the table.  Now,
+	 determine if we need a certain level of microcode or if this
+	 disk is not supported all together. */
+	if (unsupp_af->supported_with_min_ucode_level) {
+		if (disk_needs_msl(unsupp_af, &std_inq_data)) {
 			if (!silent)
-				syslog(LOG_ERR,"Disk %s canot be formatted to "
-				       "522 bytes/sector.", ipr_dev->gen_name);
+				syslog(LOG_ERR,"Disk %s needs updated microcode "
+				       "before transitioning to 522 bytes/sector "
+				       "format.", ipr_dev->gen_name);
 			return true;
 		}
-	}   
+	} else {/* disk is not supported at all */
+		if (!silent)
+			syslog(LOG_ERR,"Disk %s canot be formatted to "
+			       "522 bytes/sector.", ipr_dev->gen_name);
+		return true;
+	}
+
 	return false;
 }
 
@@ -2555,21 +2576,6 @@ int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 	return j;
 }
 
-int get_latest_ioa_fw_image(struct ipr_ioa *ioa, char *fname)
-{
-	struct ipr_fw_images *list;
-	int num;
-
-	num = get_ioa_firmware_image_list(ioa, &list);
-
-	if (num == 0)
-		return -ENOENT;
-
-	strcpy(fname, list[0].file);
-	free(list);
-	return 0;
-}
-
 static u32 get_dasd_ucode_version(char *ucode_file, int ftype)
 {
 	int fd;
@@ -2690,23 +2696,161 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 	return 0;
 }
 
-int get_lastest_dasd_fw_image(struct ipr_dev *dev,
-			      char *fname, char *version)
+void ipr_update_ioa_fw(struct ipr_ioa *ioa,
+		       struct ipr_fw_images *image, int force)
 {
-	struct ipr_fw_images *list;
-	int num, rc;
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	struct ipr_ioa_ucode_header *image_hdr;
+	struct stat ucode_stats;
+	u32 fw_version;
+	int fd, rc;
+	char *tmp;
+	char ucode_file[100];
 
-	num = get_dasd_firmware_image_list(dev, &list);
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, "fw_version");
+	sscanf(attr->value, "%8X", &fw_version);
+	sysfs_close_class_device(class_device);
 
-	if (num == 0)
-		return IPR_DASD_UCODE_NOT_FOUND;
+	if (fw_version > ioa->msl && !force)
+		return;
 
-	strcpy(fname, list[0].file);
-	memcpy(version, &list[0].version, sizeof(u32));
-	if (list[0].has_header)
-		rc = IPR_DASD_UCODE_HDR;
+	fd = open(image->file, O_RDONLY);
+
+	if (fd < 0) {
+		syslog(LOG_ERR, "Could not open firmware file %s.\n", image->file);
+		return;
+	}
+
+	rc = fstat(fd, &ucode_stats);
+
+	if (rc != 0) {
+		syslog(LOG_ERR, "Failed to stat IOA firmware file: %s.\n", image->file);
+		close(fd);
+		return;
+	}
+
+	image_hdr = mmap(NULL, ucode_stats.st_size, PROT_READ, MAP_SHARED, fd, 0);
+
+	if (image_hdr == MAP_FAILED) {
+		syslog(LOG_ERR, "Error mapping IOA firmware file: %s.\n", image->file);
+		close(fd);
+		return;
+	}
+
+	if (ntohl(image_hdr->rev_level) > fw_version || force) {
+		ioa_info(ioa, "Updating adapter microcode from %08X to %08X.\n",
+			 fw_version, ntohl(image_hdr->rev_level));
+
+		tmp = strrchr(image->file, '/');
+		tmp++;
+		sprintf(ucode_file, "%s\n", tmp);
+		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+		attr = sysfs_get_classdev_attr(class_device, "update_fw");
+		rc = sysfs_write_attribute(attr, ucode_file, strlen(ucode_file));
+		sysfs_close_class_device(class_device);
+
+		if (rc != 0)
+			ioa_err(ioa, "Microcode update failed. rc=%d\n", rc);
+		else {
+			/* Write buffer was successful. Now we need to see if all our devices
+			 are available. The IOA may have been in braindead prior to the ucode
+			 download, in which case the upper layer scsi device drivers do not
+			 know anything about our devices. */
+			check_current_config(false);
+		}
+	}
+}
+
+void ipr_update_disk_fw(struct ipr_dev *dev,
+			struct ipr_fw_images *image, int force)
+{
+	int rc = 0;
+	struct stat ucode_stats;
+	int fd, img_size, img_off;
+	struct ipr_dasd_ucode_header *img_hdr;
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	struct ipr_std_inq_data std_inq_data;
+	struct unsupported_af_dasd *unsupp_af;
+	void *buffer;
+	char level[5];
+
+	memset(&std_inq_data, 0, sizeof(std_inq_data));
+	rc = ipr_inquiry(dev, IPR_STD_INQUIRY,
+			 &std_inq_data, sizeof(std_inq_data));
+
+	if (rc != 0)
+		return;
+
+	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+
+	if (rc != 0) {
+		scsi_dbg(dev, "Inquiry failed\n");
+		return;
+	}
+
+	if (!force) {
+		unsupp_af = get_unsupp_af(&std_inq_data, &page3_inq);
+		if (!unsupp_af)
+			return;
+
+		if (!disk_needs_msl(unsupp_af, &std_inq_data))
+			return;
+	}
+
+	if (image->has_header)
+		img_off = sizeof(struct ipr_dasd_ucode_header);
 	else
-		rc = IPR_DASD_UCODE_NO_HDR;
-	free(list);
-	return rc;
+		img_off = 0;
+
+	fd = open(image->file, O_RDONLY);
+
+	if (fd < 0) {
+		syslog_dbg(LOG_ERR, "Could not open firmware file %s.\n", image->file);
+		return;
+	}
+
+	rc = fstat(fd, &ucode_stats);
+
+	if (rc != 0) {
+		syslog(LOG_ERR, "Failed to stat firmware file: %s.\n", image->file);
+		close(fd);
+		return;
+	}
+
+	img_hdr = mmap(NULL, ucode_stats.st_size,
+		       PROT_READ, MAP_SHARED, fd, 0);
+
+	if (img_hdr == MAP_FAILED) {
+		syslog(LOG_ERR, "Error reading firmware file: %s.\n", image->file);
+		close(fd);
+		return;
+	}
+
+	if (memcmp(img_hdr->load_id, page3_inq.load_id, 4) &&
+	    !memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8)) {
+		syslog(LOG_ERR, "Firmware file corrupt: %s.\n", image->file);
+		munmap(img_hdr, ucode_stats.st_size);
+		close(fd);
+		return;
+	}
+
+	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
+		scsi_info(dev, "Updating disk microcode using %s "
+			  "from %c%c%c%c to %c%c%c%c\n", image->file,
+			  page3_inq.release_level[0], page3_inq.release_level[1],
+			  page3_inq.release_level[2], page3_inq.release_level[3],
+			  level[0], level[1], level[2], level[3]);
+
+		buffer = (void *)img_hdr + img_off;
+		img_size = ucode_stats.st_size - img_off;
+
+		rc = ipr_write_buffer(dev, buffer, img_size);
+	}
+
+	if (munmap(img_hdr, ucode_stats.st_size))
+		syslog(LOG_ERR, "munmap failed.\n");
+
+	close(fd);
 }

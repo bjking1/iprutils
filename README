@@ -1,21 +1,19 @@
 This directory contains user space tools required by the ipr device driver.
 To install them, type 'make' and then 'make install'.  You will need pciutils-devel,
-ncurses and ncurses-devel packages installed to perform the 'make'.  If you have
-trouble compiling the utilities due to not finding iprlib.h, you also need to 
-download the ipr device driver source. 
+ncurses, ncurses-devel, and sysfsutils packages installed to perform the 'make'.  
 
 iprdump - A user program meant to be run in the background to gather debug
 information should an IOA failure occur.  Ideally, this program should be
-started during IPL/boot time after file systems are loaded when the ipr
+started during boot time after file systems are loaded when the ipr
 SCSI driver is used.
 
 iprupdate - IOA/disk unit microcode update utility
 This tool requires no arguments and should be run after each time the device driver
 is loaded. It will query each adapter/disk unit for the microcode version and update 
-adapters/disk units that need to be updated. 
+adapters/disk units that are not currently at the minimum supported levels. 
 
 iprconfig - IOA Configuration and Recovery tool
-This is an ncurses based utility made to look similar to the iSeries green screens.
+This is an ncurses based utility used to configure ipr adapters and devices.
 The basic functions of this tool are:
 
 CONFIGURATION
@@ -28,7 +26,7 @@ and host SCSI ID.
 3. Work with Driver Configuration.  Currently allows adjustment to the devices drivers
 debug verbosity level and internal trace enablement.
 
-PARITY/RAID
+RAID
 4. Stop parity protection. This utility allows you to stop existing arrays.  Data stored
 on the devices will not be preserved after issuing this command.
 5. Start parity protection.  This option is used to combine a set of previously non-
