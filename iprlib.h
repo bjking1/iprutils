@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.39 2004/03/24 20:02:34 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.40 2004/03/29 23:23:30 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -168,6 +168,7 @@ extern u32 num_ioas;
 extern struct ipr_ioa *ipr_ioa_head;
 extern struct ipr_ioa *ipr_ioa_tail;
 extern int runtime;
+extern void (*exit_func) (void);
 
 struct ipr_res_addr {
 	u8 host;

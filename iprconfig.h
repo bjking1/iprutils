@@ -1110,7 +1110,7 @@ struct screen_opts log_menu_opt[] = {
 	{kernel_root,          "5", __("Set root kernel message log directory")},
 	{set_default_editor,   "6", __("Set default editor")},
 	{restore_log_defaults, "7", __("Restore defaults")},
-	{ibm_boot_log,         "8", __("View IBM boot time messages")}
+	{ibm_boot_log,         "8", __("View ipr boot time messages")}
 };
 
 s_node n_log_menu = {

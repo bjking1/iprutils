@@ -184,6 +184,14 @@ char *strip_trailing_whitespace(char *p_str)
 	return p_str;
 }
 
+static void tool_exit_func()
+{
+	clearenv();
+	clear();
+	refresh();
+	endwin();
+}
+
 int main(int argc, char *argv[])
 {
 	int  next_editor, next_dir, i;
@@ -237,6 +245,7 @@ int main(int argc, char *argv[])
 	strcpy(log_root_dir, parm_dir);
 	strcpy(editor, parm_editor);
 
+	exit_func = tool_exit_func;
 	tool_init("iprconfig");
 
 	initscr();
@@ -1580,7 +1589,15 @@ int device_details(i_container *i_con)
 		n_screen = &n_adapter_details;
 
 		ipr_inquiry(device, IPR_STD_INQUIRY, &ioa_vpd, sizeof(ioa_vpd));
-		ipr_inquiry(device, 1, &cfc_vpd, sizeof(cfc_vpd));
+
+		rc =  ipr_inquiry(device, 0, &page0_inq, sizeof(page0_inq));
+		for (i = 0; !rc && i < page0_inq.page_length; i++) {
+			if (page0_inq.supported_page_codes[i] == 1) {
+				ipr_inquiry(device, 1, &cfc_vpd, sizeof(cfc_vpd));
+				break;
+			}
+		}
+
 		ipr_inquiry(device, 2, &dram_vpd, sizeof(dram_vpd));
 		ipr_inquiry(device, 3, &page3_inq, sizeof(page3_inq));
 
@@ -1619,7 +1636,8 @@ int device_details(i_container *i_con)
 		body = add_line_to_body(body,_("Serial Number"), serial_num);
 		body = add_line_to_body(body,_("Part Number"), part_num);
 		body = add_line_to_body(body,_("Plant of Manufacturer"), plant_code);
-		body = add_line_to_body(body,_("Cache Size"), buffer);
+		if (cfc_vpd.cache_size[0])
+			body = add_line_to_body(body,_("Cache Size"), buffer);
 		body = add_line_to_body(body,_("DRAM Size"), dram_size);
 		body = add_line_to_body(body,_("Resource Name"), device->gen_name);
 		body = add_line_to_body(body,"", NULL);

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.46 2004/03/24 20:02:34 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.47 2004/03/29 23:23:29 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -19,12 +19,18 @@
 
 #define IPR_HOTPLUG_FW_PATH "/usr/lib/hotplug/firmware/"
 
+static void default_exit_func()
+{
+}
+
 struct ipr_array_query_data *ipr_qac_data;
 struct scsi_dev_data *scsi_dev_table;
 u32 num_ioas;
 struct ipr_ioa *ipr_ioa_head;
 struct ipr_ioa *ipr_ioa_tail;
 int runtime = 0;
+char *tool_name;
+void (*exit_func) (void) = default_exit_func;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -426,13 +432,13 @@ static void setup_ioa_parms(struct ipr_ioa *ioa)
 	ioa->scsi_id_changeable = 0;
 }
 
-void tool_init(char *tool_name)
+void tool_init(char *name)
 {
-	int ccin;
+	int ccin, rc;
 	struct ipr_ioa *ipr_ioa;
 	struct sysfs_driver *sysfs_ipr_driver;
 	struct dlist *ipr_devs;
-	char *pci_address;
+	char *pci_address, bus[100];
 
 	struct sysfs_class *sysfs_host_class;
 	struct sysfs_class *sysfs_device_class;
@@ -443,6 +449,11 @@ void tool_init(char *tool_name)
 	struct sysfs_device *sysfs_pci_device;
 
 	struct sysfs_attribute *sysfs_model_attr;
+
+	if (!tool_name) {
+		tool_name = malloc(strlen(name)+1);
+		strcpy(tool_name, name);
+	}
 
 	for (ipr_ioa = ipr_ioa_head; ipr_ioa;) {
 		ipr_ioa = ipr_ioa->next;
@@ -458,10 +469,19 @@ void tool_init(char *tool_name)
 	ipr_ioa_head = NULL;
 	num_ioas = 0;
 
-	/* Find all the IPR IOAs attached and save away vital info about them */
-	sysfs_ipr_driver = sysfs_open_driver("ipr", "pci");
-	if (sysfs_ipr_driver == NULL)
+	rc = sysfs_find_driver_bus("ipr", bus, 100);
+	if (rc) {
+		syslog(LOG_ERR, "Failed to open ipr driver bus. %m\n");
 		return;
+	}
+
+	/* Find all the IPR IOAs attached and save away vital info about them */
+	sysfs_ipr_driver = sysfs_open_driver(bus, "ipr");
+	if (sysfs_ipr_driver == NULL) {
+		sysfs_ipr_driver = sysfs_open_driver("ipr", bus);
+		if (sysfs_ipr_driver == NULL)
+			return;
+	}
 
 	ipr_devs = sysfs_get_driver_devices(sysfs_ipr_driver);
 
@@ -1915,15 +1935,16 @@ void exit_on_error(char *s, ...)
 	va_list args;
 	char usr_str[256];
 
+	exit_func();
+
 	va_start(args, s);
 	vsprintf(usr_str, s, args);
 	va_end(args);
 
 	closelog();
-	openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER); /* FIXME xxx */
+	openlog(tool_name, LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 	syslog(LOG_ERR,"%s",usr_str);
 	closelog();
-	openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
 
 	exit(1);
 }
@@ -2538,7 +2559,7 @@ int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	char *sysfs_dev_name;
 	int rc;
 
-	if (!sysfs_dev_name)
+	if (!dev->scsi_dev_data)
 		return -ENOENT;
 
 	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;

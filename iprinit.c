@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.13 2004/03/24 20:02:34 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.14 2004/03/29 23:23:29 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 				daemonized = 1;
 				if (fork())
 					return 0;
+
 			}
 			sleep(60);
 		}

@@ -35,6 +35,7 @@ start() {
     else
 	log_failure_msg " "
     fi
+    return $RETVAL
 }
 
 stop() {
@@ -47,29 +48,33 @@ stop() {
     else
 	log_failure_msg " "
     fi
+    return $RETVAL
 }
 
 restart() {
     $0 stop
     $0 start
+    return $RETVAL
 }
 
 reload() {
     echo -n "Reload ipr initialization daemon"
     $0 stop  &&  $0 start
+    return $RETVAL
 }
 
 status() {
     echo -n "Checking for ipr initialization daemon: "
 
-    pidofproc $IPRINIT
+    pidofproc $IPRINIT >& /dev/null
 
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
-	log_success_msg " "
+	log_success_msg "running"
     else
-	log_failure_msg " "
+	log_failure_msg "unused"
     fi
+    return $RETVAL
 }
 
 case "$1" in

@@ -37,6 +37,7 @@ start() {
 	    echo -n "Completed ipr microcode updates"
 	    log_failure_msg " "
 	fi
+        return $RETVAL
 }
 
 stop() {
