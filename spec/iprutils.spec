@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.11
+Version: 2.0.12
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Jun 11 2004 Brian King <brking@us.ibm.com> 2.0.12
+- Fix bug preventing ucode download to iSeries disks from working
 * Thu Jun 10 2004 Brian King <brking@us.ibm.com> 2.0.11
 - Fix segmentation fault in _sg_ioctl that was causing a silent
   failure of microcode update to disks. The microcode update would

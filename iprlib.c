@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.56 2004/06/10 14:41:01 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.57 2004/06/11 15:19:04 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2989,7 +2989,10 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 		strcpy(ret[j].file, etc_ucode_file);
 		ret[j].version = get_dasd_ucode_version(ret[j].file,
 							IPR_DASD_UCODE_ETC);
-		ret[j].has_header = 1;
+		if (memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8) == 0)
+			ret[j].has_header = 0;
+		else
+			ret[j].has_header = 1;
 		j++;
 	}
 
