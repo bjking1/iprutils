@@ -1069,8 +1069,8 @@ s_node n_choose_ucode = {
 		__("Select the microcode image to download\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=download microcode\n\n"),
-		"OPT  Version  Image File\n",
-		"---  -------- --------------------------\n",
+		"OPT  Version         Image File\n",
+		"---  --------------- --------------------------\n",
 		"" }
 };
 
@@ -1085,8 +1085,8 @@ s_node n_confirm_download_ucode = {
 		   "the microcode download process\n\n"),
 		__("Press Enter to continue.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
-		"OPT  Version  Image File\n",
-		"---  -------- --------------------------\n",
+		"OPT  Version         Image File\n",
+		"---  --------------- --------------------------\n",
 		"" }
 };
 

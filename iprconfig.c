@@ -1276,7 +1276,7 @@ char *__body_init(char *buffer, char **header, int *num_lines)
 	}
 
 	if (num_lines)
-		*num_lines = header_lines;
+		*num_lines = *num_lines + header_lines;
 	return buffer;
 }
 
@@ -1319,7 +1319,7 @@ int disk_status(i_container *i_con)
 			continue;
 
 		for (k=0; k<2; k++)
-			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1", cur_ioa, k);
+			buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1", cur_ioa, 2+k);
 
 		i_con = add_i_con(i_con,"\0",&cur_ioa->ioa);
 
@@ -1338,7 +1338,7 @@ int disk_status(i_container *i_con)
 				continue;
 
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, 2+k);
 
 			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);  
 
@@ -1354,7 +1354,7 @@ int disk_status(i_container *i_con)
 				continue;
 
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, 2+k);
 
 			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);  
 
@@ -1378,7 +1378,7 @@ int disk_status(i_container *i_con)
 			strncpy(cur_ioa->dev[j].prot_level_str,prot_level_str, 8);
 
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, 2+k);
 
 			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
 
@@ -1398,7 +1398,7 @@ int disk_status(i_container *i_con)
 				strncpy(cur_ioa->dev[i].prot_level_str, prot_level_str, 8);
 
 				for (k=0; k<2; k++)
-					buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
+					buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, 2+k);
 
 				i_con = add_i_con(i_con,"\0",&cur_ioa->dev[i]);
 				num_lines++;
@@ -1916,7 +1916,7 @@ int raid_status(i_container *i_con)
 				continue;
 
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, 2+k);
 
 			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);  
 
@@ -1941,7 +1941,7 @@ int raid_status(i_container *i_con)
 			strncpy(cur_ioa->dev[j].prot_level_str,prot_level_str, 8);
 
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, 2+k);
 
 			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
 
@@ -1962,7 +1962,7 @@ int raid_status(i_container *i_con)
 				strncpy(cur_ioa->dev[i].prot_level_str, prot_level_str, 8);
 
 				for (k=0; k<2; k++)
-					buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
+					buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, 2+k);
 
 				i_con = add_i_con(i_con,"\0",&cur_ioa->dev[i]);
 				num_lines++;
@@ -2059,7 +2059,7 @@ int raid_stop(i_container *i_con)
 			strncpy(cur_ioa->dev[i].prot_level_str,prot_level_str, 8);
 
 			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
+				buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, 2+k);
 
 			found++;
 		}
@@ -2160,7 +2160,7 @@ int confirm_raid_stop(i_container *i_con)
 		ipr_dev = cur_raid_cmd->ipr_dev;
 
 		for (k=0; k<2; k++)
-			buffer[k] = print_device(ipr_dev,buffer[k],"1",cur_ioa, k);
+			buffer[k] = print_device(ipr_dev,buffer[k],"1",cur_ioa, 2+k);
 
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
@@ -2170,7 +2170,7 @@ int confirm_raid_stop(i_container *i_con)
 			    (dev_record->array_id == cur_raid_cmd->array_id)) {
 				strncpy(cur_ioa->dev[j].prot_level_str,ipr_dev->prot_level_str, 8);
 				for (k=0; k<2; k++)
-					buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"1",cur_ioa,k);
+					buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"1",cur_ioa,2+k);
 			}
 		}
 	}
@@ -7466,11 +7466,6 @@ int download_ucode(i_container * i_con)
 							    array_record->raid_level);
 			strncpy(cur_ioa->dev[j].prot_level_str,prot_level_str, 8);
 
-			for (k=0; k<2; k++)
-				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], " ", cur_ioa, k);
-
-			i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
-
 			dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 			array_id = dev_record->array_id;
 			num_lines++;
@@ -7580,6 +7575,8 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	i_container *i_con = NULL;
 	i_container *temp_i_con;
 	char *input;
+	int version_swp;
+	char *version;
 	struct screen_output *s_out;
 	struct ipr_dasd_inquiry_page3 page3_inq;
 
@@ -7598,12 +7595,27 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	memset(&page3_inq, 0, sizeof(page3_inq));
 	ipr_inquiry(ipr_dev, 3, &page3_inq, sizeof(page3_inq));
 
-	sprintf(buffer, "%s%02X%02X%02X%02X\n\n",
-		_("The current microcode for this device is: "),
-		page3_inq.release_level[0],
-		page3_inq.release_level[1],
-		page3_inq.release_level[2],
-		page3_inq.release_level[3]);
+	if (isprint(page3_inq.release_level[0]) &&
+	    isprint(page3_inq.release_level[1]) &&
+	    isprint(page3_inq.release_level[2]) &&
+	    isprint(page3_inq.release_level[3]))
+		sprintf(buffer, "%s%02X%02X%02X%02X (%c%c%c%c)\n\n",
+			_("The current microcode for this device is: "),
+			page3_inq.release_level[0],
+			page3_inq.release_level[1],
+			page3_inq.release_level[2],
+			page3_inq.release_level[3],
+			page3_inq.release_level[0],
+			page3_inq.release_level[1],
+			page3_inq.release_level[2],
+			page3_inq.release_level[3]);
+	else
+		sprintf(buffer, "%s%02X%02X%02X%02X\n\n",
+			_("The current microcode for this device is: "),
+			page3_inq.release_level[0],
+			page3_inq.release_level[1],
+			page3_inq.release_level[2],
+			page3_inq.release_level[3]);
 
 	body = add_string_to_body(NULL, buffer, "", &header_lines);
 	body = __body_init(body, n_choose_ucode.header, &header_lines);
@@ -7613,7 +7625,16 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 
 	if (list_count) {
 		for (i=0; i<list_count; i++) {
-			sprintf(buffer," %%1   %.8X %s",list[i].version,list[i].file);
+			version_swp = htonl(list[i].version);
+			version = (char *)&version_swp;
+			if (isprint(version[0]) && isprint(version[1]) &&
+			    isprint(version[2]) && isprint(version[3]))
+				sprintf(buffer," %%1   %.8X (%c%c%c%c) %s\n",list[i].version,
+					version[0], version[1], version[2],	version[3],
+					list[i].file);
+			else
+				sprintf(buffer," %%1   %.8X        %s",list[i].version,list[i].file);
+
 			body = add_line_to_body(body, buffer, NULL);
 			i_con = add_i_con(i_con, "\0", &list[i]);
 		}
@@ -7651,7 +7672,16 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 		goto leave;
 		
 	body = body_init(n_confirm_download_ucode.header, &header_lines);
-	sprintf(buffer," 1  %8X %s\n",fw_image->version,fw_image->file);
+	version_swp = htonl(fw_image->version);
+	version = (char *)&version_swp;
+	if (isprint(version[0]) && isprint(version[1]) &&
+	    isprint(version[2]) && isprint(version[3]))
+		sprintf(buffer," 1   %.8X (%c%c%c%c) %s\n",fw_image->version,
+			version[0], version[1], version[2],	version[3],
+			fw_image->file);
+	else
+		sprintf(buffer," 1   %.8X        %s\n",fw_image->version,fw_image->file);
+
 	body = add_line_to_body(body,buffer, NULL);
 
 	n_confirm_download_ucode.body = body;
@@ -8282,10 +8312,10 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		len = strlen(body);
 	body = ipr_realloc(body, len + 256);
 
-	if ((type == 0) && (strlen(dev_name) > 5))
-		ipr_strncpy_0(node_name, &dev_name[5], 6);
-	else if ((type == 1) && (strlen(gen_name) > 5))
+	if (((type & 3) == 3) && (strlen(gen_name) > 5))
 		ipr_strncpy_0(node_name, &gen_name[5], 6);
+	else if (strlen(dev_name) > 5)
+		ipr_strncpy_0(node_name, &dev_name[5], 6);
 	else
 		node_name[0] = '\0';
 
@@ -8297,14 +8327,15 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 	if ((scsi_dev_data) &&
 	    (scsi_dev_data->type == IPR_TYPE_ADAPTER)) {
-		if (type == 0)
+		if (type&1) {
+			if (ipr_dev->ioa->qac_data->num_records)
+				len += sprintf(body + len,"            %-25s ","SCSI RAID Adapter");
+			else
+				len += sprintf(body + len,"            %-25s ","SCSI Adapter");
+		} else
 			len += sprintf(body + len,"            %-8s %-16s ",
 				       scsi_dev_data->vendor_id,
 				       scsi_dev_data->product_id);
-		else if (ipr_dev->ioa->qac_data->num_records)
-			len += sprintf(body + len,"            %-25s ","SCSI RAID Adapter");
-		else
-			len += sprintf(body + len,"            %-25s ","SCSI Adapter");
 
 		if (cur_ioa->ioa_dead)
 			len += sprintf(body + len, "Not Operational\n");
@@ -8367,7 +8398,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 		len += 12-tab_stop;
 
-		if (type == 0) {
+		if (!(type&1)) {
 			len += sprintf(body + len, "%-8s %-16s ",
 				       vendor_id,
 				       product_id);
@@ -8399,8 +8430,13 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 				}
 			}
 			else if (ipr_is_array_member(ipr_dev)) {
-				sprintf(raid_str,"  RAID %s Array Member",
-					ipr_dev->prot_level_str);
+				if (type&2)
+					sprintf(raid_str,"  RAID %s Array Member",
+						ipr_dev->prot_level_str);
+				else
+					sprintf(raid_str,"RAID %s Array Member",
+						ipr_dev->prot_level_str);
+	
 				len += sprintf(body + len, "%-25s ", raid_str);
 
 			}
@@ -8497,7 +8533,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		else if (res_state.prot_suspended)
 			sprintf(body + len, "Degraded\n");
 		else if (res_state.prot_resuming) {
-			if (type == 0 || percent_cmplt == 0)
+			if (!(type&1) || (percent_cmplt == 0))
 				sprintf(body + len, "Rebuilding\n");
 			else
 				sprintf(body + len, "%d%% Rebuilt\n", percent_cmplt);
