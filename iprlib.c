@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.63 2005/02/25 20:39:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.64 2005/03/01 21:04:14 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -22,7 +22,6 @@ static void default_exit_func()
 }
 
 struct ipr_array_query_data *ipr_qac_data = NULL;
-struct scsi_dev_data *scsi_dev_table = NULL;
 u32 num_ioas = 0;
 struct ipr_ioa *ipr_ioa_head = NULL;
 struct ipr_ioa *ipr_ioa_tail = NULL;
@@ -30,7 +29,6 @@ void (*exit_func) (void) = default_exit_func;
 int daemonize = 0;
 int ipr_debug = 0;
 int ipr_force = 0;
-char *hotplug_dir = NULL;
 int ipr_sg_required = 0;
 int polling_mode = 0;
 
@@ -42,8 +40,11 @@ struct zeroed_dev
 
 struct zeroed_dev *head_zdev = NULL;
 struct zeroed_dev *tail_zdev = NULL;
+
 static int ipr_force_polling = 0;
 static int ipr_force_uevents = 0;
+static char *hotplug_dir = NULL;
+static struct scsi_dev_data *scsi_dev_table = NULL;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -1495,9 +1496,6 @@ static int ipr_setup_af_qdepth(struct ipr_dev *dev, int qdepth)
 	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
 					     mode_pages.hdr.block_desc_len +
 					     sizeof(mode_pages.hdr));
-
-	if (page->max_tcq_depth == 1 && !page0x0a_setup(dev))
-		scsi_warn(dev, "WARNING: Enabling tagged queuing to unsupported disk\n");
 
 	page->max_tcq_depth = qdepth;
 
@@ -3125,10 +3123,13 @@ static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
 	}
 
 	if (!ipr_read_dev_attr(dev, "queue_type", temp)) {
-		if (tcq_enabled)
+		if (!tcq_enabled)
+			return ipr_write_dev_attr(dev, "queue_type", "none");
+
+		if (page0x0a_setup(dev))
 			return ipr_write_dev_attr(dev, "queue_type", "ordered");
 		else
-			return ipr_write_dev_attr(dev, "queue_type", "none");
+			return ipr_write_dev_attr(dev, "queue_type", "simple");
 	}
 
 	return -EIO;
@@ -3251,9 +3252,6 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 
 	if (attr->tcq_enabled != old_attr.tcq_enabled) {
 		if (!ipr_is_af_dasd_device(dev)) {
-			if (attr->tcq_enabled && !page0x0a_setup(dev))
-				scsi_warn(dev, "WARNING: Enabling tagged queuing to unsupported disk\n");
-
 			if (set_tagged(dev, attr->tcq_enabled))
 				return -EIO;
 			sprintf(temp, "%d", attr->tcq_enabled);
@@ -4205,13 +4203,6 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 
 		if (rc != 0)
 			ioa_err(ioa, "Microcode update failed. rc=%d\n", rc);
-		else {
-			/* Write buffer was successful. Now we need to see if all our devices
-			 are available. The IOA may have been in braindead prior to the ucode
-			 download, in which case the upper layer scsi device drivers do not
-			 know anything about our devices. */
-			check_current_config(false);
-		}
 	} else
 		ipr_log_ucode_error(ioa);
 
@@ -4310,6 +4301,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 		img_size = ucode_stats.st_size - img_off;
 
 		rc = ipr_write_buffer(dev, buffer, img_size);
+		ipr_init_dev(dev);
 	}
 
 	if (munmap(img_hdr, ucode_stats.st_size))
@@ -4424,6 +4416,11 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	IPR_SET_MODE(ch_page->qerr, page->qerr, 3);
 	IPR_SET_MODE(ch_page->dque, page->dque, 0);
 
+	if (page->dque != 0) {
+		scsi_dbg(dev, "Cannot set dque=0\n");
+		return -EIO;
+	}
+
 	if (page->tst != 1 || page->qerr != 3) {
 		scsi_dbg(dev, "Cannot set QERR/TST for multi-initiator. "
 			 "TST=%d, QERR=%d\n", page->tst, page->qerr);
@@ -4431,23 +4428,13 @@ static int setup_page0x0a(struct ipr_dev *dev)
 		IPR_SET_MODE(ch_page->tst, page->tst, 0);
 		IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
 
-		if (page->tst != 0 || page->qerr != 1) {
+		if (page->tst != 0 || page->qerr != 1)
 			scsi_dbg(dev, "Cannot set QERR/TST for single-initiator. "
 				 "TST=%d, QERR=%d\n", page->tst, page->qerr);
-			return -EINVAL;
-		}
 	}
 
-
-	if (page->queue_algorithm_modifier != 1) {
+	if (page->queue_algorithm_modifier != 1)
 		scsi_dbg(dev, "Cannot set QAM=1\n");
-		return -EIO;
-	}
-
-	if (page->dque != 0) {
-		scsi_dbg(dev, "Cannot set dque=0\n");
-		return -EIO;
-	}
 
 	len = mode_pages.hdr.length + 1;
 	mode_pages.hdr.length = 0;
@@ -4456,9 +4443,19 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	page->hdr.parms_saveable = 0;
 
 	if (mode_select(dev, &mode_pages, len)) {
-		syslog(LOG_ERR, "Failed to setup mode page 0x0A for %s.\n",
-		       dev->scsi_dev_data->sysfs_device_name);
+		scsi_err(dev, "Failed to setup mode page 0x0A\n");
 		return -EIO;
+	}
+	return 0;
+}
+
+static int dev_init_allowed(struct ipr_dev *dev)
+{
+	struct ipr_query_res_state res_state;
+
+	if (!ipr_query_resource_state(dev, &res_state)) {
+		if (!res_state.read_write_prot && !res_state.prot_dev_failed)
+			return 1;
 	}
 	return 0;
 }
@@ -4486,17 +4483,6 @@ static int page0x20_setup(struct ipr_dev *dev)
 	return 0;
 }
 
-static int dev_init_allowed(struct ipr_dev *dev)
-{
-	struct ipr_query_res_state res_state;
-
-	if (!ipr_query_resource_state(dev, &res_state)) {
-		if (!res_state.read_write_prot && !res_state.prot_dev_failed)
-			return 1;
-	}
-	return 0;
-}
-
 /*
  * VSETs:
  * 1. Adjust queue depth based on number of devices
@@ -4511,7 +4497,7 @@ static void init_vset_dev(struct ipr_dev *dev)
 
 	memset(&res_state, 0, sizeof(res_state));
 
-	if (!ipr_query_resource_state(dev, &res_state)) {
+	if (!polling_mode && !ipr_query_resource_state(dev, &res_state)) {
 		depth = res_state.vset.num_devices_in_vset * 4;
 		snprintf(q_depth, sizeof(q_depth), "%d", depth);
 		q_depth[sizeof(q_depth)-1] = '\0';
@@ -4539,7 +4525,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
-	if (polling_mode && page0x0a_setup(dev) && attr.tcq_enabled)
+	if (polling_mode && attr.tcq_enabled)
 		return;
 	if (ipr_test_unit_ready(dev, &sense_data))
 		return;
@@ -4574,9 +4560,7 @@ static void init_af_dev(struct ipr_dev *dev)
 
 	if (ipr_set_dasd_timeouts(dev))
 		return;
-	if (polling_mode && !dev_init_allowed(dev))
-		return;
-	if (polling_mode && page0x20_setup(dev) && page0x0a_setup(dev))
+	if (polling_mode && (!dev_init_allowed(dev) || page0x20_setup(dev)))
 		return;
 	if (setup_page0x01(dev))
 		return;

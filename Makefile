@@ -36,7 +36,7 @@ iprucode:iprucode.c iprlib.o
 iprlib.o: iprlib.c iprlib.h
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
 
-%.gz : %.8
+%.8.gz : %.8
 	gzip -f -c $< > $<.gz
 
 %.nroff : %.8
@@ -48,7 +48,7 @@ iprlib.o: iprlib.c iprlib.h
 %.pdf : %.ps
 	ps2pdf $< $@
 
-docs : $(patsubst %.8,%.gz,$(wildcard *.8))
+docs : $(patsubst %.8,%.8.gz,$(wildcard *.8))
 
 pdfs : $(patsubst %.8,%.pdf,$(wildcard *.8))
 

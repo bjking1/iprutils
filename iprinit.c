@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.19 2005/02/23 20:57:11 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.20 2005/03/01 21:04:14 brking Exp $
  */
 
 #include <unistd.h>
@@ -102,8 +102,8 @@ static void kevent_handler(char *buf)
 
 static void poll_ioas()
 {
-	polling_mode = 1;
 	init_all();
+	polling_mode = 1;
 }
 
 int main(int argc, char *argv[])

@@ -1265,6 +1265,16 @@ static void verify_device(struct ipr_dev *dev)
 	}
 }
 
+static void processing()
+{
+	int max_y, max_x;
+
+	getmaxyx(stdscr,max_y,max_x);
+	move(max_y-1,0);
+	printw(_("Processing"));
+	refresh();
+}
+
 int main_menu(i_container *i_con)
 {
 	int rc;
@@ -1273,6 +1283,7 @@ int main_menu(i_container *i_con)
 	struct screen_output *s_out;
 	struct scsi_dev_data *scsi_dev_data;
 
+	processing();
 	check_current_config(false);
 
 	for_each_ioa(ioa) {
@@ -1393,16 +1404,6 @@ static int print_vsets(struct ipr_ioa *ioa,
 	}
 
 	return num_lines;
-}
-
-static void processing()
-{
-	int max_y, max_x;
-
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
 }
 
 int disk_status(i_container *i_con)
@@ -1875,6 +1876,8 @@ int device_details(i_container *i_con)
 	s_node *n_screen;
 	int rc;
 
+	processing();
+
 	if ((rc = device_details_get_device(i_con, &dev)))
 		return rc;
 
@@ -1947,6 +1950,8 @@ int raid_status(i_container *i_con)
 	char *buffer[2];
 	int toggle = 1;
 	char *prot_level_str;
+
+	processing();
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -2078,6 +2083,8 @@ int raid_stop(i_container *i_con)
 	int toggle = 1;
 	struct screen_output *s_out;
 	char *prot_level_str;
+
+	processing();
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -2355,6 +2362,8 @@ int raid_start(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
+
+	processing();
 
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
@@ -3314,6 +3323,8 @@ int raid_include(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 1;
+
+	processing();
 
 	i_con = free_i_con(i_con);
 
@@ -4952,6 +4963,8 @@ int init_device(i_container *i_con)
 
 	rc = RC_SUCCESS;
 
+	processing();
+
 	i_con = free_i_con(i_con);
 
 	check_current_config(false);
@@ -5434,6 +5447,7 @@ int reclaim_cache(i_container* i_con)
 	int toggle=1;
 	int k;
 
+	processing();
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
 
@@ -6066,6 +6080,7 @@ int bus_config(i_container *i_con)
 	int toggle = 0;
 	rc = RC_SUCCESS;
 
+	processing();
 	i_con = free_i_con(i_con);
 
 	check_current_config(false);
@@ -6849,6 +6864,7 @@ int driver_config(i_container *i_con)
 	int header_lines;
 	int toggle = 0;
 
+	processing();
 	/* empty the linked list that contains field pointers */
 	i_con = free_i_con(i_con);
 
@@ -7003,6 +7019,7 @@ int disk_config(i_container * i_con)
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
 
+	processing();
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
 
@@ -7280,12 +7297,14 @@ int change_disk_config(i_container * i_con)
 
 	if (ipr_is_volume_set(ipr_dev) || page0x0a_setup(ipr_dev))
 		header_lines += 1;
+/* xxx
 	else if (ipr_is_af_dasd_device(ipr_dev) && disk_attr.queue_depth > 1)
 		tcq_warning = 1;
 	else if (ipr_is_gscsi(ipr_dev) && disk_attr.tcq_enabled)
 		tcq_warning = 1;
 	else
 		tcq_blocked = 1;
+*/
 
 	if (tcq_warning) {
 		body = add_line_to_body(body, buffer, NULL);
@@ -7401,6 +7420,7 @@ int ioa_config(i_container * i_con)
 	char *buffer[2];
 	int toggle = 1;
 
+	processing();
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
 
