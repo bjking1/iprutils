@@ -1,3 +1,14 @@
+#ifndef iprconfig_h
+#define iprconfig_h
+/**
+ * IBM IPR adapter configuration utility
+ *
+ * (C) Copyright 2004
+ * International Business Machines Corporation and others.
+ * All Rights Reserved.
+ *
+ **/
+
 #include <libintl.h>
 #define _(string) gettext(string)
 #define __(string) (string)
@@ -1254,3 +1265,5 @@ const char *screen_status[] = {
       /* 67 */ __("Microcode Download failed.")
       /* NOTE:  127 maximum limit */
 };
+
+#endif
