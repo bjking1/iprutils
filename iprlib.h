@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.34 2004/03/16 04:30:40 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.35 2004/03/17 21:56:49 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -83,7 +83,7 @@
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (10 * 60)    /* 10 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
-#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
+#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    15
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
 #define IPR_DRIVE_ELEM_STATUS_POPULATED      1
 #define IPR_TIMEOUT_MINUTE_RADIX		0x4000
@@ -1065,8 +1065,8 @@ struct ipr_drive_elem_status
 	u8 reserved3:4;
 	u8 insert:1;
 	u8 remove:1;
-	u8 reserved4:1;
 	u8 identify:1;
+	u8 reserved4:1;
 
 	u8 reserved5:1;
 	u8 fault_requested:1;
@@ -1082,8 +1082,8 @@ struct ipr_drive_elem_status
 	u8 scsi_id:4;
 	u8 reserved2:4;
 
-	u8 identify:1;
 	u8 reserved4:1;
+	u8 identify:1;
 	u8 remove:1;
 	u8 insert:1;
 	u8 reserved3:4;
@@ -1114,12 +1114,11 @@ struct ipr_encl_status_ctl_pg
 	u8 overall_status_reserved4:4;
 	u8 overall_status_insert:1;
 	u8 overall_status_remove:1;
-	u8 overall_status_reserved5:1;
 	u8 overall_status_identify:1;
+	u8 overall_status_reserved5:1;
 
-	u8 overall_status_reserved6:1;
+	u8 overall_status_reserved6:2;
 	u8 overall_status_fault_requested:1;
-	u8 overall_status_fault_sensed:1;
 	u8 overall_status_reserved7:4;
 	u8 overall_status_disable_resets:1;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
@@ -1131,17 +1130,16 @@ struct ipr_encl_status_ctl_pg
 
 	u8 overall_status_reserved3;
 
-	u8 overall_status_identify:1;
 	u8 overall_status_reserved5:1;
+	u8 overall_status_identify:1;
 	u8 overall_status_remove:1;
 	u8 overall_status_insert:1;
 	u8 overall_status_reserved4:4;
 
 	u8 overall_status_disable_resets:1;
 	u8 overall_status_reserved7:4;
-	u8 overall_status_fault_sensed:1;
 	u8 overall_status_fault_requested:1;
-	u8 overall_status_reserved6:1;
+	u8 overall_status_reserved6:2;
 #endif
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };

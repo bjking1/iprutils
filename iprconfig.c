@@ -4401,8 +4401,8 @@ int select_hot_spare(i_container *i_con, int action)
 	struct ipr_dev *ipr_dev;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev_record *device_record;
-	i_container *temp_i_con,*i_con2=NULL;
-	struct screen_output *s_out;
+	i_container *temp_i_con,*i_con2 = NULL;
+	struct screen_output *s_out = NULL;
 	int header_lines;
 	s_node *n_screen;
 	int toggle = 0;
@@ -4669,24 +4669,41 @@ int process_conc_maint(i_container *i_con, int action)
 	if (found != 1)
 		return INVALID_OPTION_STATUS;
 
+	if (ipr_dev->scsi_dev_data) {
+		res_addr.host = ipr_dev->scsi_dev_data->host;
+		res_addr.bus = ipr_dev->scsi_dev_data->channel;
+		res_addr.target = ipr_dev->scsi_dev_data->id;
+		res_addr.lun = ipr_dev->scsi_dev_data->lun;
+	} else if (ipr_is_af_dasd_device(ipr_dev)) {
+		dev_record = (struct ipr_dev_record *) ipr_dev->qac_entry;
+
+		if (dev_record && dev_record->no_cfgte_dev) {
+			res_addr.host = ipr_dev->ioa->host_num;
+			res_addr.bus = dev_record->last_resource_addr.bus;
+			res_addr.target = dev_record->last_resource_addr.target;
+			res_addr.lun = dev_record->last_resource_addr.lun;
+		} else if (dev_record) {
+			res_addr.host = ipr_dev->ioa->host_num;
+			res_addr.bus = dev_record->resource_addr.bus;
+			res_addr.target = dev_record->resource_addr.target;
+			res_addr.lun = dev_record->resource_addr.lun;
+		}
+	}
+
 	if ((ipr_is_af_dasd_device(ipr_dev)) &&
 	    ((action == IPR_VERIFY_CONC_REMOVE) ||
 	     (action == IPR_WAIT_CONC_REMOVE))) {
 
 		/* issue suspend device bus to verify operation
 		 is allowable */
-		dev_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
-		rc = ipr_suspend_device_bus(ipr_dev->ioa,
-					    &dev_record->resource_addr,
+		rc = ipr_suspend_device_bus(ipr_dev->ioa, &res_addr,
 					    IPR_SDB_CHECK_ONLY);
 
 		if (rc)
 			return INVALID_OPTION_STATUS; /* FIXME */
 
-	} else if (num_device_opens(ipr_dev->scsi_dev_data->host,
-				    ipr_dev->scsi_dev_data->channel,
-				    ipr_dev->scsi_dev_data->id,
-				    ipr_dev->scsi_dev_data->lun))
+	} else if (num_device_opens(res_addr.host, res_addr.bus,
+				    res_addr.target, res_addr.lun))
 		return INVALID_OPTION_STATUS;  /* FIXME */
 
 	cur_ioa = ipr_dev->ioa;
@@ -4694,20 +4711,19 @@ int process_conc_maint(i_container *i_con, int action)
 	/* flash light at location of specified device */
 	for (j = 0; j < cur_ioa->num_devices; j++) {
 		scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
-		if ((scsi_dev_data == NULL) ||
-		    (scsi_dev_data->type != IPR_TYPE_SES))
+
+		if (!scsi_dev_data || scsi_dev_data->type != IPR_TYPE_SES)
 			continue;
 
 		rc = ipr_receive_diagnostics(&cur_ioa->dev[j], 2, &ses_data,
 					     sizeof(struct ipr_encl_status_ctl_pg));
 
-		if ((rc) ||
-		    (scsi_dev_data->channel != ipr_dev->scsi_dev_data->channel))
+		if (rc || res_addr.bus != scsi_dev_data->channel)
 			continue;
 
 		found = 0;
 		for (i=0; i<((ntohs(ses_data.byte_count)-8)/sizeof(struct ipr_drive_elem_status)); i++) {
-			if (ipr_dev->scsi_dev_data->id == ses_data.elem_status[i].scsi_id) {
+			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
 				found++;
 
 				if ((action == IPR_VERIFY_CONC_REMOVE)  ||
@@ -4796,10 +4812,6 @@ int process_conc_maint(i_container *i_con, int action)
 			evaluate_device(ipr_dev, ipr_dev->ioa, 0);
 		} else if (action == IPR_VERIFY_CONC_ADD) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_ADD);
-			res_addr.host = ipr_dev->scsi_dev_data->host;
-			res_addr.bus = ipr_dev->scsi_dev_data->channel;
-			res_addr.target = ipr_dev->scsi_dev_data->id;
-			res_addr.lun = ipr_dev->scsi_dev_data->lun;
 			ipr_rescan(cur_ioa, res_addr.bus, res_addr.target, res_addr.lun);
 
 			while (time--) {
@@ -4888,7 +4900,7 @@ int start_conc_maint(i_container *i_con, int action)
 	for (k=0; k<2; k++)
 		buffer[k] = body_init_status(n_screen->header, &header_lines, k);
 
-	for(cur_ioa = ipr_ioa_head; cur_ioa != NULL; cur_ioa = cur_ioa->next) {
+	for(cur_ioa = ipr_ioa_head; cur_ioa; cur_ioa = cur_ioa->next) {
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL) ||
@@ -8762,21 +8774,31 @@ int is_rw_protected(struct ipr_dev *ipr_dev)
 
 void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa, int change_size)
 {
-	struct scsi_dev_data *scsi_dev_data;
+	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
 	struct ipr_res_addr res_addr;
+	struct ipr_dev_record *dev_record;
 	int device_converted;
 	int timeout = 60;
+	u32 res_handle;
+
+	if (scsi_dev_data) {
+		res_handle = scsi_dev_data->handle;
+		res_addr.bus = scsi_dev_data->channel;
+		res_addr.target = scsi_dev_data->id;
+		res_addr.lun = scsi_dev_data->lun;
+	} else if (ipr_is_af_dasd_device(ipr_dev)) {
+		dev_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+		if (dev_record->no_cfgte_dev) 
+			return;
+
+		res_handle = ntohl(dev_record->resource_handle);
+		res_addr.bus = dev_record->resource_addr.bus;
+		res_addr.target = dev_record->resource_addr.target;
+		res_addr.lun = dev_record->resource_addr.lun;
+	}
 
 	/* send evaluate device down */
-	scsi_dev_data = ipr_dev->scsi_dev_data;
-	if (scsi_dev_data == NULL)
-		return;
-
-	ipr_evaluate_device(&ioa->ioa, scsi_dev_data->handle);
-
-	res_addr.bus = scsi_dev_data->channel;
-	res_addr.target = scsi_dev_data->id;
-	res_addr.lun = scsi_dev_data->lun;
+	ipr_evaluate_device(&ioa->ioa, res_handle);
 
 	device_converted = 0;
 

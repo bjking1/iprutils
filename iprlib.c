@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.43 2004/03/16 04:30:01 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.44 2004/03/17 21:56:49 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -2529,8 +2529,13 @@ int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	struct sysfs_class_device *class_device;
 	struct sysfs_attribute *dev_attr;
 	struct sysfs_device *device;
-	char *sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
+	char *sysfs_dev_name;
 	int rc;
+
+	if (!sysfs_dev_name)
+		return -ENOENT;
+
+	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
 
 	class_device = sysfs_open_class_device("scsi_device",
 					       sysfs_dev_name);
@@ -2567,7 +2572,12 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	struct sysfs_class_device *class_device;
 	struct sysfs_attribute *dev_attr;
 	struct sysfs_device *device;
-	char *sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
+	char *sysfs_dev_name;
+
+	if (!dev->scsi_dev_data)
+		return -ENOENT;
+
+	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
 
 	class_device = sysfs_open_class_device("scsi_device",
 					       sysfs_dev_name);
