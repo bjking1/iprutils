@@ -227,17 +227,23 @@ struct screen_opts raid_stop_opt[] = {
 };
 
 s_node n_raid_stop = {
-	203,
-	(CANCEL_FLAG),
-	NUM_OPTS(raid_stop_opt),
-	&raid_stop_opt[0]
+    203,
+    (CANCEL_FLAG),
+    NUM_OPTS(raid_stop_opt),
+    &raid_stop_opt[0],
+    NULL,
+    NULL,
+    "%e%q%t%f"
 };
 
 s_node n_raid_stop_fail = {
-	204,
-	(NULL_FLAG),
-	0,
-	NULL
+    204,
+    (NULL_FLAG),
+    0,
+    NULL,
+    NULL,
+    NULL,
+    "%n%e%q"
 };
 
 struct screen_opts confirm_raid_stop_opt[] = {
@@ -245,24 +251,13 @@ struct screen_opts confirm_raid_stop_opt[] = {
 };
 
 s_node n_confirm_raid_stop = {
-	205,
-	(CANCEL_FLAG),
-	NUM_OPTS(confirm_raid_stop_opt),
-	&confirm_raid_stop_opt[0]
-};
-
-s_node n_do_confirm_raid_stop = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_raid_stop_complete = {
-	206,
-	(NULL_FLAG),
-	0,
-	NULL
+    205,
+    (CANCEL_FLAG),
+    NUM_OPTS(confirm_raid_stop_opt),
+    &confirm_raid_stop_opt[0],
+    NULL,
+    NULL,
+    "%q%t%f"
 };
 
 struct screen_opts raid_start_opt[] = {
@@ -270,10 +265,13 @@ struct screen_opts raid_start_opt[] = {
 };
 
 s_node n_raid_start = {
-	202,
-	(CANCEL_FLAG | REFRESH_FLAG),
-	NUM_OPTS(raid_start_opt),
-	&raid_start_opt[0]
+    202,
+    (CANCEL_FLAG | REFRESH_FLAG),
+    NUM_OPTS(raid_start_opt),
+    &raid_start_opt[0],
+    NULL,
+    NULL,
+    "%e%q%t%f"
 };
 
 s_node n_raid_start_fail = {
@@ -286,29 +284,18 @@ s_node n_raid_start_fail = {
     "%n%e%q"
 };
 
-s_node n_raid_start_loop = {
-	999,
-	(NULL_FLAG | EXIT_FLAG),
-	0,
-	NULL
-};
-
 struct screen_opts configure_raid_start_opt[] = {
-	{NULL, 0, "\n"} /* configure_raid_parameters  */
+	{NULL, 0, "\n"}
 };
 
 s_node n_configure_raid_start = {
-	208,
-	(CANCEL_FLAG | REFRESH_FLAG),
-	NUM_OPTS(configure_raid_start_opt),
-	&configure_raid_start_opt[0]
-};
-
-s_node n_configure_raid_parameters = {
-	209,
-	(NULL_FLAG),
-	0,
-	NULL
+    208,
+    (CANCEL_FLAG | REFRESH_FLAG),
+    NUM_OPTS(configure_raid_start_opt),
+    &configure_raid_start_opt[0],
+    NULL,
+    NULL,
+    "%e%q%t%f"
 };
 
 struct screen_opts confirm_raid_start_opt[] = {
@@ -316,10 +303,13 @@ struct screen_opts confirm_raid_start_opt[] = {
 };
 
 s_node n_confirm_raid_start = {
-	210,
-	(NULL_FLAG),
-	NUM_OPTS(confirm_raid_start_opt),
-	&confirm_raid_start_opt[0]
+    210,
+    (NULL_FLAG),
+    NUM_OPTS(confirm_raid_start_opt),
+    &confirm_raid_start_opt[0],
+    NULL,
+    NULL,
+    "%q%t%f"
 };
 
 s_node n_raid_start_complete = {

@@ -76,65 +76,38 @@ $set 201 raid_status
 4 "No devices found"
 
 $set 202 raid_start
-$ iSeries
 1 "Create a Disk Array"
-2 "Select the subsystems to create a disk array.\
-\n\
-\nType choice, press Enter.\
-\n  1=create a disk array\
-\n\
-\n         Parity  Serial                Resource\
-\nOption     Set   Number   Type  Model  Name\
-\n#1"
-3 "%e%q%f"
+2 "Select the subsystems to create a disk array."
+3 "Type choice, press Enter."
+4 "create a disk array"
 
 $set 203 raid_stop
-$ iSeries
 1 "Delete a Disk Array"
-2 "Select the subsystems to delete a disk array.\
-\n\
-\nType choice, press Enter.\
-\n  1=delete a disk array\
-\n\
-\n         Parity  Serial                Resource\
-\nOption     Set   Number   Type  Model  Name\
-\n#1"
-3 "%e%q%f"
+2 "Select the subsystems to delete a disk array."
+3 "Type choice, press Enter."
+4 "delete a disk array"
 
 $set 204 raid_stop_fail
 1 "Delete a Disk Array Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\n\
-\no  There are no device parity protected units in the system.\
-\no  An IOA is in a condition that makes the disk units attached to\
-\n   it read/write protected.  Examine the kernel messages log\
-\n   for any errors that are logged for the IO subsystem\
-\n   and follow the appropriate procedure for the reference code to\
-\n   correct the problem, if necessary.\
-\no  Not all disk units attached to an advanced function IOA have\
-\n   reported to the system.  Retry the operation.\
-\no  The disk units are missing.\
-\no  The disk unit/s are currently in use."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no device parity protected units in the system."
+4 "An IOA is in a condition that makes the disk units attached to\
+ it read/write protected.  Examine the kernel messages log\
+ for any errors that are logged for the IO subsystem\
+ and follow the appropriate procedure for the reference code to\
+ correct the problem, if necessary."
+5 "Not all disk units attached to an advanced function IOA have\
+ reported to the system.  Retry the operation."
+6 "The disk units are missing."
+7 "The disk unit/s are currently in use."
 
 $set 205 confirm_raid_stop
 1 "Confirm Delete a Disk Array"
 2 "ATTENTION: Disk units connected to these subsystems will not be\
-\nprotected after you confirm your choice.\
-\n\
-\nPress Enter to continue.\
-\nPress q=Cancel to return and change your choice.\
-\n\
-\n         Parity  Serial                Resource\
-\nOption     Set   Number   Type  Model  Name\
-\n#1"
-3 "%q%f"
-
-$set 206 raid_stop_complete
-1 "Stop Device Parity Protection Status"
-2 "You selected to stop device parity protection"
-3 "%3d%% Complete"
+ protected after you confirm your choice."
+3 "Press Enter to continue."
+4 "Cancel to return and change your choice."
 
 $set 207 raid_start_fail
 1 "Create a Disk Array Failed"
@@ -153,39 +126,23 @@ $set 207 raid_start_fail
 
 $set 208 configure_raid_start
 1 "Select Disk Units for Parity Protection"
-2 "Type option, press Enter.\
-\n  1=Select\
-\n\
-\n       Vendor    Product           Serial    PCI    PCI   SCSI  SCSI  SCSI\
-\nOPT     ID         ID              Number    Bus    Dev    Bus    ID   Lun\
-\n#1"
-3 "%e%q%f"
-
-$set 209 configure_raid_parameters
-1 "Select Protection Level and Stripe Size"
-2 "Default array configurations are shown.  To change\
-\nsetting hit \"c\" for options menu.  Highlight desired\
-\nand option and hit Enter.\
-\n\
-\nc=Change Setting\
-\n\
-\n\
-\nProtection Level . . . . . . . . . . . . :  RAID 0 -> %6\
-\nStripe Size  . . . . . . . . . . . . . . :      64 -> %3 KB"
-3 "%n%e%q"
+2 "Type option, press Enter."
+3 "Select"
 
 $set 210 confirm_raid_start
 1 "Confirm Start Device Parity Protection"
 2 "ATTENTION: Data will not be preserved and may be lost on selected disk\
-\nunits when parity protection is enabled.\
-\n\
-\nPress Enter to continue.\
-\nPress q=Cancel to return and change your choice.\
-\n\
-\n         Parity   Vendor    Product           Serial          Resource\
-\nOption     Set     ID         ID              Number   Model  Name\
-\n#1"
-3 "%q%f"
+ units when parity protection is enabled."
+3 "Press Enter to continue."
+4 "Cancel to return and change your choice."
+
+
+
+
+
+
+
+
 
 $set 211 raid_start_complete
 1 "Start Device Parity Protection Status"

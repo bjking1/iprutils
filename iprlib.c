@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.11 2004/02/03 14:23:07 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.12 2004/02/04 23:44:40 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -1522,6 +1522,7 @@ void check_current_config(bool allow_rebuild_refresh)
             cur_qac_data->num_records = 0;
 
         cur_ioa->qac_data = cur_qac_data;
+        cur_ioa->start_array_qac_entry = NULL;
 
         device_count = 0;
         memset(cur_ioa->dev, 0, IPR_MAX_IOA_DEVICES * sizeof(struct ipr_dev));
@@ -1608,24 +1609,29 @@ void check_current_config(bool allow_rebuild_refresh)
                 syslog(LOG_ERR,
                        "Query Array Config entry referenced more than once\n");
 
-            if (common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS) {
+            if (common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS)
                 cur_ioa->supported_arrays = (struct ipr_supported_arrays *)common_record;
-                continue;
-            }
+            else if (!qac_entry_ref[k]) {
+        
+                if ((common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
+                    (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
 
-            if (qac_entry_ref[k])
-                continue;
+                    array_record = (struct ipr_array_record *)common_record;
+                    if ((common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)
+                        && (array_record->start_cand))
 
-            if ((common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
-                (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
+                        cur_ioa->start_array_qac_entry = array_record;
+                    else {
 
-                /* add phantom qac entry to ioa device list */
-                cur_ioa->dev[device_count].scsi_dev_data = NULL;
-                cur_ioa->dev[device_count].qac_entry = common_record;
+                        /* add phantom qac entry to ioa device list */
+                        cur_ioa->dev[device_count].scsi_dev_data = NULL;
+                        cur_ioa->dev[device_count].qac_entry = common_record;
 
-                strcpy(cur_ioa->dev[device_count].dev_name, "");
-                strcpy(cur_ioa->dev[device_count].gen_name, "");
-                device_count++;
+                        strcpy(cur_ioa->dev[device_count].dev_name, "");
+                        strcpy(cur_ioa->dev[device_count].gen_name, "");
+                        device_count++;
+                    }
+                }
             }
 
             common_record = (struct ipr_common_record *)
@@ -1639,7 +1645,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 int num_device_opens(int host_num, int channel, int id, int lun)
 {
-    struct scsi_dev_data *scsi_dev_base;
+    struct scsi_dev_data *scsi_dev_base = NULL;
     int opens = 0;
     int k, num_sg_devices;
 

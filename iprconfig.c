@@ -42,9 +42,9 @@ struct array_cmd_data {
   u16                          stripe_size;
   u32                          array_num;
   u32                          do_cmd;
-  struct ipr_array_query_data *qac_data;
   struct ipr_ioa              *ipr_ioa;
   struct ipr_dev              *ipr_dev;
+  struct ipr_array_query_data *qac_data;
   struct array_cmd_data       *next;
 };
 
@@ -1133,31 +1133,12 @@ char *ipr_end_list(char *body)
 
 int main_menu(i_container *i_con)
 {
-    /*
-     Work with Disk Units
-
-     Select one of the following:
-
-     1. Display disk hardware status
-     2. Work with device parity protection
-     3. Work with disk unit recovery
-     4. Work with configuration
-     5. Analyze Log
-
-
-
-     Selection:
-
-     e=Exit
-
-     */
     int rc;
     struct ipr_cmd_status cmd_status;
     char init_message[60];
     int k, j;
     struct ipr_cmd_status_record *status_record;
     int num_devs = 0;
-    int num_stops = 0;
     int num_starts = 0;
     struct ipr_ioa *cur_ioa;
     struct devs_to_init_t *cur_dev_init;
@@ -1209,30 +1190,6 @@ int main_menu(i_container *i_con)
                     else
                     {
                         raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
-                    }
-
-                    raid_cmd_tail->next = NULL;
-
-                    memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
-
-                    raid_cmd_tail->array_id = status_record->array_id;
-                    raid_cmd_tail->ipr_ioa = cur_ioa;
-                    raid_cmd_tail->do_cmd = 1;
-                }
-                else if (status_record->command_code == IPR_STOP_ARRAY_PROTECTION)
-                {
-                    cur_ioa->num_raid_cmds++;
-                    num_stops++;
-
-                    if (raid_cmd_head)
-                    {
-                        raid_cmd_tail->next = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
-                        raid_cmd_tail = raid_cmd_tail->next;
-                    }
-                    else
-                    {
-                        raid_cmd_head = raid_cmd_tail =
-                            (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
                     }
 
                     raid_cmd_tail->next = NULL;
@@ -1436,11 +1393,9 @@ int main_menu(i_container *i_con)
     return rc;
 }
 
-char *disk_status_body_init(int *num_lines, int type)
+char *status_header(char *buffer, int *num_lines, int type)
 {
-    char *string_buf;
-    char *buffer = NULL;
-    int cur_len;
+    int cur_len = strlen(buffer);
     int header_lines = 0;
     char *header[] = {
        /*   .        .                  .            .                           .          */
@@ -1450,6 +1405,24 @@ char *disk_status_body_init(int *num_lines, int type)
     char *sep[]    = {
         "--- ------ -------------------------- -------- ---------------- -----------------",
         "--- ------ -------------------------- ------------------------- -----------------"};
+
+    if (type > 1)
+        type = 0;
+    buffer = ipr_realloc(buffer, cur_len + strlen(header[type]) + strlen(sep[type]) + 8);
+    cur_len += sprintf(buffer + cur_len, "%s\n", header[type]);
+    cur_len += sprintf(buffer + cur_len, "%s\n", sep[type]);
+    header_lines += 2;
+
+    *num_lines = header_lines + *num_lines;
+    return buffer;
+}
+
+char *disk_status_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
 
     string_buf = catgets(catd,n_disk_status.text_set, 2,
                          "Type option, press Enter.");
@@ -1463,12 +1436,7 @@ char *disk_status_body_init(int *num_lines, int type)
     cur_len += sprintf(buffer + cur_len, "  5=%s\n\n", string_buf);
     header_lines += 2;
 
-    if (type > 1)
-        type = 0;
-    buffer = ipr_realloc(buffer, cur_len + strlen(header[type]) + strlen(sep[type]) + 8);
-    cur_len += sprintf(buffer + cur_len, "%s\n", header[type]);
-    cur_len += sprintf(buffer + cur_len, "%s\n", sep[type]);
-    header_lines += 2;
+    buffer = status_header(buffer, &header_lines, type);
 
     *num_lines = header_lines;
     return buffer;
@@ -1488,6 +1456,7 @@ int disk_status(i_container *i_con)
     char *buffer[2];
     int toggle = 1;
     struct ipr_dev_record *dev_record;
+    struct ipr_array_record *array_record;
     struct ipr_query_res_state res_state;
     mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
@@ -1522,13 +1491,13 @@ int disk_status(i_container *i_con)
         for (j = 0; j < cur_ioa->num_devices; j++)
         {
             scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
-            if ((scsi_dev_data->type == IPR_TYPE_ADAPTER) ||
+            if ((scsi_dev_data == NULL) ||
+                (scsi_dev_data->type == IPR_TYPE_ADAPTER) ||
                 (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
                 (ipr_is_volume_set(&cur_ioa->dev[j])) ||
                 (ipr_is_array_member(&cur_ioa->dev[j])))
-            {
+
                 continue;
-            }
 
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
@@ -1542,10 +1511,10 @@ int disk_status(i_container *i_con)
         for (j = 0; j < cur_ioa->num_devices; j++)
         {
             scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
-            if (!ipr_is_hot_spare(&cur_ioa->dev[j]))
-            {
+            if ((scsi_dev_data == NULL ) ||
+                (!ipr_is_hot_spare(&cur_ioa->dev[j])))
+
                 continue;
-            }
 
             for (k=0; k<2; k++)
                 buffer[k] = print_device(&cur_ioa->dev[j],buffer[k], "%1", cur_ioa, k);
@@ -1558,8 +1527,13 @@ int disk_status(i_container *i_con)
         /* print volume set and associated devices*/
         for (j = 0; j < cur_ioa->num_devices; j++)
         {
-            scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
             if (!ipr_is_volume_set(&cur_ioa->dev[j]))
+                continue;
+
+            array_record = (struct ipr_array_record *)
+                cur_ioa->dev[j].qac_entry;
+
+            if (array_record->start_cand)
                 continue;
 
             /* query resource state to acquire protection level string */
@@ -1581,7 +1555,6 @@ int disk_status(i_container *i_con)
 
             for (i = 0; i < cur_ioa->num_devices; i++)
             {
-                scsi_dev_data = cur_ioa->dev[i].scsi_dev_data;
                 dev_record = (struct ipr_dev_record *)cur_ioa->dev[i].qac_entry;
 
                 if (!(ipr_is_array_member(&cur_ioa->dev[i])) ||
@@ -1623,9 +1596,9 @@ int disk_status(i_container *i_con)
         toggle++;
     } while (s_out->rc == TOGGLE_SCREEN);
 
-    for (i=0; i<2; i++) {
-        ipr_free(buffer[i]);
-        buffer[i] = NULL;
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
     }
     n_disk_status.body = NULL;
 
@@ -1667,7 +1640,7 @@ void device_details_body(int code, char *field_data)
                 body = ipr_realloc(body, cur_len + field_data_len + 38);
                 cur_len += sprintf(body + cur_len, "%s", string_buf);
                 for (i = cur_len; i < 30 + start_len; i++) {
-                    if (cur_len%2)
+                    if ((cur_len + start_len)%2)
                         cur_len += sprintf(body + cur_len, ".");
                     else
                         cur_len += sprintf(body + cur_len, " ");
@@ -1797,7 +1770,6 @@ int device_details(i_container *i_con)
     struct ipr_dev *device;
     int rc;
     struct scsi_dev_data *scsi_dev_data;
-    struct ipr_array_record *ipr_array_record;
     int i;
     u8 product_id[IPR_PROD_ID_LEN+1];
     u8 vendor_id[IPR_VENDOR_ID_LEN+1];
@@ -1838,7 +1810,7 @@ int device_details(i_container *i_con)
         return rc;
 
     scsi_dev_data = device->scsi_dev_data;
-    ipr_array_record =
+    array_record =
         (struct ipr_array_record *)device->qac_entry;
 
     rc = 0;
@@ -1855,7 +1827,6 @@ int device_details(i_container *i_con)
             scsi_id = device_record->last_resource_addr.target;
             scsi_lun = device_record->last_resource_addr.lun;
         } else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
-            array_record = (struct ipr_array_record *)common_record;
             scsi_channel = array_record->last_resource_addr.bus;
             scsi_id = array_record->last_resource_addr.target;
             scsi_lun = array_record->last_resource_addr.lun;
@@ -1931,8 +1902,8 @@ int device_details(i_container *i_con)
         device_details_body(13, device->ioa->pci_address);
         sprintf(buffer,"%d", device->ioa->host_num);
         device_details_body(14, buffer);
-    } else if ((ipr_array_record) &&
-               (ipr_array_record->common.record_id ==
+    } else if ((array_record) &&
+               (array_record->common.record_id ==
                 IPR_RECORD_ID_ARRAY_RECORD)) {
 
         string_buf = catgets(catd,n_device_details.text_set,101,"Title");
@@ -1941,7 +1912,7 @@ int device_details(i_container *i_con)
         sprintf(n_device_details.title, string_buf);
 
         ipr_strncpy_0(vendor_id,
-                      ipr_array_record->vendor_id,
+                      array_record->vendor_id,
                       IPR_VENDOR_ID_LEN);
 
         device_details_body(IPR_LINE_FEED, NULL);
@@ -1950,12 +1921,12 @@ int device_details(i_container *i_con)
         sprintf(buffer,"RAID %s", device->prot_level_str);
         device_details_body(102, buffer);
 
-        if (ntohs(ipr_array_record->stripe_size) > 1024)
+        if (ntohs(array_record->stripe_size) > 1024)
             sprintf(buffer,"%d M",
-                    ntohs(ipr_array_record->stripe_size)/1024);
+                    ntohs(array_record->stripe_size)/1024);
         else
             sprintf(buffer,"%d k",
-                    ntohs(ipr_array_record->stripe_size));
+                    ntohs(array_record->stripe_size));
 
         device_details_body(103, buffer);
         
@@ -2172,24 +2143,6 @@ int device_details(i_container *i_con)
 #define IPR_RMV_HOT_SPARE 1
 int raid_screen(i_container *i_con)
 {
-    /*
-     Work with Device Parity Protection
-
-     Select one of the following:
-
-     1. Display device parity status
-     2. Start device parity protection
-     3. Stop device parity protection
-     4. Include unit in device parity protection
-     5. Work with disk unit configuration
-
-
-
-     Selection:
-
-     e=Exit  q=Cancel
-     */
-
     int rc;
     struct array_cmd_data *cur_raid_cmd;
     struct screen_output *s_out;
@@ -2237,14 +2190,6 @@ char *raid_status_body_init(int *num_lines, int type)
     char *buffer = NULL;
     int cur_len;
     int header_lines = 0;
-    char *header[] = {
-       /*   .        .                  .            .                           .          */
-       /*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
-        "OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
-        "OPT Name   PCI/SCSI Location          Description               Status"};
-    char *sep[]    = {
-        "--- ------ -------------------------- -------- ---------------- -----------------",
-        "--- ------ -------------------------- ------------------------- -----------------"};
 
     string_buf = catgets(catd,n_raid_status.text_set, 2,
                          "Type option, press Enter.");
@@ -2258,12 +2203,7 @@ char *raid_status_body_init(int *num_lines, int type)
     cur_len += sprintf(buffer + cur_len, "  5=%s\n\n", string_buf);
     header_lines += 2;
 
-    if (type > 1)
-        type = 0;
-    buffer = ipr_realloc(buffer, cur_len + strlen(header[type]) + strlen(sep[type]) + 8);
-    cur_len += sprintf(buffer + cur_len, "%s\n", header[type]);
-    cur_len += sprintf(buffer + cur_len, "%s\n", sep[type]);
-    header_lines += 2;
+    buffer = status_header(buffer, &header_lines, type);
 
     *num_lines = header_lines;
     return buffer;
@@ -2283,6 +2223,7 @@ int raid_status(i_container *i_con)
     char *buffer[2];
     int toggle = 1;
     struct ipr_dev_record *dev_record;
+    struct ipr_array_record *array_record;
     struct ipr_query_res_state res_state;
     mvaddstr(0,0,"DISK STATUS FUNCTION CALLED");
 
@@ -2328,6 +2269,12 @@ int raid_status(i_container *i_con)
         {
             scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
             if (!ipr_is_volume_set(&cur_ioa->dev[j]))
+                continue;
+
+            array_record = (struct ipr_array_record *)
+                cur_ioa->dev[j].qac_entry;
+
+            if (array_record->start_cand)
                 continue;
 
             /* query resource state to acquire protection level string */
@@ -2391,9 +2338,9 @@ int raid_status(i_container *i_con)
         toggle++;
     } while (s_out->rc == TOGGLE_SCREEN);
 
-    for (i=0; i<2; i++) {
-        ipr_free(buffer[i]);
-        buffer[i] = NULL;
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
     }
     n_raid_status.body = NULL;
 
@@ -2405,17 +2352,21 @@ int raid_status(i_container *i_con)
     return rc;
 }
 
-char *add_line_to_body(char *body, char *new_text, char *line_fill)
+char *add_line_to_body(char *body, char *new_text, char *line_fill, int *line_num)
 {
-    int body_len = strlen(body);
+    int body_len = 0;
     int new_text_len = strlen(new_text);
     int line_fill_len = strlen(line_fill);
     int rem_length;
     int new_text_offset = 0;
     int max_y, max_x;
     int len;
+    int num_lines = 0;
 
     getmaxyx(stdscr,max_y,max_x);
+
+    if (body)
+        body_len = strlen(body);
 
     len = body_len;
     rem_length = max_x - 1;
@@ -2431,6 +2382,8 @@ char *add_line_to_body(char *body, char *new_text, char *line_fill)
             /* done, all data fits in current line */
             body = realloc(body, body_len + new_text_len + 4);
             sprintf(body + body_len, "%s\n", &new_text[new_text_offset]);
+            if (line_num)
+                num_lines++;
             break;
         }
 
@@ -2459,8 +2412,11 @@ char *add_line_to_body(char *body, char *new_text, char *line_fill)
 
         body_len += sprintf(body + body_len, "\n%s", line_fill);
         rem_length = max_x - 1 - line_fill_len;
+        if (line_num)
+            num_lines++;
     }
 
+    *line_num = *line_num + num_lines;
     return body;
 }
 
@@ -2472,14 +2428,14 @@ void setup_fail_screen(s_node *n_screen, int start_index, int end_index)
 
     string_buf = catgets(catd, n_screen->text_set, 1, "Requested Action Failed");
     n_screen->title = ipr_malloc(strlen(string_buf) + 4);
-    sprintf(n_raid_start_fail.title, string_buf);
+    sprintf(n_screen->title, string_buf);
 
     /* header */
     string_buf = catgets(catd, n_screen->text_set, 2, "");
     body = malloc(strlen(string_buf) + 8);
     sprintf(body, "\n");
 
-    body = add_line_to_body(body, string_buf, "");
+    body = add_line_to_body(body, string_buf, "", NULL);
     len = strlen(body);
 
     body = realloc(body, len + 4);
@@ -2489,41 +2445,55 @@ void setup_fail_screen(s_node *n_screen, int start_index, int end_index)
         body = realloc(body, len + 4);
         sprintf(body + len, "o  ");
         string_buf = catgets(catd, n_screen->text_set, i, "");
-        body = add_line_to_body(body, string_buf, "   ");
+        body = add_line_to_body(body, string_buf, "   ", NULL);
         len = strlen(body);
     }
     n_screen->body = body;
 }
 
+char *raid_stop_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+
+    string_buf = catgets(catd,n_raid_stop.text_set, 2,
+                         "Select the subsystems to delete a disk array.");
+    buffer = ipr_realloc(buffer, strlen(string_buf) + 4);
+    cur_len = sprintf(buffer, "%s\n", string_buf);
+    header_lines += 1;
+
+    string_buf = catgets(catd,n_raid_stop.text_set, 3,
+                         "Type choice, press Enter.");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 4);
+    cur_len += sprintf(buffer + cur_len, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_raid_stop.text_set, 4,
+                         "delete a disk array");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  1=%s\n\n", string_buf);
+    header_lines += 2;
+
+    buffer = status_header(buffer, &header_lines, type);
+
+    *num_lines = header_lines;
+    return buffer;
+}
+
 int raid_stop(i_container *i_con)
 {
-    /*
-     Stop Device Parity Protection
-
-     Select the subsystems to stop device parity protection.
-
-     Type choice, press Enter.
-     1=Stop device parity protection
-
-     Parity  Serial                Resource
-     Option     Set   Number   Type  Model  Name
-     1   02127005  2782   001   /dev/ipr4
-     2   00103039  2748   001   /dev/ipr0
-
-     e=Exit   q=Cancel    f=PageDn   b=PageUp
-     */
-    int rc, i, array_num;
+    int rc, i, k, array_num;
     struct ipr_common_record *common_record;
     struct ipr_array_record *array_record;
-    u8 array_id;
-    char *buffer = NULL;
-    int buf_size = 150;
-    char *out_str = calloc(buf_size,sizeof(char));
-    int num_lines = 0;
+    char *buffer[2];
     struct ipr_ioa *cur_ioa;
-    u32 len;
+    char *string_buf;
+    int header_lines;
+    struct ipr_query_res_state res_state;
+    int toggle = 1;
     struct screen_output *s_out;
-    fn_out *output = init_output();
     mvaddstr(0,0,"RAID STOP FUNCTION CALLED");
 
     /* empty the linked list that contains field pointers */
@@ -2534,6 +2504,14 @@ int raid_stop(i_container *i_con)
     array_num = 1;
 
     check_current_config(false);
+
+    /* Setup screen title */
+    string_buf = catgets(catd,n_raid_stop.text_set,1,"Delete a Disk Array");
+    n_raid_stop.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_raid_stop.title, string_buf);
+
+    for (k=0; k<2; k++)
+        buffer[k] = raid_stop_body_init(&header_lines, k);
 
     for(cur_ioa = ipr_ioa_head;
         cur_ioa != NULL;
@@ -2567,95 +2545,122 @@ int raid_stop(i_container *i_con)
                         raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)ipr_malloc(sizeof(struct array_cmd_data));
                     }
 
-                    raid_cmd_tail->next = NULL;
-
                     memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
 
-                    array_id =  array_record->array_id;
-
-                    raid_cmd_tail->array_id = array_id;
+                    raid_cmd_tail->array_id = array_record->array_id;
                     raid_cmd_tail->array_num = array_num;
                     raid_cmd_tail->ipr_ioa = cur_ioa;
                     raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
 
                     i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
 
-                    buffer = print_device(&cur_ioa->dev[i],buffer, "%1", cur_ioa, 0);
+                    rc = ipr_query_resource_state(cur_ioa->dev[i].gen_name,
+                                                  &res_state);
+                    strncpy(cur_ioa->dev[i].prot_level_str,
+                            res_state.vset.prot_level_str, 8);
 
-                    buf_size += 150;
-                    out_str = realloc(out_str, buf_size);
+                    for (k=0; k<2; k++)
+                        buffer[k] = print_device(&cur_ioa->dev[i],buffer[k], "%1", cur_ioa, k);
 
-                    out_str = strcat(out_str,buffer);
-
-                    memset(buffer, 0, strlen(buffer));
-
-                    len = 0;
-                    num_lines++;
                     array_num++;
                 }
             }
         }
     }
 
-    if (array_num == 1)
-        s_out = screen_driver(&n_raid_stop_fail,output,i_con); /*Stop Device Parity Protection Failed*/
+    if (array_num == 1) {
+        /* Stop Device Parity Protection Failed */
+        setup_fail_screen(&n_raid_stop_fail, 3, 7);
 
-    else   
-    {
-        out_str = strip_trailing_whitespace(out_str);
-        output->next = add_fn_out(output->next,1,out_str);
+        s_out = screen_driver_new(&n_raid_stop_fail,NULL,header_lines,i_con);
 
-        s_out = screen_driver(&n_raid_stop,output,i_con);
+        free(n_raid_stop_fail.title);
+        n_raid_stop_fail.title = NULL;
+        free(n_raid_stop_fail.body);
+        n_raid_stop_fail.body = NULL;
+    } else {
+        toggle_field = 0;
+
+        do {
+            n_raid_stop.body = buffer[toggle&1];
+            s_out = screen_driver_new(&n_raid_stop,NULL,header_lines,i_con);
+            toggle++;
+        } while (s_out->rc == TOGGLE_SCREEN);
     }
 
     rc = s_out->rc;
     free(s_out);
-    free(out_str);
-    output = free_fn_out(output);
+
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
+    }
+    n_raid_stop.body = NULL;
+
+    ipr_free(n_raid_stop.title);
+    n_raid_stop.title = NULL;
+
     return rc;
+}
+
+char *confirm_raid_stop_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+
+    string_buf = catgets(catd,n_confirm_raid_stop.text_set, 2,
+                         "ATTENTION: Disk units connected to these subsystems "
+                         "will not be protected after you confirm your choice.");
+    buffer = add_line_to_body(buffer, string_buf, "  ", &header_lines);
+    cur_len = strlen(buffer);
+
+    string_buf = catgets(catd,n_confirm_raid_stop.text_set, 3,
+                         "Press Enter to continue.");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 4);
+    cur_len += sprintf(buffer + cur_len, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_confirm_raid_stop.text_set, 4,
+                         "Cancel to return and change your choice.");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  q=%s\n\n", string_buf);
+    header_lines += 2;
+
+    buffer = status_header(buffer, &header_lines, type);
+
+    *num_lines = header_lines;
+    return buffer;
 }
 
 int confirm_raid_stop(i_container *i_con)
 {
-    /* iSeries
-     Confirm Stop Device Parity Protection
-
-     ATTENTION: Disk units connected to these subsystems will not be
-     protected after you confirm your choice.
-
-     Press Enter to continue. 
-     Press q=Cancel to return and change your choice.
-
-     Parity  Serial                Resource
-     Option     Set   Number   Type  Model  Name
-     1       1   02127005  2782   001   /dev/ipr4
-     1       1   002443C6  6713   050   /dev/sdr    
-     1       1   0024B45C  6713   050   /dev/sds
-     1       1   00000DC7  6717   050   /dev/sdt
-     1       1   000BBBC1  6717   050   /dev/sdu
-     1       1   0002F5AA  6717   050   /dev/sdv
-
-     q=Cancel    f=PageDn   b=PageUp
-     */
     struct ipr_dev *ipr_dev;
     struct ipr_array_record *array_record;
     struct array_cmd_data *cur_raid_cmd;
     struct ipr_ioa *cur_ioa;
-    int rc, j;
+    int rc, j, k;
     int found = 0;
-    u16 len = 0;
-    int buf_size = 150;
-    char *out_str = calloc(buf_size,sizeof(char));
     char *input;    
-    char *buffer = NULL;
-    u32 num_lines = 0;
+    char *buffer[2];
     struct ipr_dev_record *dev_record;
+    char *string_buf;
     i_container *temp_i_con;
     struct screen_output *s_out;
-    fn_out *output = init_output();
+    int toggle = 1;
+    int header_lines;
     mvaddstr(0,0,"CONFIRM RAID STOP FUNCTION CALLED");
 
     found = 0;
+
+    /* Setup screen title */
+    string_buf = catgets(catd,n_confirm_raid_stop.text_set,1,"Confirm Delete a Disk Array");
+    n_confirm_raid_stop.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_confirm_raid_stop.title, string_buf);
+
+    for (k=0; k<2; k++)
+        buffer[k] = confirm_raid_stop_body_init(&header_lines, k);
 
     for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
     {
@@ -2685,19 +2690,13 @@ int confirm_raid_stop(i_container *i_con)
                 array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
 
                 if (array_record->issue_cmd)
-                {
                     array_record->issue_cmd = 0;
-                    cur_raid_cmd->ipr_ioa->num_raid_cmds--;
-                }
             }
         }
     }
 
     if (!found)
-    {
-        output = free_fn_out(output);
         return INVALID_OPTION_STATUS;
-    }
 
     rc = RC_SUCCESS;
 
@@ -2710,47 +2709,45 @@ int confirm_raid_stop(i_container *i_con)
             cur_ioa = cur_raid_cmd->ipr_ioa;
             ipr_dev = cur_raid_cmd->ipr_dev;
 
-            buffer = print_device(ipr_dev,buffer,"1",cur_ioa, 0);
-
-            buf_size += 150;
-            out_str = realloc(out_str, buf_size);
-
-            out_str = strcat(out_str,buffer);
-            len = 0;
-            memset(buffer, 0, strlen(buffer));
-            num_lines++;
+            for (k=0; k<2; k++)
+                buffer[k] = print_device(ipr_dev,buffer[k],"1",cur_ioa, k);
 
             for (j = 0; j < cur_ioa->num_devices; j++)
             {
                 dev_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
                 if ((ipr_is_array_member(&cur_ioa->dev[j])) &&
-                    (dev_record != NULL) &&
+                    (dev_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
                     (dev_record->array_id == cur_raid_cmd->array_id))
                 {
-                    buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
-
-                    buf_size += 150;
-                    out_str = realloc(out_str, buf_size);
-
-                    out_str = strcat(out_str,buffer);
-                    len = 0;
-
-                    memset(buffer, 0, strlen(buffer));
-                    num_lines++;
+                    for (k=0; k<2; k++)
+                        buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"1",cur_ioa,k);
                 }
             }
         }
         cur_raid_cmd = cur_raid_cmd->next;
     }
 
-    output->next = add_fn_out(output->next,1,out_str);
+    toggle_field = 0;
+    
+    do {
+        n_confirm_raid_stop.body = buffer[toggle&1];
+        s_out = screen_driver_new(&n_confirm_raid_stop,NULL,header_lines,i_con);
+        toggle++;
+    } while (s_out->rc == TOGGLE_SCREEN);
 
-    s_out = screen_driver(&n_confirm_raid_stop,output,i_con);
     rc = s_out->rc;
     free(s_out);
-    free(out_str);
-    output = free_fn_out(output);
+
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
+    }
+    n_confirm_raid_stop.body = NULL;
+
+    ipr_free(n_confirm_raid_stop.title);
+    n_confirm_raid_stop.title = NULL;
+
     return rc;
 }
 
@@ -2762,8 +2759,6 @@ int do_confirm_raid_stop(i_container *i_con)
     int rc;
     int raid_stop_complete();
     int max_y, max_x;
-    fn_out *output = init_output();
-    mvaddstr(0,0,"DO CONFIRM RAID STOP FUNCTION CALLED");
 
     cur_raid_cmd = raid_cmd_head;
     while(cur_raid_cmd)
@@ -2774,12 +2769,11 @@ int do_confirm_raid_stop(i_container *i_con)
             ipr_dev = cur_raid_cmd->ipr_dev;
 
             rc = is_array_in_use(cur_ioa, cur_raid_cmd->array_id);
-            if (rc != 0)
-            {
+            if (rc != 0)  {
+
                 syslog(LOG_ERR,
                        "Array %s is currently in use and cannot be deleted.\n",
                        ipr_dev->dev_name);
-                output = free_fn_out(output);
                 return (20 | EXIT_FLAG);
             }
 
@@ -2790,148 +2784,84 @@ int do_confirm_raid_stop(i_container *i_con)
 
                 rc = ipr_start_stop_stop(ipr_dev->gen_name);
 
-                if (rc != 0) {
-                    output = free_fn_out(output);
+                if (rc != 0)
                     return (20 | EXIT_FLAG);
-                }
+
+                rc = ipr_stop_array_protection(cur_ioa->ioa.gen_name,
+                                               cur_ioa->qac_data);
+                if (rc != 0)
+                    return (20 | EXIT_FLAG);
             }
         }
         cur_raid_cmd = cur_raid_cmd->next;
     }
 
-    for (cur_ioa = ipr_ioa_head;
-         cur_ioa != NULL;
-         cur_ioa = cur_ioa->next)
-    {
-        if (cur_ioa->num_raid_cmds > 0)
-        {
-            rc = ipr_stop_array_protection(cur_ioa->ioa.gen_name,
-                                           cur_ioa->qac_data);
-            if (rc != 0)
-            {
-                output = free_fn_out(output);
-                return (20 | EXIT_FLAG);
-            }
-        }
-    }
-
     rc = raid_stop_complete();
-    output = free_fn_out(output);
     return rc;
 }
 
-/* ??? odd screen - draw in function rather than screen_driver ??? */
 int raid_stop_complete()
 {
-    /*
-     Stop Device Parity Protection Status
-
-     You selected to stop device parity protection
-
-
-
-
-
-
-
-
-
-     16% Complete
-     */
-
     struct ipr_cmd_status cmd_status;
     struct ipr_cmd_status_record *status_record;
     int done_bad;
     int not_done = 0;
     int rc, j;
-    u32 percent_cmplt = 0;
     struct ipr_ioa *cur_ioa;
-    u32 num_stops = 0;
     struct array_cmd_data *cur_raid_cmd;
     struct ipr_common_record *common_record;
     struct scsi_dev_data *scsi_dev_data;
-    char *title, *body, *complete;
-
-    title = catgets(catd,n_raid_stop_complete.text_set,1,"Stop Device Parity Protection Status");
-    body = catgets(catd,n_raid_stop_complete.text_set,2,"You selected to stop device parity protection");
-    complete = malloc(strlen(catgets(catd,n_raid_stop_complete.text_set,3,"%d%% Complete"))+20);
-
-    sprintf(complete,catgets(catd,n_raid_stop_complete.text_set,3,"%d%% Complete"),percent_cmplt);
-
-    complete_screen_driver(title,body,complete);
 
     while(1)
     {
-        sprintf(complete,catgets(catd,n_raid_stop_complete.text_set,3,"%d%% Complete"),percent_cmplt,0);
-        complete_screen_driver(title,body,complete);
-
-        percent_cmplt = 100;
         done_bad = 0;
-        num_stops = 0;
         not_done = 0;
 
-        for (cur_ioa = ipr_ioa_head;
-             cur_ioa != NULL;
-             cur_ioa = cur_ioa->next)
+        for (cur_raid_cmd = raid_cmd_head;
+             cur_raid_cmd != NULL; 
+             cur_raid_cmd = cur_raid_cmd->next)
         {
-            if (cur_ioa->num_raid_cmds > 0)
-            {
-                rc = ipr_query_command_status(cur_ioa->ioa.gen_name, &cmd_status);
+            cur_ioa = cur_raid_cmd->ipr_ioa;
 
-                if (rc) {
-                    cur_ioa->num_raid_cmds = 0;
-                    done_bad = 1;
-                    continue;
-                }
+            rc = ipr_query_command_status(cur_ioa->ioa.gen_name, &cmd_status);
 
-                status_record = cmd_status.record;
+            if (rc) {
+                cur_ioa->num_raid_cmds = 0;
+                done_bad = 1;
+                continue;
+            }
 
-                for (j=0; j < cmd_status.num_records; j++, status_record++)
-                {
-                    if (status_record->command_code == IPR_STOP_ARRAY_PROTECTION)
-                    {
-                        for (cur_raid_cmd = raid_cmd_head;
-                             cur_raid_cmd != NULL; 
-                             cur_raid_cmd = cur_raid_cmd->next)
-                        {
-                            if ((cur_raid_cmd->ipr_ioa = cur_ioa) &&
-                                (cur_raid_cmd->array_id == status_record->array_id))
-                            {
-                                num_stops++;
-                                if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
-                                {
-                                    if (status_record->percent_complete < percent_cmplt)
-                                        percent_cmplt = status_record->percent_complete;
-                                    not_done = 1;
-                                }
-                                else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
-                                {
-                                    rc = (20 | EXIT_FLAG); /* "Stop Parity Protection failed" */
-                                }
-                                break;
-                            }
-                        }
-                    }
+            status_record = cmd_status.record;
+
+            for (j=0; j < cmd_status.num_records; j++, status_record++) {
+
+                if ((status_record->command_code == IPR_STOP_ARRAY_PROTECTION) &&
+                    (cur_raid_cmd->array_id == status_record->array_id)) {
+
+                    if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
+                        not_done = 1;
+                    else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
+                        /* "Stop Parity Protection failed" */
+                        done_bad = 1;
+                    break;
                 }
             }
         }
 
-        if (!not_done)
-        {
-            flush_stdscr();
+        if (!not_done) {
 
             if (done_bad)
-                return (20 | EXIT_FLAG); /* "Stop Parity Protection failed" */
+                /* "Stop Parity Protection failed" */
+                return (20 | EXIT_FLAG); 
 
             for (cur_raid_cmd = raid_cmd_head;
                  cur_raid_cmd != NULL; 
-                 cur_raid_cmd = cur_raid_cmd->next)
-            {
-                cur_ioa = cur_raid_cmd->ipr_ioa;
+                 cur_raid_cmd = cur_raid_cmd->next) {
+
                 common_record = cur_raid_cmd->ipr_dev->qac_entry;
                 if ((common_record != NULL) &&
-                    (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
-                {
+                    (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
+
                     scsi_dev_data = cur_raid_cmd->ipr_dev->scsi_dev_data;
                     remove_device(scsi_dev_data);
                     scan_device(scsi_dev_data);
@@ -2939,28 +2869,56 @@ int raid_stop_complete()
             }
             check_current_config(false);
 
-            return (21 | EXIT_FLAG); /* "Stop Parity Protection completed successfully" */;
+            /* "Stop Parity Protection completed successfully" */
+            return (21 | EXIT_FLAG);
         }
         not_done = 0;
-        sleep(2);
+        sleep(1);
     }
+}
+
+char *raid_start_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+
+    string_buf = catgets(catd,n_raid_start.text_set, 2,
+                         "Select the subsystems to create a disk array.");
+    buffer = ipr_realloc(buffer, strlen(string_buf) + 4);
+    cur_len = sprintf(buffer, "%s\n", string_buf);
+    header_lines += 1;
+
+    string_buf = catgets(catd,n_raid_start.text_set, 3,
+                         "Type choice, press Enter.");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 4);
+    cur_len += sprintf(buffer + cur_len, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_raid_start.text_set, 4,
+                         "create a disk array");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  1=%s\n\n", string_buf);
+    header_lines += 2;
+
+    buffer = status_header(buffer, &header_lines, type);
+
+    *num_lines = header_lines;
+    return buffer;
 }
 
 int raid_start(i_container *i_con)
 {
-    int rc, i, array_num;
+    int rc, k, array_num;
     struct array_cmd_data *cur_raid_cmd;
-    struct ipr_common_record *common_record;
     struct ipr_array_record *array_record;
-    u8 array_id;
-    char *buffer = NULL;
-    int num_lines = 0;
+    char *buffer[2];
     struct ipr_ioa *cur_ioa;
-    u32 len;
-    int buf_size = 150;
-    char *out_str = calloc(buf_size,sizeof(char));
     struct screen_output *s_out;
-    fn_out *output = init_output();
+    char *string_buf;
+    int header_lines;
+    int toggle = 1;
     mvaddstr(0,0,"RAID START FUNCTION CALLED");
 
     /* empty the linked list that contains field pointers */
@@ -2972,66 +2930,46 @@ int raid_start(i_container *i_con)
 
     check_current_config(false);
 
+    /* Setup screen title */
+    string_buf = catgets(catd,n_raid_start.text_set,1,"Create a Disk Array");
+    n_raid_start.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_raid_start.title, string_buf);
+
+    for (k=0; k<2; k++)
+        buffer[k] = raid_start_body_init(&header_lines, k);
+
     for(cur_ioa = ipr_ioa_head;
         cur_ioa != NULL;
         cur_ioa = cur_ioa->next)
     {
         cur_ioa->num_raid_cmds = 0;
+        array_record = cur_ioa->start_array_qac_entry;
 
-        for (i = 0;
-             i < cur_ioa->num_devices;
-             i++)
+        if (array_record != NULL)
         {
-            common_record = cur_ioa->dev[i].qac_entry;
-
-            if ((common_record != NULL) &&
-                (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD))
+            if (raid_cmd_head)
             {
-                array_record = (struct ipr_array_record *)common_record;
-
-                if (array_record->start_cand)
-                {
-                    rc = is_array_in_use(cur_ioa, array_record->array_id);
-                    if (rc != 0) continue;
-
-                    if (raid_cmd_head)
-                    {
-                        raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-                        raid_cmd_tail = raid_cmd_tail->next;
-                    }
-                    else
-                    {
-                        raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-                    }
-
-                    raid_cmd_tail->next = NULL;
-
-                    memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
-
-                    array_id =  array_record->array_id;
-
-                    raid_cmd_tail->array_id = array_id;
-                    raid_cmd_tail->array_num = array_num;
-                    raid_cmd_tail->ipr_ioa = cur_ioa;
-                    raid_cmd_tail->ipr_dev = &cur_ioa->dev[i];
-                    raid_cmd_tail->qac_data = NULL;
-
-                    i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
-
-                    buffer = print_device(&cur_ioa->dev[i],buffer,"%1",cur_ioa, 0);
-
-                    buf_size += 150;
-
-                    out_str = realloc(out_str, buf_size);
-
-                    out_str = strcat(out_str,buffer);
-                    memset(buffer, 0, strlen(buffer));
-
-                    len = 0;
-                    num_lines++;
-                    array_num++;
-                }
+                raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+                raid_cmd_tail = raid_cmd_tail->next;
             }
+            else
+            {
+                raid_cmd_head = raid_cmd_tail = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
+            }
+
+            memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
+
+            raid_cmd_tail->array_id = array_record->array_id;
+            raid_cmd_tail->ipr_ioa = cur_ioa;
+            raid_cmd_tail->ipr_dev = &cur_ioa->ioa;
+
+            i_con = add_i_con(i_con,"\0",(char *)raid_cmd_tail,list);
+
+            for (k=0; k<2; k++)
+                buffer[k] = print_device(&cur_ioa->ioa,buffer[k],"%1",
+                                         cur_ioa, k);
+
+            array_num++;
         }
     }
 
@@ -3039,7 +2977,7 @@ int raid_start(i_container *i_con)
         /* Start Device Parity Protection Failed */
         setup_fail_screen(&n_raid_start_fail, 3, 7);
 
-        s_out = screen_driver(&n_raid_start_fail,output,i_con);
+        s_out = screen_driver_new(&n_raid_start_fail,NULL,header_lines,i_con);
 
         free(n_raid_start_fail.title);
         n_raid_start_fail.title = NULL;
@@ -3049,124 +2987,106 @@ int raid_start(i_container *i_con)
         rc = s_out->rc;
         free(s_out);
     } else {
-        output->next = add_fn_out(output->next,1,out_str);
+        toggle_field = 0;
 
-        s_out = screen_driver(&n_raid_start,output,i_con);
+        do {
+            n_raid_start.body = buffer[toggle&1];
+            s_out = screen_driver_new(&n_raid_start,NULL,header_lines,i_con);
+            toggle++;
+        } while (s_out->rc == TOGGLE_SCREEN);
+
         rc = s_out->rc;
         free(s_out);
 
         cur_raid_cmd = raid_cmd_head;
 
         while(cur_raid_cmd) {
-            if (cur_raid_cmd->qac_data) {
-
-                free(cur_raid_cmd->qac_data);
-                cur_raid_cmd->qac_data = NULL;
-            }
             cur_raid_cmd = cur_raid_cmd->next;
             free(raid_cmd_head);
             raid_cmd_head = cur_raid_cmd;
         }
     }
 
-    free(out_str);
-    output = free_fn_out(output);
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
+    }
+    n_raid_start.body = NULL;
+
+    ipr_free(n_raid_start.title);
+    n_raid_start.title = NULL;
+
     return rc;
 }
 
 int raid_start_loop(i_container *i_con)
 {
     int rc;
-    int array_num;
-    struct ipr_array_record *array_record;
     struct array_cmd_data *cur_raid_cmd;
-    u8 array_id;
-    int num_vsets;
     int found = 0;
     char *input;
     i_container *temp_i_con;
-    fn_out *output = init_output();
     mvaddstr(0,0,"RAID START LOOP FUNCTION CALLED");
 
-    found = 0;
-    cur_raid_cmd = raid_cmd_head;
+    for (temp_i_con = i_con;
+         temp_i_con != NULL;
+         temp_i_con = temp_i_con->next_item) {
 
-    for (temp_i_con = i_con; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-    {
         cur_raid_cmd = (struct array_cmd_data *)(temp_i_con->data);
-        if (cur_raid_cmd != NULL)
-        {
+        if (cur_raid_cmd != NULL)  {
+
             input = temp_i_con->field_data;
-            array_record = (struct ipr_array_record *)cur_raid_cmd->ipr_dev->qac_entry;
 
-            if (strcmp(input, "1") == 0)
-            {
-                if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
-                {
-                    rc = RC_SUCCESS;
+            if (strcmp(input, "1") == 0) {
 
-                    rc = configure_raid_start(temp_i_con);
+                rc = configure_raid_start(temp_i_con);
 
-                    if (rc > 0)
-                    {
-                        output = free_fn_out(output);
-                        return rc;
-                    }
-
-                    if (RC_SUCCESS == rc)
-                    {
-                        num_vsets++;
-                        found = 1;
-                        cur_raid_cmd->do_cmd = 1;
-                        array_record->issue_cmd = 1;
-                        cur_raid_cmd->ipr_ioa->num_raid_cmds++;
-
-                        raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
-                        raid_cmd_tail = raid_cmd_tail->next;
-                        raid_cmd_tail->next = NULL;
-
-                        memset(raid_cmd_tail, 0, sizeof(struct array_cmd_data));
-
-                        array_id =  array_record->array_id;
-
-                        raid_cmd_tail->array_id = array_id;
-                        raid_cmd_tail->array_num = array_num;
-                        raid_cmd_tail->ipr_ioa = cur_raid_cmd->ipr_ioa;
-                        raid_cmd_tail->ipr_dev = cur_raid_cmd->ipr_dev;
-
-                        cur_raid_cmd = raid_cmd_tail;
-                        array_num++;
-                    }
-                }
-                else
+                if (RC_SUCCESS == rc)
                 {
                     found = 1;
                     cur_raid_cmd->do_cmd = 1;
-                    array_record->issue_cmd = 1;
                     cur_raid_cmd->ipr_ioa->num_raid_cmds++;
-                }
-            }
-            else
-            {
+                } else
+                    return rc;
+            } else
                 cur_raid_cmd->do_cmd = 0;
-            }
         }
     }
 
     if (found != 0)
     {
-
         /* Go to verification screen */
         rc = confirm_raid_start(NULL);
         rc |= EXIT_FLAG;
-    }
-    else
-    {
+    } else
         rc =  INVALID_OPTION_STATUS; /* "Invalid options specified" */
-    }
 
-    output = free_fn_out(output);
     return rc;
+}
+
+char *configure_raid_start_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+
+    string_buf = catgets(catd,n_configure_raid_start.text_set, 2,
+                         "Type option, press Enter.");
+    buffer = ipr_realloc(buffer, strlen(string_buf) + 4);
+    cur_len = sprintf(buffer, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_configure_raid_start.text_set, 3,
+                         "Select");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  1=%s\n\n", string_buf);
+    header_lines += 2;
+
+    buffer = status_header(buffer, &header_lines, type);
+
+    *num_lines = header_lines;
+    return buffer;
 }
 
 int configure_raid_start(i_container *i_con)
@@ -3174,29 +3094,35 @@ int configure_raid_start(i_container *i_con)
     char *input;
     int found;
     struct ipr_dev *ipr_dev;
-    struct array_cmd_data *cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
-    int rc, j;
-    char *buffer = NULL;
-    int num_devs = 0;
+    struct array_cmd_data *cur_raid_cmd;
+    int rc, j, k;
+    char *buffer[2];
     struct ipr_ioa *cur_ioa;
-    u32 len;
     struct scsi_dev_data *scsi_dev_data;
     struct ipr_dev_record *device_record;
-    struct ipr_array_query_data *qac_data_tmp;
-    int buf_size = 150;
-    char *out_str = calloc(buf_size,sizeof(char));
     i_container *i_con2 = NULL;
     i_container *temp_i_con = NULL;
     struct screen_output *s_out;
-    fn_out *output = init_output();
+    char *string_buf;
+    int header_lines;
+    int toggle = 1;
     mvaddstr(0,0,"CONFIGURE RAID START FUNCTION CALLED");
 
     rc = RC_SUCCESS;
 
+    cur_raid_cmd = (struct array_cmd_data *)(i_con->data);
     cur_ioa = cur_raid_cmd->ipr_ioa;
 
-    for (j = 0; j < cur_ioa->num_devices; j++)
-    {
+    /* Setup screen title */
+    string_buf = catgets(catd,n_configure_raid_start.text_set,1,"Create a Disk Array");
+    n_configure_raid_start.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_configure_raid_start.title, string_buf);
+
+    for (k=0; k<2; k++)
+        buffer[k] = configure_raid_start_body_init(&header_lines, k);
+
+    for (j = 0; j < cur_ioa->num_devices; j++) {
+
         scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
         device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
@@ -3204,108 +3130,83 @@ int configure_raid_start(i_container *i_con)
             (scsi_dev_data == NULL))
             continue;
 
-        if (cur_ioa->dev[j].is_start_cand)
-            continue;
-
         if ((scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
             (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-            (device_record->start_cand))
-        {
-            buffer = print_device(&cur_ioa->dev[j],buffer,"%1", cur_ioa, 0);
+            (device_record->start_cand)) {
+
+            for (k=0; k<2; k++)
+                buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"%1", cur_ioa, k);
 
             i_con2 = add_i_con(i_con2,"\0",(char *)&cur_ioa->dev[j],list);
-
-            buf_size += 150;
-            out_str = realloc(out_str, buf_size);
-
-            out_str = strcat(out_str,buffer);
-
-            memset(buffer, 0, strlen(buffer));
-
-            len = 0;
-            num_devs++;
         }
     }
 
-    if (num_devs)
-    {
-        qac_data_tmp = malloc(sizeof(struct ipr_array_query_data));
-        memcpy(qac_data_tmp,
-               cur_ioa->qac_data,
-               sizeof(struct ipr_array_query_data));
-    }
-
-    output->next = add_fn_out(output->next,1,out_str);
-
     do
     {
-        s_out = screen_driver(&n_configure_raid_start,output,i_con2);
+        toggle_field = 0;
+
+        do {
+            n_configure_raid_start.body = buffer[toggle&1];
+            s_out = screen_driver_new(&n_configure_raid_start,NULL,header_lines,i_con2);
+            toggle++;
+        } while (s_out->rc == TOGGLE_SCREEN);
+
         rc = s_out->rc;
 
         if (rc > 0)
-            return rc;
+            goto leave;
 
         i_con2 = s_out->i_con;
         free(s_out);
 
         found = 0;
 
-        for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-        {
-            ipr_dev = (struct ipr_dev *)temp_i_con->data;
+        for (temp_i_con = i_con2;
+             temp_i_con != NULL;
+             temp_i_con = temp_i_con->next_item) {
 
-            if (ipr_dev != NULL)
-            {
-                input = temp_i_con->field_data;
-                if (strcmp(input, "1") == 0)
-                {
-                    found = 1;
-                    device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
-                    device_record->issue_cmd = 1;
-                    ipr_dev->is_start_cand = 1;
-                }
+            ipr_dev = (struct ipr_dev *)temp_i_con->data;
+            input = temp_i_con->field_data;
+
+            if ((ipr_dev != NULL) &&
+                (strcmp(input, "1") == 0)) {
+
+                found = 1;
+                device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                device_record->issue_cmd = 1;
             }
         }
 
-        if (found != 0)
-        {
+        if (found != 0) {
+
             /* Go to parameters screen */
             rc = configure_raid_parameters(i_con);
 
-            if (rc &  EXIT_FLAG)
+            if ((rc &  EXIT_FLAG) ||
+                !(rc & CANCEL_FLAG))
                 goto leave;
-            if (rc & CANCEL_FLAG)
-            {
-                /* clear out current selections */
-                for (temp_i_con = i_con2; temp_i_con != NULL; temp_i_con = temp_i_con->next_item)
-                {
-                    ipr_dev = (struct ipr_dev *)temp_i_con->data;
-                    if (ipr_dev != NULL)
-                    {
-                        input = temp_i_con->field_data;
-                        if (strcmp(input, "1") == 0)
-                        {
-                            device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
-                            device_record->issue_cmd = 0;
-                            ipr_dev->is_start_cand = 0;
-                        }
-                    }
-                }
-                rc = REFRESH_FLAG;
-                continue;
-            }
-            cur_raid_cmd->qac_data =
-                malloc(sizeof(struct ipr_array_query_data));
 
-            /* save off qac data image with issue_cmd set
-             for selected devices */
-            memcpy(cur_raid_cmd->qac_data,
-                   cur_ioa->qac_data,
-                   sizeof(struct ipr_array_query_data));
-            goto leave;
+            /* User selected Cancel, clear out current selections
+             for redisplay */
+            for (temp_i_con = i_con2;
+                 temp_i_con != NULL;
+                 temp_i_con = temp_i_con->next_item) {
+
+                ipr_dev = (struct ipr_dev *)temp_i_con->data;
+                input = temp_i_con->field_data;
+
+                if ((ipr_dev != NULL) &&
+                    (strcmp(input, "1") == 0)) {
+
+                    device_record = (struct ipr_dev_record *)ipr_dev->qac_entry;
+                    device_record->issue_cmd = 0;
+                }
+            }
+            rc = REFRESH_FLAG;
+            continue;
         }
-        else
-        {
+        else {
+
             s_status.index = INVALID_OPTION_STATUS;
             rc = REFRESH_FLAG;
         }
@@ -3313,47 +3214,21 @@ int configure_raid_start(i_container *i_con)
 
     leave:
         i_con2 = free_i_con(i_con2);
-    free(out_str);
-    output = free_fn_out(output);
 
-    if (rc > 0)
-    {
-        /* restore unmodified image of qac data */
-        memcpy(cur_ioa->qac_data,
-               qac_data_tmp,
-               sizeof(struct ipr_array_query_data));
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
     }
+    n_configure_raid_start.body = NULL;
 
-    free(qac_data_tmp);
+    ipr_free(n_configure_raid_start.title);
+    n_configure_raid_start.title = NULL;
 
     return rc;
 }
 
 int configure_raid_parameters(i_container *i_con)
 {
-    /*
-     Select Protection Level and Stripe Size
-
-     Default array configurations are shown.  To change
-     setting hit "c" for options menu.  Highlight desired
-     and option and hit Enter.
-
-     c=Change Setting
-
-
-     Protection Level . . . . . . . . . . . . :  RAID 0
-     Stripe Size  . . . . . . . . . . . . . . :  64  KB
-
-
-
-
-
-
-
-     Press Enter to Continue.
-
-     e=Exit   q=Cancel
-     */
     FIELD *input_fields[4];
     FIELD *cur_field;
     FORM *form;
@@ -3385,8 +3260,6 @@ int configure_raid_parameters(i_container *i_con)
     getmaxyx(stdscr,max_y,max_x);
     getbegyx(stdscr,start_y,start_x);
 
-    /*  move(1,0);printw("max x:%d start x:%d",max_x,start_x);refresh();getch();*/
-
     rc = RC_SUCCESS;
 
     /* Title */
@@ -3415,15 +3288,15 @@ int configure_raid_parameters(i_container *i_con)
     cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
 
     /* determine number of devices selected for this parity set */
-    for (i=0; i<cur_ioa->num_devices; i++)
-    {
+    for (i=0; i<cur_ioa->num_devices; i++) {
+
         device_record = (struct ipr_dev_record *)
             cur_ioa->dev[i].qac_entry;
 
         if ((device_record != NULL) &&
             (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-            (device_record->issue_cmd))
-        {
+            (device_record->issue_cmd)) {
+
             selected_count++;
         }
     }
@@ -3681,102 +3554,108 @@ int configure_raid_parameters(i_container *i_con)
     return rc;
 }
 
+char *confirm_raid_start_body_init(int *num_lines, int type)
+{
+    char *string_buf;
+    char *buffer = NULL;
+    int cur_len;
+    int header_lines = 0;
+
+    string_buf = catgets(catd,n_confirm_raid_start.text_set, 2,
+                         "ATTENTION: Data will not be preserved and "
+                         "may be lost on selected disk units when "
+                         "parity protection is enabled.");
+    buffer = add_line_to_body(buffer, string_buf, "  ", &header_lines);
+    cur_len = strlen(buffer);
+
+    string_buf = catgets(catd,n_confirm_raid_start.text_set, 3,
+                         "Press Enter to continue.");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 4);
+    cur_len += sprintf(buffer + cur_len, "\n%s\n", string_buf);
+    header_lines += 2;
+
+    string_buf = catgets(catd,n_confirm_raid_start.text_set, 4,
+                         "Cancel to return and change your choice.");
+    buffer = ipr_realloc(buffer, cur_len + strlen(string_buf) + 8);
+    cur_len += sprintf(buffer + cur_len, "  q=%s\n\n", string_buf);
+    header_lines += 2;
+
+    buffer = status_header(buffer, &header_lines, type);
+
+    *num_lines = header_lines;
+    return buffer;
+}
+
 int confirm_raid_start(i_container *i_con)
 {
-    /*      Confirm Start Device Parity Protection
-
-     ATTENTION: Data will not be preserved and may be lost on selected disk
-     units when parity protection is enabled.              
-
-     Press Enter to continue.
-     Press q=Cancel to return and change your choice.
-
-     Parity   Vendor    Product           Serial          Resource
-     Option     Set     ID         ID              Number   Model  Name   
-     1       1     IBM       DAB61C0E         3AFB348C   200   /dev/sdb
-     1       1     IBMAS400  DCHS09W          0024A0B9   070
-     1       1     IBMAS400  DFHSS4W          00D37A11   070
-
-     q=Cancel    f=PageDn   b=PageUp
-     */
-
     struct array_cmd_data *cur_raid_cmd;
     struct ipr_ioa *cur_ioa;
-    int rc, i, j;
-    char *buffer = NULL;
-    u32 num_lines = 0;
-    struct ipr_array_record *array_record;
-    struct ipr_common_record *common_record_saved;
-    struct ipr_common_record *common_record;
-    struct ipr_dev_record *device_record_saved;
+    int rc, i, j, k;
+    char *buffer[2];
     struct ipr_dev_record *device_record;
     struct ipr_dev *ipr_dev;
-    int found;
-
-    int buf_size = 150;
-    char *out_str = calloc(buf_size,sizeof(char));
-
+    char *string_buf;
+    int header_lines;
+    int toggle = 1;
     struct screen_output *s_out;
-    fn_out *output = init_output();
     mvaddstr(0,0,"CONFIRM RAID START FUNCTION CALLED");
 
     rc = RC_SUCCESS;
 
+    /* Setup screen title */
+    string_buf = catgets(catd,n_confirm_raid_start.text_set,1,"Create a Disk Array");
+    n_confirm_raid_start.title = ipr_malloc(strlen(string_buf) + 4);
+    sprintf(n_confirm_raid_start.title, string_buf);
+
+    for (k=0; k<2; k++)
+        buffer[k] = confirm_raid_start_body_init(&header_lines, k);
+
     cur_raid_cmd = raid_cmd_head;
 
-    while(cur_raid_cmd)
-    {
-        if (cur_raid_cmd->do_cmd)
-        {
-            cur_ioa = cur_raid_cmd->ipr_ioa;
+    while(cur_raid_cmd) {
+        if (cur_raid_cmd->do_cmd) {
 
+            cur_ioa = cur_raid_cmd->ipr_ioa;
             ipr_dev = cur_raid_cmd->ipr_dev;
 
-            array_record = (struct ipr_array_record *)ipr_dev->qac_entry;
+            for (k=0; k<2; k++)
+                buffer[k] = print_device(ipr_dev,buffer[k],"1",cur_ioa, k);
 
-            if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
-            {
-                /* swap in this raid cmd's image of qac data */
-                memcpy(cur_ioa->qac_data,
-                       cur_raid_cmd->qac_data,
-                       sizeof(struct ipr_array_query_data));
-            }
+            for (j = 0; j < cur_ioa->num_devices; j++) {
 
-            buffer = print_device(ipr_dev,buffer,"1",cur_ioa, 0);
-
-            buf_size += 100;
-            out_str = realloc(out_str, buf_size);
-            out_str = strcat(out_str,buffer);
-            memset(buffer, 0, strlen(buffer));
-            num_lines++;
-
-            for (j = 0; j < cur_ioa->num_devices; j++)
-            {
                 device_record = (struct ipr_dev_record *)cur_ioa->dev[j].qac_entry;
 
                 if ((device_record != NULL) &&
                     ((device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-                     (device_record->issue_cmd)))
-                {
-                    buffer = print_device(&cur_ioa->dev[j],buffer,"1",cur_ioa, 0);
+                     (device_record->issue_cmd))) {
 
-                    buf_size += 100;
-                    out_str = realloc(out_str, buf_size);
-                    out_str = strcat(out_str,buffer);
-                    memset(buffer, 0, strlen(buffer));
-                    num_lines++;
+                    for (k=0; k<2; k++)
+                        buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"1",cur_ioa, k);
                 }
             }
         }
         cur_raid_cmd = cur_raid_cmd->next;
     }
 
-    output->next = add_fn_out(output->next,1,strip_trailing_whitespace(out_str));
+    toggle_field = 0;
 
-    s_out = screen_driver(&n_confirm_raid_start,output,NULL);
+    do {
+        n_configure_raid_start.body = buffer[toggle&1];
+        s_out = screen_driver_new(&n_confirm_raid_start,NULL,header_lines,NULL);
+        toggle++;
+    } while (s_out->rc == TOGGLE_SCREEN);
+
     rc = s_out->rc;
     free(s_out);
-    free(out_str);        
+
+    for (k=0; k<2; k++) {
+        ipr_free(buffer[k]);
+        buffer[k] = NULL;
+    }
+    n_confirm_raid_start.body = NULL;
+
+    ipr_free(n_confirm_raid_start.title);
+    n_confirm_raid_start.title = NULL;
 
     if (rc > 0)
         return rc;
@@ -3792,7 +3671,6 @@ int confirm_raid_start(i_container *i_con)
             if (rc != 0)
             {
                 rc = 19;  /* "Start Parity Protection failed." */
-                output = free_fn_out(output);
                 syslog(LOG_ERR, "Devices may have changed state. Command cancelled,"
                        " please issue commands again if RAID still desired %s.\n",
                        cur_ioa->ioa.gen_name);
@@ -3811,89 +3689,14 @@ int confirm_raid_start(i_container *i_con)
             continue;
 
         cur_ioa = cur_raid_cmd->ipr_ioa;
+        rc = ipr_start_array_protection(cur_ioa->ioa.gen_name,
+                                        cur_ioa->qac_data,
+                                        cur_raid_cmd->stripe_size,
+                                        cur_raid_cmd->prot_level);
 
-        if (cur_ioa->num_raid_cmds > 0)
-        {
-            array_record = (struct ipr_array_record *)
-                cur_raid_cmd->ipr_dev->qac_entry;
-
-            if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
-            {
-                /* refresh qac data for ARRAY */
-                rc = ipr_query_array_config(cur_ioa->ioa.gen_name, 0, 0, 0,
-                                            cur_raid_cmd->qac_data);
-
-                if (rc != 0)
-                    continue;
-
-                /* scan through this raid command to determine which
-                 devices should be part of this parity set */
-                common_record_saved = (struct ipr_common_record *)
-                    cur_raid_cmd->qac_data->data;
-                for (i = 0; i < cur_raid_cmd->qac_data->num_records; i++)
-                {
-                    device_record_saved = (struct ipr_dev_record *)common_record_saved;
-                    if (device_record_saved->issue_cmd)
-                    {
-                        common_record = (struct ipr_common_record *)
-                            cur_ioa->qac_data->data;
-                        found = 0;
-                        for (j = 0; j < cur_ioa->qac_data->num_records; j++)
-                        {
-                            device_record = (struct ipr_dev_record *)common_record;
-                            if (device_record->resource_handle ==
-                                device_record_saved->resource_handle)
-                            {
-                                device_record->issue_cmd = 1;
-                                found = 1;
-                                break;
-                            }
-                            common_record = (struct ipr_common_record *)
-                                ((unsigned long)common_record +
-                                 ntohs(common_record->record_len));
-                        }
-                        if (!found)
-                        {
-                            syslog(LOG_ERR,
-                                   "Resource not found to start parity protection to %s"
-                                   "failed\n", cur_ioa->ioa.gen_name);
-                            break;
-                        }
-                    }
-                    common_record_saved = (struct ipr_common_record *)
-                        ((unsigned long)common_record_saved +
-                         ntohs(common_record_saved->record_len));
-                }
-
-                if (!found)
-                    continue;
-
-                array_record->issue_cmd = 1;
-                cur_raid_cmd->array_id = array_record->array_id;
-            }
-            else
-            {
-                if (cur_ioa->num_raid_cmds > 1)
-                {
-                    /* need to only issue one start for this
-                     adapter, only send start for the last
-                     listed array, which contains data for
-                     all arrays.  A positive value of num_raid_cmds
-                     must be maintained for status screen */
-                    cur_ioa->num_raid_cmds--;
-                    continue;
-                }
-            }
-
-            rc = ipr_start_array_protection(cur_ioa->ioa.gen_name,
-                                            cur_ioa->qac_data,
-                                            cur_raid_cmd->stripe_size,
-                                            cur_raid_cmd->prot_level);
-        }
     }
 
     rc = raid_start_complete(NULL);
-    output = free_fn_out(output);
 
     return rc;
 }
@@ -4551,9 +4354,6 @@ int configure_raid_include(i_container *i_con)
         if (device_record == NULL)
             continue;
 
-        if (cur_ioa->dev[j].is_start_cand)
-            continue;
-
         if (device_record->include_cand)
         {
             if ((cur_ioa->dev[j].scsi_dev_data) &&
@@ -4640,7 +4440,6 @@ int configure_raid_include(i_container *i_con)
                     {
                         device_record->issue_cmd = 1;
                         device_record->known_zeroed = 1;
-                        ipr_dev->is_start_cand = 1;
                         cur_raid_cmd->ipr_ioa->num_raid_cmds++;
                     }
                 }
@@ -4651,7 +4450,6 @@ int configure_raid_include(i_container *i_con)
                     {
                         device_record->issue_cmd = 0;
                         device_record->known_zeroed = 0;
-                        ipr_dev->is_start_cand = 0;
                     }
                 }
             }
@@ -9796,10 +9594,12 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
     char *dev_name = ipr_dev->dev_name;
     char *gen_name = ipr_dev->gen_name;
     int tab_stop = 0;
-    char *vendor_id, *product_id;
+    char vendor_id[IPR_VENDOR_ID_LEN];
+    char product_id[IPR_PROD_ID_LEN];
     struct ipr_common_record *common_record;
     struct ipr_dev_record *device_record;
     struct ipr_array_record *array_record;
+    int is_start_cand = 0;
 
     if (body)
         len = strlen(body);
@@ -9848,8 +9648,8 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
                                 scsi_dev_data->id,
                                 scsi_dev_data->lun);
 
-            vendor_id = scsi_dev_data->vendor_id;
-            product_id = scsi_dev_data->product_id;
+            ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
+            ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
         }
         else if (ipr_dev->qac_entry) {
             common_record = ipr_dev->qac_entry;
@@ -9859,16 +9659,25 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
                                     device_record->last_resource_addr.bus,
                                     device_record->last_resource_addr.target,
                                     device_record->last_resource_addr.lun);
-                vendor_id = array_record->vendor_id;
-                product_id = array_record->product_id;
+                ipr_strncpy_0(vendor_id, device_record->vendor_id, IPR_VENDOR_ID_LEN);
+                ipr_strncpy_0(product_id , device_record->product_id, IPR_PROD_ID_LEN);
             } else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
                 array_record = (struct ipr_array_record *)common_record;
-                tab_stop  = sprintf(body + len,"%d:%d:%d ",
-                                    array_record->last_resource_addr.bus,
-                                    array_record->last_resource_addr.target,
-                                    array_record->last_resource_addr.lun);
-                vendor_id = array_record->vendor_id;
-                product_id = array_record->product_id;
+
+                if (array_record->start_cand) {
+                    tab_stop  = sprintf(body + len,"            ");
+                    ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
+                    product_id[0] = '\0';
+                    is_start_cand = 1;
+                } else {
+                    tab_stop  = sprintf(body + len,"%d:%d:%d ",
+                                        array_record->last_resource_addr.bus,
+                                        array_record->last_resource_addr.target,
+                                        array_record->last_resource_addr.lun);
+                    ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
+                    ipr_strncpy_0(product_id , array_record->product_id,
+                                  IPR_PROD_ID_LEN);
+                }
             }
         }
         
@@ -9887,13 +9696,19 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
         else {
             if (ipr_is_hot_spare(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "Hot Spare");
-            else if (ipr_is_volume_set(ipr_dev))
-                len += sprintf(body + len, "RAID %-20s ",
-                               ipr_dev->prot_level_str);
+            else if (ipr_is_volume_set(ipr_dev)) {
+                if (is_start_cand)
+                    len += sprintf(body + len, "%-25s ",
+                                   "SCSI RAID Adapter");
+                else 
+                    len += sprintf(body + len, "RAID %-20s ",
+                                   ipr_dev->prot_level_str);
+            }
             else if (ipr_is_array_member(ipr_dev)) {
                 sprintf(raid_str,"  RAID %s Array Member",
                         ipr_dev->prot_level_str);
                 len += sprintf(body + len, "%-25s ", raid_str);
+
             }
             else if (ipr_is_af_dasd_device(ipr_dev))
                 len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
@@ -9946,9 +9761,11 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
             }
         }
 
-        if (!scsi_dev_data)
+        if (is_start_cand)
+            sprintf(body + len, "Available");
+        else if (!scsi_dev_data)
             sprintf(body + len, "Missing\n");
-        if (!scsi_dev_data->online)
+        else if (!scsi_dev_data->online)
             sprintf(body + len, "Offline\n");
         else if (res_state.not_oper)
             sprintf(body + len, "Not Operational\n");
