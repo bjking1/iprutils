@@ -178,9 +178,9 @@ struct screen_opts main_menu_opt[] = {
 	{bus_config,         "4", __("Work with SCSI bus configuration")},
 	{driver_config,      "5", __("Work with driver configuration")},
 	{disk_config,        "6", __("Work with disk configuration")},
-	{ioa_config,         "7", __("Work with adapter configuration")},
-	{download_ucode,     "8", __("Download microcode")},
-	{log_menu,           "9", __("Analyze log")}
+	/* {ioa_config,         "7", __("Work with adapter configuration")}, */
+	{download_ucode,     "7", __("Download microcode")},
+	{log_menu,           "8", __("Analyze log")}
 };
 
 s_node n_main_menu = {

@@ -28,6 +28,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+char *tool_name = "iprconfig";
+
 struct devs_to_init_t {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
@@ -1956,7 +1958,6 @@ int raid_status(i_container *i_con)
 		if (!ioa->ioa.scsi_dev_data)
 			continue;
 
-		/* xxx possibly have a utility to print all hot spares? */
 		/* print Hot Spare devices*/
 		for (j = 0; j < ioa->num_devices; j++) {
 			if (!ipr_is_hot_spare(&ioa->dev[j]))
@@ -5230,6 +5231,7 @@ int send_dev_inits(i_container *i_con)
 		} else if (cur_dev_init->do_init &&
 			   cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE) {
 			num_devs++;
+			ioa = cur_dev_init->ioa;
 
 			scsi_dev_data = cur_dev_init->dev->scsi_dev_data;
 			if (!scsi_dev_data) {
@@ -7245,6 +7247,7 @@ int change_disk_config(i_container * i_con)
 	struct ipr_array_record *array_record;
 	int tcq_warning = 0;
 	int tcq_blocked = 0;
+	int tcq_enabled = 0;
 
 	rc = RC_SUCCESS;
 
@@ -7326,6 +7329,7 @@ int change_disk_config(i_container * i_con)
 		disk_config_attr[2].option = 3;
 		disk_config_attr[2].tcq_enabled = disk_attr.tcq_enabled;
 		body = add_line_to_body(body,_("Tag Command Queueing"), "%4");
+		tcq_enabled = disk_config_attr[2].tcq_enabled;
 		if (disk_config_attr[2].tcq_enabled)
 			i_con = add_i_con(i_con,_("Yes"),&disk_config_attr[2]);
 		else
@@ -8773,20 +8777,15 @@ int main(int argc, char *argv[])
 		next_cmd = 0;
 		next_dev = 0;
 		for (i = 1; i < argc; i++) {
-			if (strcmp(argv[i], "-e") == 0)
+			if (parse_option(argv[i]))
+				continue;
+			else if (strcmp(argv[i], "-e") == 0)
 				next_editor = 1;
 			else if (strcmp(argv[i], "-k") == 0)
 				next_dir = 1;
 			else if (strcmp(argv[i], "-c") == 0)
 				next_cmd = 1;
-			else if (strcmp(argv[i], "--version") == 0) {
-				printf("iprconfig: %s\n", IPR_VERSION_STR);
-				exit(1);
-			} else if (strcmp(argv[i], "--debug") == 0) {
-				ipr_debug = 1;
-			} else if (strcmp(argv[i], "--force") == 0) {
-				ipr_force = 1;
-			} else if (next_editor)	{
+			else if (next_editor)	{
 				strcpy(parm_editor, argv[i]);
 				next_editor = 0;
 			} else if (next_dir) {
@@ -8812,7 +8811,7 @@ int main(int argc, char *argv[])
 
 	system("modprobe sg");
 	exit_func = tool_exit_func;
-	tool_init("iprconfig");
+	tool_init();
 
 	if (non_interactive) {
 		check_current_config(false);
@@ -8833,6 +8832,10 @@ int main(int argc, char *argv[])
 
 	s_status.index = 0;
 	main_menu(NULL);
+	if (head_zdev){
+		check_current_config(false);
+		ipr_cleanup_zeroed_devs();
+	}
 
 	while (head_zdev) {
 		struct screen_output *s_out;
@@ -8855,6 +8858,8 @@ int main(int argc, char *argv[])
 		i_con = s_out->i_con;
 		i_con = free_i_con(i_con);
 		free(s_out);
+		check_current_config(false);
+		ipr_cleanup_zeroed_devs();
 	}
 
 	clear();

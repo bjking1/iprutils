@@ -11,6 +11,7 @@ include version.mk
 
 CFLAGS = -g -Wall $(IPR_DEFINES) -DIPR_IPRUTILS
 UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
+TAR = cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS --exclude applied-patches --exclude series --exclude txt --exclude pc --exclude patches --exclude *~* iprutils
 
 all: iprconfig iprupdate iprdump iprinit iprdbg docs 
 
@@ -56,7 +57,7 @@ pdfs: docs
 
 utils: ./*.c ./*.h
 	cd ..
-	tar -zcpf iprutils-$(UTILS_VER)-src.tgz --directory ../ --exclude CVS iprutils
+	$(TAR)
 
 clean:
 	rm -f iprupdate iprconfig iprdump iprinit iprdbg iprupdate.ps iprupdate.pdf *.o
@@ -79,7 +80,7 @@ rpm: *.c *.h *.8
 	-make clean
 	cd ..
 	cp -f spec/iprutils.spec .
-	cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS iprutils
+	$(TAR)
 	mv ../iprutils-$(UTILS_VER)-src.tgz .
 	rm -f iprutils.spec
 	rpmbuild --nodeps -ts iprutils-$(UTILS_VER)-src.tgz

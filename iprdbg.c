@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.14 2004/09/09 17:52:35 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.15 2005/02/23 20:57:11 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -28,6 +28,8 @@
 #define IPR_MAX_FLIT_ENTRIES 59
 #define IPR_FLIT_TIMESTAMP_LEN 12
 #define IPR_FLIT_FILENAME_LEN 184
+
+char *tool_name = "iprdbg";
 
 enum iprdbg_cmd {
 	IPRDBG_READ = IPR_IOA_DEBUG_READ_IOA_MEM,
@@ -189,7 +191,7 @@ int main(int argc, char *argv[])
 		LOG_USER);
 
 	outfile = fopen(".iprdbglog", "a");
-	tool_init("iprdbg");
+	tool_init();
 	check_current_config(false);
 
 	if (num_ioas == 0)

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.48 2005/01/12 17:19:21 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.49 2005/02/23 20:57:12 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/mount.h>
+#include <sys/utsname.h>
 #include <linux/types.h>
 #include <linux/kdev_t.h>
 #include <scsi/scsi.h>
@@ -34,6 +35,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <ctype.h>
 #include <syslog.h>
 #include <term.h>
@@ -45,6 +47,9 @@
 #include <asm/byteorder.h>
 #include <sys/mman.h>
 #include <paths.h>
+#include <bits/sockaddr.h>
+#include <linux/netlink.h>
+#include <sys/capability.h>
 
 #define IPR_DASD_UCODE_USRLIB 0
 #define IPR_DASD_UCODE_ETC 1
@@ -176,10 +181,13 @@ extern struct ipr_ioa *ipr_ioa_head;
 extern struct ipr_ioa *ipr_ioa_tail;
 extern int runtime;
 extern void (*exit_func) (void);
+extern int daemonize;
 extern int ipr_debug;
 extern int ipr_force;
 extern int ipr_sg_required;
+extern int polling_mode;
 extern char *hotplug_dir;
+extern char *tool_name;
 extern struct zeroed_dev *head_zdev;
 extern struct zeroed_dev *tail_zdev;
 
@@ -1138,6 +1146,9 @@ struct ipr_inquiry_ioa_cap {
 	u8 reserved3[3];
 #endif
 	u16 af_block_size;
+	u16 af_ext_cap;
+	u16 vset_ext_cap;
+	u16 gscsi_ext_cap;
 };
 
 struct ipr_dasd_ucode_header {
@@ -1372,6 +1383,12 @@ u32 get_dasd_ucode_version(char *, int);
 const char *get_ioa_desc(struct ipr_ioa *);
 int is_spi(struct ipr_ioa *);
 int page0x0a_setup(struct ipr_dev *);
+int handle_events(void (*) (void), int, void (*) (char *));
+struct ipr_ioa *find_ioa(int);
+int parse_option(char *);
+struct ipr_dev *find_blk_dev(char *);
+struct ipr_dev *find_gen_dev(char *);
+int ipr_cmds_per_lun(struct ipr_ioa *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.61 2005/01/12 17:19:21 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.62 2005/02/23 20:57:11 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -26,13 +26,13 @@ struct scsi_dev_data *scsi_dev_table = NULL;
 u32 num_ioas = 0;
 struct ipr_ioa *ipr_ioa_head = NULL;
 struct ipr_ioa *ipr_ioa_tail = NULL;
-int runtime = 0;
-char *tool_name = NULL;
 void (*exit_func) (void) = default_exit_func;
+int daemonize = 0;
 int ipr_debug = 0;
 int ipr_force = 0;
 char *hotplug_dir = NULL;
 int ipr_sg_required = 0;
+int polling_mode = 0;
 
 struct zeroed_dev
 {
@@ -42,6 +42,8 @@ struct zeroed_dev
 
 struct zeroed_dev *head_zdev = NULL;
 struct zeroed_dev *tail_zdev = NULL;
+static int ipr_force_polling = 0;
+static int ipr_force_uevents = 0;
 
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
@@ -652,7 +654,191 @@ static void setup_ioa_parms(struct ipr_ioa *ioa)
 	}
 }
 
-void tool_init(char *name)
+struct ipr_ioa *find_ioa(int host_no)
+{
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa)
+		if (ioa->host_num == host_no)
+			return ioa;
+	return NULL;
+}
+
+static struct ipr_dev *find_dev(char *blk, int (*compare) (struct ipr_dev *, char *))
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int i;
+	char *name = malloc(strlen(_PATH_DEV) + strlen(blk) + 1);
+
+	if (!name)
+		return NULL;
+
+	sprintf(name, _PATH_DEV"%s", blk);
+
+	for_each_ioa(ioa) {
+		for (i = 0, dev = ioa->dev; i < ioa->num_devices; i++, dev++)
+			if (!compare(dev, name)) {
+				free(name);
+				return dev;
+			}
+	}
+
+	free(name);
+	return NULL;
+}
+
+static int blk_compare(struct ipr_dev *dev, char *name)
+{
+	return strcmp(dev->dev_name, name);
+}
+
+struct ipr_dev *find_blk_dev(char *blk)
+{
+	return find_dev(blk, blk_compare);
+}
+
+static int gen_compare(struct ipr_dev *dev, char *name)
+{
+	return strcmp(dev->gen_name, name);
+}
+
+struct ipr_dev *find_gen_dev(char *gen)
+{
+	return find_dev(gen, gen_compare);
+}
+
+#define NETLINK_KOBJECT_UEVENT        15
+
+int handle_events(void (*poll_func) (void), int poll_delay,
+		  void (*kevent_handler) (char *))
+{
+	struct sockaddr_nl snl;
+	int sock, rc, len, flags;
+	int uevent_rcvd = ipr_force_uevents;
+	char buf[1024];
+
+	memset(&snl, 0, sizeof(snl));
+	snl.nl_family = AF_NETLINK;
+	snl.nl_pid = getpid();
+	snl.nl_groups = 1;
+
+	sock = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
+	if (sock == -1) {
+		syslog_dbg("Failed to get socket\n");
+		return -EIO;
+	}
+
+	rc = bind(sock, (struct sockaddr *)&snl, sizeof(snl));
+
+	if (rc < 0) {
+		syslog_dbg("Failed to bind to socket\n");
+		return -EIO;
+	}
+
+	if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
+		syslog(LOG_ERR, "Failed to fcntl socket\n");
+		close(sock);
+		return -EIO;
+	}
+
+	while (1) {
+		len = recv(sock, &buf, sizeof(buf), 0);
+
+		if (ipr_force_polling || (!uevent_rcvd && len < 0)) {
+			poll_func();
+			sleep(poll_delay);
+			continue;
+		}
+
+		if (len < 0) {
+			syslog_dbg("kevent recv failed\n");
+			return -EIO;
+		}
+
+		if (!uevent_rcvd) {
+			flags = fcntl(sock, F_GETFL);
+			if (flags == -1) {
+				syslog_dbg("F_GETFL Failed\n");
+				sleep(poll_delay);
+				continue;
+			}
+
+			if (fcntl(sock, F_SETFL, (flags & ~O_NONBLOCK)) == -1) {
+				syslog_dbg("F_SETFL Failed\n");
+				sleep(poll_delay);
+				continue;
+			}
+
+			uevent_rcvd = 1;
+		}
+
+		kevent_handler(buf);
+	}
+
+	close(sock);
+	return 0;
+}
+
+int parse_option(char *opt)
+{
+	if (strcmp(opt, "--version") == 0) {
+		printf("%s: %s\n", tool_name, IPR_VERSION_STR);
+		exit(0);
+	}
+
+	if (strcmp(opt, "--daemon") == 0)
+		daemonize = 1;
+	else if (strcmp(opt, "--debug") == 0)
+		ipr_debug = 1;
+	else if (strcmp(opt, "--force") == 0)
+		ipr_force = 1;
+	else if (strcmp(opt, "--use-polling") == 0)
+		ipr_force_polling = 1;
+	else if (strcmp(opt, "--use-uevents") == 0)
+		ipr_force_uevents = 1;
+	else
+		return 0;
+
+	return 1;
+}
+
+static int get_pci_attr(struct sysfs_device *sysfs_pci_device,
+			char *attr)
+{
+	int temp, fd, len;
+	char path[SYSFS_PATH_MAX];
+	char data[200];
+
+	sprintf(path, "%s/%s", sysfs_pci_device->path, attr);
+
+	if ((fd = open(path, O_RDONLY)) < 0) {
+		syslog_dbg("Failed to open %s\n", path);
+		return 0;
+	}
+
+	len = read(fd, data, 200);
+	if (len < 0) {
+		syslog_dbg("Failed to read %s\n", path);
+		close(fd);
+		return 0;
+	}
+
+	sscanf(data, "0x%4X", &temp);
+	close(fd);
+	return temp;
+}
+
+static void get_pci_attrs(struct ipr_ioa *ioa,
+			  struct sysfs_device *sysfs_pci_device)
+{
+	ioa->subsystem_vendor = get_pci_attr(sysfs_pci_device, "subsystem_vendor");
+	ioa->subsystem_device = get_pci_attr(sysfs_pci_device, "subsystem_device");
+	ioa->pci_vendor = get_pci_attr(sysfs_pci_device, "vendor");
+	ioa->pci_device = get_pci_attr(sysfs_pci_device, "device");
+}
+
+void tool_init()
 {
 	int rc, temp;
 	struct ipr_ioa *ipr_ioa;
@@ -669,11 +855,6 @@ void tool_init(char *name)
 	struct sysfs_device *sysfs_pci_device;
 
 	struct sysfs_attribute *sysfs_attr;
-
-	if (!tool_name) {
-		tool_name = malloc(strlen(name)+1);
-		strcpy(tool_name, name);
-	}
 
 	for (ipr_ioa = ipr_ioa_head; ipr_ioa;) {
 		ipr_ioa = ipr_ioa->next;
@@ -729,24 +910,7 @@ void tool_init(char *name)
 				if (strcmp(pci_address, sysfs_pci_device->name) == 0) {
 					strcpy(ipr_ioa->host_name, sysfs_host_device->name);
 					sscanf(ipr_ioa->host_name, "host%d", &ipr_ioa->host_num);
-
-					sysfs_attr = sysfs_get_device_attr(sysfs_pci_device,
-									   "subsystem_vendor");
-					sscanf(sysfs_attr->value, "0x%4X", &temp);
-					ipr_ioa->subsystem_vendor = temp;
-					sysfs_attr = sysfs_get_device_attr(sysfs_pci_device,
-									   "subsystem_device");
-					sscanf(sysfs_attr->value, "0x%4X", &temp);
-					ipr_ioa->subsystem_device = temp;
-
-					sysfs_attr = sysfs_get_device_attr(sysfs_pci_device,
-									   "vendor");
-					sscanf(sysfs_attr->value, "0x%4X", &temp);
-					ipr_ioa->pci_vendor = temp;
-					sysfs_attr = sysfs_get_device_attr(sysfs_pci_device,
-									   "device");
-					sscanf(sysfs_attr->value, "0x%4X", &temp);
-					ipr_ioa->pci_device = temp;
+					get_pci_attrs(ipr_ioa, sysfs_pci_device);
 					break;
 				}
 			}
@@ -800,6 +964,41 @@ void ipr_reset_adapter(struct ipr_ioa *ioa)
 				       "reset_host");
 	sysfs_write_attribute(attr, "1", 1);
 	sysfs_close_class_device(class_device);
+}
+
+static int ipr_read_host_attr(struct ipr_ioa *ioa, char *name, char *value)
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	int rc;
+
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, name);
+	rc = sysfs_read_attribute(attr);
+
+	if (rc) {
+		ioa_dbg(ioa, "Failed to read %s attribute. %m\n", name);
+		sysfs_close_class_device(class_device);
+		return -EIO;
+	}
+
+	sprintf(value, "%s", attr->value);
+	value[strlen(value)-1] = '\0';
+	sysfs_close_class_device(class_device);
+	return 0;
+}
+
+int ipr_cmds_per_lun(struct ipr_ioa *ioa)
+{
+	char value[100];
+	int rc;
+
+	rc = ipr_read_host_attr(ioa, "cmd_per_lun", value);
+
+	if (rc)
+		return 6;
+
+	return strtoul(value, NULL, 10);
 }
 
 void ipr_scan(struct ipr_ioa *ioa, int bus, int id, int lun)
@@ -1725,6 +1924,56 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 	return rc;
 }
 
+static char *get_write_buffer_dev(struct ipr_dev *dev)
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *dev_attr;
+	int rc, val;
+	char path[SYSFS_PATH_MAX];
+
+	/* xxx FIXME */
+	return dev->gen_name;
+
+	if (!strlen(dev->dev_name) || !dev->scsi_dev_data)
+		return dev->gen_name;
+
+	class_device = sysfs_open_class_device("block",
+					       &dev->dev_name[5]);
+	if (!class_device) {
+		scsi_dbg(dev, "Failed to open block class device for %s. %m\n",
+			 dev->dev_name);
+		return dev->gen_name;
+	}
+
+	sprintf(path, "%s/queue/max_sectors_kb", class_device->path);
+
+	dev_attr = sysfs_open_attribute(path);
+	if (!dev_attr) {
+		scsi_dbg(dev, "Failed to get max_sectors_kb attribute. %m\n");
+		goto fail;
+	}
+
+	rc = sysfs_read_attribute(dev_attr);
+
+	if (rc) {
+		sysfs_close_attribute(dev_attr);
+		scsi_dbg(dev, "Failed to read max_sectors_kb attribute. %m\n");
+		goto fail;
+	}
+
+	sscanf(dev_attr->value, "%d", &val);
+	sysfs_close_attribute(dev_attr);
+	sysfs_close_class_device(class_device);
+
+	if (val > 256)
+		return dev->dev_name;
+
+	return dev->gen_name;	
+fail:
+	sysfs_close_class_device(class_device);
+	return dev->gen_name;
+}
+
 int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 {
 	int fd, rc, i;
@@ -1732,7 +1981,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	struct sense_data_t sense_data;
 	struct ipr_disk_attr attr;
 	int old_qdepth;
-	char *name = dev->gen_name;
+	char *name = get_write_buffer_dev(dev);
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -2044,6 +2293,7 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 				segment_size = buff_len;
 		}
 
+		iovec_count = i;
 		dxferp = (void *)iovec;
 	} else {
 		iovec_count = 0;
@@ -2353,6 +2603,8 @@ static void get_ioa_name(struct ipr_ioa *cur_ioa,
 		    scsi_dev_table[i].type == IPR_TYPE_ADAPTER) {
 			strcpy(cur_ioa->ioa.dev_name, scsi_dev_table[i].dev_name);
 			strcpy(cur_ioa->ioa.gen_name, scsi_dev_table[i].gen_name);
+			cur_ioa->ioa.scsi_dev_data = &scsi_dev_table[i];
+			cur_ioa->ioa.ioa = cur_ioa;
 		}
 	}
 }
@@ -2851,6 +3103,37 @@ static int get_tcq_depth(struct ipr_dev *dev)
 	return DEFAULT_TCQ_DEPTH;
 }
 
+static int is_tagged(struct ipr_dev *dev)
+{
+	char temp[100];
+
+	if (!ipr_read_dev_attr(dev, "tcq_enable", temp))
+		return strtoul(temp, NULL, 10);
+	else if (!ipr_read_dev_attr(dev, "queue_type", temp))
+		return (strstr(temp, "none") ? 0 : 1);
+
+	return 0;
+}
+
+static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
+{
+	char temp[100];
+
+	if (!ipr_read_dev_attr(dev, "tcq_enable", temp)) {
+		sprintf(temp, "%d", tcq_enabled);
+		return ipr_write_dev_attr(dev, "tcq_enable", temp);
+	}
+
+	if (!ipr_read_dev_attr(dev, "queue_type", temp)) {
+		if (tcq_enabled)
+			return ipr_write_dev_attr(dev, "queue_type", "ordered");
+		else
+			return ipr_write_dev_attr(dev, "queue_type", "none");
+	}
+
+	return -EIO;
+}
+
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
 	char temp[100];
@@ -2874,16 +3157,13 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	} else
 		attr->queue_depth = strtoul(temp, NULL, 10);
 
-	if (ipr_read_dev_attr(dev, "tcq_enable", temp))
-		return -EIO;
-
 	if (ipr_is_af_dasd_device(dev)) {
 		if (attr->queue_depth < 2)
 			attr->tcq_enabled = 0;
 		else
 			attr->tcq_enabled = 1;
 	} else
-		attr->tcq_enabled = strtoul(temp, NULL, 10);
+		attr->tcq_enabled = is_tagged(dev);
 
 	attr->format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
 
@@ -2974,9 +3254,9 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 			if (attr->tcq_enabled && !page0x0a_setup(dev))
 				scsi_warn(dev, "WARNING: Enabling tagged queuing to unsupported disk\n");
 
-			sprintf(temp, "%d", attr->tcq_enabled);
-			if (ipr_write_dev_attr(dev, "tcq_enable", temp))
+			if (set_tagged(dev, attr->tcq_enabled))
 				return -EIO;
+			sprintf(temp, "%d", attr->tcq_enabled);
 			if (save)
 				ipr_save_dev_attr(dev, IPR_TCQ_ENABLED, temp, 1);
 		}
@@ -3498,7 +3778,7 @@ static int ipr_get_hotplug_dir()
 {
 	FILE *file;
 	char buf[100];
-	char *loc;
+	char *loc, *end;
 
 	file = fopen(FIRMWARE_HOTPLUG_CONFIG_FILE, "r");
 
@@ -3527,14 +3807,22 @@ static int ipr_get_hotplug_dir()
 		return -EIO;
 	}
 
+	end = strchr(loc, ' ');
+
+	if (!end)
+		end = strchr(loc, '"');
+	if (end)
+		*end = '\0';
+
 	hotplug_dir = realloc(hotplug_dir, strlen(loc + 1));
 
 	if (!hotplug_dir)
 		return -ENOMEM;
 
 	strcpy(hotplug_dir, loc);
-	/* strip trailing \n */
-	hotplug_dir[strlen(hotplug_dir)-1] = '\0';
+	end = strchr(hotplug_dir, '\n');
+	if (end)
+		*end = '\0';
 
 	return 0;
 }
@@ -3633,13 +3921,13 @@ static void init_ioa_ucode_entry(struct ipr_fw_images *img)
 
 static void init_disk_ucode_entry(struct ipr_fw_images *img)
 {
-	img->version = get_dasd_ucode_version(img->file, 0);
+	img->version = get_dasd_ucode_version(img->file, 1);
 	img->has_header = 1;
 }
 
 static void init_disk_ucode_entry_nohdr(struct ipr_fw_images *img)
 {
-	img->version = get_dasd_ucode_version(img->file, 1);
+	img->version = get_dasd_ucode_version(img->file, 0);
 	img->has_header = 0;
 }
 
@@ -4251,7 +4539,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
-	if (runtime && page0x0a_setup(dev) && attr.tcq_enabled)
+	if (polling_mode && page0x0a_setup(dev) && attr.tcq_enabled)
 		return;
 	if (ipr_test_unit_ready(dev, &sense_data))
 		return;
@@ -4286,9 +4574,9 @@ static void init_af_dev(struct ipr_dev *dev)
 
 	if (ipr_set_dasd_timeouts(dev))
 		return;
-	if (runtime && !dev_init_allowed(dev))
+	if (polling_mode && !dev_init_allowed(dev))
 		return;
-	if (runtime && page0x20_setup(dev) && page0x0a_setup(dev))
+	if (polling_mode && page0x20_setup(dev) && page0x0a_setup(dev))
 		return;
 	if (setup_page0x01(dev))
 		return;
@@ -4320,6 +4608,8 @@ static void init_ioa_dev(struct ipr_dev *dev)
 {
 	struct ipr_scsi_buses buses;
 
+	if (!dev->ioa)
+		return;
 	if (ipr_get_bus_attr(dev->ioa, &buses))
 		return;
 	ipr_modify_bus_attr(dev->ioa, &buses);
@@ -4341,6 +4631,10 @@ void ipr_init_dev(struct ipr_dev *dev)
 		break;
 	case IPR_TYPE_AF_DISK:
 		init_af_dev(dev);
+		break;
+	case IPR_TYPE_ADAPTER:
+		if (&dev->ioa->ioa == dev)
+			init_ioa_dev(dev);
 		break;
 	default:
 		break;

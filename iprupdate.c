@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.17 2004/12/10 20:22:44 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.18 2005/02/23 20:57:12 bjking1 Exp $
  */
 
 #include <unistd.h>
@@ -23,6 +23,11 @@
 #endif
 
 #include <sys/mman.h>
+
+char *tool_name = "iprupdate";
+
+static int force_devs;
+static int force_ioas;
 
 static int ioa_needs_update(struct ipr_ioa *ioa, int silent)
 {
@@ -94,66 +99,139 @@ static void update_disk_fw(struct ipr_dev *dev, int force)
 	return;
 }
 
+static int download_needed(struct ipr_ioa *ioa)
+{
+	struct ipr_dev *dev;
+	int i, rc = 0;
+
+	rc |= ioa_needs_update(ioa, 0);
+
+	for (i = 0, dev = ioa->dev; i < ioa->num_devices; i++, dev++) {
+		/* If not a DASD, ignore */
+		if (!dev->scsi_dev_data ||
+		    ipr_is_volume_set(dev) ||
+		    (dev->scsi_dev_data->type != TYPE_DISK &&
+		     dev->scsi_dev_data->type != IPR_TYPE_AF_DISK))
+			continue;
+
+		rc |= dev_needs_update(dev);
+	}
+
+	return rc;
+}
+
+static int any_download_needed()
+{
+	struct ipr_ioa *ioa;
+	int rc = 0;
+
+	for_each_ioa(ioa)
+		rc |= download_needed(ioa);
+
+	return rc;
+}
+
+static void update_ioa(struct ipr_ioa *ioa)
+{
+	struct ipr_dev *dev;
+	int i;
+
+	update_ioa_fw(ioa, force_ioas);
+
+	for (i = 0; i < ioa->num_devices; i++) {
+		dev = &ioa->dev[i];
+
+		/* If not a DASD, ignore */
+		if (!dev->scsi_dev_data ||
+		    ipr_is_volume_set(dev) ||
+		    (dev->scsi_dev_data->type != TYPE_DISK &&
+		     dev->scsi_dev_data->type != IPR_TYPE_AF_DISK))
+			continue;
+
+		update_disk_fw(dev, force_devs);
+	}
+}
+
+static void update_all()
+{
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa)
+		update_ioa(ioa);
+}
+
+static void kevent_handler(char *buf)
+{
+	struct ipr_ioa *ioa;
+	char *c;
+	int host;
+
+	if (strncmp(buf, "change@/class/scsi_host", 23))
+		return;
+
+	c = strrchr(buf, '/');
+	if (!c) {
+		syslog_dbg("Failed to handle %s kevent\n", buf);
+		return;
+	}
+
+	c += strlen("/host");
+	host = strtoul(c, NULL, 10);
+
+	tool_init();
+	check_current_config(false);
+
+	ioa = find_ioa(host);
+
+	if (!ioa) {
+		syslog(LOG_ERR, "Failed to find ipr ioa %d for iprdump\n", host);
+		return;
+	}
+
+	update_ioa(ioa);
+}
+
 int main(int argc, char *argv[])
 {
-	int rc = 0;
 	int i;
-	int force_devs, force_ioas;
 	int check_levels = 0;
-	struct ipr_ioa *ioa;
-	struct ipr_dev *dev;
 
 	openlog("iprupdate", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 
-	force_devs = force_ioas = 0;
-
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--force") == 0) {
-			force_devs = force_ioas = 1;
-		} else if (strcmp(argv[i], "--version") == 0) {
-			printf("iprupdate: %s\n", IPR_VERSION_STR);
-			exit(1);
-		} else if (strcmp(argv[i], "--force-devs") == 0) {
+		if (parse_option(argv[i]))
+			continue;
+		else if (strcmp(argv[i], "--force-devs") == 0)
 			force_devs = 1;
-		} else if (strcmp(argv[i], "--force-ioas") == 0) {
+		else if (strcmp(argv[i], "--force-ioas") == 0)
 			force_ioas = 1;
-		} else if (strcmp(argv[i], "--check_only") == 0) {
+		else if (strcmp(argv[i], "--check_only") == 0)
 			check_levels = 1;
-		} else if (strcmp(argv[i], "--debug") == 0) {
-			ipr_debug = 1;
-		} else {
+		else {
 			printf("Usage: iprupdate [options]\n");
 			printf("  Options: --version    Print iprupdate version\n");
 			exit(1);
 		}
 	}
 
-	tool_init("iprupdate");
+	if (ipr_force)
+		force_devs = force_ioas = 1;
+
+	ipr_sg_required = 1;
+
+	tool_init();
 
 	check_current_config(false);
 
-	for_each_ioa(ioa) {
-		if (check_levels)
-			rc |= ioa_needs_update(ioa, 0);
-		else
-			update_ioa_fw(ioa, force_ioas);
+	if (check_levels)
+		return any_download_needed();
 
-		for (i = 0; i < ioa->num_devices; i++) {
-			dev = &ioa->dev[i];
-
-			/* If not a DASD, ignore */
-			if (!dev->scsi_dev_data ||
-			    ipr_is_volume_set(dev) ||
-			    (dev->scsi_dev_data->type != TYPE_DISK &&
-			     dev->scsi_dev_data->type != IPR_TYPE_AF_DISK))
-				continue;
-
-			if (check_levels)
-				rc |= dev_needs_update(dev);
-			else
-				update_disk_fw(dev, force_devs);
-		}
+	if (!daemonize) {
+		update_all();
+		return 0;
 	}
 
-	return rc;
+	ipr_daemonize();
+
+	return handle_events(update_all, 60, kevent_handler);
 }

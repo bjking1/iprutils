@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.13 2004/12/10 20:22:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.14 2005/02/23 20:57:11 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -18,6 +18,8 @@
 #endif
 
 #include <sys/mman.h>
+
+char *tool_name = "iprdump";
 
 #define IPRDUMP_SIZE (8 * 1024 * 1024)
 #define IPRDUMP_DIR "/var/log/"
@@ -241,27 +243,71 @@ static void handle_signal(int signal)
 {
 	struct ipr_ioa *ioa;
 
-	tool_init("iprdump");
+	tool_init();
 	for_each_ioa(ioa)
 		disable_dump(ioa);
 	exit(0);
 }
 
+static void dump_ioa(struct ipr_ioa *ioa)
+{
+	int count;
+
+	count = read_dump(ioa);
+	if (count <= 0)
+		return;
+	write_dump(ioa, count);
+	disable_dump(ioa);
+	enable_dump(ioa);
+}
+
+static void poll_for_dump()
+{
+	struct ipr_ioa *ioa;
+
+	tool_init();
+
+	for_each_ioa(ioa)
+		enable_dump(ioa);
+	for_each_ioa(ioa)
+		dump_ioa(ioa);
+}
+
+static void kevent_handler(char *buf)
+{
+	struct ipr_ioa *ioa;
+	int host;
+
+	if (strncmp(buf, "change@/class/scsi_host", 23))
+		return;
+
+	host = strtoul(&buf[28], NULL, 10);
+
+	tool_init();
+
+	ioa = find_ioa(host);
+
+	if (!ioa) {
+		syslog(LOG_ERR, "Failed to find ipr ioa %d for iprdump\n", host);
+		return;
+	}
+
+	enable_dump(ioa);
+	dump_ioa(ioa);
+}
+
 int main(int argc, char *argv[])
 {
 	struct ipr_ioa *ioa;
-	int count, len, i;
+	int len, i;
 
 	openlog("iprdump", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 	strcpy(usr_dir, IPRDUMP_DIR);
 
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--version") == 0) {
-			printf("iprdump: %s\n", IPR_VERSION_STR);
-			exit(1);
-		} else if (strcmp(argv[i], "--debug") == 0) {
-			ipr_debug = 1;
-		} else if (strcmp(argv[i], "-d") == 0) {
+		if (parse_option(argv[i]))
+			continue;
+		if (strcmp(argv[i], "-d") == 0) {
 			strcpy(usr_dir,argv[++i]);
 			len = strlen(usr_dir);
 			if (len < sizeof(usr_dir) && usr_dir[len] != '/') {
@@ -283,24 +329,11 @@ int main(int argc, char *argv[])
 	signal(SIGQUIT, handle_signal);
 	signal(SIGTERM, handle_signal);
 
-	while (1) {
-		tool_init("iprdump");
+	tool_init();
+	for_each_ioa(ioa)
+		enable_dump(ioa);
 
-		for_each_ioa(ioa)
-			enable_dump(ioa);
-
-		for_each_ioa(ioa) {
-			count = read_dump(ioa);
-			if (count <= 0)
-				continue;
-			write_dump(ioa, count);
-			disable_dump(ioa);
-			enable_dump(ioa);
-		}
-		sleep(60);
-	};
-
-	return 0;
+	return handle_events(poll_for_dump, 60, kevent_handler);
 }
 
 

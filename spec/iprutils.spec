@@ -52,6 +52,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Wed Oct 26 2004 Brian King <brking@us.ibm.com> 2.0.14
+- Use kobject_uevent notifications instead of polling if the kernel
+  supports it.
 - Fix iprconfig to set the actual queue depth for advanced function disks
 - Allow user to force tagged queuing on to drives that do not support
   QERR=1.
