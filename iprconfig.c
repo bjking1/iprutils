@@ -5172,7 +5172,7 @@ int start_conc_maint(i_container *i_con, int action)
 					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
 					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
 					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = scsi_dev_data->id;
+					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
 					local_dev[local_dev_count]->ioa = cur_ioa;
 
