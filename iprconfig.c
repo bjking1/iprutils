@@ -116,22 +116,99 @@ struct special_status {
 	char *str;
 } s_status;
 
-i_container *free_i_con(i_container *);
-i_container *add_i_con(i_container *, char *, void *);
 char *print_device(struct ipr_dev *, char *, char *, struct ipr_ioa *, int);
-int is_format_allowed(struct ipr_dev *);
-int select_log_file(const struct dirent *);
-int compare_log_file(const void *, const void *);
-void evaluate_device(struct ipr_dev *, struct ipr_ioa *, int);
-int is_array_in_use(struct ipr_ioa *, u8);
 int display_menu(ITEM **, int, int, int **);
-void free_screen(struct panel_l *, struct window_l *, FIELD **);
-void flush_stdscr();
-int flush_line();
 
 #define print_dev(i, dev, buf, fmt, ioa, type) \
         for (i = 0; i < 2; i++) \
-            buf[i] = print_device(dev, buf[i], fmt, ioa, type);
+            (buf)[i] = print_device(dev, (buf)[i], fmt, ioa, type);
+
+/* not needed after screen_driver can do menus */
+static void flush_stdscr()
+{
+	nodelay(stdscr, TRUE);
+
+	while(getch() != ERR) {}
+	nodelay(stdscr, FALSE);
+}
+
+static i_container *free_i_con(i_container *i_con)
+{
+	i_container *temp_i_con;
+
+	i_con = i_con_head;
+	if (i_con == NULL)
+		return NULL;
+
+	do {
+		temp_i_con = i_con->next_item;
+		free(i_con);
+		i_con = temp_i_con;
+	} while (i_con);
+
+	i_con_head = NULL;
+	return NULL;
+}
+
+static i_container *add_i_con(i_container *i_con, char *f, void *d)
+{  
+	i_container *new_i_con;
+	new_i_con = malloc(sizeof(i_container));
+
+	new_i_con->next_item = NULL;
+
+	/* used to hold data entered into user-entry fields */
+	strncpy(new_i_con->field_data, f, MAX_FIELD_SIZE+1); 
+	new_i_con->field_data[strlen(f)+1] = '\0';
+
+	/* a pointer to the device information represented by the i_con */
+	new_i_con->data = d;
+
+	if (i_con)
+		i_con->next_item = new_i_con;
+	else
+		i_con_head = new_i_con;
+
+	return new_i_con;
+}
+
+int exit_confirmed(i_container *i_con)
+{
+	exit_func();
+	exit(0);
+	return 0;
+}
+
+/*not needed after screen_driver can do menus */
+static void free_screen(struct panel_l *panel, struct window_l *win,
+			FIELD **fields)
+{
+	struct panel_l *cur_panel;
+	struct window_l *cur_win;
+	int i;
+
+	cur_panel = panel;
+
+	while(cur_panel) {
+		panel = panel->next;
+		del_panel(cur_panel->panel);
+		free(cur_panel);
+		cur_panel = panel;
+	}
+
+	cur_win = win;
+	while(cur_win) {
+		win = win->next;
+		delwin(cur_win->win);
+		free(cur_win);
+		cur_win = win;
+	}
+
+	if (fields) {
+		for (i = 0; fields[i] != NULL; i++)
+			free_field(fields[i]);
+	}
+}
 
 static void add_raid_cmd_tail(struct ipr_ioa *ioa, struct ipr_dev *dev, u8 array_id)
 {
@@ -173,13 +250,6 @@ static void tool_exit_func()
 	clear();
 	refresh();
 	endwin();
-}
-
-int exit_confirmed(i_container *i_con)
-{
-	exit_func();
-	exit(0);
-	return 0;
 }
 
 static char *ipr_list_opts(char *body, char *key, char *list_str)
@@ -1068,6 +1138,76 @@ static int time_screen_driver(s_node *n_screen, unsigned long seconds, int allow
 	return rc;
 }
 
+static int is_format_allowed(struct ipr_dev *dev)
+{
+	int rc;
+	struct ipr_cmd_status cmd_status;
+	struct ipr_cmd_status_record *status_record;
+	struct sense_data_t sense_data;
+
+	if (ipr_is_af_dasd_device(dev)) {
+		rc = ipr_query_command_status(dev, &cmd_status);
+		if (rc == 0 && cmd_status.num_records != 0) {
+			status_record = cmd_status.record;
+			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
+			    (status_record->status != IPR_CMD_STATUS_FAILED))
+				return 0;
+		}
+	} else {
+		rc = ipr_test_unit_ready(dev, &sense_data);
+
+		if (rc == CHECK_CONDITION && (sense_data.error_code & 0x7F) == 0x70) {
+			if (sense_data.add_sense_code == 0x31 &&
+			    sense_data.add_sense_code_qual == 0x00)
+				return 1;
+			else if ((sense_data.sense_key & 0x0F) == 0x02)
+				return 0;
+
+		}
+	}
+
+	return 1;
+}
+
+static void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa,
+			    int new_block_size)
+{
+	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
+	struct ipr_res_addr res_addr;
+	struct ipr_dev_record *dev_record;
+	int device_converted;
+	int timeout = 60;
+	u32 res_handle;
+
+	if (scsi_dev_data) {
+		res_handle = scsi_dev_data->handle;
+		res_addr.bus = scsi_dev_data->channel;
+		res_addr.target = scsi_dev_data->id;
+		res_addr.lun = scsi_dev_data->lun;
+	} else if (ipr_is_af_dasd_device(ipr_dev)) {
+		dev_record = ipr_dev->dev_rcd;
+		if (dev_record->no_cfgte_dev) 
+			return;
+
+		res_handle = ntohl(dev_record->resource_handle);
+		res_addr.bus = dev_record->resource_addr.bus;
+		res_addr.target = dev_record->resource_addr.target;
+		res_addr.lun = dev_record->resource_addr.lun;
+	}
+
+	/* send evaluate device down */
+	ipr_evaluate_device(&ioa->ioa, res_handle);
+
+	device_converted = 0;
+
+	while (!device_converted && timeout) {
+		/* xxx FIXME how to determine evaluate device completed? */
+		device_converted = 1;
+		sleep(1);
+		timeout--;
+	}
+}
+
 static void verify_device(struct ipr_dev *dev)
 {
 	int rc;
@@ -1160,24 +1300,121 @@ int main_menu(i_container *i_con)
 	return rc;
 }
 
-int disk_status(i_container *i_con)
+static int print_standalone_disks(struct ipr_ioa *ioa,
+				  i_container **i_con, char **buffer)
 {
-	int rc, j, i, k, max_y, max_x;
-	int len = 0;
-	int num_lines = 0;
-	struct ipr_ioa *ioa;
 	struct scsi_dev_data *scsi_dev_data;
-	struct screen_output *s_out;
-	int header_lines;
-	int array_id;
-	char *buffer[2];
-	int toggle = 1;
+	int j, k;
+	int num_lines = 0;
+
+	/* print JBOD and non-member AF devices*/
+	for (j = 0; j < ioa->num_devices; j++) {
+		scsi_dev_data = ioa->dev[j].scsi_dev_data;
+		if (!scsi_dev_data ||
+		    (scsi_dev_data->type != TYPE_DISK &&
+		     scsi_dev_data->type != IPR_TYPE_AF_DISK) ||
+		    ipr_is_hot_spare(&ioa->dev[j]) ||
+		    ipr_is_volume_set(&ioa->dev[j]) ||
+		    ipr_is_array_member(&ioa->dev[j]))
+			continue;
+
+		/* check if evaluate_device is needed for this device */
+		verify_device(&ioa->dev[j]);
+		print_dev(k, &ioa->dev[j], buffer, "%1", ioa, 2+k);
+
+		*i_con = add_i_con(*i_con,"\0",&ioa->dev[j]);  
+		num_lines++;
+	}
+
+	return num_lines;
+}
+
+static int print_hotspare_disks(struct ipr_ioa *ioa,
+				i_container **i_con, char **buffer)
+{
+	struct scsi_dev_data *scsi_dev_data;
+	int j, k;
+	int num_lines = 0;
+
+	/* print Hot Spare devices*/
+	for (j = 0; j < ioa->num_devices; j++) {
+		scsi_dev_data = ioa->dev[j].scsi_dev_data;
+		if (!scsi_dev_data || !ipr_is_hot_spare(&ioa->dev[j]))
+			continue;
+
+		print_dev(k, &ioa->dev[j], buffer, "%1", ioa, 2+k);
+		*i_con = add_i_con(*i_con,"\0",&ioa->dev[j]);  
+		num_lines++;
+	}
+
+	return num_lines;
+}
+
+static int print_vsets(struct ipr_ioa *ioa,
+		       i_container **i_con, char **buffer)
+{
+	int j, k, i;
+	int num_lines = 0;
 	char *prot_level_str;
+	int array_id;
+
+	/* print volume set and associated devices*/
+	for (j = 0; j < ioa->num_devices; j++) {
+		if (!ipr_is_volume_set(&ioa->dev[j]))
+			continue;
+		if (ioa->dev[j].array_rcd->start_cand)
+			continue;
+
+		/* query resource state to acquire protection level string */
+		prot_level_str = get_prot_level_str(ioa->supported_arrays,
+						    ioa->dev[j].array_rcd->raid_level);
+		strncpy(ioa->dev[j].prot_level_str,prot_level_str, 8);
+
+		print_dev(k, &ioa->dev[j], buffer, "%1", ioa, 2+k);
+		*i_con = add_i_con(*i_con,"\0",&ioa->dev[j]);
+
+		array_id = ioa->dev[j].dev_rcd->array_id;
+		num_lines++;
+
+		for (i = 0; i < ioa->num_devices; i++) {
+			if (!ipr_is_array_member(&ioa->dev[i]) ||
+			    ipr_is_volume_set(&ioa->dev[i]) ||
+			    (ioa->dev[i].dev_rcd && ioa->dev[i].dev_rcd->array_id != array_id))
+				continue;
+
+			strncpy(ioa->dev[i].prot_level_str, prot_level_str, 8);
+
+			print_dev(k, &ioa->dev[i], buffer, "%1", ioa, 2+k);
+			*i_con = add_i_con(*i_con,"\0",&ioa->dev[i]);
+			num_lines++;
+		}
+	}
+
+	return num_lines;
+}
+
+static void processing()
+{
+	int max_y, max_x;
 
 	getmaxyx(stdscr,max_y,max_x);
 	move(max_y-1,0);
 	printw(_("Processing"));
 	refresh();
+}
+
+int disk_status(i_container *i_con)
+{
+	int rc, k;
+	int len = 0;
+	int num_lines = 0;
+	struct ipr_ioa *ioa;
+	struct screen_output *s_out;
+	int header_lines;
+	char *buffer[2];
+	int toggle = 1;
+
+	processing();
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -1194,67 +1431,9 @@ int disk_status(i_container *i_con)
 
 		num_lines++;
 
-		/* print JBOD and non-member AF devices*/
-		for (j = 0; j < ioa->num_devices; j++) {
-			scsi_dev_data = ioa->dev[j].scsi_dev_data;
-			if (!scsi_dev_data ||
-			    (scsi_dev_data->type != TYPE_DISK &&
-			     scsi_dev_data->type != IPR_TYPE_AF_DISK) ||
-			    ipr_is_hot_spare(&ioa->dev[j]) ||
-			    ipr_is_volume_set(&ioa->dev[j]) ||
-			    ipr_is_array_member(&ioa->dev[j]))
-				continue;
-
-			/* check if evaluate_device is needed for this device */
-			verify_device(&ioa->dev[j]);
-			print_dev(k, &ioa->dev[j], buffer, "%1", ioa, 2+k);
-
-			i_con = add_i_con(i_con,"\0",&ioa->dev[j]);  
-			num_lines++;
-		}
-
-		/* print Hot Spare devices*/
-		for (j = 0; j < ioa->num_devices; j++) {
-			scsi_dev_data = ioa->dev[j].scsi_dev_data;
-			if (!scsi_dev_data || !ipr_is_hot_spare(&ioa->dev[j]))
-				continue;
-
-			print_dev(k, &ioa->dev[j], buffer, "%1", ioa, 2+k);
-			i_con = add_i_con(i_con,"\0",&ioa->dev[j]);  
-			num_lines++;
-		}
-
-		/* print volume set and associated devices*/
-		for (j = 0; j < ioa->num_devices; j++) {
-			if (!ipr_is_volume_set(&ioa->dev[j]))
-				continue;
-			if (ioa->dev[j].array_rcd->start_cand)
-				continue;
-
-			/* query resource state to acquire protection level string */
-			prot_level_str = get_prot_level_str(ioa->supported_arrays,
-							    ioa->dev[j].array_rcd->raid_level);
-			strncpy(ioa->dev[j].prot_level_str,prot_level_str, 8);
-
-			print_dev(k, &ioa->dev[j], buffer, "%1", ioa, 2+k);
-			i_con = add_i_con(i_con,"\0",&ioa->dev[j]);
-
-			array_id = ioa->dev[j].dev_rcd->array_id;
-			num_lines++;
-
-			for (i = 0; i < ioa->num_devices; i++) {
-				if (!ipr_is_array_member(&ioa->dev[i]) ||
-				    ipr_is_volume_set(&ioa->dev[i]) ||
-				    (ioa->dev[i].dev_rcd && ioa->dev[i].dev_rcd->array_id != array_id))
-					continue;
-
-				strncpy(ioa->dev[i].prot_level_str, prot_level_str, 8);
-
-				print_dev(k, &ioa->dev[i], buffer, "%1", ioa, 2+k);
-				i_con = add_i_con(i_con,"\0",&ioa->dev[i]);
-				num_lines++;
-			}
-		}
+		num_lines += print_standalone_disks(ioa, &i_con, buffer);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer);
+		num_lines += print_vsets(ioa, &i_con, buffer);
 	}
 
 
@@ -1285,8 +1464,8 @@ int disk_status(i_container *i_con)
 	return rc;
 }
 
-int device_details_get_device(i_container *i_con,
-			      struct ipr_dev **device)
+static int device_details_get_device(i_container *i_con,
+				     struct ipr_dev **device)
 {
 	i_container *temp_i_con;
 	int invalid=0;
@@ -1853,6 +2032,40 @@ int raid_status(i_container *i_con)
 	return rc;
 }
 
+static int is_array_in_use(struct ipr_ioa *ioa,
+			   u8 array_id)
+{
+	int j, opens;
+	struct ipr_dev_record *device_record;
+	struct ipr_array_record *array_record;
+	struct scsi_dev_data *scsi_dev_data;
+
+	for (j = 0; j < ioa->num_devices; j++) {
+		device_record = ioa->dev[j].dev_rcd;
+		array_record = ioa->dev[j].array_rcd;
+
+		if (!device_record)
+			continue;
+
+		if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+			if (array_id == array_record->array_id) {
+				scsi_dev_data = ioa->dev[j].scsi_dev_data;
+				if (!scsi_dev_data)
+					continue;
+
+				opens = num_device_opens(scsi_dev_data->host,
+							 scsi_dev_data->channel,
+							 scsi_dev_data->id,
+							 scsi_dev_data->lun);
+
+				if (opens != 0)
+					return 1;
+			}
+		}
+	}
+	return 0;
+}
+
 int raid_stop(i_container *i_con)
 {
 	int rc, i, k;
@@ -2013,61 +2226,7 @@ int confirm_raid_stop(i_container *i_con)
 	return rc;
 }
 
-int do_confirm_raid_stop(i_container *i_con)
-{
-	struct ipr_dev *ipr_dev;
-	struct array_cmd_data *cur_raid_cmd;
-	struct ipr_ioa *ioa;
-	int rc;
-	int raid_stop_complete();
-	int max_y, max_x;
-
-	for_each_raid_cmd(cur_raid_cmd) {
-		if (!cur_raid_cmd->do_cmd)
-			continue;
-
-		ioa = cur_raid_cmd->ioa;
-		ipr_dev = cur_raid_cmd->dev;
-
-		rc = is_array_in_use(ioa, cur_raid_cmd->array_id);
-		if (rc != 0)  {
-			syslog(LOG_ERR,
-			       _("Array %s is currently in use and cannot be deleted.\n"),
-			       ipr_dev->dev_name);
-			return (20 | EXIT_FLAG);
-		}
-
-		if (ipr_dev->qac_entry->record_id != IPR_RECORD_ID_ARRAY_RECORD)
-			continue;
-
-		getmaxyx(stdscr,max_y,max_x);
-		move(max_y-1,0);
-		printw(_("Operation in progress - please wait"));
-		refresh();
-
-		if (ipr_dev->scsi_dev_data)
-			rc = ipr_start_stop_stop(ipr_dev);
-
-		if (rc != 0)
-			return (20 | EXIT_FLAG);
-		ioa->num_raid_cmds++;
-	}
-
-	for_each_ioa(ioa) {
-		if (ioa->num_raid_cmds == 0)
-			continue;
-		ioa->num_raid_cmds = 0;
-
-		rc = ipr_stop_array_protection(ioa);
-		if (rc != 0)
-			return (20 | EXIT_FLAG);
-	}
-
-	rc = raid_stop_complete();
-	return rc;
-}
-
-int raid_stop_complete()
+static int raid_stop_complete()
 {
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
@@ -2129,6 +2288,59 @@ int raid_stop_complete()
 		not_done = 0;
 		sleep(1);
 	}
+}
+
+int do_confirm_raid_stop(i_container *i_con)
+{
+	struct ipr_dev *ipr_dev;
+	struct array_cmd_data *cur_raid_cmd;
+	struct ipr_ioa *ioa;
+	int rc;
+	int max_y, max_x;
+
+	for_each_raid_cmd(cur_raid_cmd) {
+		if (!cur_raid_cmd->do_cmd)
+			continue;
+
+		ioa = cur_raid_cmd->ioa;
+		ipr_dev = cur_raid_cmd->dev;
+
+		rc = is_array_in_use(ioa, cur_raid_cmd->array_id);
+		if (rc != 0)  {
+			syslog(LOG_ERR,
+			       _("Array %s is currently in use and cannot be deleted.\n"),
+			       ipr_dev->dev_name);
+			return (20 | EXIT_FLAG);
+		}
+
+		if (ipr_dev->qac_entry->record_id != IPR_RECORD_ID_ARRAY_RECORD)
+			continue;
+
+		getmaxyx(stdscr,max_y,max_x);
+		move(max_y-1,0);
+		printw(_("Operation in progress - please wait"));
+		refresh();
+
+		if (ipr_dev->scsi_dev_data)
+			rc = ipr_start_stop_stop(ipr_dev);
+
+		if (rc != 0)
+			return (20 | EXIT_FLAG);
+		ioa->num_raid_cmds++;
+	}
+
+	for_each_ioa(ioa) {
+		if (ioa->num_raid_cmds == 0)
+			continue;
+		ioa->num_raid_cmds = 0;
+
+		rc = ipr_stop_array_protection(ioa);
+		if (rc != 0)
+			return (20 | EXIT_FLAG);
+	}
+
+	rc = raid_stop_complete();
+	return rc;
 }
 
 int raid_start(i_container *i_con)
@@ -2939,13 +3151,10 @@ int raid_rebuild(i_container *i_con)
 	char *buffer[2];
 	struct ipr_ioa *ioa;
 	struct screen_output *s_out;
-	int header_lines, max_y, max_x;
+	int header_lines;
 	int toggle=1;
 
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
+	processing();
 
 	i_con = free_i_con(i_con);
 
@@ -3703,7 +3912,7 @@ int configure_af_device(i_container *i_con, int action_code)
 {
 	int rc, j, k;
 	struct scsi_dev_data *scsi_dev_data;
-	int can_init, max_y, max_x;
+	int can_init;
 	int dev_type;
 	int new_block_size;
 	char *buffer[2];
@@ -3718,10 +3927,7 @@ int configure_af_device(i_container *i_con, int action_code)
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
 	struct ipr_block_desc *block_desc;
 
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
+	processing();
 
 	i_con = free_i_con(i_con);
 
@@ -3910,7 +4116,7 @@ int remove_hot_spare(i_container *i_con)
 
 int hot_spare(i_container *i_con, int action)
 {
-	int rc, i, k, max_y, max_x;
+	int rc, i, k;
 	struct array_cmd_data *cur_raid_cmd;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
@@ -3922,11 +4128,7 @@ int hot_spare(i_container *i_con, int action)
 	s_node *n_screen;
 	int header_lines;
 
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
-
+	processing();
 	i_con = free_i_con(i_con);
 
 	rc = RC_SUCCESS;
@@ -4580,12 +4782,9 @@ int start_conc_maint(i_container *i_con, int action)
 	u8 ses_channel;
 	int toggle = 1;
 	s_node *n_screen;
-	int header_lines, max_y, max_x;
+	int header_lines;
 
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
+	processing();
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -5871,6 +6070,9 @@ int bus_config(i_container *i_con)
 	body_init_status(buffer, n_bus_config.header, &header_lines);
 
 	for_each_ioa(ioa) {
+		if (!is_spi(ioa) && !ipr_debug)
+			continue;
+
 		/* mode sense page28 to focal point */
 		mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 		rc = ipr_mode_sense(&ioa->ioa, 0x28, mode_parm_hdr);
@@ -6152,7 +6354,7 @@ int change_bus_attr(i_container *i_con)
 int confirm_change_bus_attr(i_container *i_con)
 {
 	struct ipr_ioa *ioa;
-	int rc, j, i, max_y, max_x;
+	int rc, j, i;
 	struct ipr_scsi_buses *page_28_cur;
 	struct ipr_scsi_buses page_28_chg;
 	struct scsi_dev_data *scsi_dev_data;
@@ -6240,10 +6442,7 @@ int confirm_change_bus_attr(i_container *i_con)
 	if (rc)
 		return rc;
 
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
+	processing();
 
 	rc = ipr_set_bus_attr(ioa, page_28_cur, 1);
 	if (!rc)
@@ -6923,12 +7122,8 @@ struct disk_config_attr {
 	int tcq_enabled;
 };
 
-const char *queue_depth_opt[] = {
-	"1","2","4","6","8","12","16","24","32","48",
-	"64","80","96","112","128",""};
-
-int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_config_attr,
-		     int start_row, int header_lines)
+static int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_config_attr,
+			    int start_row, int header_lines)
 {
 	int i;
 	int num_menu_items;
@@ -7048,6 +7243,8 @@ int change_disk_config(i_container * i_con)
 	char *body = NULL;
 	struct screen_output *s_out;
 	struct ipr_array_record *array_record;
+	int tcq_warning = 0;
+	int tcq_blocked = 0;
 
 	rc = RC_SUCCESS;
 
@@ -7076,14 +7273,43 @@ int change_disk_config(i_container * i_con)
 	body = body_init(n_change_disk_config.header, &header_lines);
 	sprintf(buffer, "Device: %s   %s\n", ipr_dev->scsi_dev_data->sysfs_device_name,
 		ipr_dev->dev_name);
-	body = add_line_to_body(body, buffer, NULL);
 	header_lines += 2;
 
-	body = add_line_to_body(body,_("Queue Depth"), "%3");
-	disk_config_attr[0].option = 1;
-	disk_config_attr[0].queue_depth = disk_attr.queue_depth;
-	sprintf(qdepth_str,"%d",disk_config_attr[0].queue_depth);
-	i_con = add_i_con(i_con, qdepth_str, &disk_config_attr[0]);
+	if (ipr_is_volume_set(ipr_dev) || page0x0a_setup(ipr_dev))
+		header_lines += 1;
+	else if (ipr_is_af_dasd_device(ipr_dev) && disk_attr.queue_depth > 1)
+		tcq_warning = 1;
+	else if (ipr_is_gscsi(ipr_dev) && disk_attr.tcq_enabled)
+		tcq_warning = 1;
+	else
+		tcq_blocked = 1;
+
+	if (tcq_warning) {
+		body = add_line_to_body(body, buffer, NULL);
+		body = add_string_to_body(body,
+					  _("Note: Tagged queuing to this device is ENABLED "
+					    "and it does not support the required "
+					    "control mode page settings to run safely in this mode!\n\n"),
+					  "", &header_lines);
+	} else if (tcq_blocked) {
+		body = add_line_to_body(body, buffer, NULL);
+		body = add_string_to_body(body,
+					  _("Note: Tagged queuing to this device is disabled by default "
+					    "since it does not support the required control mode page "
+					    "settings to run safely in this mode.\n\n"),
+					  "", &header_lines);
+	}
+
+	if (ipr_force)
+		tcq_warning = tcq_blocked = 0;
+
+	if (!tcq_blocked || ipr_is_gscsi(ipr_dev)) {
+		body = add_line_to_body(body,_("Queue Depth"), "%3");
+		disk_config_attr[0].option = 1;
+		disk_config_attr[0].queue_depth = disk_attr.queue_depth;
+		sprintf(qdepth_str,"%d",disk_config_attr[0].queue_depth);
+		i_con = add_i_con(i_con, qdepth_str, &disk_config_attr[0]);
+	}
 
 	array_record = ipr_dev->array_rcd;
 
@@ -7096,7 +7322,7 @@ int change_disk_config(i_container * i_con)
 		body = add_line_to_body(body,_("Format Timeout"), "%4");
 		sprintf(format_timeout_str,"%d hr",disk_config_attr[1].format_timeout);
 		i_con = add_i_con(i_con, format_timeout_str, &disk_config_attr[1]);
-	} else {
+	} else if (!tcq_blocked) {
 		disk_config_attr[2].option = 3;
 		disk_config_attr[2].tcq_enabled = disk_attr.tcq_enabled;
 		body = add_line_to_body(body,_("Tag Command Queueing"), "%4");
@@ -7381,17 +7607,14 @@ int download_ucode(i_container * i_con)
 	struct scsi_dev_data *scsi_dev_data;
 	struct screen_output *s_out;
 	int header_lines;
-	int array_id, max_y, max_x;
+	int array_id;
 	char *buffer[2];
 	int toggle = 0;
 	struct ipr_dev_record *dev_record;
 	struct ipr_array_record *array_record;
 	char *prot_level_str;
 
-	getmaxyx(stdscr,max_y,max_x);
-	move(max_y-1,0);
-	printw(_("Processing"));
-	refresh();
+	processing();
 
 	rc = RC_SUCCESS;
 	i_con = free_i_con(i_con);
@@ -7832,6 +8055,55 @@ int ibm_storage_log_tail(i_container *i_con)
 		return 1; 
 }
 
+static int select_log_file(const struct dirent *dir_entry)
+{
+	if (dir_entry) {
+		if (strstr(dir_entry->d_name, "messages") == dir_entry->d_name)
+			return 1;
+	}
+	return 0;
+}
+
+static int compare_log_file(const void *log_file1, const void *log_file2)
+{
+	char *first_start_num, *first_end_num;
+	char *second_start_num, *second_end_num;
+	struct dirent **first_dir, **second_dir;
+	char name1[100], name2[100];
+	int first, second;
+
+	first_dir = (struct dirent **)log_file1;
+	second_dir = (struct dirent **)log_file2;
+
+	if (strcmp((*first_dir)->d_name, "messages") == 0)
+		return 1;
+	if (strcmp((*second_dir)->d_name, "messages") == 0)
+		return -1;
+
+	strcpy(name1, (*first_dir)->d_name);
+	strcpy(name2, (*second_dir)->d_name);
+	first_start_num = strchr(name1, '.');
+	first_end_num = strrchr(name1, '.');
+	second_start_num = strchr(name2, '.');
+	second_end_num = strrchr(name2, '.');
+
+	if (first_start_num == first_end_num) {
+		/* Not compressed */
+		first_end_num = name1 + strlen(name1);
+		second_end_num = name2 + strlen(name2);
+	} else {
+		*first_end_num = '\0';
+		*second_end_num = '\0';
+	}
+	first = strtoul(first_start_num, NULL, 10);
+	second = strtoul(second_start_num, NULL, 10);
+
+	if (first > second)
+		return -1;
+	else
+		return 1;
+}
+
 int ibm_storage_log(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
@@ -8201,57 +8473,6 @@ int ibm_boot_log(i_container *i_con)
 		return 1; /* return with no status */
 }
 
-
-int select_log_file(const struct dirent *dir_entry)
-{
-	if (dir_entry) {
-		if (strstr(dir_entry->d_name, "messages") == dir_entry->d_name)
-			return 1;
-	}
-	return 0;
-}
-
-
-int compare_log_file(const void *log_file1, const void *log_file2)
-{
-	char *first_start_num, *first_end_num;
-	char *second_start_num, *second_end_num;
-	struct dirent **first_dir, **second_dir;
-	char name1[100], name2[100];
-	int first, second;
-
-	first_dir = (struct dirent **)log_file1;
-	second_dir = (struct dirent **)log_file2;
-
-	if (strcmp((*first_dir)->d_name, "messages") == 0)
-		return 1;
-	if (strcmp((*second_dir)->d_name, "messages") == 0)
-		return -1;
-
-	strcpy(name1, (*first_dir)->d_name);
-	strcpy(name2, (*second_dir)->d_name);
-	first_start_num = strchr(name1, '.');
-	first_end_num = strrchr(name1, '.');
-	second_start_num = strchr(name2, '.');
-	second_end_num = strrchr(name2, '.');
-
-	if (first_start_num == first_end_num) {
-		/* Not compressed */
-		first_end_num = name1 + strlen(name1);
-		second_end_num = name2 + strlen(name2);
-	} else {
-		*first_end_num = '\0';
-		*second_end_num = '\0';
-	}
-	first = strtoul(first_start_num, NULL, 10);
-	second = strtoul(second_start_num, NULL, 10);
-
-	if (first > second)
-		return -1;
-	else
-		return 1;
-}
-
 char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		   struct ipr_ioa *ioa, int type)
 {
@@ -8300,10 +8521,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
 		if (type&1) {
-			if (ipr_dev->ioa->qac_data->num_records)
-				len += sprintf(body + len,"            %-25s ","PCI-X SCSI RAID Adapter");
-			else
-				len += sprintf(body + len,"            %-25s ","PCI-X SCSI Adapter");
+			len += sprintf(body + len,"            %-25s ", get_ioa_desc(ipr_dev->ioa));
 		} else
 			len += sprintf(body + len,"            %-8s %-16s ",
 				       scsi_dev_data->vendor_id,
@@ -8516,207 +8734,6 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	return body;
 }
 
-int is_format_allowed(struct ipr_dev *dev)
-{
-	int rc;
-	struct ipr_cmd_status cmd_status;
-	struct ipr_cmd_status_record *status_record;
-	struct sense_data_t sense_data;
-
-	if (ipr_is_af_dasd_device(dev)) {
-		rc = ipr_query_command_status(dev, &cmd_status);
-		if (rc == 0 && cmd_status.num_records != 0) {
-			status_record = cmd_status.record;
-			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
-			    (status_record->status != IPR_CMD_STATUS_FAILED))
-				return 0;
-		}
-	} else {
-		rc = ipr_test_unit_ready(dev, &sense_data);
-
-		if (rc == CHECK_CONDITION && (sense_data.error_code & 0x7F) == 0x70) {
-			if (sense_data.add_sense_code == 0x31 &&
-			    sense_data.add_sense_code_qual == 0x00)
-				return 1;
-			else if ((sense_data.sense_key & 0x0F) == 0x02)
-				return 0;
-
-		}
-	}
-
-	return 1;
-}
-
-void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa, int new_block_size)
-{
-	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
-	struct ipr_res_addr res_addr;
-	struct ipr_dev_record *dev_record;
-	int device_converted;
-	int timeout = 60;
-	u32 res_handle;
-
-	if (scsi_dev_data) {
-		res_handle = scsi_dev_data->handle;
-		res_addr.bus = scsi_dev_data->channel;
-		res_addr.target = scsi_dev_data->id;
-		res_addr.lun = scsi_dev_data->lun;
-	} else if (ipr_is_af_dasd_device(ipr_dev)) {
-		dev_record = ipr_dev->dev_rcd;
-		if (dev_record->no_cfgte_dev) 
-			return;
-
-		res_handle = ntohl(dev_record->resource_handle);
-		res_addr.bus = dev_record->resource_addr.bus;
-		res_addr.target = dev_record->resource_addr.target;
-		res_addr.lun = dev_record->resource_addr.lun;
-	}
-
-	/* send evaluate device down */
-	ipr_evaluate_device(&ioa->ioa, res_handle);
-
-	device_converted = 0;
-
-	while (!device_converted && timeout) {
-		/* xxx FIXME how to determine evaluate device completed? */
-		device_converted = 1;
-		sleep(1);
-		timeout--;
-	}
-}
-
-/* not needed after screen_driver can do menus */
-void flush_stdscr()
-{
-	nodelay(stdscr, TRUE);
-
-	while(getch() != ERR) {}
-	nodelay(stdscr, FALSE);
-}
-
-/* Flush the input buffer until we hit either an eol or run
- out of characters in the input buffer */
-
-/* not needed after screen_driver can do menus */
-int flush_line()
-{
-	int ch;
-
-	nodelay(stdscr, TRUE);
-
-	do {
-		ch = getch();
-	} while (( ch != ERR) && !IS_5250_CHAR(ch));
-
-	nodelay(stdscr, FALSE);
-
-	return ch;
-}
-
-/*not needed after screen_driver can do menus */
-void free_screen(struct panel_l *panel, struct window_l *win, FIELD **fields)
-{
-	struct panel_l *cur_panel;
-	struct window_l *cur_win;
-	int i;
-
-	cur_panel = panel;
-
-	while(cur_panel) {
-		panel = panel->next;
-		del_panel(cur_panel->panel);
-		free(cur_panel);
-		cur_panel = panel;
-	}
-
-	cur_win = win;
-	while(cur_win) {
-		win = win->next;
-		delwin(cur_win->win);
-		free(cur_win);
-		cur_win = win;
-	}
-
-	if (fields) {
-		for (i = 0; fields[i] != NULL; i++)
-			free_field(fields[i]);
-	}
-}
-
-int is_array_in_use(struct ipr_ioa *ioa,
-		    u8 array_id)
-{
-	int j, opens;
-	struct ipr_dev_record *device_record;
-	struct ipr_array_record *array_record;
-	struct scsi_dev_data *scsi_dev_data;
-
-	for (j = 0; j < ioa->num_devices; j++) {
-		device_record = ioa->dev[j].dev_rcd;
-		array_record = ioa->dev[j].array_rcd;
-
-		if (!device_record)
-			continue;
-
-		if (array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD) {
-			if (array_id == array_record->array_id) {
-				scsi_dev_data = ioa->dev[j].scsi_dev_data;
-				if (!scsi_dev_data)
-					continue;
-
-				opens = num_device_opens(scsi_dev_data->host,
-							 scsi_dev_data->channel,
-							 scsi_dev_data->id,
-							 scsi_dev_data->lun);
-
-				if (opens != 0)
-					return 1;
-			}
-		}
-	}
-	return 0;
-}
-
-i_container *free_i_con(i_container *i_con)
-{
-	i_container *temp_i_con;
-
-	i_con = i_con_head;
-	if (i_con == NULL)
-		return NULL;
-
-	do {
-		temp_i_con = i_con->next_item;
-		free(i_con);
-		i_con = temp_i_con;
-	} while (i_con);
-
-	i_con_head = NULL;
-	return NULL;
-}
-
-i_container *add_i_con(i_container *i_con, char *f, void *d)
-{  
-	i_container *new_i_con;
-	new_i_con = malloc(sizeof(i_container));
-
-	new_i_con->next_item = NULL;
-
-	/* used to hold data entered into user-entry fields */
-	strncpy(new_i_con->field_data, f, MAX_FIELD_SIZE+1); 
-	new_i_con->field_data[strlen(f)+1] = '\0';
-
-	/* a pointer to the device information represented by the i_con */
-	new_i_con->data = d;
-
-	if (i_con)
-		i_con->next_item = new_i_con;
-	else
-		i_con_head = new_i_con;
-
-	return new_i_con;
-}
-
 static void usage()
 {
 	printf(_("Usage: iprconfig [options]\n"));
@@ -8846,3 +8863,4 @@ int main(int argc, char *argv[])
 	exit(0);
 	return 0;
 }
+

@@ -52,6 +52,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Wed Oct 26 2004 Brian King <brking@us.ibm.com> 2.0.14
+- Fix iprconfig to set the actual queue depth for advanced function disks
+- Allow user to force tagged queuing on to drives that do not support
+  QERR=1.
 - Fix handling of medium format corrupt drives for drives
 - iprconfig: Download microcode. Fix blank screen when displaying
   lots of microcode images.

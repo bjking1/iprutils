@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.60 2004/12/10 20:22:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.61 2005/01/12 17:19:21 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -577,6 +577,56 @@ static const struct ioa_parms ioa_parms [] = {
 	{.ccin = 0x2780, .scsi_id_changeable = 0,
 	.msl = 0x030E0040, .fw_name = "5349530E" },
 };
+
+struct ioa_details {
+	u16 subsystem_vendor;
+	u16 subsystem_device;
+	const char *ioa_desc;
+	int is_spi:1;
+};
+
+static const struct ioa_details ioa_details [] = {
+	{.subsystem_vendor = 0x1014,
+	.subsystem_device = 0x028D,
+	"PCI-X SAS RAID Adapter", .is_spi = 0}
+};
+
+static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ioa_details); i++) {
+		if (ioa->subsystem_vendor == ioa_details[i].subsystem_vendor &&
+		    ioa->subsystem_device == ioa_details[i].subsystem_device)
+			return &ioa_details[i];
+	}
+
+	return NULL;
+}
+
+static const char *raid_desc = "PCI-X SCSI RAID Adapter";
+static const char *jbod_desc = "PCI-X SCSI Adapter";
+
+const char *get_ioa_desc(struct ipr_ioa *ioa)
+{
+	const struct ioa_details *details = get_ioa_details(ioa);
+
+	if (details)
+		return details->ioa_desc;
+	else if (ioa->qac_data->num_records)
+		return raid_desc;
+
+	return jbod_desc;
+}
+
+int is_spi(struct ipr_ioa *ioa)
+{
+	const struct ioa_details *details = get_ioa_details(ioa);
+
+	if (details)
+		return details->is_spi;
+	return 1;
+}
 
 static const struct ioa_parms *get_ioa_fw(struct ipr_ioa *ioa)
 {
@@ -1206,6 +1256,65 @@ int ipr_mode_select(struct ipr_dev *dev, void *buff, int length)
 	return rc;
 }
 
+int page0x0a_setup(struct ipr_dev *dev)
+{
+	struct ipr_mode_pages mode_pages;
+	struct ipr_control_mode_page *page;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	if (ipr_mode_sense(dev, 0x0A, &mode_pages))
+		return -EIO;
+
+	page = (struct ipr_control_mode_page *)(((u8 *)&mode_pages) +
+						mode_pages.hdr.block_desc_len +
+						sizeof(mode_pages.hdr));
+
+	if (page->queue_algorithm_modifier != 1)
+		return 0;
+	if (page->tst == 1 && page->qerr != 3)
+		return 0;
+	if (page->qerr != 1)
+		return 0;
+	if (page->dque != 0)
+		return 0;
+
+	return 1;
+}
+
+static int ipr_setup_af_qdepth(struct ipr_dev *dev, int qdepth)
+{
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
+	int len;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	if (ipr_mode_sense(dev, 0x20, &mode_pages))
+		return -EIO;
+
+	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+					     mode_pages.hdr.block_desc_len +
+					     sizeof(mode_pages.hdr));
+
+	if (page->max_tcq_depth == 1 && !page0x0a_setup(dev))
+		scsi_warn(dev, "WARNING: Enabling tagged queuing to unsupported disk\n");
+
+	page->max_tcq_depth = qdepth;
+
+	len = mode_pages.hdr.length + 1;
+	mode_pages.hdr.length = 0;
+	mode_pages.hdr.medium_type = 0;
+	mode_pages.hdr.device_spec_parms = 0;
+	page->hdr.parms_saveable = 0;
+
+	if (ipr_mode_select(dev, &mode_pages, len))
+		return -EIO;
+
+	return 0;
+
+}
+
 int ipr_reset_device(struct ipr_dev *dev)
 {
 	int fd, rc, arg;
@@ -1618,7 +1727,7 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 
 int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 {
-	int fd, rc;
+	int fd, rc, i;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	struct ipr_disk_attr attr;
@@ -1670,7 +1779,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 
 		/* Wait for the device to come back to life */
 		for (i = 0, rc = -1; rc && (i < 60); i ++)
-			rc = __ipr_test_unit_ready(dev, sense_data)
+			rc = __ipr_test_unit_ready(dev, &sense_data);
 	}
 
 	close(fd);
@@ -2302,9 +2411,51 @@ static void get_dual_ioa_state(struct ipr_ioa *ioa)
 
 #define IPR_DEFAULT_AF_BLOCK_SIZE 522
 
-static void get_af_block_size(struct ipr_ioa *ioa)
+static u16 get_af_block_size(struct ipr_inquiry_ioa_cap *ioa_cap)
 {
+	int sz_off = offsetof(struct ipr_inquiry_ioa_cap, af_block_size);
+	int len_off = offsetof(struct ipr_inquiry_ioa_cap, page_length);
+
+	if (ioa_cap->page_length > (sz_off - len_off))
+		return ntohs(ioa_cap->af_block_size);
+	return IPR_DEFAULT_AF_BLOCK_SIZE;
+}
+
+static void get_ioa_cap(struct ipr_ioa *ioa)
+{
+	int rc, j;
+	struct ipr_inquiry_page0 page0_inq;
+	struct ipr_inquiry_ioa_cap ioa_cap;
+	struct ipr_mode_page24 *page24;
+	struct ipr_mode_pages mode_pages;
+
 	ioa->af_block_size = IPR_DEFAULT_AF_BLOCK_SIZE;
+
+	rc = ipr_inquiry(&ioa->ioa, 0, &page0_inq, sizeof(page0_inq));
+
+	if (!rc) {
+		for (j = 0; j < page0_inq.page_length; j++) {
+			if (page0_inq.supported_page_codes[j] != 0xD0)
+				continue;
+			rc = ipr_inquiry(&ioa->ioa, 0xD0, &ioa_cap, sizeof(ioa_cap));
+			if (rc)
+				break;
+			if (ioa_cap.dual_ioa_raid) {
+				memset(&mode_pages, 0, sizeof(mode_pages));
+				rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
+				if (!rc) {
+					page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
+									     mode_pages.hdr.block_desc_len +
+									     sizeof(mode_pages.hdr));
+
+					if (page24->enable_dual_ioa_af)
+						ioa->dual_raid_support = 1;
+				}
+			}
+			ioa->af_block_size = get_af_block_size(&ioa_cap);
+		}
+	} else
+		ioa->ioa_dead = 1;
 }
 
 void check_current_config(bool allow_rebuild_refresh)
@@ -2317,8 +2468,6 @@ void check_current_config(bool allow_rebuild_refresh)
 	struct ipr_dev_record *device_record;
 	struct ipr_array_record *array_record;
 	struct ipr_std_inq_data std_inq_data;
-	struct ipr_inquiry_page0 page0_inq;
-	struct ipr_inquiry_ioa_cap ioa_cap;
 	struct sense_data_t sense_data;
 	int *qac_entry_ref;
 
@@ -2345,22 +2494,8 @@ void check_current_config(bool allow_rebuild_refresh)
 		if (rc)
 			ioa->ioa_dead = 1;
 
-		rc = ipr_inquiry(&ioa->ioa, 0, &page0_inq, sizeof(page0_inq));
-
-		if (!rc) {
-			for (j = 0; j < page0_inq.page_length; j++) {
-				if (page0_inq.supported_page_codes[j] == 0xD0) {
-					rc = ipr_inquiry(&ioa->ioa, 0xD0, &ioa_cap, sizeof(ioa_cap));
-					if (!rc && ioa_cap.dual_ioa_raid)
-						ioa->dual_raid_support = 1;
-					break;
-				}
-			}
-		} else
-			ioa->ioa_dead = 1;
-
+		get_ioa_cap(ioa);
 		get_dual_ioa_state(ioa);
-		get_af_block_size(ioa);
 
 		/* Get Query Array Config Data */
 		rc = ipr_query_array_config(ioa, allow_rebuild_refresh,
@@ -2703,18 +2838,52 @@ static int ipr_get_saved_ioa_attr(struct ipr_ioa *ioa,
 	return ipr_get_saved_attr(ioa, category, field, value);
 }
 
+#define AS400_TCQ_DEPTH 16
+#define DEFAULT_TCQ_DEPTH 64
+
+static int get_tcq_depth(struct ipr_dev *dev)
+{
+	if (!dev->scsi_dev_data)
+		return AS400_TCQ_DEPTH;
+	if (!strncmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8))
+		return AS400_TCQ_DEPTH;
+
+	return DEFAULT_TCQ_DEPTH;
+}
+
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
 	char temp[100];
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
 
 	if (ipr_read_dev_attr(dev, "queue_depth", temp))
 		return -EIO;
 
-	attr->queue_depth = strtoul(temp, NULL, 10);
+	if (ipr_is_af_dasd_device(dev)) {
+		memset(&mode_pages, 0, sizeof(mode_pages));
+
+		if (ipr_mode_sense(dev, 0x20, &mode_pages))
+			return -EIO;
+
+		page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+						     mode_pages.hdr.block_desc_len +
+						     sizeof(mode_pages.hdr));
+
+		attr->queue_depth = page->max_tcq_depth;
+	} else
+		attr->queue_depth = strtoul(temp, NULL, 10);
 
 	if (ipr_read_dev_attr(dev, "tcq_enable", temp))
 		return -EIO;
-	attr->tcq_enabled = strtoul(temp, NULL, 10);
+
+	if (ipr_is_af_dasd_device(dev)) {
+		if (attr->queue_depth < 2)
+			attr->tcq_enabled = 0;
+		else
+			attr->tcq_enabled = 1;
+	} else
+		attr->tcq_enabled = strtoul(temp, NULL, 10);
 
 	attr->format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
 
@@ -2778,13 +2947,16 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 		return -EIO;
 
 	if (attr->queue_depth != old_attr.queue_depth) {
-		if (!ipr_is_af_dasd_device(dev)) {
-			sprintf(temp, "%d", attr->queue_depth);
+		sprintf(temp, "%d", attr->queue_depth);
+		if (ipr_is_af_dasd_device(dev)) {
+			if (ipr_setup_af_qdepth(dev, attr->queue_depth))
+				return -EIO;
+		} else {
 			if (ipr_write_dev_attr(dev, "queue_depth", temp))
 				return -EIO;
-			if (save)
-				ipr_save_dev_attr(dev, IPR_QUEUE_DEPTH, temp, 1);
 		}
+		if (save)
+			ipr_save_dev_attr(dev, IPR_QUEUE_DEPTH, temp, 1);
 	}
 
 	if (attr->format_timeout != old_attr.format_timeout) {
@@ -2799,6 +2971,9 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 
 	if (attr->tcq_enabled != old_attr.tcq_enabled) {
 		if (!ipr_is_af_dasd_device(dev)) {
+			if (attr->tcq_enabled && !page0x0a_setup(dev))
+				scsi_warn(dev, "WARNING: Enabling tagged queuing to unsupported disk\n");
+
 			sprintf(temp, "%d", attr->tcq_enabled);
 			if (ipr_write_dev_attr(dev, "tcq_enable", temp))
 				return -EIO;
@@ -3641,7 +3816,7 @@ struct ipr_ioa_desc ioa_desc [] = {
 	{0x570B, "PCI-X Dual Channel SCSI Integrated Controller (Adapter bus) [570B]"}
 };
 
-static const char *get_ioa_desc(u16 type)
+static const char *get_long_ioa_desc(u16 type)
 {
 	int i;
 
@@ -3655,7 +3830,7 @@ static const char *get_ioa_desc(u16 type)
 
 void ipr_log_ucode_error(struct ipr_ioa *ioa)
 {
-	const char *desc = get_ioa_desc(ioa->ccin);
+	const char *desc = get_long_ioa_desc(ioa->ccin);
 
 	if (desc) {
 		syslog(LOG_ERR, "Could not find required level of microcode for IBM '%s'. "
@@ -3855,19 +4030,6 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 	close(fd);
 }
 
-#define AS400_TCQ_DEPTH 16
-#define DEFAULT_TCQ_DEPTH 64
-
-static int get_tcq_depth(struct ipr_dev *dev)
-{
-	if (!dev->scsi_dev_data)
-		return AS400_TCQ_DEPTH;
-	if (!strncmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8))
-		return AS400_TCQ_DEPTH;
-
-	return DEFAULT_TCQ_DEPTH;
-}
-
 static int mode_select(struct ipr_dev *dev, void *buff, int length)
 {
 	int fd;
@@ -3947,32 +4109,6 @@ error:
 	return 0;
 }
 
-static int page0x0a_setup(struct ipr_dev *dev)
-{
-	struct ipr_mode_pages mode_pages;
-	struct ipr_control_mode_page *page;
-
-	memset(&mode_pages, 0, sizeof(mode_pages));
-
-	if (ipr_mode_sense(dev, 0x0A, &mode_pages))
-		return -EIO;
-
-	page = (struct ipr_control_mode_page *)(((u8 *)&mode_pages) +
-						mode_pages.hdr.block_desc_len +
-						sizeof(mode_pages.hdr));
-
-	if (page->queue_algorithm_modifier != 1)
-		return 0;
-	if (page->tst == 1 && page->qerr != 3)
-		return 0;
-	if (page->qerr != 1)
-		return 0;
-	if (page->dque != 0)
-		return 0;
-
-	return 1;
-}
-
 static int setup_page0x0a(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages, ch_mode_pages;
@@ -4010,7 +4146,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 		if (page->tst != 0 || page->qerr != 1) {
 			scsi_dbg(dev, "Cannot set QERR/TST for single-initiator. "
 				 "TST=%d, QERR=%d\n", page->tst, page->qerr);
-			return -EIO;
+			return -EINVAL;
 		}
 	}
 
@@ -4043,6 +4179,7 @@ static int page0x20_setup(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages;
 	struct ipr_ioa_mode_page *page;
+	struct ipr_disk_attr attr;
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
 
@@ -4053,37 +4190,10 @@ static int page0x20_setup(struct ipr_dev *dev)
 					     mode_pages.hdr.block_desc_len +
 					     sizeof(mode_pages.hdr));
 
-	return (page->max_tcq_depth == get_tcq_depth(dev));
-}
-
-static int ipr_setup_page0x20(struct ipr_dev *dev)
-{
-	struct ipr_mode_pages mode_pages;
-	struct ipr_ioa_mode_page *page;
-	int len;
-
-	if (!ipr_is_af_dasd_device(dev))
-		return 0;
-
-	memset(&mode_pages, 0, sizeof(mode_pages));
-
-	if (ipr_mode_sense(dev, 0x20, &mode_pages))
-		return -EIO;
-
-	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
-					     mode_pages.hdr.block_desc_len +
-					     sizeof(mode_pages.hdr));
-
-	page->max_tcq_depth = get_tcq_depth(dev);
-
-	len = mode_pages.hdr.length + 1;
-	mode_pages.hdr.length = 0;
-	mode_pages.hdr.medium_type = 0;
-	mode_pages.hdr.device_spec_parms = 0;
-	page->hdr.parms_saveable = 0;
-
-	if (ipr_mode_select(dev, &mode_pages, len))
-		return -EIO;
+	if (!ipr_get_dev_attr(dev, &attr)) {
+		ipr_modify_dev_attr(dev, &attr);
+		return (page->max_tcq_depth == attr.queue_depth);
+	}
 
 	return 0;
 }
@@ -4137,6 +4247,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
 	struct sense_data_t sense_data;
+	int rc;
 
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
@@ -4146,13 +4257,15 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 		return;
 	if (enable_af(dev))
 		return;
-	if (setup_page0x0a(dev)) {
-		scsi_dbg(dev, "Failed to enable TCQing.\n");
-		return;
+	if ((rc = setup_page0x0a(dev))) {
+		if (rc != -EINVAL) {
+			scsi_dbg(dev, "Failed to enable TCQing.\n");
+			return;
+		}
+	} else {
+		attr.queue_depth = get_tcq_depth(dev);
+		attr.tcq_enabled = 1;
 	}
-
-	attr.queue_depth = get_tcq_depth(dev);
-	attr.tcq_enabled = 1;
 
 	if (ipr_modify_dev_attr(dev, &attr))
 		return;
@@ -4169,6 +4282,7 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 static void init_af_dev(struct ipr_dev *dev)
 {
 	struct ipr_disk_attr attr;
+	int rc;
 
 	if (ipr_set_dasd_timeouts(dev))
 		return;
@@ -4178,16 +4292,19 @@ static void init_af_dev(struct ipr_dev *dev)
 		return;
 	if (setup_page0x01(dev))
 		return;
-	if (setup_page0x0a(dev))
-		return;
-	if (ipr_setup_page0x20(dev))
-		return;
 	if (enable_af(dev))
 		return;
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
-
 	attr.format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
+
+	if ((rc = setup_page0x0a(dev))) {
+		if (rc != -EINVAL) {
+			scsi_dbg(dev, "Failed to enable TCQing.\n");
+			return;
+		}
+	} else
+		attr.queue_depth = get_tcq_depth(dev);
 
 	if (ipr_modify_dev_attr(dev, &attr))
 		return;

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.47 2004/12/10 20:22:43 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.48 2005/01/12 17:19:21 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -971,6 +971,17 @@ struct ipr_ioa_mode_page {
 	u8 max_tcq_depth;
 };
 
+struct ipr_mode_page24 {
+	struct ipr_mode_page_hdr hdr;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 enable_dual_ioa_af:1;
+	u8 reserved:7;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved:7;
+	u8 enable_dual_ioa_af:1;
+#endif
+};
+
 struct ipr_mode_page_28_header {
 	struct ipr_mode_page_hdr header;
 	u8 num_dev_entries;
@@ -1126,6 +1137,7 @@ struct ipr_inquiry_ioa_cap {
 	u8 dual_ioa_raid:1;
 	u8 reserved3[3];
 #endif
+	u16 af_block_size;
 };
 
 struct ipr_dasd_ucode_header {
@@ -1357,6 +1369,9 @@ u32 get_ioa_fw_version(struct ipr_ioa *);
 int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
 u32 get_dasd_ucode_version(char *, int);
+const char *get_ioa_desc(struct ipr_ioa *);
+int is_spi(struct ipr_ioa *);
+int page0x0a_setup(struct ipr_dev *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1469,6 +1484,9 @@ if (dev->scsi_dev_data) { \
 
 #define scsi_err(dev, fmt, ...) \
       scsi_log(LOG_ERR, dev, fmt, ##__VA_ARGS__)
+
+#define scsi_warn(dev, fmt, ...) \
+      scsi_log(LOG_WARNING, dev, fmt, ##__VA_ARGS__)
 
 #define scsi_cmd_err(dev, sense, cmd, rc) \
       scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
