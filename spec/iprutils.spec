@@ -30,7 +30,7 @@ install init.d/iprupdate $RPM_BUILD_ROOT/etc/rc.d/init.d/iprupdate
 /sbin/chkconfig --add iprdump
 /sbin/chkconfig --add iprupdate
 
-%postun
+%preun
 /sbin/chkconfig --del iprdump
 /sbin/chkconfig --del iprupdate
 
