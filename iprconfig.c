@@ -1616,7 +1616,6 @@ int device_details(i_container *i_con)
 		body = add_line_to_body(body,"", NULL);
 		body = add_line_to_body(body,_("Manufacturer"), vendor_id);
 		body = add_line_to_body(body,_("Machine Type and Model"), product_id);
-		body = add_line_to_body(body,_("Driver Version"), device->ioa->driver_version);
 		body = add_line_to_body(body,_("Firmware Version"), firmware_version);
 		body = add_line_to_body(body,_("Serial Number"), serial_num);
 		body = add_line_to_body(body,_("Part Number"), part_num);
@@ -4778,6 +4777,7 @@ int process_conc_maint(i_container *i_con, int action)
 	if (!rc) {
 		if (action == IPR_VERIFY_CONC_REMOVE) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_REMOVE);
+			ipr_write_dev_attr(ipr_dev, "delete", "1");
 			evaluate_device(ipr_dev, ipr_dev->ioa, 0);
 		} else if (action == IPR_VERIFY_CONC_ADD) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_ADD);
@@ -4785,6 +4785,7 @@ int process_conc_maint(i_container *i_con, int action)
 			res_addr.bus = ipr_dev->scsi_dev_data->channel;
 			res_addr.target = ipr_dev->scsi_dev_data->id;
 			res_addr.lun = ipr_dev->scsi_dev_data->lun;
+			ipr_rescan(cur_ioa, res_addr.bus, res_addr.target, res_addr.lun);
 
 			while (time--) {
 				check_current_config(false);

@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.41 2004/03/15 22:09:48 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.42 2004/03/15 22:11:46 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -472,9 +472,6 @@ void tool_init(char *tool_name)
 			/* PCI address */
 			strcpy(ipr_ioa->pci_address, pci_address);
 
-			/* driver version */
-			strcpy(ipr_ioa->driver_version, "2");  /* FIXME pick up version from modinfo? */
-
 			sysfs_host_class = sysfs_open_class("scsi_host");
 			class_devices = sysfs_get_class_devices(sysfs_host_class);
 			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
@@ -535,6 +532,21 @@ void ipr_reset_adapter(struct ipr_ioa *ioa)
 	attr = sysfs_get_classdev_attr(class_device,
 				       "reset_host");
 	sysfs_write_attribute(attr, "1", 1);
+	sysfs_close_class_device(class_device);
+}
+
+void ipr_rescan(struct ipr_ioa *ioa, int bus, int id, int lun)
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	char buf[100];
+
+	sprintf(buf, "%d %d %d", bus, id, lun);
+
+	class_device = sysfs_open_class_device("scsi_host",
+					       ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, "scan");
+	sysfs_write_attribute(attr, buf, strlen(buf));
 	sysfs_close_class_device(class_device);
 }
 

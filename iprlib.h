@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.32 2004/03/15 22:09:48 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.33 2004/03/15 22:11:46 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -783,7 +783,6 @@ struct ipr_ioa {
 	u32 host_addr;
 	u32 num_raid_cmds;
 	u32 msl;
-	char driver_version[50];
 	u16 num_devices;
 	u8 rw_protected:1; /* FIXME */
 	u8 ioa_dead:1;
@@ -1176,6 +1175,7 @@ int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 void ipr_reset_adapter(struct ipr_ioa *);
+void ipr_rescan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_suspend_device_bus(struct ipr_ioa *, struct ipr_res_addr *, u8);

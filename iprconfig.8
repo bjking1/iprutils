@@ -11,17 +11,17 @@ is used to configure IBM Power RAID storage adapters, display information
 about them, and to perform adapter and disk unit recovery. 
 The menu options are: 
 .PP
-.B 1. Display disk hardware status.
+.B 1. Display hardware status.
 .br
 This option can be used to display various information regarding
 the IBM Power RAID adapters attached to the system and the disk 
 units controlled by them. For each adapter and disk unit, their 
 /dev name, physical location, description, vendor/product ID, and
 hardware status will be available. Beside each resource is an OPT 
-field. By entering a 5 beside any resource, detailed information 
+field. By entering a 1 beside any resource, detailed information 
 about that resource can be obtained. For an adapter resource, this 
-will display the driver version, the adapter firmware version, 
-and the physical location amongst other things.
+will display the adapter firmware version and the physical location 
+amongst other things.
 .PP
 .B 2. Work with Disk Arrays
 .br
@@ -36,35 +36,35 @@ is used to create a disk array.
 .PP
 .B Delete a disk array
 is used to delete disk arrays. Selecting this option will provide you 
-with list of disk arrays which can be deleted.
+with a list of disk arrays which can be deleted.
 .PP
 .B Add a device to a disk array
 is used to include devices of similar capacity into an existing disk 
 array. This function is currently only supported for RAID 5 disk arrays.
 .PP
-.B Format device for advanced function
+.B Format device for advanced function (522)
 is used to format disks to 522 bytes/sector so that they may be used in
 a disk array.
 .PP
-.B Format device for JBOD function
+.B Format device for JBOD function (512)
 is used to format disks to 512 bytes/sector so that they may be used 
 as standalone disks.
 .PP
-.B Configure a hot spare device
+.B Create a hot spare
 is used to designate a device as a dedicated hot spare.
 .PP
-.B Unconfigure a hot spare device
+.B Delete a hot spare
 is used to unconfigure a previously configured hot spare.
 .PP
 .B 3. Work with disk unit recovery
 is used to perform the following disk unit recovery actions:
 .PP
-.B Concurrent Add Device
+.B Concurrent add device
 is used to concurrently add a new disk to a running system. This feature
 is only supported with SES (SCSI Enclosure Services) packaging.
 .PP
-.B Concurrent Remove/Replace Device
-is used to concurrently remove and replace a disk from a running system.
+.B Concurrent remove device
+is used to concurrently remove a disk from a running system.
 This feature is only supported with SES (SCSI Enclosure Services) packaging.
 .PP
 .B Initialize and format disk unit
@@ -100,7 +100,13 @@ bus speed, SCSI initiator ID, etc.
 .B 5. Work with driver configuration
 is used to change driver configurable attributes, such as log_level.
 .PP
-.B 5. Analyze Log
+.B 6. Work with disk configuration
+is used to change configurable disk attributes, such as queue depth.
+.PP
+.B 7. Download microcode
+is used to download microcode to ipr adapters and attached SCSI disks.
+.PP
+.B 8. Analyze Log
 is an option available to analyze /var/log/messages* files. By default
 it will use vi as the editor to open the concatenated error log files.
 This can be changed by using option 6 on the
@@ -127,7 +133,7 @@ Default is /var/log.
 Print version number of 
 .B iprconfig
 .SH AUTHOR
-Brian King (brking@us.ibm.com)
+Brian King <brking@us.ibm.com>
 .SH NOTES
 .TP
 .B Notes on using under iSeries 5250 telnet

@@ -5,53 +5,57 @@ ncurses, ncurses-devel, and sysfsutils packages installed to perform the 'make'.
 iprdump - A user program meant to be run in the background to gather debug
 information should an IOA failure occur.  Ideally, this program should be
 started during boot time after file systems are loaded when the ipr
-SCSI driver is used.
+SCSI driver is used. An init.d script is provided to do this.
 
 iprupdate - IOA/disk unit microcode update utility
 This tool requires no arguments and should be run after each time the device driver
 is loaded. It will query each adapter/disk unit for the microcode version and update 
-adapters/disk units that are not currently at the minimum supported levels. 
+adapters/disk units that are not currently at the minimum supported levels. An init.d
+script is provided to run this at boot time.
 
 iprconfig - IOA Configuration and Recovery tool
 This is an ncurses based utility used to configure ipr adapters and devices.
 The basic functions of this tool are:
 
 CONFIGURATION
-1. Display disk hardware status.  This can be used to display all SCSI disks attached
-to your system. Using this option it is possible to obtain the physical location
-of each device on the system.
+1. Display hardware status.  This can be used to display all SCSI disks attached
+to your system. Using this option it is possible to obtain information about
+each device on the system.
 2. Work with SCSI Bus Configuration.  This allows flexibility in setting some
 SCSI Bus parameters such is Max Bus Throughput and host SCSI ID.
 3. Work with Driver Configuration.  Currently allows adjustment to the devices drivers
 log level.
+4. Work with disk configuration. Allows setting per device attributes, such as
+queue depth.
+5. Download microcode. Allows microcode to be downloaded to adapters and SCSI disks.
 
 RAID
-4. Delete a disk array. Allows you to delete existing arrays.  Data stored
+6. Create a disk array.  Used to create a disk array.
+7. Delete a disk array. Allows you to delete existing arrays.  Data stored
 on the devices will not be preserved after issuing this command.
-5. Create a disk array.  Used to create a disk array.
-6. Add a device to a disk array.  This option allows devices of similar capacity
-to be included into an existing disk array.
-7. Configure a hot spare device.  Configure a disk to become a hot spare, capable
-of being used by the adapter to automatically replace a failed device
-8. Format Device for advanced function/Format Device for JBOD (Just a Bunch Of DASD) function.
+8. Add a device to a disk array.  This option allows devices of similar capacity
+to be included into an existing RAID 5 disk array.
+9. Format Device for advanced function/Format Device for JBOD (Just a Bunch Of DASD) function.
 Disk devices can either be formatted to 512 bytes/sector or 522 bytes/sector. Devices must
 be formatted to 522 bytes/sector, or advanced function format, in order to be used in
 a disk array or as a hot spare. Devices not in a disk array can be formatted to
 512 bytes/sector so they can be used directly by the operating system.
+10. Create a hot spare.  Configure a disk to become a hot spare, capable
+of being used by the adapter to automatically replace a failed device
 
 
 RECOVERY
-9. Rebuild disk unit data.  This option is generally used following concurrent
-maintenance.  Select this option after a failing array member device has been replaced to
-reconstruct device as an active array member.
-10. Device concurrent maintenance. This can be used to concurrently add or replace disk
-units from a running system.
-11. Reclaim IOA cache storage. This is to be used by IBM hardware service personnel only. 
+12. Concurrent add device. Concurrently add a SCSI disk to a running system.
+13. Concurrent remove device. Concurrently remove a SCSI disk from a running system.
+14. Initialize and format disk. This allows you to issue a SCSI format command 
+to SCSI disks. Proceed with caution when using this option.
+15. Reclaim IOA cache storage. This is to be used by IBM hardware service personnel only. 
 Use of this function is potentially dangerous and may delete data from the non-volatile
 write cache on the adapter.
-12. Initialize and format disk unit. This allows you to issue an actual SCSI format command 
-to SCSI disks. Proceed with caution when using this option.
-13. Work with Resources Containing Cache Battery Packs.  A set of displays are used to view
+16. Rebuild disk unit data.  This option is generally used following concurrent
+maintenance.  Select this option after a failing array member device has been replaced to
+reconstruct device as an active array member.
+17. Work with Resources Containing Cache Battery Packs.  A set of displays are used to view
 the current status of the Cache Battery on resources containing battery packs and allow
 maintanence actions to be performed against those resources when necessary.
-14. Analyze Log. This allows you to view the error messages logged by the ipr device driver.
+18. Analyze Log. This allows you to view the error messages logged by the ipr device driver.

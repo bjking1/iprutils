@@ -5,13 +5,13 @@ iprupdate - IBM Power RAID adapter/device microcode update utility
 .B iprupdate
 .SH DESCRIPTION
 .B iprupdate
-is used to update the firmware on IBM storage adapters and the disk units
+is used to update the microcode on IBM storage adapters and the disk units
 attached to them to a minimum supported level. It can be run at any time 
 while the ipr device driver is loaded. The utility will check the 
-firmware revision level of each storage adapter/disk unit on the system and 
-compare it to the firmware revision level that is installed in /etc/microcode. 
-If the firmware level on the adapter/device is below the minimum supported 
-level and the level of the image is newer, the firmware will be updated. 
+microcode revision level of each storage adapter/disk unit on the system and 
+compare it to the microcode revision level that is installed in /etc/microcode. 
+If the microcode level on the adapter/device is below the minimum supported 
+level and the level of the image is newer, the microcode will be updated. 
 It is desired that this be called in the boot process.  
 .SH OPTIONS
 .TP
