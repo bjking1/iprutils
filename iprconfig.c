@@ -15,6 +15,8 @@
 #include <scsi/sg.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 struct devs_to_init_t {
 	struct ipr_dev       *ipr_dev;
@@ -1212,11 +1214,10 @@ char *body_init_status(char **header, int *num_lines, int type)
 	return buffer;
 }
 
-char *body_init(char **header, int *num_lines)
+char *__body_init(char *buffer, char **header, int *num_lines)
 {
-	char *buffer = NULL;
 	int j, i;
-	int header_lines = 0;
+	int header_lines = *num_lines;
 	char *x_header;
 
 	for (j=0, x_header = _(header[j]); strlen(x_header) != 0; j++, x_header = _(header[j])) {
@@ -1234,6 +1235,13 @@ char *body_init(char **header, int *num_lines)
 	if (num_lines != NULL)
 		*num_lines = header_lines;
 	return buffer;
+}
+
+char *body_init(char **header, int *num_lines)
+{
+	if (num_lines)
+		*num_lines = 0;
+	return __body_init(NULL, header, num_lines);
 }
 
 int disk_status(i_container *i_con)
@@ -2436,9 +2444,10 @@ int configure_raid_start(i_container *i_con)
 		    (scsi_dev_data == NULL))
 			continue;
 
-		if ((scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
-		    (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-		    (device_record->start_cand)) {
+		if (scsi_dev_data->type != IPR_TYPE_ADAPTER &&
+		    device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+		    device_record->start_cand &&
+		    device_supported(&cur_ioa->dev[j])) {
 
 			for (k=0; k<2; k++)
 				buffer[k] = print_device(&cur_ioa->dev[j],buffer[k],"%1", cur_ioa, k);
@@ -3439,9 +3448,10 @@ int configure_raid_include(i_container *i_con)
 					if (scsi_dev_data == NULL)
 						continue;
 
-					if ((scsi_dev_data->handle == device_record->resource_handle) &&
-					    (scsi_dev_data->opens == 0) &&
-					    (device_record->include_cand)) {
+					if (scsi_dev_data->handle == device_record->resource_handle &&
+					    scsi_dev_data->opens == 0 &&
+					    device_record->include_cand &&
+					    device_supported(&cur_ioa->dev[j])) {
 
 						cur_ioa->dev[j].qac_entry = common_record;
 						i_con = add_i_con(i_con,"\0",&cur_ioa->dev[j]);
@@ -3912,11 +3922,12 @@ int configure_af_device(i_container *i_con, int action_code)
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
 			/* If not a DASD, disallow format */
-			if ((scsi_dev_data == NULL) ||
-			    (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
-			    (ipr_is_volume_set(&cur_ioa->dev[j])) ||
-			    ((scsi_dev_data->type != TYPE_DISK) &&
-			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)))
+			if (scsi_dev_data == NULL ||
+			    ipr_is_hot_spare(&cur_ioa->dev[j]) ||
+			    ipr_is_volume_set(&cur_ioa->dev[j]) ||
+			    !device_supported(&cur_ioa->dev[j]) ||
+			    (scsi_dev_data->type != TYPE_DISK &&
+			     scsi_dev_data->type != IPR_TYPE_AF_DISK))
 				continue;
 
 			/* If Advanced Function DASD */
@@ -4109,12 +4120,11 @@ int hot_spare(i_container *i_con, int action)
 			array_record = (struct ipr_array_record *)common_record;
 			device_record = (struct ipr_dev_record *)common_record;
 
-			if (((common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) &&
-			     (!array_record->established) &&
-			     (action == IPR_ADD_HOT_SPARE)) ||
-			    ((common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-			     (device_record->is_hot_spare) &&
-			     (action == IPR_RMV_HOT_SPARE)))  {
+			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+			    ((action == IPR_ADD_HOT_SPARE &&
+			      device_record->add_hot_spare_cand) ||
+			     (action == IPR_RMV_HOT_SPARE &&
+			      device_record->rmv_hot_spare_cand))) {
 
 				if (raid_cmd_head) {
 					raid_cmd_tail->next = (struct array_cmd_data *)malloc(sizeof(struct array_cmd_data));
@@ -4277,11 +4287,12 @@ int select_hot_spare(i_container *i_con, int action)
 		    (device_record == NULL))
 			continue;
 
-		if ((scsi_dev_data->type != IPR_TYPE_ADAPTER) &&
-		    (device_record != NULL) &&
-		    (device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD) &&
-		    (((device_record->add_hot_spare_cand) && (action == IPR_ADD_HOT_SPARE)) ||
-		     ((device_record->rmv_hot_spare_cand) && (action == IPR_RMV_HOT_SPARE))))  {
+		if (scsi_dev_data->type != IPR_TYPE_ADAPTER &&
+		    device_record != NULL &&
+		    device_supported(&cur_ioa->dev[j]) &&
+		    device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+		    ((device_record->add_hot_spare_cand && action == IPR_ADD_HOT_SPARE) ||
+		     (device_record->rmv_hot_spare_cand && action == IPR_RMV_HOT_SPARE))) {
 
 			i_con2 = add_i_con(i_con2,"\0",&cur_ioa->dev[j]);
 
@@ -4823,11 +4834,12 @@ int init_device(i_container *i_con)
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
 			/* If not a DASD, disallow format */
-			if ((scsi_dev_data == NULL) ||
-			    (ipr_is_hot_spare(&cur_ioa->dev[j])) ||
-			    (ipr_is_volume_set(&cur_ioa->dev[j])) ||
-			    ((scsi_dev_data->type != TYPE_DISK) &&
-			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)))
+			if (scsi_dev_data == NULL ||
+			    ipr_is_hot_spare(&cur_ioa->dev[j]) ||
+			    ipr_is_volume_set(&cur_ioa->dev[j]) ||
+			    !device_supported(&cur_ioa->dev[j]) ||
+			    (scsi_dev_data->type != TYPE_DISK &&
+			     scsi_dev_data->type != IPR_TYPE_AF_DISK))
 				continue;
 
 			/* If Advanced Function DASD */
@@ -7548,6 +7560,45 @@ int download_ucode(i_container * i_con)
 	return rc;
 }
 
+static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
+{
+	char *body;
+	int header_lines, status, time = 0;
+	int percent = 0;
+	pid_t pid, rc;
+
+	body = body_init(n_download_ucode_in_progress.header, &header_lines);
+	n_download_ucode_in_progress.body = body;
+	complete_screen_driver(&n_download_ucode_in_progress, percent, 0);
+
+	pid = fork();
+
+	if (pid) {
+		do {
+			rc = waitpid(pid, &status, WNOHANG);
+			sleep(1);
+			time++;
+			percent = (time * 100) / 60;
+			if (percent > 99)
+				percent = 99;
+			complete_screen_driver(&n_download_ucode_in_progress, percent, 0);
+		} while (rc == 0);			
+	} else {
+		if (dev->scsi_dev_data && dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+			ipr_update_ioa_fw(dev->ioa, fw_image, 1);
+		else
+			ipr_update_disk_fw(dev, fw_image, 1);
+		exit(0);
+	}
+
+	complete_screen_driver(&n_download_ucode_in_progress, 100, 0);
+	sleep(1);
+
+	free(n_download_ucode_in_progress.body);
+	n_download_ucode_in_progress.body = NULL;
+	return 0; /* xxx check version to make sure download worked */
+}
+
 int process_choose_ucode(struct ipr_dev *ipr_dev)
 {
 	struct ipr_fw_images *list;
@@ -7562,6 +7613,7 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	i_container *temp_i_con;
 	char *input;
 	struct screen_output *s_out;
+	struct ipr_dasd_inquiry_page3 page3_inq;
 
 	if ((ipr_dev->scsi_dev_data) &&
 	    (ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER))
@@ -7575,15 +7627,27 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	else
 		list_count = rc;
 
-	body = body_init(n_choose_ucode.header, &header_lines);
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	ipr_inquiry(ipr_dev, 3, &page3_inq, sizeof(page3_inq));
+
+	sprintf(buffer, "%s%02X%02X%02X%02X\n\n",
+		_("The current microcode for this device is: "),
+		page3_inq.release_level[0],
+		page3_inq.release_level[1],
+		page3_inq.release_level[2],
+		page3_inq.release_level[3]);
+
+	body = add_string_to_body(NULL, buffer, "", &header_lines);
+	body = __body_init(body, n_choose_ucode.header, &header_lines);
+
 	i_con_head_saved = i_con_head;
 	i_con_head = i_con = NULL;
 
 	if (list_count) {
 		for (i=0; i<list_count; i++) {
 			sprintf(buffer," %%1   %.8X %s\n",list[i].version,list[i].file);
-			body = add_line_to_body(body,buffer, NULL);
-			i_con = add_i_con(i_con,"\0",&list[i]);
+			body = add_line_to_body(body, buffer, NULL);
+			i_con = add_i_con(i_con, "\0", &list[i]);
 		}
 	} else {
 		body = add_line_to_body(body,"(No available images)",NULL);
@@ -7628,13 +7692,17 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	free(n_confirm_download_ucode.body);
 	n_confirm_download_ucode.body = NULL;
 
+
 	if (!s_out->rc) {
+		update_ucode(ipr_dev, fw_image);
+/* xxx delete
 		if ((ipr_dev->scsi_dev_data) &&
 		    (ipr_dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)) 
 
 			ipr_update_ioa_fw(ipr_dev->ioa, fw_image, 1);
 		else
 			ipr_update_disk_fw(ipr_dev, fw_image, 1);
+*/
 	}
 
 	leave:
@@ -7644,7 +7712,6 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 	i_con_head = i_con_head_saved;
 	ipr_free(s_out);
 	return rc;
-
 }
 
 int choose_ucode(i_container * i_con)

@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.24 2004/03/04 22:52:07 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.25 2004/03/10 02:56:16 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -913,13 +913,18 @@ struct unsupported_af_dasd {
 	char compare_vendor_id_byte[IPR_VENDOR_ID_LEN];
 	char product_id[IPR_PROD_ID_LEN + 1];
 	char compare_product_id_byte[IPR_PROD_ID_LEN];
-	struct ipr_std_inq_vpids vpid;   /* vpid - meaningful bits */
-	struct ipr_std_inq_vpids vpid_mask;  /* mask don't cares in the vpid */
 	char lid[5];       /* Load ID - Bytes 8-11 of Inquiry Page 3 */
 	char lid_mask[4];  /* Mask for certain bytes of the LID */
 	uint supported_with_min_ucode_level;
 	char min_ucode_level[5];
 	char min_ucode_mask[4];    /* used to mask don't cares in the ucode level */
+};
+
+struct unsupported_dasd {
+	char vendor_id[IPR_VENDOR_ID_LEN + 1]; /* xxx char * instead? */
+	char compare_vendor_id_byte[IPR_VENDOR_ID_LEN];
+	char product_id[IPR_PROD_ID_LEN + 1];
+	char compare_product_id_byte[IPR_PROD_ID_LEN];
 };
 
 struct ipr_cmd_status_record {
@@ -1175,6 +1180,7 @@ void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
 void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 void ipr_init_dev(struct ipr_dev *);
 void ipr_init_ioa(struct ipr_ioa *);
+int device_supported(struct ipr_dev *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

@@ -55,3 +55,4 @@ rm -rf $RPM_BUILD_ROOT
 /etc/init.d/iprinit
 /etc/init.d/iprupdate
 /usr/share/ipr/ipr.cat
+/usr/share/doc/iprutils-%version/LICENSE

@@ -1092,6 +1092,17 @@ s_node n_confirm_download_ucode = {
 		"" }
 };
 
+s_node n_download_ucode_in_progress = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (CANCEL_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Microcode Download In Progress"),
+	.header   = {
+		__("Please wait for the microcode update to complete\n"),
+		"" }
+};
+
 struct screen_opts log_menu_opt[] = {
 	{ibm_storage_log_tail, "1", __("View most recent IBM Storage error messages")},
 	{ibm_storage_log,      "2", __("View IBM Storage error messages")},

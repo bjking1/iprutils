@@ -8,7 +8,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.30 2004/03/08 23:18:02 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.31 2004/03/10 02:56:15 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -258,6 +258,51 @@ struct unsupported_af_dasd unsupported_af[] =
 	}
 };
 
+struct unsupported_dasd unsupported_dasd [] = {
+	{	/* Piranha 18 GB, 15k RPM 160 MB/s - UCPR018 - 4322 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"UCPR018         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	},
+	{	/* Piranha 18 GB, 15k RPM 320 MB/s - XCPR018 - 4325 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"XCPR018         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}, 
+	{	/* Piranha 35 GB, 15k RPM 160 MB/s - UCPR036 - 4323 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"UCPR036         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}, 
+	{	/* Piranha 35 GB, 15k RPM 320 MB/s - XCPR036 - 4326 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"XCPR036         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	},
+	{	/* Monza 70 GB, 15k RPM 320 MB/s - XCPR073 - 4327 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"XCPR073         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	},
+	{	/* Monza 141 GB, 15k RPM 320 MB/s - XCPR146 - 4328 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"XCPR146         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	},
+	{	/* Monaco 282 GB, 15k RPM 320 MB/s - XCPR282 - 4329 */
+		vendor_id: {"IBMAS400"},
+		compare_vendor_id_byte: {1, 1, 1, 1, 1, 1, 1, 1},
+		product_id: {"XCPR282         "},
+		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}
+};
+
 struct ses_table_entry {
 	char product_id[17];
 	char compare_product_id_byte[17];
@@ -281,7 +326,7 @@ static const struct ses_table_entry ses_table[] = {
 	{"VSBPD1H   U3SCSI", "XXXXXXX*XXXXXXXX", 160, 0}
 };
 
-int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
+static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 {
 	int i, j, matches;
 	struct ipr_dev *dev = ioa->dev;
@@ -296,9 +341,9 @@ int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 	}
 
 	if (i == ioa->num_devices)
-		return IPR_MAX_XFER_RATE;
+		return NULL;
 	if (strncmp(dev->scsi_dev_data->vendor_id, "IBM", 3))
-		return IPR_MAX_XFER_RATE;
+		return NULL;
 
 	for (i = 0; i < ARRAY_SIZE(ses_table); i++, ste++) {
 		for (j = 0, matches = 0; j < IPR_PROD_ID_LEN; j++) {
@@ -312,8 +357,18 @@ int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 		}
 
 		if (matches == IPR_PROD_ID_LEN)
-			return ste->max_bus_speed_limit;
+			return ste;
 	}
+
+	return NULL;
+}
+
+int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
+{
+	const struct ses_table_entry *ste = get_ses_entry(ioa, bus);
+
+	if (ste)
+		return ste->max_bus_speed_limit;
 
 	return IPR_MAX_XFER_RATE;
 }
@@ -1349,11 +1404,63 @@ static int set_supported_devs(struct ipr_dev *dev,
 	return rc;
 }
 
+static int __device_supported(struct ipr_dev *dev, struct ipr_std_inq_data *inq)
+{
+	int i, j;
+	const struct ses_table_entry *ste;
+
+	if (!dev->scsi_dev_data)
+		return 1;
+
+	ste = get_ses_entry(dev->ioa, dev->scsi_dev_data->channel);
+
+	if (!ste)
+		return 1;
+	if (!ste->block_15k_devices)
+		return 1;
+
+	for (i=0; i < ARRAY_SIZE(unsupported_dasd); i++) {
+		for (j = 0; j < IPR_VENDOR_ID_LEN; j++) {
+			if (unsupported_dasd[i].compare_vendor_id_byte[j] &&
+			    unsupported_dasd[i].vendor_id[j] != inq->vpids.vendor_id[j])
+				break;
+		}
+
+		if (j != IPR_VENDOR_ID_LEN)
+			continue;
+
+		for (j = 0; j < IPR_PROD_ID_LEN; j++) {
+			if (unsupported_dasd[i].compare_product_id_byte[j] &&
+			    unsupported_dasd[i].product_id[j] != inq->vpids.product_id[j])
+				break;
+		}
+
+		if (j != IPR_PROD_ID_LEN)
+			continue;
+
+		return 0;
+	}
+	return 1;
+}
+
+int device_supported(struct ipr_dev *dev)
+{
+	struct ipr_std_inq_data std_inq;
+
+	if (ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq)))
+		return -EIO;
+
+	return __device_supported(dev, &std_inq);
+}
+
 int enable_af(struct ipr_dev *dev)
 {
 	struct ipr_std_inq_data std_inq;
 
 	if (ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq)))
+		return -EIO;
+
+	if (!__device_supported(dev, &std_inq))
 		return -EIO;
 
 	if (set_supported_devs(dev, &std_inq))
