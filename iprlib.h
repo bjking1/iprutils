@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.16 2004/02/17 16:34:44 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.17 2004/02/17 23:49:25 manderso Exp $
  */
 
 #include <stdarg.h>
@@ -42,6 +42,7 @@
 #include <sysfs/libsysfs.h>
 #include <linux/byteorder/swab.h>
 #include <asm/byteorder.h>
+#include <libiberty.h>
 
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
@@ -699,9 +700,10 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
 #define IPR_HOST_SCSI_ID "HOST_SCSI_ID"
 #define IPR_BUS_WIDTH "BUS_WIDTH"
-#define IPR_MAX_XFER_RATE "MAX_BUS_SPEED"
+#define IPR_MAX_XFER_RATE_STR "MAX_BUS_SPEED"
 #define IPR_MIN_TIME_DELAY "MIN_TIME_DELAY"
 #define IPR_CATEGORY_BUS "Bus"
+#define IPR_MAX_XFER_RATE 320
 #define IPR_LIMITED_MAX_XFER_RATE 80
 /* IPR_LIMITED_CONFIG is used to compensate for
  a set of devices which will not allow firmware
@@ -768,6 +770,7 @@ struct ipr_ioa {
 	u8 ioa_dead:1;
 	u8 nr_ioa_microcode:1;
 	int host_num;
+	int scsi_id_changeable;
 	char pci_address[16];
 	char host_name[16];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
@@ -1115,7 +1118,7 @@ void get_sg_ioctl_data(struct sg_map_info *, int);
 int num_device_opens(int, int, int, int);
 void tool_init();
 void exit_on_error(char *, ...);
-int ipr_config_file_valid(char *);
+int ipr_config_file_valid(struct ipr_ioa *ioa);
 int ipr_config_file_read(char *, char *, char *, char *);
 void ipr_config_file_entry(char *, char *, char *, char *, int);
 void ipr_save_page_28(struct ipr_ioa *, struct ipr_page_28 *,

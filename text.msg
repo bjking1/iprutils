@@ -303,7 +303,7 @@ $set 301 concurrent_add_device
 2 "Choose a single location for add operations"
 3 "Select"
 
-$set 320 concurrent_remove_device
+$set 302 concurrent_remove_device
 1 "Concurrent Device Remove"
 2 "Choose a single location for remove operations"
 3 "Select"
@@ -311,7 +311,7 @@ $set 320 concurrent_remove_device
 5 "Choose a single location for add operations"
 6 "Select"
 
-$set 321 process_conc_maint
+$set 303 process_conc_maint
 1 "Verify Device Concurrent Remove"
 2 "Verify the selected device for concurrent remove operations"
 3 "Press Enter when verification complete and ready to continue"
@@ -348,105 +348,69 @@ $set 314 dev_init_complete
 
 $set 315 reclaim_cache
 1 "Reclaim IOA Cache Storage"
-2 "Select the IOA to reclaim IOA cache storage.\
-\n\
-\nATTENTION: Proceed with this function only if directed to from a\
-\nservice procedure.  Data in the IOA cache will be discarded.\
-\nDamaged objects may result on the system.\
-\n\
-\nType choice, press Enter.\
-\n  1=Reclaim IOA cache storage\
-\n\
-\n                         Serial     Resource\
-\nOption    Type   Model   Number     Name"
-3 "%e%q"
+2 "Select the IOA to reclaim IOA cache storage."
+3 "ATTENTION: Proceed with this function only if directed to from a\
+ service procedure.  Data in the IOA cache will be discarded.\
+ Damaged objects may result on the system."
+4 "Type choice, press Enter."
+5 "Reclaim IOA cache storage."
 
 $set 316 confirm_reclaim
 1 "Confirm Reclaim IOA Cache Storage"
-2 "The disk units that may be affected by the function are displayed.\
-\n\
-\nATTENTION: Proceed with this function only if directed to from a\
-\nservice procedure.  Data in the IOA cache will be discarded.\
-\nFilesystem corruption may result on the system.\
-\n\
-\nPress c=Confirm to reclaim cache storage.\
-\nPress q=Cancel to return to change your choice.\
-\n\
-\n          Serial                 Resource\
-\nOption    Number   Type   Model  Name"
-3 "%e%q%f"
+2 "The disk units that may be affected by the function are displayed."
+3 "ATTENTION: Proceed with this function only if directed to from a\
+ service procedure. Data in the IOA cache will be discarded.\
+ Filesystem corruption may result on the system."
+4 "Press c=Confirm to reclaim cache storage."
+5 "Cancel to return to change your choice."
 
 $set 317 confirm_reclaim_warning
-1 ""
-2 "ATTENTION!!!   ATTENTION!!!   ATTENTION!!!   ATTENTION!!!\
-\n\
-\nATTENTION: Proceed with this function only if directed to from a\
-\nservice procedure.  Data in the IOA cache will be discarded.\
-\nBy proceeding you will be allowing UNKNOWN data loss.\
-\nThis data loss may or may not be detected by the host operating system.\
-\nFilesystem corruption may result on the system.\
-\n\
-\nPress 's' to continue.\
-\n          Serial                 Resource\
-\nOption    Number   Type   Model  Name"
-3 "%qs=Confirm reclaim    %f"
+2 "ATTENTION!!!   ATTENTION!!!   ATTENTION!!!   ATTENTION!!!"
+3 "ATTENTION: Proceed with this function only if directed to from a\
+ service procedure. Data in the IOA cache will be discarded.\
+ By proceeding you will be allowing UNKNOWN data loss.\
+ This data loss may or may not be detected by the host operating system.\
+ Filesystem corruption may result on the system."
+4 "Press 's' to continue."
 
 $set 319 reclaim_result
 1 "Reclaim IOA Cache Storage Results"
-2 "IOA cache storage reclamation has completed.  Use the number\
-\nof lost sectors to decide whether to restore data from the\
-\nmost recent save media or to continue with possible data loss.\
-\n\
-\nNumber of lost sectors . . . . . . . . . . : #1"
-3 "%n%e%q"
+2 "IOA cache storage reclamation has completed. Use the number\
+ of lost sectors to decide whether to restore data from the\
+ most recent save media or to continue with possible data loss."
+3 "Number of lost sectors"
+4 "IOA cache storage reclamation has completed.  The number of\
+ lost sectors could not be determined."
 
-4 "Reclaim IOA Cache Storage Results"
-5 "IOA cache storage reclamation has completed.  The number of\
-\nlost sectors could not be determined."
-6 "%n%e%q"
-
-$set 331 raid_rebuild
+$set 321 raid_rebuild
 1 "Rebuild Disk Unit Data"
-2 "Select the units to be rebuilt\
-\n\
-\nType choice, press Enter.\
-\n  1=Rebuild\
-\n\
-\n         Vendor    Product           Serial    PCI    PCI   SCSI  SCSI  SCSI\
-\nOption    ID         ID              Number    Bus    Dev    Bus    ID   Lun\
-\n#1"
-3 "%e%q%f"
+2 "Select the units to be rebuilt"
+3 "Type choice, press Enter."
+4 "Rebuild"
 
 $set 322 raid_rebuild_fail
 1 "Rebuild Disk Unit Data Failed"
 2 "There are no disk units eligible for the selected operation\
-\ndue to one or more of the following reasons:\
-\no  There are no disk units that need to be rebuilt.\
-\no  The disk unit that needs  to be rebuild is not at the right\
-\n   location.  Examine the 'message log' for the exposed unit\
-\n   and make sure that the replacement unit is at the correct\
-\n   location.\
-\no  Not all disk units attached to an IOA have reported to the\
-\n   system.  Retry the operation.\
-\no  All the disk units in a parity set must be the same capacity\
-\n   with a minumum number of 4 disk units and a maximum of 10 units\
-\n   in the resulting parity set.\
-\no  The type/model of the disk units is not supported for the\
-\n   requested operation."
-3 "%n%e%q"
+ due to one or more of the following reasons:"
+3 "There are no disk units that need to be rebuilt."
+4 "The disk unit that needs  to be rebuild is not at the right\
+ location. Examine the 'message log' for the exposed unit\
+ and make sure that the replacement unit is at the correct\
+ location."
+5 "Not all disk units attached to an IOA have reported to the\
+ system. Retry the operation."
+6 "All the disk units in a parity set must be the same capacity\
+ with a minumum number of 4 disk units and a maximum of 10 units\
+ in the resulting parity set."
+7 "The type/model of the disk units is not supported for the\
+ requested operation."
 
 $set 323 confirm_raid_rebuild
 1 "Confirm Rebuild Disk Unit Data"
 2 "Rebuilding the disk unit data may take several minutes for\
-\neach unit selected.\
-\n\
-\nPress Enter to confirm having the data rebuilt.\
-\nPress q=Cancel to return and change your choice.\
-\n\
-\n        Vendor    Product           Serial    PCI    PCI   SCSI  SCSI  SCSI\
-\nOption   ID         ID              Number    Bus    Dev    Bus    ID   Lun\
-\n#1"
-3 "%q%f"
+ each unit selected."
+3 "Press Enter to confirm having the data rebuilt."
+4 "Cancel to return and change your choice."
 
 $set 330 battery_maint
 1 "Work with Resources Containing Cache Battery Packs"

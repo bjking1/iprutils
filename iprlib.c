@@ -9,7 +9,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.15 2004/02/17 16:34:44 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.16 2004/02/17 23:49:24 manderso Exp $
  */
 
 #ifndef iprlib_h
@@ -289,14 +289,15 @@ static int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 	for (i = 0; i < ioa->num_devices; i++, dev++) {
 		if (!dev->scsi_dev_data)
 			continue;
-		if (dev->channel = bus && dev->type == TYPE_ENCLOSURE)
+		if ((dev->scsi_dev_data->channel == bus) &&
+		    (dev->scsi_dev_data->type == TYPE_ENCLOSURE))
 			break;
 	}
 
 	if (i == ioa->num_devices)
-		return IPR_MAX_BUS_SPEED;
+		return IPR_MAX_XFER_RATE;
 	if (strncmp(dev->scsi_dev_data->vendor_id, "IBM", 3))
-		return IPR_MAX_BUS_SPEED;
+		return IPR_MAX_XFER_RATE;
 
 	for (i = 0; i < ARRAY_SIZE(ses_table); i++, ste++) {
 		for (j = 0, matches = 0; j < IPR_PROD_ID_LEN; j++) {
@@ -310,10 +311,10 @@ static int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 		}
 
 		if (matches == IPR_PROD_ID_LEN)
-			return ste-L>max_bus_speed_limit;
+			return ste->max_bus_speed_limit;
 	}
 
-	return IPR_MAX_BUS_SPEED;
+	return IPR_MAX_XFER_RATE;
 }
 
 struct ioa_parms {
@@ -322,12 +323,12 @@ struct ioa_parms {
 };
 
 static const struct ioa_parms ioa_parms [] = {
-	{.ccin:0x5702, .scsi_id_changeable: 1},
-	{.ccin:0x5703, .scsi_id_changeable: 0},
-	{.ccin:0x5709, .scsi_id_changeable: 0},
-	{.ccin:0x570A, .scsi_id_changeable: 0},
-	{.ccin:0x570B, .scsi_id_changeable: 0},
-	{.ccin:0x2780, .scsi_id_changeable: 0},
+	{.ccin = 0x5702, .scsi_id_changeable = 1},
+	{.ccin = 0x5703, .scsi_id_changeable = 0},
+	{.ccin = 0x5709, .scsi_id_changeable = 0},
+	{.ccin = 0x570A, .scsi_id_changeable = 0},
+	{.ccin = 0x570B, .scsi_id_changeable = 0},
+	{.ccin = 0x2780, .scsi_id_changeable = 0},
 };
 
 static void setup_ioa_parms(struct ipr_ioa *ioa)
@@ -2032,7 +2033,8 @@ static int ipr_get_saved_bus_attr(struct ipr_ioa *ioa, int bus,
 				}
 			}
 		}
-	} 
+	}
+	return RC_FAILED;
 }
 
 int ipr_config_file_valid(struct ipr_ioa *ioa)
@@ -2088,7 +2090,7 @@ void ipr_save_page_28(struct ipr_ioa *ioa,
 				(ntohl(page_28_cur->attr[i].max_xfer_rate) *
 				 (page_28_cur->attr[i].bus_width / 8))/10);
 			ipr_save_bus_attr(ioa, page_28_cur->attr[i].res_addr.bus,
-					  IPR_MAX_XFER_RATE, value_str,
+					  IPR_MAX_XFER_RATE_STR, value_str,
 					  page_28_ipr->attr[i].max_xfer_rate);
 		}
 
@@ -2104,13 +2106,14 @@ void ipr_save_page_28(struct ipr_ioa *ioa,
 void ipr_set_page_28(struct ipr_ioa *ioa,
 		     int limited_config, int reset_scheduled)
 {
-	int rc, i, length, new_value;
+	int rc, i, new_value;
 	char current_mode_settings[255];
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
 	struct ipr_page_28 *page_28;
 	int is_reset_req = 0;
 	char value_str[64];
-	u32 max_xfer_rate;
+	int max_xfer_rate;
+	int length;
 
 	memset(current_mode_settings,0,sizeof(current_mode_settings));
 	mode_parm_hdr = (struct ipr_mode_parm_hdr *)current_mode_settings;
@@ -2132,7 +2135,7 @@ void ipr_set_page_28(struct ipr_ioa *ioa,
 
 		if (ioa->scsi_id_changeable) {
 			rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
-						    IPR_HOST_SCSI_ID, value_str)
+						    IPR_HOST_SCSI_ID, value_str);
 				if (rc == RC_SUCCESS) {
 					sscanf(value_str,"%d", &new_value);
 					if (page_28->attr[i].scsi_id != new_value) {
@@ -2143,12 +2146,12 @@ void ipr_set_page_28(struct ipr_ioa *ioa,
 		}
 
 		rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
-					    IPR_BUS_WIDTH, value_str)
+					    IPR_BUS_WIDTH, value_str);
 
-			if (rc == RC_SUCCESS) {
-				sscanf(value_str,"%d", &new_value);
-				page_28->attr[i].bus_width = new_value;
-			}
+		if (rc == RC_SUCCESS) {
+			sscanf(value_str,"%d", &new_value);
+			page_28->attr[i].bus_width = new_value;
+		}
 
 		if (1) { /* xxx FIXME - build backplane table */
 			if (limited_config & (1 << page_28->attr[i].res_addr.bus)) {
@@ -2166,50 +2169,50 @@ void ipr_set_page_28(struct ipr_ioa *ioa,
 						(ntohl(page_28->attr[i].max_xfer_rate) *
 						 (page_28->attr[i].bus_width / 8))/10);
 					ipr_save_bus_attr(ioa, page_28->attr[i].res_addr.bus,
-							  IPR_MAX_XFER_RATE, value_str, 1);
+							  IPR_MAX_XFER_RATE_STR, value_str, 1);
 				}
 			} else {
 				max_xfer_rate = get_max_bus_speed(ioa,
 								  page_28->attr[i].res_addr.bus);
 
 				rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
-							    IPR_MAX_XFER_RATE, value_str)
+							    IPR_MAX_XFER_RATE_STR, value_str);
 
-					if (rc == RC_SUCCESS) {
-						sscanf(value_str,"%d", &new_value);
+				if (rc == RC_SUCCESS) {
+					sscanf(value_str,"%d", &new_value);
 
-						if (new_value <= max_xfer_rate) {
-							page_28->attr[i].max_xfer_rate =
-								htonl(new_value * 10 /
-								      (page_28->attr[i].bus_width / 8));
-						} else {
-							page_28->attr[i].max_xfer_rate =
-								htonl(max_xfer_rate * 10 /
-								      (page_28->attr[i].bus_width / 8));
-							sprintf(value_str,"%d",
-								(ntohl(page_28->attr[i].max_xfer_rate) *
-								 (page_28->attr[i].bus_width / 8))/10);
-							ipr_save_bus_attr(ioa, page_28->attr[i].res_addr.bus,
-									  IPR_MAX_XFER_RATE, value_str, 1);
-						}
+					if (new_value <= max_xfer_rate) {
+						page_28->attr[i].max_xfer_rate =
+							htonl(new_value * 10 /
+							      (page_28->attr[i].bus_width / 8));
 					} else {
 						page_28->attr[i].max_xfer_rate =
 							htonl(max_xfer_rate * 10 /
 							      (page_28->attr[i].bus_width / 8));
+						sprintf(value_str,"%d",
+							(ntohl(page_28->attr[i].max_xfer_rate) *
+							 (page_28->attr[i].bus_width / 8))/10);
+						ipr_save_bus_attr(ioa, page_28->attr[i].res_addr.bus,
+								  IPR_MAX_XFER_RATE_STR, value_str, 1);
 					}
+				} else {
+					page_28->attr[i].max_xfer_rate =
+						htonl(max_xfer_rate * 10 /
+						      (page_28->attr[i].bus_width / 8));
+				}
 			}
 		}
 
 		if (0) { /* xxx FIXME? */
 			rc = ipr_get_saved_bus_attr(ioa, page_28->attr[i].res_addr.bus,
-						    IPR_MIN_TIME_DELAY, value_str)
+						    IPR_MIN_TIME_DELAY, value_str);
 
-				if (rc == RC_SUCCESS) {
-					sscanf(value_str,"%d", &new_value);
-					page_28->attr[i].min_time_delay = new_value;
-				} else {
-					page_28->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
-				}
+			if (rc == RC_SUCCESS) {
+				sscanf(value_str,"%d", &new_value);
+				page_28->attr[i].min_time_delay = new_value;
+			} else {
+				page_28->attr[i].min_time_delay = IPR_INIT_SPINUP_DELAY;
+			}
 		}
 	}
 
@@ -2217,7 +2220,7 @@ void ipr_set_page_28(struct ipr_ioa *ioa,
 	length = mode_parm_hdr->length + 1;
 	mode_parm_hdr->length = 0;
 
-	rc = ipr_mode_select(ioa->ioa.gen_name, page_28_sense, length);
+	rc = ipr_mode_select(ioa->ioa.gen_name, mode_parm_hdr, length);
 
 	if (rc != 0)
 		return;

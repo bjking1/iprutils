@@ -75,7 +75,7 @@ int confirm_init_device(i_container * i_con);
 int send_dev_inits(i_container * i_con);
 int reclaim_cache(i_container * i_con);
 int confirm_reclaim(i_container * i_con);
-int confirm_reclaim_warning(i_container * i_con);
+int reclaim_warning(i_container * i_con);
 int reclaim_result(i_container * i_con);
 int af_include(i_container * i_con);
 int af_remove(i_container * i_con);
@@ -500,7 +500,7 @@ struct screen_opts concurrent_remove_device_opt[] = {
 };
 
 s_node n_concurrent_remove_device = {
-	320,
+	302,
 	(CANCEL_FLAG),
 	NUM_OPTS(concurrent_remove_device_opt),
 	&concurrent_remove_device_opt[0],
@@ -514,7 +514,7 @@ struct screen_opts process_conc_maint_opt[] = {
 };
 
 s_node n_process_conc_maint = {
-	321,
+	303,
 	(NULL_FLAG),
 	NUM_OPTS(process_conc_maint_opt),
 	&process_conc_maint_opt[0],
@@ -566,27 +566,31 @@ s_node n_dev_init_complete = {
 };
 
 struct screen_opts reclaim_cache_opts[] = {
-	{confirm_reclaim, 0, "1"}
+	{confirm_reclaim, 0, "\n"}
 };
 
 s_node n_reclaim_cache = {
 	315,
 	(CANCEL_FLAG),
 	NUM_OPTS(reclaim_cache_opts),
-	&reclaim_cache_opts[0]
+	&reclaim_cache_opts[0],
+	NULL,
+	NULL,
+	"%e%q%t"
 };
 
 struct screen_opts confirm_reclaim_opt[] = {
-	{NULL, 0, "c"}		/* xxx */
+	{reclaim_warning, 0, "c"}
 };
-
-
 
 s_node n_confirm_reclaim = {
 	316,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_reclaim_opt),
-	&confirm_reclaim_opt[0]
+	&confirm_reclaim_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 struct screen_opts confirm_reclaim_warning_opt[] = {
@@ -597,14 +601,20 @@ s_node n_confirm_reclaim_warning = {
 	317,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_reclaim_warning_opt),
-	&confirm_reclaim_warning_opt[0]
+	&confirm_reclaim_warning_opt[0],
+	NULL,
+	NULL,
+	"%qs=Confirm reclaim    %f"
 };
 
 s_node n_reclaim_result = {
 	319,
 	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts raid_rebuild_opt[] = {
@@ -612,17 +622,23 @@ struct screen_opts raid_rebuild_opt[] = {
 };
 
 s_node n_raid_rebuild = {
-	331,
+	321,
 	(CANCEL_FLAG),
 	NUM_OPTS(raid_rebuild_opt),
-	&raid_rebuild_opt[0]
+	&raid_rebuild_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_raid_rebuild_fail = {
 	322,
 	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts confirm_raid_rebuild_opt[] = {
@@ -630,10 +646,13 @@ struct screen_opts confirm_raid_rebuild_opt[] = {
 };
 
 s_node n_confirm_raid_rebuild = {
-	331,
-	(CANCEL_FLAG),
+	323,
+	(NULL_FLAG),
 	NUM_OPTS(raid_rebuild_opt),
-	&confirm_raid_rebuild_opt[0]
+	&confirm_raid_rebuild_opt[0],
+	NULL,
+	NULL,	
+	"%q%f%t"
 };
 
 struct screen_opts configure_af_device_opt[] = {
