@@ -845,6 +845,7 @@ struct screen_output *screen_driver(s_node *screen, int header_lines, i_containe
 		if (fields[i] != NULL)
 			free_field(fields[i]);
 	}
+	ipr_free(fields);
 	delwin(w_pad);
 	delwin(w_page_header);
 	return s_out;

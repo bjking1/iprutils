@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.7
+Version: 2.0.8
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -27,14 +27,14 @@ install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
 install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
 
 %post
-/usr/lib/lsb/install_initd $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
-/usr/lib/lsb/install_initd $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
-/usr/lib/lsb/install_initd $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
+/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
+/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
+/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
 
 %preun
-/usr/lib/lsb/remove_initd $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
-/usr/lib/lsb/remove_initd $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
-/usr/lib/lsb/remove_initd $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
+/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
+/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
+/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -47,6 +47,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon Apr 28 2004 Brian King <brking@us.ibm.com> 2.0.8
+- Fix to properly enable init.d scripts when the rpm is installed
+- Fix memory leak in code download path
+- Increase size of page 0 inquiry buffer so that extended vpd is displayed
+- Decrease write buffer timeout to 2 minutes
 * Wed Apr 16 2004 Brian King <brking@us.ibm.com> 2.0.7
 - Load sg module in init.d scripts if not loaded
 - Load sg module in iprconfig if not loaded

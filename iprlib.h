@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.41 2004/04/06 21:10:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.42 2004/04/28 22:53:22 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -71,7 +71,7 @@
 #define IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER    256
 #define  IPR_SDB_CHECK_AND_QUIESCE           0x00
 #define  IPR_SDB_CHECK_ONLY                  0x40
-#define IPR_MAX_NUM_SUPP_INQ_PAGES           8
+#define IPR_MAX_NUM_SUPP_INQ_PAGES           36
 #define IPR_DUMP_TRACE_ENTRY_SIZE            8192
 #define IPR_MODE_SENSE_LENGTH                255
 #define IPR_DEFECT_LIST_HDR_LEN              4
@@ -83,7 +83,7 @@
 #define IPR_INTERNAL_TIMEOUT                 (30)         /* 30 seconds */
 #define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)         /* 35 seconds */
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
-#define IPR_WRITE_BUFFER_TIMEOUT             (10 * 60)    /* 10 minutes */
+#define IPR_WRITE_BUFFER_TIMEOUT             (2 * 60)     /* 2 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
 #define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    15
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
