@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.55 2004/05/23 05:45:41 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.56 2004/06/10 14:41:01 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1594,8 +1594,8 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		segment_size = IPR_MAX_XFER;
 
 		for (i = 0; (i < iovec_count) && (buff_len != 0); i++) {
-			iovec[i].iov_base = malloc(IPR_MAX_XFER);
-			memcpy(iovec[i].iov_base, data + IPR_MAX_XFER * i, IPR_MAX_XFER);
+			iovec[i].iov_base = malloc(segment_size);
+			memcpy(iovec[i].iov_base, data + IPR_MAX_XFER * i, segment_size);
 			iovec[i].iov_len = segment_size;
 
 			buff_len -= segment_size;

@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.10
+Version: 2.0.11
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Jun 10 2004 Brian King <brking@us.ibm.com> 2.0.11
+- Fix segmentation fault in _sg_ioctl that was causing a silent
+  failure of microcode update to disks. The microcode update would
+  fail, but no error would be logged. The seg fault was in a child
+  process, so the parent process kept running.
 * Thu May 23 2004 Brian King <brking@us.ibm.com> 2.0.10
 - Don't let iprdbg sg ioctls be retried.
 - Add --force flag to iprconfig to allow user to workaround buggy
