@@ -11,7 +11,7 @@
 /******************************************************************/
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.1 2003/10/22 22:21:02 manderso Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.2 2003/10/22 22:44:25 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -38,6 +38,7 @@
 #include <term.h>
 #include <pci/pci.h>
 #include <stdbool.h>
+#include <netinet/in.h>
 
 #define IOCTL_BUFFER_SIZE 512
 #define IBMSIS_MAX_NUM_BUSES               4
@@ -213,20 +214,13 @@ struct ibmsis_record_common
 
 #if (defined(__KERNEL__) && defined(__LITTLE_ENDIAN)) || \
 (!defined(__KERNEL__) && (__BYTE_ORDER == __LITTLE_ENDIAN))
-#ifdef IBMSIS_IBMSISDD
-#define htosis16(x) swab16(x)
-#define htosis32(x) swab32(x)
-#define sistoh16(x) swab16(x)
-#define sistoh32(x) swab32(x)
-#else
-#define htosis16(x) bswap16(x)
-#define htosis32(x) bswap32(x)
-#define sistoh16(x) bswap16(x)
-#define sistoh32(x) bswap32(x)
-#endif
+#define htosis16(x) htons(x)
+#define htosis32(x) htonl(x)
+#define sistoh16(x) ntohs(x)
+#define sistoh32(x) ntohl(x)
 
-#define _i16(x) _sw16(x)
-#define _i32(x) _sw32(x)
+#define _i16(x) htons(x)
+#define _i32(x) htonl(x)
 
 #define IBMSIS_BIG_ENDIAN       0
 #define IBMSIS_LITTLE_ENDIAN    1
