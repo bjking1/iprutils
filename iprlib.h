@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.37 2004/03/19 23:13:12 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.38 2004/03/22 14:36:57 bjking1 Exp $
  */
 
 #include <stdarg.h>
@@ -140,7 +140,6 @@
 #endif
 
 #define IPR_TYPE_AF_DISK             0xC
-#define IPR_TYPE_SES                 TYPE_ENCLOSURE /* xxx change to TYPE_ENCLOSURE */
 #define IPR_TYPE_ADAPTER             0x1f
 #define IPR_TYPE_EMPTY_SLOT          0xff
 
@@ -384,7 +383,7 @@ struct ipr_query_res_state {
 	u8 reserved1:1;
 	u8 not_oper:1;
 	u8 not_ready:1;
-	u8 not_func:1; /* xxx check this bit? */
+	u8 not_func:1;
 	u8 reserved2:4;
 
 	u8 read_write_prot:1;
@@ -925,7 +924,7 @@ struct ipr_read_cap16 {
 /* Struct for disks that are unsupported or require a minimum microcode
  level prior to formatting to 522-byte sectors. */
 struct unsupported_af_dasd {
-	char vendor_id[IPR_VENDOR_ID_LEN + 1]; /* xxx char * instead? */
+	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char compare_vendor_id_byte[IPR_VENDOR_ID_LEN];
 	char product_id[IPR_PROD_ID_LEN + 1];
 	char compare_product_id_byte[IPR_PROD_ID_LEN];
@@ -937,7 +936,7 @@ struct unsupported_af_dasd {
 };
 
 struct unsupported_dasd {
-	char vendor_id[IPR_VENDOR_ID_LEN + 1]; /* xxx char * instead? */
+	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char compare_vendor_id_byte[IPR_VENDOR_ID_LEN];
 	char product_id[IPR_PROD_ID_LEN + 1];
 	char compare_product_id_byte[IPR_PROD_ID_LEN];

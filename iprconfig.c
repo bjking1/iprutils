@@ -2693,6 +2693,54 @@ int configure_raid_parameters(i_container *i_con)
 
 	rc = RC_SUCCESS;
 
+	cur_ioa = cur_raid_cmd->ipr_ioa;
+	supported_arrays = cur_ioa->supported_arrays;
+	cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
+
+	/* determine number of devices selected for this parity set */
+	for (i=0; i<cur_ioa->num_devices; i++) {
+		device_record = (struct ipr_dev_record *) cur_ioa->dev[i].qac_entry;
+
+		if (device_record &&
+		    device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
+		    device_record->issue_cmd)
+			selected_count++;
+	}
+	qdepth = selected_count * 4;
+	cur_raid_cmd->qdepth = qdepth;
+
+	/* set up raid lists */
+	raid_index = 0;
+	raid_index_default = -1;
+	prot_level_list = malloc(sizeof(struct prot_level));
+	prot_level_list[raid_index].is_valid_entry = 0;
+
+	for (i = 0; i < ntohs(supported_arrays->num_entries); i++) {
+		if (selected_count <= cur_array_cap_entry->max_num_array_devices &&
+		    selected_count >= cur_array_cap_entry->min_num_array_devices &&
+		    ((selected_count % cur_array_cap_entry->min_mult_array_devices) == 0)) {
+			prot_level_list[raid_index].array_cap_entry = cur_array_cap_entry;
+			prot_level_list[raid_index].is_valid_entry = 1;
+			if (raid_index_default == -1 &&
+			    !strcmp(cur_array_cap_entry->prot_level_str, "10"))
+				raid_index_default = raid_index;
+			else if (!strcmp(cur_array_cap_entry->prot_level_str, IPR_DEFAULT_RAID_LVL))
+				raid_index_default = raid_index;
+
+			raid_index++;
+			prot_level_list = realloc(prot_level_list, sizeof(struct prot_level) * (raid_index + 1));
+			prot_level_list[raid_index].is_valid_entry = 0;
+		}
+		cur_array_cap_entry = (struct ipr_array_cap_entry *)
+			((void *)cur_array_cap_entry + ntohs(supported_arrays->entry_length));
+	}
+
+	if (!raid_index)
+		return 69 | EXIT_FLAG;
+
+	if (raid_index_default == -1)
+		raid_index_default = 0;
+
 	/* Title */
 	input_fields[0] = new_field(1, max_x - start_x,   /* new field size */ 
 				    0, 0,       /* upper left corner */
@@ -2718,46 +2766,6 @@ int configure_raid_parameters(i_container *i_con)
 				    0);          /* number of working buffers */
 
 	input_fields[4] = NULL;
-
-
-	cur_ioa = cur_raid_cmd->ipr_ioa;
-	supported_arrays = cur_ioa->supported_arrays;
-	cur_array_cap_entry = (struct ipr_array_cap_entry *)supported_arrays->data;
-
-	/* determine number of devices selected for this parity set */
-	for (i=0; i<cur_ioa->num_devices; i++) {
-		device_record = (struct ipr_dev_record *) cur_ioa->dev[i].qac_entry;
-
-		if (device_record &&
-		    device_record->common.record_id == IPR_RECORD_ID_DEVICE_RECORD &&
-		    device_record->issue_cmd)
-			selected_count++;
-	}
-	qdepth = selected_count * 4;
-	cur_raid_cmd->qdepth = qdepth;
-
-	/* set up raid lists */
-	raid_index = 0;
-	raid_index_default = 0;
-	prot_level_list = malloc(sizeof(struct prot_level));
-	prot_level_list[raid_index].is_valid_entry = 0;
-
-	for (i=0; i<ntohs(supported_arrays->num_entries); i++) {
-		if (selected_count <= cur_array_cap_entry->max_num_array_devices &&
-		    selected_count >= cur_array_cap_entry->min_num_array_devices &&
-		    ((selected_count % cur_array_cap_entry->min_mult_array_devices) == 0)) {
-			prot_level_list[raid_index].array_cap_entry = cur_array_cap_entry;
-			prot_level_list[raid_index].is_valid_entry = 1;
-			if (!strcmp(cur_array_cap_entry->prot_level_str,IPR_DEFAULT_RAID_LVL))
-				raid_index_default = raid_index;
-
-			raid_index++;
-			prot_level_list = realloc(prot_level_list, sizeof(struct prot_level) * (raid_index + 1));
-			prot_level_list[raid_index].is_valid_entry = 0;
-		}
-		cur_array_cap_entry = (struct ipr_array_cap_entry *)
-			((void *)cur_array_cap_entry + ntohs(supported_arrays->entry_length));
-	}
 
 	raid_index = raid_index_default;
 	cur_array_cap_entry = prot_level_list[raid_index].array_cap_entry;
@@ -4736,7 +4744,7 @@ int process_conc_maint(i_container *i_con, int action)
 	for (j = 0; j < cur_ioa->num_devices; j++) {
 		scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 
-		if (!scsi_dev_data || scsi_dev_data->type != IPR_TYPE_SES)
+		if (!scsi_dev_data || scsi_dev_data->type != TYPE_ENCLOSURE)
 			continue;
 
 		rc = ipr_receive_diagnostics(&cur_ioa->dev[j], 2, &ses_data,
@@ -4966,7 +4974,7 @@ int start_conc_maint(i_container *i_con, int action)
 		for (j = 0; j < cur_ioa->num_devices; j++) {
 			scsi_dev_data = cur_ioa->dev[j].scsi_dev_data;
 			if ((scsi_dev_data == NULL) ||
-			    (scsi_dev_data->type != IPR_TYPE_SES))
+			    (scsi_dev_data->type != TYPE_ENCLOSURE))
 				continue;
 
 			rc = ipr_receive_diagnostics(&cur_ioa->dev[j], 2, &ses_data,
@@ -6489,7 +6497,10 @@ int change_bus_attr(i_container *i_con)
 	for (j = 0; j < page_28_cur.num_buses; j++) {
 
 		page_28_chg.bus[j].qas_capability = 0;
-		page_28_chg.bus[j].scsi_id = 0; /* FIXME!!! need to allow dart (by vend/prod & subsystem id) */
+		if (cur_ioa->scsi_id_changeable)
+			page_28_chg.bus[j].scsi_id = 1;
+		else
+			page_28_chg.bus[j].scsi_id = 0;
 		page_28_chg.bus[j].bus_width = 1;
 		page_28_chg.bus[j].max_xfer_rate = 1;
 	}
@@ -6649,7 +6660,10 @@ int confirm_change_bus_attr(i_container *i_con)
 	for (j = 0; j < page_28_cur->num_buses; j++) {
 
 		page_28_chg.bus[j].qas_capability = 0;
-		page_28_chg.bus[j].scsi_id = 0; /* FIXME!!! need to allow dart (by vend/prod & subsystem id) */
+		if (cur_ioa->scsi_id_changeable)
+			page_28_chg.bus[j].scsi_id = 1;
+		else
+			page_28_chg.bus[j].scsi_id = 0;
 		page_28_chg.bus[j].bus_width = 1;
 		page_28_chg.bus[j].max_xfer_rate = 1;
 	}
@@ -8760,7 +8774,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			sprintf(body + len, "Missing\n");
 		else if (!scsi_dev_data->online)
 			sprintf(body + len, "Offline\n");
-		else if (res_state.not_oper)
+		else if (res_state.not_oper || res_state.not_func)
 			sprintf(body + len, "Failed\n");
 		else if (res_state.read_write_prot)
 			sprintf(body + len, "R/W Protected\n");

@@ -1250,6 +1250,7 @@ const char *screen_status[] = {
       /* 66 */ __("Failed to change disk configuration."),
       /* 67 */ __("Microcode Download failed."),
 	/* 68 */ __("Failed to enable IOA cache."),
+	/* 69 */ __("Invalid number of devices selected."),
       /* NOTE:  127 maximum limit */
 };
 
