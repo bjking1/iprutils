@@ -93,12 +93,11 @@ int confirm_raid_rebuild(i_container * i_con);
 
 int battery_maint(i_container * i_con);
 int battery_fork(i_container * i_con);
-int confirm_force_battery_error(i_container * i_con);
-int force_battery_error(i_container * i_con);
-int show_battery_info(i_container * i_con);
+int force_battery_error(i_container *i_con);
 int bus_config(i_container * i_con);
 int change_bus_attr(i_container * i_con);
 int driver_config(i_container * i_con);
+int change_driver_config(i_container *i_con);
 int log_menu(i_container * i_con);
 int ibm_storage_log_tail(i_container * i_con);
 int ibm_storage_log(i_container * i_con);
@@ -667,19 +666,10 @@ s_node n_battery_maint = {
 	330,
 	(CANCEL_FLAG),
 	NUM_OPTS(battery_maint_opt),
-	&battery_maint_opt[0]
-};
-
-struct screen_opts battery_fork_opt[] = {
-	{confirm_force_battery_error, 2, "2"},
-	{show_battery_info, 3, "5"}
-};
-
-s_node n_battery_fork = {
-	999,
-	(NULL_FLAG),
-	NUM_OPTS(battery_fork_opt),
-	&battery_fork_opt[0]
+	&battery_maint_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t"
 };
 
 struct screen_opts confirm_force_battery_error_opt[] = {
@@ -687,24 +677,23 @@ struct screen_opts confirm_force_battery_error_opt[] = {
 };
 
 s_node n_confirm_force_battery_error = {
-	341,
+	340,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_force_battery_error_opt),
-	&confirm_force_battery_error_opt[0]
-};
-
-s_node n_force_battery_error = {
-	341,
-	(NULL_FLAG),
-	0,
-	NULL
+	&confirm_force_battery_error_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_show_battery_info = {
 	332,
 	(NULL_FLAG),
 	0,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 struct screen_opts bus_config_opt[] = {
@@ -715,54 +704,49 @@ s_node n_bus_config = {
 	401,
 	(CANCEL_FLAG | REFRESH_FLAG),
 	NUM_OPTS(bus_config_opt),
-	&bus_config_opt[0]
+	&bus_config_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
 };
 
 s_node n_bus_config_fail = {
 	402,
 	(NULL_FLAG),
 	0,
-	NULL
-};
-
-s_node n_change_bus_attr = { /* this is copied straight MENUS */
-	403,
-	(CANCEL_FLAG),
-	0,
-	NULL
-};
-
-struct screen_opts confirm_bus_config_opt[] = {
-	{NULL, 0, "c"} /* confirm_bus_config_reset */
+	NULL,
+	NULL,
+	NULL,
+	"%n%e%q"
 };
 
 
-s_node n_confirm_bus_config = {
-	404,
-	(NULL_FLAG),
-	NUM_OPTS(confirm_bus_config_opt),
-	&confirm_bus_config_opt[0]
-};
-
-s_node n_confirm_bus_config_reset = {
-	405,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_processing_bus_config = {
-	404,
-	(NULL_FLAG),
-	NUM_OPTS(confirm_bus_config_opt),
-	&confirm_bus_config_opt[0]
+struct screen_opts driver_config_opt[] = {
+	{change_driver_config, 0, "\n"}
 };
 
 s_node n_driver_config = {
+	458,
+	(CANCEL_FLAG | REFRESH_FLAG),
+	NUM_OPTS(driver_config_opt),
+	&driver_config_opt[0],
+	NULL,
+	NULL,
+	"%e%q%t%f"
+};
+
+struct screen_opts change_driver_config_opt[] = {
+	{NULL, 0, "\n"}
+};
+
+s_node n_change_driver_config = {
 	459,
-	(EXIT_FLAG | CANCEL_FLAG),
-	0,
-	NULL
+	(NULL_FLAG),
+	NUM_OPTS(change_driver_config_opt),
+	&change_driver_config_opt[0],
+	NULL,
+	NULL,
+	"%n"
 };
 
 struct screen_opts log_menu_opt[] = {
@@ -780,35 +764,10 @@ s_node n_log_menu = {
 	500,
 	(EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
 	NUM_OPTS(log_menu_opt),
-	&log_menu_opt[0]
-};
-
-s_node n_ibm_storage_log_tail = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_ibm_storage_log = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_kernel_log = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_iprconfig_log = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
+	&log_menu_opt[0],
+	NULL,
+	NULL,
+	"%e%q"
 };
 
 struct screen_opts kernel_root_opt[] = {
@@ -819,7 +778,10 @@ s_node n_kernel_root = {
 	501,
 	(NULL_FLAG),
 	NUM_OPTS(kernel_root_opt),
-	&kernel_root_opt[0]
+	&kernel_root_opt[0],
+	NULL,
+	NULL,
+	"%n"
 };
 
 struct screen_opts confirm_kernel_root_opt[] = {
@@ -830,7 +792,10 @@ s_node n_confirm_kernel_root = {
 	502,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_kernel_root_opt),
-	&confirm_kernel_root_opt[0]
+	&confirm_kernel_root_opt[0],
+	NULL,
+	NULL,
+	"c=Confirm   %q"
 };
 
 struct screen_opts set_default_editor_opt[] = {
@@ -841,7 +806,10 @@ s_node n_set_default_editor = {
 	503,
 	(NULL_FLAG),
 	NUM_OPTS(set_default_editor_opt),
-	&set_default_editor_opt[0]
+	&set_default_editor_opt[0],
+	NULL,
+	NULL,
+	"%n"
 };
 
 struct screen_opts confirm_set_default_editor_opt[] = {
@@ -852,26 +820,8 @@ s_node n_confirm_set_default_editor = {
 	504,
 	(NULL_FLAG),
 	NUM_OPTS(confirm_set_default_editor_opt),
-	&confirm_set_default_editor_opt[0]
-};
-
-s_node n_restore_log_defaults = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_ibm_boot_log = {
-	999,
-	(NULL_FLAG),
-	0,
-	NULL
-};
-
-s_node n_print_device = {
-	700,
-	(NULL_FLAG),
-	0,
-	NULL
+	&confirm_set_default_editor_opt[0],
+	NULL,
+	NULL,
+	"c=Confirm   %q"
 };

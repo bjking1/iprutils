@@ -414,210 +414,103 @@ $set 323 confirm_raid_rebuild
 
 $set 330 battery_maint
 1 "Work with Resources Containing Cache Battery Packs"
-2 "Type options, press Enter\
-\n  2=Force battery pack into error state    5=Display battery information\
-\n\
-\n    Resource                               PCI  PCI   SCSI\
-\nOpt Name          Serial Number Type-Model Bus Device Host\
-\n#1"
-3 "%e%q"
+2 "Type options, press Enter"
+3 "Force battery pack into error state"
+4 "Display battery information"
 
 $set 341 confirm_force_battery_error
 1 "Force Battery Packs Into Error State"
 2 "ATTENTION: This service function should be run only under the direction\
-\nof the IBM Hardware Service Support\
-\n\
-\nYou have selected to force a cache batter error on an IOA\
-\n\
-\nYou will have to replace the Cache Battery Pack in each selected IOA to\
-\nresume normal operations.\
-\n\
-\nSystem performance could be significantly degraded until the cache battery\
-\npacks are replaced on the selected IOAs.\
-\n\
-\nPress c=Continue to force the following battery packs into an error state\
-\n\
-\n    Resource                               PCI  PCI   SCSI\
-\nOpt Name          Serial Number Type-Model Bus Device Host\
-\n#1"
-3 "%e%q%f"
+ of the IBM Hardware Service Support"
+3 "You have selected to force a cache batter error on an IOA"
+4 "You will have to replace the Cache Battery Pack in each selected IOA to\
+ resume normal operations."
+5 "System performance could be significantly degraded until the cache battery\
+ packs are replaced on the selected IOAs."
+6 "Continue to force the following battery packs into an error state"
 
 $set 332 show_battery_info
 1 "Battery Information"
-2 "Resource Name . . . . . . . . . . . : #1\
-\nSerial Number . . . . . . . . . . . : #2\
-\nType  . . . . . . . . . . . . . . . : #3\
-\nPCI Address . . . . . . . . . . . . : #4\
-\nSCSI Host Number  . . . . . . . . . : #6\
-\nBattery type  . . . . . . . . . . . : #7\
-\nBattery state . . . . . . . . . . . : #8\
-\nPower on time (days)  . . . . . . . : #9\
-\nAdjusted power on time (days) . . . : #10\
-\nEstimated time to warning (days)  . : #11\
-\nEstimated time to error (days)  . . : #12"
-3 "%n%e%q"
+2 "Resource Name"
+3 "Serial Number"
+4 "Type"
+5 "PCI Address"
+6 "SCSI Host Number"
+7 "Battery type"
+8 "Battery state"
+9 "Power on time (days)"
+10 "Adjusted power on time (days)"
+11 "Estimated time to warning (days)"
+12 "Estimated time to error (days)"
 
-4 "Nickel Cadmium (NiCd)"
-5 "Nickel Metal Hydride (NiMH)"
-6 "Lithium Ion (LiIon)"
-7 "Unknown"
-8 "No battery warning"
-9 "Battery warning issued"
-10 "Battery error issued"
+21 "Nickel Cadmium (NiCd)"
+22 "Nickel Metal Hydride (NiMH)"
+23 "Lithium Ion (LiIon)"
+24 "Unknown"
 
-
-
-
-$ 4's
-$ ------------------------
+31 "No battery warning"
+32 "Battery warning issued"
+33 "Battery error issued"
 
 $set 401 bus_config
 1 "Work with SCSI Bus Configuration"
-2 "Select the subsystem to change scsi bus attribute.\
-\n\
-\nType choice, press Enter.\
-\n  1=change scsi bus attribute\
-\n\
-\n         Vendor    Product            Serial     PCI    PCI\
-\nOption    ID         ID               Number     Bus    Dev\
-\n#1"
-3 "%e%q%f"
+2 "Select the subsystem to change scsi bus attribute."
+3 "Type choice, press Enter."
+4 "change scsi bus attribute"
 
 $set 402 bus_config_fail
 1 "Work with SCSI Bus Configuration Failed"
 2 "There are no SCSI Buses eligible for the selected operation.\
-\nNone of the installed adapters support the requested\
-\noperation."
-3 "%n%e%q"
+ None of the installed adapters support the requested\
+ operation."
 
-$set 403 change_bus_attr
-1 "Change SCSI Bus Configuration"
-2 "Current Bus configurations are shown.  To change\
-\nsetting hit \"c\" for options menu.  Hightlight desired\
-\noption then hit Enter\
-\n\
-\nc=Change Setting\
-\n\
-\n#1"
-3 "%n%e%q%f"
+$set 458 driver_config
+1 "Adapter Driver Configuration"
+2 "Select subsystem to change driver configuration"
+3 "Type choice, press Enter"
+4 "change driver configuration"
 
-$set 404 confirm_bus_config
-1 "Confirm Change SCSI Bus Configuration"
-2 "Confirming this action will result in the following configuration to\
-\nbecome active.\
-\n\
-\n\
-\n\
-\nPress c=Confirm Change SCSI Bus Configuration\
-\n\
-\n#1"
-3 "c=Confirm   %e%q%f"
-
-
-$set 405
-1 "Confirm Change SCSI Bus Configuration"
-2 "Confirming this action will result in the following configuration to\
-\nbecome active.\
-\nATTENTION:  This action requires a reset of the Host Adapter.  Confirming\
-\nthis action may affect system performance while processing changes.\
-\n\
-\nPress c=Confirm Change SCSI Bus Configuration\
-\n\
-\n#1"
-3 "c=Confirm   %e%q%f"
-
-
-$set 406 processing_bus_config
-1 "Processing Change SCSI Bus Configuration"
-2 "Please wait for next screen"
-3 ""
-
-$set 459 driver_config
+$set 459 change_driver_config
 1 "Change Driver Configuration"
-
-2 " Current Driver configurations are shown.  To change\
-\n setting hit "c" for options menu.  Highlight desired\
-\n option then hit Enter\
-\n\
-\n c=Change Setting\
-\n\
-\n\
-\n    Verbosity  . . . . . . . . . . . . . :  %m"
-3 "%n%e%q"
-
-
-$ 5's
-$ ------------------------
+2 "Current Driver configurations are shown. To change\
+ setting, type in new value then hit Enter"
+3 "Current Verbosity"
+4 "New Verbosity"
 
 $set 500 log_menu
 1 "Kernel Messages Log"
-2 "Select one of the following:\
-\n\
-\n     1. Use #1 to view most recent IBM Storage error messages\
-\n     2. Use #1 to view IBM Storage error messages\
-\n     3. Use #1 to view all kernel error messages\
-\n     4. Use #1 to view sisconfig error messages\
-\n     5. Set root kernel message log directory\
-\n     6. Set default editor\
-\n     7. Restore defaults\
-\n     8. Use #1 to view IBM boot time messages\
-\n\
-\nSelection:  %1"
-3 "%e%q"
-
-$ used when IBM boot message log does not exist
-4 "Kernel Messages Log"
-5 "Select one of the following:\
-\n\
-\n     1. Use #1 to view most recent IBM Storage error messages\
-\n     2. Use #1 to view IBM Storage error messages\
-\n     3. Use #1 to view all kernel error messages\
-\n     4. Use #1 to view sisconfig error messages\
-\n     5. Set root kernel message log directory\
-\n     6. Set default editor\
-\n     7. Restore defaults\
-\n\
-\n\
-\nSelection:  %1"
-6 "%e%q"
+2 "View most recent IBM Storage error messages"
+3 "View IBM Storage error messages"
+4 "View all kernel error messages"
+5 "View sisconfig error messages"
+6 "Set root kernel message log directory"
+7 "Set default editor"
+8 "Restore defaults"
+9 "View IBM boot time messages"
 
 $set 501 kernel_root
 1 "Kernel Messages Log Root Directory"
-2 "\n\
-\nEnter new directory and press Enter\
-\n\
-\n\
-\nCurrent root directory: #1\
-\nNew root directory:     %39"
-3 "%n"
+2 "Enter new directory and press Enter"
+3 "Current root directory:"
+4 "New root directory:"
 
 $set 502 confirm_kernel_root
 1 "Confirm Root Directory Change"
-2 "\nPress \"c\" to confirm your new kernel root directory choice.\
-\nTo return to the log menu without changing the root directory, choose \"q\".\
-\n\
-\n\
-\nNew root directory:     #1"
-3 "c=Confirm   %q"
+2 "Press 'c' to confirm your new kernel root directory choice."
+3 "To return to the log menu without changing the root directory, choose 'q'."
+4 "New root directory:"
 
 $set 503 set_default_editor
 1 "Kernel Messages Editor"
-2 "\n\
-\nEnter new editor command and press Enter\
-\n\
-\n\
-\nCurrent editor: #1\
-\nNew editor:     %39"
-3 "%n"
+2 "Enter new editor command and press Enter"
+3 "Current editor:"
+4 "New editor:"
 
 $set 504 confirm_set_default_editor
 1 "Confirm Editor Change"
-2 "\nPress \"c\" to confirm your editor choice,\
-\nTo return to the log menu without changing the editor, choose \"q\".\
-\n\
-\n\
-\nNew editor:     #1"
-3 "c=Confirm   %q"
+2 "Press 'c' to confirm your editor choice"
+3 "To return to the log menu without changing the editor, choose 'q'."
+4 "New editor:"
 
 $set 888 screen status strings
 1 ""
@@ -680,19 +573,5 @@ $set 888 screen status strings
 63 "Editor unchanged"
 64 "Default log values restored"
 65 "Editor returned %d. Try setting the default editor."
-
-$set 900
-1 "Menu Test Screen"
-2 "This is test of the emergency menu system\
-\nUnder normal conditions, this screen would be\
-\nfollowed by bla bla bla...\
-\n\
-\nHit 'c' to choose one:\
-\n\
-\nOption1 .  .  .  .  .  .  .  .  .  .  .  : >%m<menu\
-\n\
-\nOption2 .  .  .  .  .  .  .  .  .  .  .  : %m\
-\n field length 2 -->%2<--"
-3 "%n%e%q%f"
 
 $set 999 empty set used for screens without displays
