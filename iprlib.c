@@ -7,7 +7,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.22 2004/02/24 23:20:25 bjking1 Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.23 2004/02/27 18:52:44 bjking1 Exp $
  */
 
 #ifndef iprlib_h
@@ -1446,6 +1446,10 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 
 
 	sysfs_device_class = sysfs_open_class("scsi_device");
+	if (!sysfs_device_class) {
+		exit_on_error("Cannot open scsi_device class. "
+			      "Make sure /sys is mounted\n");
+	}
 	class_devices = sysfs_get_class_devices(sysfs_device_class);
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 
@@ -1516,6 +1520,10 @@ static void get_sg_names(int num_devs)
 
 	sysfs_device_class = sysfs_open_class("scsi_generic");
 	class_devices = sysfs_get_class_devices(sysfs_device_class);
+	if (!class_devices) {
+		exit_on_error("Cannot open scsi_generic class. "
+			      "Make sure sg is loaded and /sys is mounted\n");
+	}
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 		sysfs_device_device = sysfs_get_classdev_device(class_device);
 		if (!sysfs_device_device)
@@ -1543,6 +1551,10 @@ static void get_sd_names(int num_devs)
 
 	sysfs_device_class = sysfs_open_class("block");
 	class_devices = sysfs_get_class_devices(sysfs_device_class);
+	if (!class_devices) {
+		exit_on_error("Cannot open block sysfs class. "
+			      "Make sure /sys is mounted\n");
+	}
 	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 		sysfs_device_device = sysfs_get_classdev_device(class_device);
 		if (!sysfs_device_device)

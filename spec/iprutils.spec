@@ -54,3 +54,4 @@ rm -rf $RPM_BUILD_ROOT
 /etc/init.d/iprdump
 /etc/init.d/iprinit
 /etc/init.d/iprupdate
+/usr/share/ipr/ipr.cat
