@@ -5854,7 +5854,7 @@ int dev_init_complete(u8 num_devs)
 
 		if (!not_done) {
 
-			for (cur_dev_init = dev_init_head; (1);
+			for (cur_dev_init = dev_init_head; cur_dev_init;
 			     cur_dev_init = cur_dev_init->next) {
 
 				if (!cur_dev_init->do_init)
