@@ -3319,6 +3319,232 @@ int confirm_raid_rebuild(i_container *i_con)
 	return (28 | EXIT_FLAG); 
 }
 
+static int raid_resync_complete()
+{
+	struct ipr_cmd_status cmd_status;
+	struct ipr_cmd_status_record *status_record;
+	int done_bad;
+	int not_done = 0;
+	int rc, j;
+	u32 percent_cmplt = 0;
+	struct ipr_ioa *ioa;
+	struct array_cmd_data *cur_raid_cmd;
+
+	while (1) {
+		rc = complete_screen_driver(&n_raid_resync_complete,percent_cmplt,1);
+
+		if (rc & EXIT_FLAG)
+			return EXIT_FLAG;
+
+		percent_cmplt = 100;
+		done_bad = 0;
+		not_done = 0;
+
+		for_each_raid_cmd(cur_raid_cmd) {
+			if (cur_raid_cmd->do_cmd == 0)
+				continue;
+
+			ioa = cur_raid_cmd->ioa;
+			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
+
+			if (rc) {
+				done_bad = 1;
+				continue;
+			}
+
+			status_record = cmd_status.record;
+
+			for (j = 0; j < cmd_status.num_records; j++, status_record++) {
+				if ((status_record->command_code != IPR_RESYNC_ARRAY_PROTECTION) ||
+				    (cur_raid_cmd->array_id != status_record->array_id))
+					continue;
+
+				if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS) {
+					if (status_record->percent_complete < percent_cmplt)
+						percent_cmplt = status_record->percent_complete;
+					not_done = 1;
+				} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL) {
+					done_bad = 1;
+					syslog(LOG_ERR, _("Resync array to %s failed.\n"),
+					       ioa->ioa.gen_name);
+					rc = RC_FAILED;
+				}
+				break;
+			}
+		}
+
+		if (!not_done) {
+			flush_stdscr();
+
+			if (done_bad)
+				/* Resync array failed. */
+				return (73 | EXIT_FLAG); 
+
+			/* Resync completed successfully */
+			return (74 | EXIT_FLAG); 
+		}
+		not_done = 0;
+		sleep(1);
+	}
+}
+
+int raid_resync(i_container *i_con)
+{
+	int rc, i, k;
+	int found = 0;
+	struct array_cmd_data *cur_raid_cmd;
+	char *buffer[2];
+	struct ipr_ioa *ioa;
+	struct screen_output *s_out;
+	int header_lines;
+	int toggle=1;
+	char *prot_level_str;
+
+	processing();
+
+	i_con = free_i_con(i_con);
+
+	rc = RC_SUCCESS;
+
+	check_current_config(true);
+	body_init_status(buffer, n_raid_resync.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		ioa->num_raid_cmds = 0;
+
+		for (i = 0; i < ioa->num_devices; i++) {
+			if (!ipr_is_volume_set(&ioa->dev[i]))
+				continue;
+			if (!ioa->dev[i].array_rcd->resync_cand)
+				continue;
+
+			prot_level_str = get_prot_level_str(ioa->supported_arrays,
+							    ioa->dev[i].array_rcd->raid_level);
+			strncpy(ioa->dev[i].prot_level_str, prot_level_str, 8);
+
+			add_raid_cmd_tail(ioa, &ioa->dev[i], ioa->dev[i].array_rcd->array_id);
+			i_con = add_i_con(i_con,"\0",raid_cmd_tail);
+			print_dev(k, &ioa->dev[i], buffer, "%1", ioa, k);
+			found++;
+			ioa->num_raid_cmds++;
+		}
+	}
+ 
+	if (!found) {
+		/* Start Device Parity Protection Failed */
+		n_raid_resync_fail.body = body_init(n_raid_resync_fail.header, NULL);
+		s_out = screen_driver(&n_raid_resync_fail,0,NULL);
+
+		free(n_raid_resync_fail.body);
+		n_raid_resync_fail.body = NULL;
+
+		rc = s_out->rc;
+		free(s_out);
+	} else {
+		do {
+			n_raid_resync.body = buffer[toggle&1];
+			s_out = screen_driver(&n_raid_resync,header_lines,i_con);
+			toggle++;
+		} while (s_out->rc == TOGGLE_SCREEN);
+
+		rc = s_out->rc;
+		free(s_out);
+
+		cur_raid_cmd = raid_cmd_head;
+
+		while(cur_raid_cmd) {
+			cur_raid_cmd = cur_raid_cmd->next;
+			free(raid_cmd_head);
+			raid_cmd_head = cur_raid_cmd;
+		}
+	}
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_raid_resync.body = NULL;
+
+	return rc;
+}
+
+int confirm_raid_resync(i_container *i_con)
+{
+	struct array_cmd_data *cur_raid_cmd;
+	struct ipr_ioa *ioa;
+	int rc;
+	char *buffer[2];
+	int found = 0;
+	char *input;
+	int k;
+	int header_lines;
+	int toggle=1;
+	i_container *temp_i_con;
+	struct screen_output *s_out;
+
+	for_each_icon(temp_i_con) {
+		cur_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
+		if (!cur_raid_cmd)
+			continue;
+
+		input = temp_i_con->field_data;
+
+		if (strcmp(input, "1") == 0) {
+			cur_raid_cmd->do_cmd = 1;
+			if (cur_raid_cmd->dev->dev_rcd)
+				cur_raid_cmd->dev->dev_rcd->issue_cmd = 1;
+			found++;
+		} else {
+			cur_raid_cmd->do_cmd = 0;
+			if (cur_raid_cmd->dev->dev_rcd)
+				cur_raid_cmd->dev->dev_rcd->issue_cmd = 0;
+		}
+	}
+
+	if (!found)
+		return INVALID_OPTION_STATUS;
+
+	body_init_status(buffer, n_confirm_raid_resync.header, &header_lines);
+
+	for_each_raid_cmd(cur_raid_cmd) {
+		if (!cur_raid_cmd->do_cmd)
+			continue;
+
+		ioa = cur_raid_cmd->ioa;
+		print_dev(k, cur_raid_cmd->dev, buffer, "1", ioa, k);
+	}
+
+	do {
+		n_confirm_raid_resync.body = buffer[toggle&1];
+		s_out = screen_driver(&n_confirm_raid_resync,header_lines,NULL);
+		toggle++;
+	} while (s_out->rc == TOGGLE_SCREEN);
+
+	rc = s_out->rc;
+	free(s_out);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_confirm_raid_resync.body = NULL;
+
+	if (rc)
+		return rc;
+
+	for_each_ioa(ioa) {
+		if (ioa->num_raid_cmds == 0)
+			continue;
+
+		if ((rc = ipr_resync_array(ioa)))
+			return (73 | EXIT_FLAG);
+	}
+
+	return raid_resync_complete();
+}
+
 int raid_include(i_container *i_con)
 {
 	int i, k;
@@ -8502,6 +8728,7 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	struct ipr_cmd_status_record *status_record;
 	int percent_cmplt = 0;
 	int format_in_progress = 0;
+	int resync_in_progress = 0;
 
 	if (body)
 		len = strlen(body);
@@ -8584,15 +8811,16 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
 
 			if (!rc) {
-
 				array_record = ipr_dev->array_rcd;
 				status_record = cmd_status.record;
 
-				for (i=0; i < cmd_status.num_records; i++, status_record++) {
-
+				for (i = 0; i < cmd_status.num_records; i++, status_record++) {
 					if (array_record->array_id == status_record->array_id) {
-						if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS)
+						if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS) {
+							if (status_record->command_code == IPR_RESYNC_ARRAY_PROTECTION)
+								resync_in_progress = 1;
 							percent_cmplt = status_record->percent_complete;
+						}
 					}
 				}
 			}
@@ -8721,6 +8949,11 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 					sprintf(body + len, "Rebuilding\n");
 				else
 					sprintf(body + len, "%d%% Rebuilt\n", percent_cmplt);
+			} else if (resync_in_progress) {
+				if (!(type&1) || (percent_cmplt == 0))
+					sprintf(body + len, "Checking\n");
+				else
+					sprintf(body + len, "%d%% Checked\n", percent_cmplt);
 			} else if (res_state.degraded_oper || res_state.service_req)
 				sprintf(body + len, "Degraded\n");
 			else

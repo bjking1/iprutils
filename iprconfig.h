@@ -107,6 +107,8 @@ int hot_spare_complete(int action);
 
 int raid_rebuild(i_container * i_con);
 int confirm_raid_rebuild(i_container * i_con);
+int raid_resync(i_container * i_con);
+int confirm_raid_resync(i_container * i_con);
 
 int battery_maint(i_container * i_con);
 int battery_fork(i_container * i_con);
@@ -248,7 +250,8 @@ struct screen_opts raid_screen_opt[] = {
 	{af_include,       "5", __("Format device for RAID function")},
 	{af_remove,        "6", __("Format device for JBOD function (512)")},
 	{add_hot_spare,    "7", __("Create a hot spare")},
-	{remove_hot_spare, "8", __("Delete a hot spare")}
+	{remove_hot_spare, "8", __("Delete a hot spare")},
+	{raid_resync,      "9", __("Force RAID Consistency Check")},
 };
 
 s_node n_raid_screen = {
@@ -632,7 +635,8 @@ struct screen_opts disk_unit_recovery_opt[] = {
 	{init_device,              "3", __("Initialize and format disk")},
 	{reclaim_cache,            "4", __("Reclaim IOA cache storage")},
 	{raid_rebuild,             "5", __("Rebuild disk unit data")},
-	{battery_maint,            "6", __("Work with resources containing cache battery packs")}
+	{raid_resync,              "6", __("Force RAID Consistency Check")},
+	{battery_maint,            "7", __("Work with resources containing cache battery packs")}
 };
 
 s_node n_disk_unit_recovery = {
@@ -887,6 +891,59 @@ s_node n_confirm_raid_rebuild = {
 		__("Rebuilding the disk unit data may take several "
 		   "minutes for each disk selected.\n\n"),
 		__("Press Enter to confirm having the data rebuilt.\n"),
+		__("  q=Cancel to return and change your choice.\n\n"),
+		"" },
+};
+
+s_node n_raid_resync_complete = {
+	.title    = __("Force RAID Consistency Check Status"),
+	.body     = __("You selected to force a RAID consistency check")
+};
+
+struct screen_opts raid_resync_opt[] = {
+	{confirm_raid_resync, "\n"}
+};
+
+s_node n_raid_resync = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(raid_resync_opt),
+	.options  = &raid_resync_opt[0],
+	.title    = __("Force RAID Consistency Check"),
+	.header   = {
+		__("Select the arrays to be checked\n\n"),
+		__("Type choice, press Enter.\n"),
+		__("  1=Check\n\n"),
+		"" }
+};
+
+s_node n_raid_resync_fail = {
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
+	.title    = __("Force RAID Consistency Check Failed"),
+	.header   = {
+		__("There are no arrays eligible for the selected operation "
+		   "due to one or more of the following reasons:\n\n"),
+		__("o There are no disk arrays in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
+		   "it read/write protected. Examine the kernel messages log "
+		   "for any errors that are logged for the IO subsystem "
+		   "and follow the appropriate procedure for the reference code to "
+		   "correct the problem, if necessary.\n"),
+		__("o Not all disks attached to an advanced function IOA have "
+		   "reported to the system. Retry the operation.\n"),
+		__("o The disks are missing.\n"),
+		"" }
+};
+
+s_node n_confirm_raid_resync = {
+	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Confirm Force RAID Consistency Check"),
+	.header   = {
+		__("Forcing a consistency check on a RAID array may take "
+		   "a long time, depending on current system activity.\n\n"),
+		__("Press Enter to confirm.\n"),
 		__("  q=Cancel to return and change your choice.\n\n"),
 		"" },
 };
@@ -1343,6 +1400,8 @@ const char *screen_status[] = {
 	/* 70 */ __("Failed to start IOA cache."),
 	/* 71 */ __("IOA cache started successfully."),
 	/* 72 */ __("Selected battery packs successfully forced into an error state."),
+	/* 73 */ __("Force RAID Consistency check failed"),
+	/* 74 */ __("RAID Consistency check successful"),
       /* NOTE:  127 maximum limit */
 };
 

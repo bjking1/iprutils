@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.67 2005/03/25 22:21:02 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.68 2005/04/12 19:21:10 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1468,6 +1468,40 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 
 	if (rc != 0)
 		ioa_cmd_err(ioa, &sense_data, "Rebuild Device Data", rc);
+
+	close(fd);
+	return rc;
+}
+
+int ipr_resync_array(struct ipr_ioa *ioa)
+{
+	int fd;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	int rc;
+	int length = ntohs(ioa->qac_data->resp_len);
+
+	if (strlen(ioa->ioa.gen_name) == 0)
+		return -ENOENT;
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_RESYNC_ARRAY_PROTECTION;
+	cdb[7] = (length & 0xff00) >> 8;
+	cdb[8] = length & 0xff;
+
+	rc = sg_ioctl(fd, cdb, ioa->qac_data, length,
+		      SG_DXFER_TO_DEV, &sense_data, IPR_ARRAY_CMD_TIMEOUT);
+
+	if (rc != 0)
+		ioa_cmd_err(ioa, &sense_data, "Resync Array", rc);
 
 	close(fd);
 	return rc;
@@ -4275,7 +4309,7 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 	len = scan_fw_dir("/etc/microcode/device", buf, &ret, len,
 			  init_disk_ucode_entry);
 
-	sprintf(buf, "%.7s.%02X%02X%02X%02X",
+	sprintf(buf, "IBM-%.7s.%02X%02X%02X%02X",
 		dev->scsi_dev_data->product_id,
 		page3_inq.load_id[0], page3_inq.load_id[1],
 		page3_inq.load_id[2], page3_inq.load_id[3]);

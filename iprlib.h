@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.52 2005/03/25 22:21:02 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.53 2005/04/12 19:21:16 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1337,6 +1337,7 @@ int ipr_remove_hot_spare(struct ipr_ioa *);
 int ipr_start_array_protection(struct ipr_ioa *, int, int);
 int ipr_add_hot_spare(struct ipr_ioa *);
 int ipr_rebuild_device_data(struct ipr_ioa *);
+int ipr_resync_array(struct ipr_ioa *);
 int ipr_test_unit_ready(struct ipr_dev *, struct sense_data_t *);
 int ipr_format_unit(struct ipr_dev *);
 int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);

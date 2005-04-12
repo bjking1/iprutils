@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.14.1
+Version: 2.0.15
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -51,6 +51,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon Apr 4 2005 Brian King <brking@us.ibm.com> 2.0.15
+- Add ability to force RAID consistency check
 * Mon Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1
 - Removed mention of primary/secondary adapters in some error
   screens since multi-initiator RAID is not supported and the
