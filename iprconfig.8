@@ -82,7 +82,11 @@ This feature is only supported with SES (SCSI Enclosure Services) packaging.
 is used to issue a SCSI format command to attached devices. A format
 unit command has special meaning to the adapter and is used as a service
 action for certain error conditions. Formatting a disk unit will lose
-all data on that drive.
+all data on that drive. If the disk is attached to an ipr adapter that
+does not support RAID, the drive will be formatted to 512 bytes/sector.
+If the disk is attached to an ipr RAID adapter, the block size will not
+be changed. To change the block size, use the format menu options under
+the disk arrays menu.
 .PP
 .B Reclaim IOA cache storage
 is used to repair cache error conditions. 

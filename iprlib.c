@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.69 2005/05/18 15:24:47 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.70 2005/05/18 21:44:01 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2993,6 +2993,20 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 		ioa->ioa_dead = 1;
 }
 
+static void get_prot_levels(struct ipr_ioa *ioa)
+{
+	struct ipr_dev *vset, *dev;
+	char *prot_level_str;
+
+	for_each_vset(ioa, vset) {
+		prot_level_str = get_prot_level_str(ioa->supported_arrays,
+						    vset->array_rcd->raid_level);
+		strncpy(vset->prot_level_str, prot_level_str, 8);
+		for_each_dev_in_vset(vset, dev)
+			strncpy(dev->prot_level_str, prot_level_str, 8);
+	}
+}
+
 void check_current_config(bool allow_rebuild_refresh)
 {
 	struct scsi_dev_data *scsi_dev_data;
@@ -3128,6 +3142,7 @@ void check_current_config(bool allow_rebuild_refresh)
 		}
 
 		ioa->num_devices = device_count;
+		get_prot_levels(ioa);
 		free(qac_entry_ref);
 	}
 

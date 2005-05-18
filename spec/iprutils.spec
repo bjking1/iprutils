@@ -5,7 +5,7 @@ Release: 1
 License: CPL
 Group: System Environment/Base
 Vendor: IBM
-URL: http://www-124.ibm.com/storageio/
+URL: http://sourceforge.net/projects/iprdd/
 Source0: iprutils-%{version}-src.tgz
 BuildRoot: %{_tmppath}/%{name}-root
 
@@ -35,9 +35,14 @@ install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
 
 %ifarch ppc ppc64
 %preun
-/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
-/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
-/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
+if [ $1 = 0 ]; then
+	%{_sysconfdir}/init.d/iprdump stop  > /dev/null 2>&1
+	%{_sysconfdir}/init.d/iprupdate stop  > /dev/null 2>&1
+	%{_sysconfdir}/init.d/iprinit stop  > /dev/null 2>&1
+	/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
+	/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
+	/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
+fi
 %endif
 
 %clean
@@ -54,6 +59,12 @@ rm -rf $RPM_BUILD_ROOT
 * Wed May 18 2005 Brian King <brking@us.ibm.com> 2.0.15
 - Setup mode page 0 for IBM drives to ensure command aging is
   enabled. This ensures commands are not starved on some drives.
+- Fix so that iprdump properly names dump files once 100 dumps
+  have been made.
+- Make iprconfig handle failures of scsi disk formats better
+- Fix iprconfig Set root kernel message log directory menu
+- Properly display RAID level on all iprconfig screens
+- Don't disable init.d daemons on an rpm -U
 * Mon Apr 4 2005 Brian King <brking@us.ibm.com>
 - Add ability to force RAID consistency check
 * Mon Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1

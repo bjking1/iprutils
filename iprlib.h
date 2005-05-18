@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.54 2005/05/18 15:24:47 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.55 2005/05/18 21:44:01 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1051,7 +1051,16 @@ struct ipr_ioa {
 
 #define __for_each_ioa(ioa, head) for (ioa = head; ioa; ioa = ioa->next)
 #define for_each_ioa(ioa) __for_each_ioa(ioa, ipr_ioa_head)
-#define for_each_dev(i, d) for (d = i->dev; (d - i->dev) < i->num_devices; d++)
+#define for_each_dev(i, d) for (d = (i)->dev; (d - (i)->dev) < (i)->num_devices; d++)
+
+#define for_each_dev_in_vset(v, d) \
+      for_each_dev(v->ioa, d) \
+           if (ipr_is_af_dasd_device(d) && ipr_is_array_member(d) && \
+               d->dev_rcd->array_id == v->array_rcd->array_id)
+
+#define for_each_vset(i, d) \
+      for_each_dev(i, d) \
+           if (ipr_is_volume_set(dev))
 
 struct ipr_dasd_inquiry_page3 {
 	u8 peri_qual_dev_type;

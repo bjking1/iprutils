@@ -5408,7 +5408,9 @@ static int dev_init_complete(u8 num_devs)
 
 				if (rc == CHECK_CONDITION &&
 				    (sense_data.error_code & 0x7F) == 0x70 &&
-				    (sense_data.sense_key & 0x0F) == 0x02) {
+				    (sense_data.sense_key & 0x0F) == 0x02 &&
+				    sense_data.add_sense_code == 0x04 &&
+				    sense_data.add_sense_code_qual == 0x04) {
 					dev->cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
 					if (dev->cmplt < percent_cmplt)
 						percent_cmplt = dev->cmplt;
@@ -5424,8 +5426,11 @@ static int dev_init_complete(u8 num_devs)
 
 				ioa = dev->ioa;
 				if (dev->new_block_size != ioa->af_block_size && ipr_is_gscsi(dev->dev)) {
-					ipr_write_dev_attr(dev->dev, "rescan", "1");
-					ipr_init_dev(dev->dev);
+					rc = ipr_test_unit_ready(dev->dev, &sense_data);
+					if (rc == 0) {
+						ipr_write_dev_attr(dev->dev, "rescan", "1");
+						ipr_init_dev(dev->dev);
+					}
 				}
 
 				if (dev->new_block_size != 0) {
@@ -8094,7 +8099,7 @@ int process_choose_ucode(struct ipr_dev *ipr_dev)
 			version = (char *)&version_swp;
 			if (isprint(version[0]) && isprint(version[1]) &&
 			    isprint(version[2]) && isprint(version[3]))
-				sprintf(buffer," %%1   %.8X (%c%c%c%c) %s\n",list[i].version,
+				sprintf(buffer," %%1   %.8X (%c%c%c%c) %s",list[i].version,
 					version[0], version[1], version[2],	version[3],
 					list[i].file);
 			else
@@ -8551,6 +8556,9 @@ int confirm_kernel_root(i_container *i_con)
 	char *body = NULL;
 
 	input = strip_trailing_whitespace(i_con->field_data);
+	if (strlen(input) == 0)
+		return (EXIT_FLAG | 61);
+
 	dir = opendir(input);
 
 	if (dir == NULL)
@@ -8560,7 +8568,7 @@ int confirm_kernel_root(i_container *i_con)
 		closedir(dir);
 		if (strcmp(log_root_dir, input) == 0)
 			/*"Root directory unchanged"*/
-			return 61;
+			return (EXIT_FLAG | 61);
 	}
 
 	body = body_init(n_confirm_kernel_root.header, NULL);
@@ -8620,9 +8628,13 @@ int confirm_set_default_editor(i_container *i_con)
 	char *body = NULL;
 
 	input = strip_trailing_whitespace(i_con->field_data);
+	if (strlen(input) == 0)
+		/*"Editor unchanged"*/
+		return (EXIT_FLAG | 63); 
+
 	if (strcmp(editor, input) == 0)
 		/*"Editor unchanged"*/
-		return 63; 
+		return (EXIT_FLAG | 63); 
 
 	body = body_init(n_confirm_set_default_editor.header, NULL);
 	body = add_line_to_body(body,_("New editor"), input);

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.15 2005/03/07 17:20:16 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.16 2005/05/18 21:44:00 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -168,13 +168,29 @@ static int select_dump_file(const struct dirent *dirent)
 	return 0;
 }
 
+static int dump_sort(const void *a, const void *b)
+{
+	const struct dirent **dumpa = (const struct dirent **)a;
+	const struct dirent **dumpb = (const struct dirent **)b;
+	int numa, numb;
+
+	sscanf((*dumpa)->d_name, "iprdump.%d", &numa);
+	sscanf((*dumpb)->d_name, "iprdump.%d", &numb);
+
+	if (numa < MAX_DUMP_FILES && numb >= (100 - MAX_DUMP_FILES))
+		return 1;
+	if (numb < MAX_DUMP_FILES && numa >= (100 - MAX_DUMP_FILES))
+		return -1;
+	return alphasort(dumpa, dumpb);
+}
+
 static void cleanup_old_dumps()
 {
 	struct dirent **dirent;
 	char fname[100];
 	int rc, i;
 
-	rc = scandir(usr_dir, &dirent, select_dump_file, alphasort);
+	rc = scandir(usr_dir, &dirent, select_dump_file, dump_sort);
 	if (rc > 0) {
 		for (i = 0 ; i < (rc - MAX_DUMP_FILES); i++) {
 			sprintf(fname, "%s%s", usr_dir, dirent[i]->d_name);
@@ -196,7 +212,7 @@ static int get_dump_fname(char *fname)
 	int dump_id = 0;
 
 	cleanup_old_dumps();
-	rc = scandir(usr_dir, &dirent, select_dump_file, alphasort);
+	rc = scandir(usr_dir, &dirent, select_dump_file, dump_sort);
 	if (rc > 0) {
 		rc--;
 		tmp = strstr(dirent[rc]->d_name, DUMP_PREFIX);
