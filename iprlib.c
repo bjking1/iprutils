@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.68 2005/04/12 19:21:10 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.69 2005/05/18 15:24:47 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -4631,6 +4631,55 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 	return rc;
 }
 
+static int setup_page0x00(struct ipr_dev *dev)
+{
+	struct ipr_mode_pages mode_pages, ch_mode_pages;
+	struct ipr_vendor_mode_page *page, *ch_page;
+	int len;
+
+	if (strncmp(dev->scsi_dev_data->vendor_id, "IBM", 3)) {
+		syslog_dbg("Not setting up mode page 0x00 for unknown device %s.\n",
+			   dev->scsi_dev_data->sysfs_device_name);
+		return 0;
+	}
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+	memset(&ch_mode_pages, 0, sizeof(ch_mode_pages));
+
+	if (ipr_mode_sense(dev, 0x00, &mode_pages))
+		return -EIO;
+	if (ipr_mode_sense(dev, 0x40, &ch_mode_pages))
+		return -EIO;
+
+	page = (struct ipr_vendor_mode_page *)(((u8 *)&mode_pages) +
+					       mode_pages.hdr.block_desc_len +
+					       sizeof(mode_pages.hdr));
+	ch_page = (struct ipr_vendor_mode_page *)(((u8 *)&ch_mode_pages) +
+						  ch_mode_pages.hdr.block_desc_len +
+						  sizeof(ch_mode_pages.hdr));
+
+	IPR_SET_MODE(ch_page->arhes, page->arhes, 1);
+	IPR_SET_MODE(ch_page->cmdac, page->cmdac, 1);
+	IPR_SET_MODE(ch_page->caen, page->caen, 1);
+
+	/* Use a 3 second command aging timer - units are 50 ms */
+	IPR_SET_MODE(ch_page->cmd_aging_limit_hi, page->cmd_aging_limit_hi, 0);
+	IPR_SET_MODE(ch_page->cmd_aging_limit_lo, page->cmd_aging_limit_lo, 60);
+
+	len = mode_pages.hdr.length + 1;
+	mode_pages.hdr.length = 0;
+	mode_pages.hdr.medium_type = 0;
+	mode_pages.hdr.device_spec_parms = 0;
+	page->hdr.parms_saveable = 0;
+
+	if (mode_select(dev, &mode_pages, len)) {
+		syslog_dbg("Failed to setup mode page 0x00 for %s.\n",
+			   dev->scsi_dev_data->sysfs_device_name);
+		return -EIO;
+	}
+	return 0;
+}
+
 static int setup_page0x01(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages, ch_mode_pages;
@@ -4786,6 +4835,8 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 		return;
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
+	if (setup_page0x00(dev))
+		return;
 	if ((rc = setup_page0x0a(dev))) {
 		if (rc != -EINVAL) {
 			scsi_dbg(dev, "Failed to enable TCQing.\n");
@@ -4816,6 +4867,8 @@ static void init_af_dev(struct ipr_dev *dev)
 	if (ipr_set_dasd_timeouts(dev))
 		return;
 	if (polling_mode && (!dev->should_init || !dev_init_allowed(dev)))
+		return;
+	if (setup_page0x00(dev))
 		return;
 	if (setup_page0x01(dev))
 		return;

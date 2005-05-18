@@ -51,7 +51,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Mon Apr 4 2005 Brian King <brking@us.ibm.com> 2.0.15
+* Wed May 18 2005 Brian King <brking@us.ibm.com> 2.0.15
+- Setup mode page 0 for IBM drives to ensure command aging is
+  enabled. This ensures commands are not starved on some drives.
+* Mon Apr 4 2005 Brian King <brking@us.ibm.com>
 - Add ability to force RAID consistency check
 * Mon Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1
 - Removed mention of primary/secondary adapters in some error

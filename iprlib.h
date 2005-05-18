@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.53 2005/04/12 19:21:16 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.54 2005/05/18 15:24:47 brking Exp $
  */
 
 #include <stdarg.h>
@@ -259,6 +259,130 @@ struct ipr_mode_page_hdr {
 	u8 parms_saveable:1;
 #endif
 	u8 page_length;
+};
+
+struct ipr_vendor_mode_page {
+	/* Mode page 0x00 */
+	struct ipr_mode_page_hdr hdr;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 qpe:1;
+	u8 uqe:1;
+	u8 dwd:1;
+	u8 reserved1:4;
+	u8 arhes:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 arhes:1;
+	u8 reserved1:4;
+	u8 dwd:1;
+	u8 uqe:1;
+	u8 qpe:1;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 asdpe:1;
+	u8 reserved2:1;
+	u8 cmdac:1;
+	u8 rpfae:1;
+	u8 dotf:1;
+	u8 reserved3:1;
+	u8 rrnde:1;
+	u8 cpe:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 cpe:1;
+	u8 rrnde:1;
+	u8 reserved3:1;
+	u8 dotf:1;
+	u8 rpfae:1;
+	u8 cmdac:1;
+	u8 reserved2:1;
+	u8 asdpe:1;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved4:6;
+	u8 dwlro:1;
+	u8 dlro:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 dlro:1;
+	u8 dwlro:1;
+	u8 reserved4:6;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved5:2;
+	u8 dsn:1;
+	u8 frdd:1;
+	u8 dpsdp:1;
+	u8 wpen:1;
+	u8 caen:1;
+	u8 ovple:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 ovple:1;
+	u8 caen:1;
+	u8 wpen:1;
+	u8 dpsdp:1;
+	u8 frdd:1;
+	u8 dsn:1;
+	u8 reserved5:2;
+#endif
+
+	u8 reserved7[2];
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved8:1;
+	u8 adc:1;
+	u8 qemc:1;
+	u8 drd:1;
+	u8 led_mode:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 led_mode:4;
+	u8 drd:1;
+	u8 qemc:1;
+	u8 adc:1;
+	u8 reserved8:1;
+#endif
+
+	u8 temp_threshold;
+	u8 cmd_aging_limit_hi;
+	u8 cmd_aging_limit_lo;
+	u8 qpe_read_threshold;
+	u8 reserved10;
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 drrt:1;
+	u8 dnr:1;
+	u8 reserved11:1;
+	u8 rarr:1;
+	u8 ffmt:1;
+	u8 reserved12:3;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved12:3;
+	u8 ffmt:1;
+	u8 rarr:1;
+	u8 reserved11:1;
+	u8 dnr:1;
+	u8 drrt:1;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 rtp:1;
+	u8 rrc:1;
+	u8 fcert:1;
+	u8 reserved13:1;
+	u8 drpdv:1;
+	u8 dsf:1;
+	u8 irt:1;
+	u8 ivr:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 ivr:1;
+	u8 irt:1;
+	u8 dsf:1;
+	u8 drpdv:1;
+	u8 reserved13:1;
+	u8 fcert:1;
+	u8 rrc:1;
+	u8 rtp:1;
+#endif
 };
 
 struct ipr_control_mode_page {
