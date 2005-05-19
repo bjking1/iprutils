@@ -486,6 +486,7 @@ s_node n_af_include_fail = {
 		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
 		__("o There are no eligible disks in the system.\n"),
+		__("o All disks are already formatted for RAID Function.\n"),
 		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
@@ -505,6 +506,7 @@ s_node n_af_remove_fail = {
 		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
 		__("o There are no eligible disks in the system.\n"),
+		__("o All disks are already formatted for JBOD function.\n"),
 		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "

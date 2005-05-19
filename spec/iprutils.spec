@@ -57,6 +57,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Wed May 18 2005 Brian King <brking@us.ibm.com> 2.0.15
+- Clarify format options
 - Setup mode page 0 for IBM drives to ensure command aging is
   enabled. This ensures commands are not starved on some drives.
 - Fix so that iprdump properly names dump files once 100 dumps

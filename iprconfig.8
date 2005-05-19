@@ -50,11 +50,15 @@ disk arrays.
 .PP
 .B Format device for advanced function
 is used to format disks to 522 bytes/sector so that they may be used in
-a disk array.
+a disk array. Only disks which are not formatted for advanced function
+or are formatted for advanced function but are not known to be zeroed will
+be available for selection for this function.
 .PP
 .B Format device for JBOD function (512)
 is used to format disks to 512 bytes/sector so that they may be used 
-as standalone disks.
+as standalone disks. Only disks which are not formatted for JBOD function
+or are formatted for JBOD function and are in the Format Required state
+will be available for this function.
 .PP
 .B Create a hot spare
 is used to designate a device as a dedicated hot spare.
