@@ -65,6 +65,8 @@ rm -rf $RPM_BUILD_ROOT
 - Fix iprconfig Set root kernel message log directory menu
 - Properly display RAID level on all iprconfig screens
 - Don't disable init.d daemons on an rpm -U
+* Tue Apr 12 2005 Brian King <brking@us.ibm.com> 2.0.14.2
+- Fixed bug preventing disk microcode update from working.
 * Mon Apr 4 2005 Brian King <brking@us.ibm.com>
 - Add ability to force RAID consistency check
 * Mon Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1
