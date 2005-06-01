@@ -8298,11 +8298,9 @@ static int select_log_file(const struct dirent *dir_entry)
 
 static int compare_log_file(const void *log_file1, const void *log_file2)
 {
-	char *first_start_num, *first_end_num;
-	char *second_start_num, *second_end_num;
 	struct dirent **first_dir, **second_dir;
-	char name1[100], name2[100];
-	int first, second;
+	char name1[MAX_CMD_LENGTH], name2[MAX_CMD_LENGTH];
+	struct stat stat1, stat2;
 
 	first_dir = (struct dirent **)log_file1;
 	second_dir = (struct dirent **)log_file2;
@@ -8312,28 +8310,19 @@ static int compare_log_file(const void *log_file1, const void *log_file2)
 	if (strcmp((*second_dir)->d_name, "messages") == 0)
 		return -1;
 
-	strcpy(name1, (*first_dir)->d_name);
-	strcpy(name2, (*second_dir)->d_name);
-	first_start_num = strchr(name1, '.');
-	first_end_num = strrchr(name1, '.');
-	second_start_num = strchr(name2, '.');
-	second_end_num = strrchr(name2, '.');
+	sprintf(name1, "%s/%s", log_root_dir, (*first_dir)->d_name);
+	sprintf(name2, "%s/%s", log_root_dir, (*second_dir)->d_name);
 
-	if (first_start_num == first_end_num) {
-		/* Not compressed */
-		first_end_num = name1 + strlen(name1);
-		second_end_num = name2 + strlen(name2);
-	} else {
-		*first_end_num = '\0';
-		*second_end_num = '\0';
-	}
-	first = strtoul(first_start_num, NULL, 10);
-	second = strtoul(second_start_num, NULL, 10);
-
-	if (first > second)
-		return -1;
-	else
+	if (stat(name1, &stat1))
 		return 1;
+	if (stat(name2, &stat2))
+		return -1;
+
+	if (stat1.st_mtime < stat2.st_mtime)
+		return -1;
+	if (stat1.st_mtime > stat2.st_mtime)
+		return 1;
+	return 0;
 }
 
 int ibm_storage_log(i_container *i_con)
