@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.55 2005/05/18 21:44:01 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.56 2005/07/20 18:07:11 brking Exp $
  */
 
 #include <stdarg.h>
@@ -185,6 +185,7 @@ extern int ipr_debug;
 extern int ipr_force;
 extern int ipr_sg_required;
 extern int polling_mode;
+extern int ipr_fast;
 extern char *tool_name;
 extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
@@ -1053,14 +1054,25 @@ struct ipr_ioa {
 #define for_each_ioa(ioa) __for_each_ioa(ioa, ipr_ioa_head)
 #define for_each_dev(i, d) for (d = (i)->dev; (d - (i)->dev) < (i)->num_devices; d++)
 
+#define for_each_af_dasd(i, d) \
+      for_each_dev(i, d) \
+           if (ipr_is_af_dasd_device(d))
+
 #define for_each_dev_in_vset(v, d) \
-      for_each_dev(v->ioa, d) \
-           if (ipr_is_af_dasd_device(d) && ipr_is_array_member(d) && \
-               d->dev_rcd->array_id == v->array_rcd->array_id)
+      for_each_af_dasd(v->ioa, d) \
+           if (ipr_is_array_member(d) && d->dev_rcd->array_id == v->array_rcd->array_id)
 
 #define for_each_vset(i, d) \
       for_each_dev(i, d) \
-           if (ipr_is_volume_set(dev))
+           if (ipr_is_volume_set(d) && !d->array_rcd->start_cand)
+
+#define for_each_ses(i, d) \
+      for_each_dev(i, d) \
+           if (d->scsi_dev_data && d->scsi_dev_data->type == TYPE_ENCLOSURE)
+
+#define for_each_hot_spare(i, d) \
+      for_each_dev(i, d) \
+           if (ipr_is_hot_spare(d))
 
 struct ipr_dasd_inquiry_page3 {
 	u8 peri_qual_dev_type;
@@ -1246,6 +1258,8 @@ struct ipr_cmd_status {
 	u8  num_records;
 	struct ipr_cmd_status_record record[100];
 };
+
+#define for_each_cmd_status(r, s) for (r = (s)->record; (r - (s)->record) < (s)->num_records; r++)
 
 struct ipr_inquiry_page0 {
 	u8 peri_qual_dev_type;
@@ -1442,7 +1456,8 @@ struct ipr_encl_status_ctl_pg
 };
 
 #define for_each_elem_status(i, ses_data) \
-        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)); i++)
+        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) \
+                 && i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++)
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
@@ -1540,6 +1555,7 @@ void ipr_add_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev *
 void ipr_del_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
 struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *);
 struct ipr_array_cap_entry *get_cap_entry(struct ipr_supported_arrays *, char *);
+int ipr_get_blk_size(struct ipr_dev *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present
@@ -1657,9 +1673,14 @@ if (dev->scsi_dev_data) { \
       scsi_log(LOG_WARNING, dev, fmt, ##__VA_ARGS__)
 
 #define scsi_cmd_err(dev, sense, cmd, rc) \
-      scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
-              cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
-              (sense)->add_sense_code_qual)
+do { \
+      if ((((sense)->error_code & 0x7F) != 0x70) || \
+          (((sense)->sense_key & 0x0F) != 0x05) || ipr_debug) { \
+             scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
+                      cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
+                      (sense)->add_sense_code_qual); \
+      } \
+} while (0)
 
 #define ioa_log(level, ioa, fmt, ...) \
       syslog(level, "%s: " fmt, ioa->pci_address, ##__VA_ARGS__)
@@ -1676,9 +1697,12 @@ if (dev->scsi_dev_data) { \
 #define ioa_cmd_err(ioa, sense, cmd, rc) \
 do { \
 if (!ioa->ioa_dead) { \
-      ioa_err(ioa, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
-              cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
-              (sense)->add_sense_code_qual); \
+      if ((((sense)->error_code & 0x7F) != 0x70) || \
+          (((sense)->sense_key & 0x0F) != 0x05) || ipr_debug) { \
+             ioa_err(ioa, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
+                     cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
+                     (sense)->add_sense_code_qual); \
+      } \
 } \
 } while (0)
 #endif
