@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.15.3
+Version: 2.0.15.4
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Aug 17 2005 Brian King <brking@us.ibm.com> 2.0.15.4
+- Fix a couple of uninitialized variable compile errors
 * Wed Jul 27 2005 Brian King <brking@us.ibm.com> 2.0.15.3
 - Fix: iprconfig: IOA microcode update would leave AF DASD
   (disks that are in disk arrays) in a state where they were

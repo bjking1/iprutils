@@ -4736,7 +4736,7 @@ static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 			res_addr->bus = array_record->last_resource_addr.bus;
 			res_addr->target = array_record->last_resource_addr.target;
 			res_addr->lun = array_record->last_resource_addr.lun;
-		} else if (dev_record) {
+		} else if (array_record) {
 			res_addr->host = dev->ioa->host_num;
 			res_addr->bus = array_record->resource_addr.bus;
 			res_addr->target = array_record->resource_addr.target;
@@ -6729,7 +6729,7 @@ int bus_attr_menu(struct ipr_ioa *ioa, struct bus_attr *bus_attr, int start_row,
 {
 	int i, scsi_id, found;
 	int num_menu_items;
-	int menu_index;
+	int menu_index = 0;
 	ITEM **menu_item = NULL;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_scsi_buses *page_28_cur;
