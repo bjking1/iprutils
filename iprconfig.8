@@ -173,6 +173,15 @@ name. Only 1 array can be deleted with a single command. Example:
 .br
 This would delete the disk array represented by /dev/sda
 .TP
+.B status [device]
+.br
+Prints the status of the specified device. This is the same status as which shows
+up in the last column of the Display hardware status menu. Can specify either a 
+/dev/sdX name or a /dev/sgX name. Example:
+.br
+.B iprconfig -c status /dev/sda
+.br
+.TP
 .B \-\-version
 Print version number of 
 .B iprconfig

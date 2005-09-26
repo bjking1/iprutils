@@ -11,7 +11,7 @@ include version.mk
 
 CFLAGS = -g -Wall $(IPR_DEFINES)
 UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
-TAR = cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS --exclude applied-patches --exclude series --exclude txt --exclude pc --exclude patches --exclude *~* iprutils
+TAR = cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS --exclude applied-patches --exclude series --exclude txt --exclude pc --exclude patches --exclude debug --exclude *~* iprutils
 
 all: iprconfig iprupdate iprdump iprinit iprdbg docs 
 
@@ -28,7 +28,7 @@ iprinit:iprinit.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprinit iprlib.o iprinit.c -lsysfs
 
 iprdbg:iprdbg.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs -lncurses
 
 iprucode:iprucode.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprucode iprlib.o iprucode.c -lsysfs

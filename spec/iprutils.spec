@@ -56,6 +56,22 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Aug 17 2005 Brian King <brking@us.ibm.com> 2.0.15.4
+- Fix a couple of uninitialized variable compile errors
+* Wed Jul 27 2005 Brian King <brking@us.ibm.com> 2.0.15.3
+- Fix: iprconfig: IOA microcode update would leave AF DASD
+  (disks that are in disk arrays) in a state where they were
+  no longer tagged queueing. Fix iprconfig to run iprinit on the
+  adapter after a microcode download to ensure all attached devices
+  are properly setup after a microcode download.
+- Fix iprinit: If an IOA was reset for some reason at runtime,
+  this would cause AF DASD devices to get tagged queueing turned
+  off and it would never get turned back on. Change iprinit to
+  detect this and turn tagged queueing back on if this happens.
+- Changing the queue depth for a disk array was broken. Fix iprinit
+  to properly restore the queue depth from the ipr configuration file.
+- Fix iprconfig to handle disk format failures better
+- Fix potential iprutils segfaults when iterating over disk arrays
 * Wed Jun 1 2005 Brian King <brking@us.ibm.com> 2.0.15.1
 - Fix iprconfig Analyze Log options
 * Wed May 18 2005 Brian King <brking@us.ibm.com> 2.0.15

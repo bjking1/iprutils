@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.71 2005/07/20 18:07:09 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.72 2005/09/26 20:19:36 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1069,6 +1069,7 @@ static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 		for_each_dev(old_ioa, old_dev) {
 			if (!same_dev(dev, old_dev))
 				continue;
+			memcpy(&dev->attr, &old_dev->attr, sizeof(dev->attr));
 			resolve_dev(dev, old_dev);
 			break;
 		}
@@ -2575,6 +2576,7 @@ int format_req(struct ipr_dev *dev)
 }
 
 #define IPR_MAX_XFER 0x8000
+
 const int cdb_size[] ={6, 10, 10, 0, 16, 12, 16, 16};
 static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		     void *data, u32 xfer_len, u32 data_direction,
@@ -2588,6 +2590,7 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 	int i;
 	int buff_len, segment_size;
 	void *dxferp;
+	u8 *buf;
 
 	/* check if scatter gather should be used */
 	if (xfer_len > IPR_MAX_XFER) {
@@ -2599,7 +2602,8 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 
 		for (i = 0; (i < iovec_count) && (buff_len != 0); i++) {
 			iovec[i].iov_base = malloc(segment_size);
-			memcpy(iovec[i].iov_base, data + (IPR_MAX_XFER * i), segment_size);
+			if (data_direction == SG_DXFER_TO_DEV)
+				memcpy(iovec[i].iov_base, data + (IPR_MAX_XFER * i), segment_size);
 			iovec[i].iov_len = segment_size;
 
 			buff_len -= segment_size;
@@ -2644,8 +2648,12 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 	}
 
 	if (iovec_count) {
-		for (i = 0; i < iovec_count; i++)
+		for (i = 0, buf = (u8 *)data; i < iovec_count; i++) {
+			if (data_direction == SG_DXFER_FROM_DEV)
+				memcpy(buf, iovec[i].iov_base, iovec[i].iov_len);
+			buf += iovec[i].iov_len;
 			free(iovec[i].iov_base);
+		}
 		free(iovec);
 	}
 
@@ -2794,11 +2802,11 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 
 		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "vendor");
 		if (sysfs_attr)
-			ipr_strncpy_0(scsi_dev_data->vendor_id, sysfs_attr->value, IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0n(scsi_dev_data->vendor_id, sysfs_attr->value, IPR_VENDOR_ID_LEN);
 
 		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "model");
 		if (sysfs_attr)
-			ipr_strncpy_0(scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
+			ipr_strncpy_0n(scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
 
 		strcpy(scsi_dev_data->dev_name,"");
 		strcpy(scsi_dev_data->gen_name,"");
@@ -4484,6 +4492,7 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	struct stat ucode_stats;
 	u32 fw_version;
 	int fd, rc;
+	int host_num = ioa->host_num;
 	char *tmp;
 	char ucode_file[200];
 	DIR *dir;
@@ -4545,6 +4554,13 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 
 		if (rc != 0)
 			ioa_err(ioa, "Microcode update failed. rc=%d\n", rc);
+		check_current_config(false);
+		for_each_ioa(ioa) {
+			if (ioa->host_num != host_num)
+				continue;
+			ipr_init_ioa(ioa);
+			break;
+		}
 	} else
 		ipr_log_ucode_error(ioa);
 
@@ -4929,7 +4945,9 @@ static void init_af_dev(struct ipr_dev *dev)
 
 	if (ipr_set_dasd_timeouts(dev))
 		return;
-	if (polling_mode && (!dev->should_init || !dev_init_allowed(dev)))
+	if (polling_mode && (!dev->should_init && !memcmp(&attr, &dev->attr, sizeof(attr))))
+	    return;
+	if (polling_mode && !dev_init_allowed(dev))
 		return;
 	if (setup_page0x00(dev))
 		return;
@@ -4951,6 +4969,7 @@ static void init_af_dev(struct ipr_dev *dev)
 
 	if (ipr_modify_dev_attr(dev, &attr))
 		return;
+	memcpy(&dev->attr, &attr, sizeof(attr));
 	if (ipr_set_dev_attr(dev, &attr, 0))
 		return;
 }

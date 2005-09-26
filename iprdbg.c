@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.16 2005/03/07 17:20:16 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.17 2005/09/26 20:19:36 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <curses.h>
+#include <term.h>
 
 #define IPR_MAX_FLIT_ENTRIES 59
 #define IPR_FLIT_TIMESTAMP_LEN 12
@@ -170,6 +172,49 @@ static int format_flit(struct ipr_flit *flit)
 	return 0;
 } 
 
+static char *term;
+static char *k_up;
+static char *k_down;
+static unsigned char hindex;
+static char *history[256];
+
+static void ipr_fgets(char *buf, int size, FILE *stream)
+{
+	int i, ch = 0;
+
+	for (i = 0; ch != EOF && i < (size - 1); i++) {
+		ch = fgetc(stream);
+		if (ch == '\n')
+			break;
+
+		buf[i] = ch;
+
+		if (!strcmp(buf, k_up)) {
+			rewind(stdin);
+			if (history[hindex]) {
+				fprintf(stdout, "%s", history[--hindex]);
+				strcpy(buf, history[hindex]);
+				i = strlen(buf) + 1;
+			}
+		} else if (!strcmp(buf, k_down)) {
+			rewind(stdin);
+			if (history[hindex]) {
+				fprintf(stdout, "%s", history[++hindex]);
+				strcpy(buf, history[hindex]);
+				i = strlen(buf) + 1;
+			}
+		}
+	}
+
+	buf[i] = '\0';
+
+	if (history[hindex])
+		free(history[hindex]);
+	history[hindex] = malloc(strlen(buf) + 2);
+	strcpy(history[hindex++], buf);
+	strcat(buf, "\n");
+}
+
 int main(int argc, char *argv[])
 {
 	int num_args, address, prev_address = 0;
@@ -182,6 +227,23 @@ int main(int argc, char *argv[])
 	struct ipr_ioa *ioa;
 	char ascii_buffer[17];
 	struct ipr_flit flit;
+	char *term_type;
+
+	term_type = getenv ("TERM");
+	if (!term_type) {
+		fprintf(stderr, "Cannot determine terminal type. Is TERM set?\n");
+		return -EIO;
+	}
+
+	rc = tgetent (term, term_type);
+	if (rc < 0) {
+		fprintf(stderr, "Cannot determine terminal type\n");
+		return -EIO;
+	}
+
+
+	k_up = tgetstr ("ku", NULL);
+	k_down = tgetstr ("kd", NULL);
 
 	openlog("iprdbg",
 		LOG_PERROR | /* Print error to stderr as well */
@@ -246,7 +308,7 @@ int main(int argc, char *argv[])
 		memset(arg, 0, sizeof(arg));
 		address = 0;
 
-		fgets(cmd_line, 999, stdin);
+		ipr_fgets(cmd_line, 999, stdin);
 
 		logtofile("\n%s\n", cmd_line);
 

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.56 2005/07/20 18:07:11 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.57 2005/09/26 20:19:36 brking Exp $
  */
 
 #include <stdarg.h>
@@ -999,6 +999,20 @@ struct ipr_multi_ioa_status {
  */
 };
 
+struct ipr_disk_attr {
+	int queue_depth;
+	int tcq_enabled;
+	int format_timeout;
+};
+
+struct ipr_vset_attr {
+	int queue_depth;
+};
+
+struct ipr_ioa_attr {
+	int preferred_primary;
+};
+
 struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
@@ -1007,6 +1021,7 @@ struct ipr_dev {
 	u32 should_init:1;
 	u32 init_not_allowed:1;
 	struct scsi_dev_data *scsi_dev_data;
+	struct ipr_disk_attr attr;
 	union {
 		struct ipr_common_record *qac_entry;
 		struct ipr_dev_record *dev_rcd;
@@ -1171,20 +1186,6 @@ struct ipr_scsi_bus_attr {
 struct ipr_scsi_buses {
 	int num_buses;
 	struct ipr_scsi_bus_attr bus[IPR_MAX_NUM_BUSES];
-};
-
-struct ipr_disk_attr {
-	int queue_depth;
-	int tcq_enabled;
-	int format_timeout;
-};
-
-struct ipr_vset_attr {
-	int queue_depth;
-};
-
-struct ipr_ioa_attr {
-	int preferred_primary;
 };
 
 struct ipr_dasd_timeout_record {
@@ -1456,8 +1457,8 @@ struct ipr_encl_status_ctl_pg
 };
 
 #define for_each_elem_status(i, ses_data) \
-        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) \
-                 && i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++)
+        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) && \
+             i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++)
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
@@ -1639,6 +1640,16 @@ static inline void ipr_strncpy_0(char *dest, char *source, int length)
 	dest[length] = '\0';
 }
 
+static inline void ipr_strncpy_0n(char *dest, char *source, int length)
+{
+	char *ch;
+	memcpy(dest, source, length);
+	dest[length] = '\0';
+	ch = strchr(dest, '\n');
+	if (ch)
+		*ch = '\0';
+}
+
 #define syslog_dbg(...) \
 do { \
 if (ipr_debug) \
@@ -1656,10 +1667,10 @@ if (dev->scsi_dev_data && !dev->ioa->ioa_dead) { \
 
 #define scsi_dbg(dev, fmt, ...) \
 do { \
-if (dev->scsi_dev_data) { \
-      syslog_dbg("%d:%d:%d:%d: " fmt, dev->ioa->host_num, \
-             dev->scsi_dev_data->channel, dev->scsi_dev_data->id, \
-             dev->scsi_dev_data->lun, ##__VA_ARGS__); \
+if ((dev)->scsi_dev_data) { \
+      syslog_dbg("%d:%d:%d:%d: " fmt, (dev)->ioa->host_num, \
+             (dev)->scsi_dev_data->channel, (dev)->scsi_dev_data->id, \
+             (dev)->scsi_dev_data->lun, ##__VA_ARGS__); \
 } \
 } while (0)
 

@@ -3517,7 +3517,7 @@ int configure_raid_include(i_container *i_con)
 	struct screen_output *s_out;
 
 	for_each_icon(temp_i_con) {
-		cur_raid_cmd = i_con->data;
+		cur_raid_cmd = temp_i_con->data;
 		if (!cur_raid_cmd)
 			continue;
 
@@ -4534,7 +4534,7 @@ int disk_unit_recovery(i_container *i_con)
 	return rc;
 }
 
-static void get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
+static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 {
 	struct ipr_dev_record *dev_record = dev->dev_rcd;
 	struct ipr_array_record *array_record = dev->array_rcd;
@@ -4555,20 +4555,24 @@ static void get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 			res_addr->bus = dev_record->resource_addr.bus;
 			res_addr->target = dev_record->resource_addr.target;
 			res_addr->lun = dev_record->resource_addr.lun;
-		}
+		} else
+			return -1;
 	} else if (ipr_is_volume_set(dev)) {
 		if (array_record && array_record->no_config_entry) {
 			res_addr->host = dev->ioa->host_num;
 			res_addr->bus = array_record->last_resource_addr.bus;
 			res_addr->target = array_record->last_resource_addr.target;
 			res_addr->lun = array_record->last_resource_addr.lun;
-		} else if (dev_record) {
+		} else if (array_record) {
 			res_addr->host = dev->ioa->host_num;
 			res_addr->bus = array_record->resource_addr.bus;
 			res_addr->target = array_record->resource_addr.target;
 			res_addr->lun = array_record->resource_addr.lun;
-		}
-	}
+		} else
+			return -1;
+	} else
+		return -1;
+	return 0;
 }
 
 int process_conc_maint(i_container *i_con, int action)
@@ -4603,7 +4607,8 @@ int process_conc_maint(i_container *i_con, int action)
 	if (found != 1)
 		return INVALID_OPTION_STATUS;
 
-	get_res_addr(dev, &res_addr);
+	if (get_res_addr(dev, &res_addr))
+		return INVALID_OPTION_STATUS; /* FIXME */
 
 	if (ipr_is_af_dasd_device(dev) &&
 	    (action == IPR_VERIFY_CONC_REMOVE || action == IPR_WAIT_CONC_REMOVE)) {
@@ -4795,6 +4800,7 @@ int start_conc_maint(i_container *i_con, int action)
 	int toggle = 1;
 	s_node *n_screen;
 	int header_lines;
+	u8 scsi_id_found;
 
 	processing();
 
@@ -4822,8 +4828,13 @@ int start_conc_maint(i_container *i_con, int action)
 				continue;
 
 			ses_channel = ses->scsi_dev_data->channel;
+			scsi_id_found = 0;
 
 			for_each_elem_status(i, &ses_data) {
+				if (scsi_id_found & (1 << ses_data.elem_status[i].scsi_id))
+					continue;
+				scsi_id_found |= (1 << ses_data.elem_status[i].scsi_id);
+
 				if (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					local_dev = realloc(local_dev, (sizeof(void *) *
 									local_dev_count) + 1);
@@ -4844,7 +4855,10 @@ int start_conc_maint(i_container *i_con, int action)
 				}
 
 				for_each_dev(ioa, dev) {
-					get_res_addr(dev, &res_addr);
+					if (get_res_addr(dev, &res_addr)) {
+						scsi_dbg(dev, "Cannot find resource address\n");
+						continue;
+					}
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
 						if (action == IPR_CONC_REMOVE) {
@@ -5012,23 +5026,9 @@ int init_device(i_container *i_con)
 				continue;
 
 			if (can_init) {
-				if (dev_init_head) {
-					dev_init_tail->next = malloc(sizeof(struct devs_to_init_t));
-					dev_init_tail = dev_init_tail->next;
-				}
-				else
-					dev_init_head = dev_init_tail = malloc(sizeof(struct devs_to_init_t));
-
-				memset(dev_init_tail, 0, sizeof(struct devs_to_init_t));
-
-				dev_init_tail->ioa = ioa;
-				dev_init_tail->dev_type = dev_type;
-				dev_init_tail->dev = dev;
-				dev_init_tail->new_block_size = 0;
-
+				add_format_device(dev, 0);
 				print_dev(k, dev, buffer, "%1", ioa, k);
 				i_con = add_i_con(i_con,"\0",dev_init_tail);
-
 				num_devs++;
 			}
 		}
@@ -5137,7 +5137,7 @@ int confirm_init_device(i_container *i_con)
 
 static int dev_init_complete(u8 num_devs)
 {
-	int done_bad;
+	int done_bad = 0;
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
 	int not_done = 0;
@@ -5162,7 +5162,6 @@ static int dev_init_complete(u8 num_devs)
 		}
 
 		percent_cmplt = 100;
-		done_bad = 0;
 
 		for_each_dev_to_init(dev) {
 			if (!dev->do_init || dev->done)
@@ -5213,6 +5212,7 @@ static int dev_init_complete(u8 num_devs)
 
 				if (rc < 0) {
 					dev->done = 1;
+					done_bad = 1;
 					continue;
 				}
 
@@ -5236,9 +5236,11 @@ static int dev_init_complete(u8 num_devs)
 					continue;
 
 				ioa = dev->ioa;
-				if (dev->new_block_size != ioa->af_block_size && ipr_is_gscsi(dev->dev)) {
+				if (ipr_is_gscsi(dev->dev)) {
 					rc = ipr_test_unit_ready(dev->dev, &sense_data);
-					if (rc == 0) {
+					if (rc) {
+						done_bad = 1;
+					} else if (dev->new_block_size != ioa->af_block_size) {
 						ipr_write_dev_attr(dev->dev, "rescan", "1");
 						ipr_init_dev(dev->dev);
 					}
@@ -6463,7 +6465,7 @@ int bus_attr_menu(struct ipr_ioa *ioa, struct bus_attr *bus_attr, int start_row,
 {
 	int i, scsi_id, found;
 	int num_menu_items;
-	int menu_index;
+	int menu_index = 0;
 	ITEM **menu_item = NULL;
 	struct ipr_scsi_buses *page_28_cur;
 	struct ipr_dev *dev;
@@ -8410,29 +8412,18 @@ int ibm_boot_log(i_container *i_con)
 		return 1; /* return with no status */
 }
 
-char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
-		   struct ipr_ioa *ioa, int type)
+static void get_status(struct ipr_dev *ipr_dev, char *buf, int type)
 {
-	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
-	int i, rc;
+	struct ipr_ioa *ioa = ipr_dev->ioa;
+	int rc;
 	struct ipr_query_res_state res_state;
-	struct ipr_res_addr res_addr;
 	u8 ioctl_buffer[255];
-	char raid_str[48];
 	int status;
 	int format_req = 0;
 	struct ipr_mode_parm_hdr *mode_parm_hdr;
 	struct ipr_block_desc *block_desc;
 	struct sense_data_t sense_data;
-	char *dev_name = ipr_dev->dev_name;
-	char *gen_name = ipr_dev->gen_name;
-	char node_name[7];
-	int tab_stop = 0;
-	char vendor_id[IPR_VENDOR_ID_LEN + 1];
-	char product_id[IPR_PROD_ID_LEN + 1];
-	struct ipr_common_record *common_record;
-	struct ipr_dev_record *device_record;
 	struct ipr_array_record *array_record;
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
@@ -8440,83 +8431,16 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 	int format_in_progress = 0;
 	int resync_in_progress = 0;
 
-	if (body)
-		len = strlen(body);
-	body = realloc(body, len + 256);
-
-	if (((type & 3) == 2) && (strlen(gen_name) > 5))
-		ipr_strncpy_0(node_name, &gen_name[5], 6);
-	else if (strlen(dev_name) > 5)
-		ipr_strncpy_0(node_name, &dev_name[5], 6);
-	else
-		node_name[0] = '\0';
-
-	len += sprintf(body + len, " %s  %-6s %s/%d:",
-		       option,
-		       node_name,
-		       ioa->pci_address,
-		       ioa->host_num);
-
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
-		if (type&1) {
-			len += sprintf(body + len,"            %-25s ", get_ioa_desc(ipr_dev->ioa));
-		} else
-			len += sprintf(body + len,"            %-8s %-16s ",
-				       scsi_dev_data->vendor_id,
-				       scsi_dev_data->product_id);
-
 		if (ioa->ioa_dead)
-			len += sprintf(body + len, "Not Operational\n");
+			sprintf(buf, "Not Operational");
 		else if (ioa->nr_ioa_microcode)
-			len += sprintf(body + len, "Not Ready\n");
+			sprintf(buf, "Not Ready");
 		else
-			len += sprintf(body + len, "Operational\n");
-	} else if ((scsi_dev_data) &&
-		   (scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT)) {
-
-		tab_stop  = sprintf(body + len,"%d:%d: ",
-				    scsi_dev_data->channel,
-				    scsi_dev_data->id);
-
-		len += tab_stop;
-
-		for (i = 0; i < 12-tab_stop; i++)
-			body[len+i] = ' ';
-
-		len += 12-tab_stop;
-		len += sprintf(body + len, "%-8s %-16s "," ", " ");
-		len += sprintf(body + len, "Empty\n");
+			sprintf(buf, "Operational");
+	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
+		sprintf(buf, "Empty");
 	} else {
-		get_res_addr(ipr_dev, &res_addr);
-
-		tab_stop  = sprintf(body + len,"%d:%d:%d ", res_addr.bus,
-				    res_addr.target, res_addr.lun);
-
-		if (scsi_dev_data) {
-			ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
-			ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
-		}
-		else if (ipr_dev->qac_entry) {
-			common_record = ipr_dev->qac_entry;
-			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
-				device_record = (struct ipr_dev_record *)common_record;
-				ipr_strncpy_0(vendor_id, device_record->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , device_record->product_id, IPR_PROD_ID_LEN);
-			} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
-				array_record = (struct ipr_array_record *)common_record;
-				ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , array_record->product_id,
-					      IPR_PROD_ID_LEN);
-			}
-		}
-
-		len += tab_stop;
-
-		for (i = 0; i < 12-tab_stop; i++)
-			body[len+i] = ' ';
-
-		len += 12-tab_stop;
-
 		if (ipr_is_volume_set(ipr_dev)) {
 			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
 
@@ -8537,7 +8461,6 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 			rc = ipr_query_command_status(ipr_dev, &cmd_status);
 
 			if ((rc == 0) && (cmd_status.num_records != 0)) {
-
 				status_record = cmd_status.record;
 				if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
 				    (status_record->status != IPR_CMD_STATUS_FAILED)) {
@@ -8558,36 +8481,6 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 				percent_cmplt = ((int)sense_data.sense_key_spec[1]*100)/0x100;
 				format_in_progress++;
 			}
-		}
-
-		if (!(type&1)) {
-			len += sprintf(body + len, "%-8s %-16s ",
-				       vendor_id, product_id);
-		} else {
-			if (ipr_is_hot_spare(ipr_dev))
-				len += sprintf(body + len, "%-25s ", "Hot Spare");
-			else if (ipr_is_volume_set(ipr_dev)) {
-				sprintf(ioctl_buffer, "RAID %s Disk Array",
-					ipr_dev->prot_level_str);
-				len += sprintf(body + len, "%-25s ", ioctl_buffer);
-			} else if (ipr_is_array_member(ipr_dev)) {
-				if (type&2)
-					sprintf(raid_str,"  RAID %s Array Member",
-						ipr_dev->prot_level_str);
-				else
-					sprintf(raid_str,"RAID %s Array Member",
-						ipr_dev->prot_level_str);
-	
-				len += sprintf(body + len, "%-25s ", raid_str);
-
-			} else if (ipr_is_af_dasd_device(ipr_dev))
-				len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
-			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE)
-				len += sprintf(body + len, "%-25s ", "Enclosure");
-			else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
-				len += sprintf(body + len, "%-25s ", "Processor");
-			else
-				len += sprintf(body + len, "%-25s ", "Physical Disk");
 		}
 
 		if (ipr_is_af(ipr_dev)) {
@@ -8636,43 +8529,165 @@ char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
 		}
 
 		if (format_in_progress)
-			sprintf(body + len, "%d%% Formatted\n", percent_cmplt);
+			sprintf(buf, "%d%% Formatted", percent_cmplt);
 		else if (!scsi_dev_data && ipr_dev->ioa->is_secondary)
-			sprintf(body + len, "Remote\n");
+			sprintf(buf, "Remote");
 		else if (!scsi_dev_data)
-			sprintf(body + len, "Missing\n");
+			sprintf(buf, "Missing");
 		else if (!scsi_dev_data->online)
-			sprintf(body + len, "Offline\n");
+			sprintf(buf, "Offline");
 		else if (res_state.not_oper || res_state.not_func)
-			sprintf(body + len, "Failed\n");
+			sprintf(buf, "Failed");
 		else if (res_state.read_write_prot)
-			sprintf(body + len, "R/W Protected\n");
+			sprintf(buf, "R/W Protected");
 		else if (res_state.prot_dev_failed)
-			sprintf(body + len, "Failed\n");
+			sprintf(buf, "Failed");
 		else if (ipr_is_volume_set(ipr_dev)) {
 			if (res_state.prot_suspended && ipr_is_volume_set(ipr_dev))
-				sprintf(body + len, "Degraded\n");
+				sprintf(buf, "Degraded");
 			else if (res_state.prot_resuming && ipr_is_volume_set(ipr_dev)) {
 				if (!(type&1) || (percent_cmplt == 0))
-					sprintf(body + len, "Rebuilding\n");
+					sprintf(buf, "Rebuilding");
 				else
-					sprintf(body + len, "%d%% Rebuilt\n", percent_cmplt);
+					sprintf(buf, "%d%% Rebuilt", percent_cmplt);
 			} else if (resync_in_progress) {
 				if (!(type&1) || (percent_cmplt == 0))
-					sprintf(body + len, "Checking\n");
+					sprintf(buf, "Checking");
 				else
-					sprintf(body + len, "%d%% Checked\n", percent_cmplt);
+					sprintf(buf, "%d%% Checked", percent_cmplt);
 			} else if (res_state.degraded_oper || res_state.service_req)
-				sprintf(body + len, "Degraded\n");
+				sprintf(buf, "Degraded");
 			else
-				sprintf(body + len, "Active\n");
+				sprintf(buf, "Active");
 		} else if (format_req)
-			sprintf(body + len, "Format Required\n");
+			sprintf(buf, "Format Required");
 		else if (ipr_device_is_zeroed(ipr_dev))
-			sprintf(body + len, "Zeroed\n");
+			sprintf(buf, "Zeroed");
 		else
-			sprintf(body + len, "Active\n");
+			sprintf(buf, "Active");
 	}
+}
+
+char *print_device(struct ipr_dev *ipr_dev, char *body, char *option,
+		   struct ipr_ioa *ioa, int type)
+{
+	u16 len = 0;
+	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
+	int i;
+	struct ipr_res_addr res_addr;
+	u8 ioctl_buffer[255];
+	char raid_str[48];
+	char *dev_name = ipr_dev->dev_name;
+	char *gen_name = ipr_dev->gen_name;
+	char node_name[7], buf[100];
+	int tab_stop = 0;
+	char vendor_id[IPR_VENDOR_ID_LEN + 1];
+	char product_id[IPR_PROD_ID_LEN + 1];
+	struct ipr_common_record *common_record;
+	struct ipr_dev_record *device_record;
+	struct ipr_array_record *array_record;
+
+	if (body)
+		len = strlen(body);
+	body = realloc(body, len + 256);
+
+	if (((type & 3) == 2) && (strlen(gen_name) > 5))
+		ipr_strncpy_0(node_name, &gen_name[5], 6);
+	else if (strlen(dev_name) > 5)
+		ipr_strncpy_0(node_name, &dev_name[5], 6);
+	else
+		node_name[0] = '\0';
+
+	len += sprintf(body + len, " %s  %-6s %s/%d:",
+		       option,
+		       node_name,
+		       ioa->pci_address,
+		       ioa->host_num);
+
+	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
+		if (type&1) {
+			len += sprintf(body + len,"            %-25s ", get_ioa_desc(ipr_dev->ioa));
+		} else
+			len += sprintf(body + len,"            %-8s %-16s ",
+				       scsi_dev_data->vendor_id,
+				       scsi_dev_data->product_id);
+	} else if ((scsi_dev_data) &&
+		   (scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT)) {
+
+		tab_stop  = sprintf(body + len,"%d:%d: ",
+				    scsi_dev_data->channel,
+				    scsi_dev_data->id);
+
+		len += tab_stop;
+
+		for (i = 0; i < 12-tab_stop; i++)
+			body[len+i] = ' ';
+
+		len += 12-tab_stop;
+		len += sprintf(body + len, "%-8s %-16s "," ", " ");
+	} else {
+		get_res_addr(ipr_dev, &res_addr);
+
+		tab_stop  = sprintf(body + len,"%d:%d:%d ", res_addr.bus,
+				    res_addr.target, res_addr.lun);
+
+		if (scsi_dev_data) {
+			ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+		}
+		else if (ipr_dev->qac_entry) {
+			common_record = ipr_dev->qac_entry;
+			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
+				device_record = (struct ipr_dev_record *)common_record;
+				ipr_strncpy_0(vendor_id, device_record->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , device_record->product_id, IPR_PROD_ID_LEN);
+			} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+				array_record = (struct ipr_array_record *)common_record;
+				ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , array_record->product_id,
+					      IPR_PROD_ID_LEN);
+			}
+		}
+
+		len += tab_stop;
+
+		for (i = 0; i < 12-tab_stop; i++)
+			body[len+i] = ' ';
+
+		len += 12-tab_stop;
+
+		if (!(type&1)) {
+			len += sprintf(body + len, "%-8s %-16s ",
+				       vendor_id, product_id);
+		} else {
+			if (ipr_is_hot_spare(ipr_dev))
+				len += sprintf(body + len, "%-25s ", "Hot Spare");
+			else if (ipr_is_volume_set(ipr_dev)) {
+				sprintf(ioctl_buffer, "RAID %s Disk Array",
+					ipr_dev->prot_level_str);
+				len += sprintf(body + len, "%-25s ", ioctl_buffer);
+			} else if (ipr_is_array_member(ipr_dev)) {
+				if (type&2)
+					sprintf(raid_str,"  RAID %s Array Member",
+						ipr_dev->prot_level_str);
+				else
+					sprintf(raid_str,"RAID %s Array Member",
+						ipr_dev->prot_level_str);
+	
+				len += sprintf(body + len, "%-25s ", raid_str);
+			} else if (ipr_is_af_dasd_device(ipr_dev))
+				len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE)
+				len += sprintf(body + len, "%-25s ", "Enclosure");
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
+				len += sprintf(body + len, "%-25s ", "Processor");
+			else
+				len += sprintf(body + len, "%-25s ", "Physical Disk");
+		}
+	}
+
+	get_status(ipr_dev, buf, type);
+	sprintf(body + len, "%s\n", buf);
 	return body;
 }
 
@@ -8742,6 +8757,15 @@ static int raid_create_check_num_devs(struct ipr_array_cap_entry *cap,
 	return 0;
 }
 
+static void curses_init()
+{
+	/* makes program compatible with all terminals -
+	 originally did not display text correctly when user was running xterm */
+	setenv("TERM", "vt100", 1);
+	setlocale(LC_ALL, "");
+	initscr();
+}
+
 static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
@@ -8753,6 +8777,7 @@ static int raid_create(char **args, int num_args)
 	struct ipr_ioa *ioa = NULL;
 	struct ipr_array_cap_entry *cap;
 
+	curses_init();
 	next_raid_level = 0;
 	next_stripe_size = 0;
 	next_qdepth = 0;
@@ -8874,6 +8899,8 @@ static int raid_delete(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	curses_init();
+
 	dev->array_rcd->issue_cmd = 1;
 	if (dev->scsi_dev_data)
 		rc = ipr_start_stop_stop(dev);
@@ -8883,17 +8910,29 @@ static int raid_delete(char **args, int num_args)
 	return rc;
 }
 
+static int print_status(char *name)
+{
+	struct ipr_dev *dev = find_blk_dev(name);
+	char buf[100];
+
+	if (!dev)
+		dev = find_gen_dev(name);
+	if (!dev) {
+		printf("Missing\n");
+		return -EINVAL;
+	}
+
+	get_status(dev, buf, 0);
+	printf("%s\n", buf);
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	int  next_editor, next_dir, next_cmd, next_dev, i, rc = 0;
 	char parm_editor[200], parm_dir[200], cmd[200];
 	char **dev = NULL;
 	int non_interactive = 0, num_devs = 0;
-
-	/* makes program compatible with all terminals -
-	 originally did not display text correctly when user was running xterm */
-	setenv("TERM", "vt100", 1);
-	setlocale(LC_ALL, "");
 
 	strcpy(parm_dir, DEFAULT_LOG_DIR);
 	strcpy(parm_editor, DEFAULT_EDITOR);
@@ -8947,7 +8986,6 @@ int main(int argc, char *argv[])
 	system("modprobe sg");
 	exit_func = tool_exit_func;
 	tool_init(0);
-	initscr();
 
 	if (non_interactive) {
 		exit_func = cmdline_exit_func;
@@ -8967,6 +9005,8 @@ int main(int argc, char *argv[])
 			rc = raid_create(dev, num_devs);
 		else if (strcmp(cmd, "raid-delete") == 0)
 			rc = raid_delete(dev, num_devs);
+		else if (strcmp(cmd, "status") == 0)
+			rc = print_status(dev[0]);
 		else {
 			exit_func();
 			usage();
@@ -8976,6 +9016,7 @@ int main(int argc, char *argv[])
 		return rc;
 	}
 
+	curses_init();
 	cbreak(); /* take input chars one at a time, no wait for \n */
 
 	keypad(stdscr,TRUE);
