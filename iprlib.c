@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.72 2005/09/26 20:19:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.73 2005/09/28 04:28:58 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -755,7 +755,7 @@ struct ipr_ioa *find_ioa(int host_no)
 	return NULL;
 }
 
-static struct ipr_dev *find_dev(char *blk, int (*compare) (struct ipr_dev *, char *))
+static struct ipr_dev *_find_dev(char *blk, int (*compare) (struct ipr_dev *, char *))
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
@@ -789,7 +789,7 @@ static int blk_compare(struct ipr_dev *dev, char *name)
 
 struct ipr_dev *find_blk_dev(char *blk)
 {
-	return find_dev(blk, blk_compare);
+	return _find_dev(blk, blk_compare);
 }
 
 static int gen_compare(struct ipr_dev *dev, char *name)
@@ -799,7 +799,16 @@ static int gen_compare(struct ipr_dev *dev, char *name)
 
 struct ipr_dev *find_gen_dev(char *gen)
 {
-	return find_dev(gen, gen_compare);
+	return _find_dev(gen, gen_compare);
+}
+
+struct ipr_dev *find_dev(char *name)
+{
+	struct ipr_dev *dev = find_blk_dev(name);
+
+	if (!dev)
+		dev = find_gen_dev(name);
+	return dev;
 }
 
 #define NETLINK_KOBJECT_UEVENT        15
@@ -5052,7 +5061,7 @@ void ipr_init_ioa(struct ipr_ioa *ioa)
 	init_ioa_dev(&ioa->ioa);
 }
 
-void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_dev)(char *),
+void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 		     void (*func)(struct ipr_dev *))
 {
 	struct ipr_dev *dev;
@@ -5067,7 +5076,7 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_dev)(char *),
 	name++;
 	tool_init(1);
 	check_current_config(false);
-	dev = find_dev(name);
+	dev = find_device(name);
 
 	if (!dev) {
 		syslog_dbg("Failed to find ipr dev %s\n", name);

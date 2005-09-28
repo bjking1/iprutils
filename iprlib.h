@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.57 2005/09/26 20:19:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.58 2005/09/28 04:28:58 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1089,6 +1089,14 @@ struct ipr_ioa {
       for_each_dev(i, d) \
            if (ipr_is_hot_spare(d))
 
+#define for_each_disk(i, d) \
+      for_each_dev(i, d) \
+          if ((d)->scsi_dev_data && (ipr_is_af_dasd_device(d) || ipr_is_gscsi(d)))
+
+#define for_each_standalone_disk(i, d) \
+      for_each_disk(i, d) \
+           if (!ipr_is_hot_spare(d) && !ipr_is_array_member(dev))
+
 struct ipr_dasd_inquiry_page3 {
 	u8 peri_qual_dev_type;
 	u8 page_code;
@@ -1547,6 +1555,7 @@ struct ipr_ioa *find_ioa(int);
 int parse_option(char *);
 struct ipr_dev *find_blk_dev(char *);
 struct ipr_dev *find_gen_dev(char *);
+struct ipr_dev *find_dev(char *);
 int ipr_cmds_per_lun(struct ipr_ioa *);
 void scsi_host_kevent(char *, void (*)(struct ipr_ioa *));
 void scsi_dev_kevent(char *, struct ipr_dev *(*)(char *), void (*)(struct ipr_dev *));

@@ -85,6 +85,8 @@ static char editor[200];
 FILE *errpath;
 static int toggle_field;
 nl_catd catd;
+static char **add_args;
+static int num_add_args;
 
 #define for_each_raid_cmd(cmd) for (cmd = raid_cmd_head; cmd; cmd = cmd->next)
 
@@ -883,24 +885,24 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 	return s_out;
 }
 
-static char *status_header(char *buffer, int *num_lines, int type)
-{
-	int cur_len = strlen(buffer);
-	int header_lines = 0;
-	char *header[] = {
+static char *status_hdr[] = {
 		/*   .        .                  .            .                           .          */
 		/*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
 		"OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
 		"OPT Name   PCI/SCSI Location          Description               Status"};
-	char *sep[]    = {
+static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
 		"--- ------ -------------------------- ------------------------- -----------------"};
+static char *status_header(char *buffer, int *num_lines, int type)
+{
+	int cur_len = strlen(buffer);
+	int header_lines = 0;
 
 	if (type > 1)
 		type = 0;
-	buffer = realloc(buffer, cur_len + strlen(header[type]) + strlen(sep[type]) + 8);
-	cur_len += sprintf(buffer + cur_len, "%s\n", header[type]);
-	cur_len += sprintf(buffer + cur_len, "%s\n", sep[type]);
+	buffer = realloc(buffer, cur_len + strlen(status_hdr[type]) + strlen(status_sep[type]) + 8);
+	cur_len += sprintf(buffer + cur_len, "%s\n", status_hdr[type]);
+	cur_len += sprintf(buffer + cur_len, "%s\n", status_sep[type]);
 	header_lines += 2;
 
 	*num_lines = header_lines + *num_lines;
@@ -8912,11 +8914,9 @@ static int raid_delete(char **args, int num_args)
 
 static int print_status(char *name)
 {
-	struct ipr_dev *dev = find_blk_dev(name);
+	struct ipr_dev *dev = find_dev(name);
 	char buf[100];
 
-	if (!dev)
-		dev = find_gen_dev(name);
 	if (!dev) {
 		printf("Missing\n");
 		return -EINVAL;
@@ -8927,12 +8927,66 @@ static int print_status(char *name)
 	return 0;
 }
 
+static void printf_device(struct ipr_dev *dev, int type)
+{
+	char *buf = print_device(dev, NULL, " ", dev->ioa, type);
+	printf("%s", buf);
+	free(buf);
+}
+
+static void printf_vsets(struct ipr_ioa *ioa, int type)
+{
+	struct ipr_dev *vset, *dev;
+
+	for_each_vset(ioa, vset) {
+		printf_device(vset, type);
+		for_each_dev_in_vset(vset, dev)
+			printf_device(dev, type);
+	}
+}
+
+static void printf_hot_spare_disks(struct ipr_ioa *ioa, int type)
+{
+	struct ipr_dev *dev;
+
+	for_each_hot_spare(ioa, dev)
+		printf_device(dev, type);
+}
+
+static void printf_standlone_disks(struct ipr_ioa *ioa, int type)
+{
+	struct ipr_dev *dev;
+
+	for_each_standalone_disk(ioa, dev)
+		printf_device(dev, type);
+}
+
+static void printf_ioa(struct ipr_ioa *ioa, int type)
+{
+	if (!ioa->ioa.scsi_dev_data)
+		return;
+
+	printf_device(&ioa->ioa, type);
+	printf_standlone_disks(ioa, type);
+	printf_hot_spare_disks(ioa, type);
+	printf_vsets(ioa, type);
+}
+
+static int show_config(int type)
+{
+	struct ipr_ioa *ioa;
+
+	printf("%s\n%s\n", status_hdr[type], status_sep[type]);
+	for_each_ioa(ioa)
+		printf_ioa(ioa, type);
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
-	int  next_editor, next_dir, next_cmd, next_dev, i, rc = 0;
+	int  next_editor, next_dir, next_cmd, next_args, i, rc = 0;
 	char parm_editor[200], parm_dir[200], cmd[200];
-	char **dev = NULL;
-	int non_interactive = 0, num_devs = 0;
+	int non_interactive = 0;
 
 	strcpy(parm_dir, DEFAULT_LOG_DIR);
 	strcpy(parm_editor, DEFAULT_EDITOR);
@@ -8947,7 +9001,7 @@ int main(int argc, char *argv[])
 		next_editor = 0;
 		next_dir = 0;
 		next_cmd = 0;
-		next_dev = 0;
+		next_args = 0;
 		for (i = 1; i < argc; i++) {
 			if (parse_option(argv[i]))
 				continue;
@@ -8967,12 +9021,12 @@ int main(int argc, char *argv[])
 				strcpy(cmd, argv[i]);
 				non_interactive = 1;
 				next_cmd = 0;
-				next_dev = 1;
-			} else if (next_dev) {
-				dev = realloc(dev, sizeof(*dev) * (num_devs + 1));
-				dev[num_devs] = malloc(strlen(argv[i]) + 1);
-				strcpy(dev[num_devs], argv[i]);
-				num_devs++;
+				next_args = 1;
+			} else if (next_args) {
+				add_args = realloc(add_args, sizeof(*add_args) * (num_add_args + 1));
+				add_args[num_add_args] = malloc(strlen(argv[i]) + 1);
+				strcpy(add_args[num_add_args], argv[i]);
+				num_add_args++;
 			} else {
 				usage();
 				exit(1);
@@ -8993,20 +9047,24 @@ int main(int argc, char *argv[])
 		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 		check_current_config(false);
 
-		if (num_devs == 0) {
+		if (strcmp(cmd, "show-config") == 0)
+			rc = show_config(0);
+		else if (strcmp(cmd, "show-alt-config") == 0)
+			rc = show_config(1);
+		else if (num_add_args == 0) {
 			exit_func();
 			usage();
 			return -EINVAL;
 		} else if (strcmp(cmd, "primary") == 0)
-			rc = set_preferred_primary(dev[0], 1);
+			rc = set_preferred_primary(add_args[0], 1);
 		else if (strcmp(cmd, "secondary") == 0)
-			rc = set_preferred_primary(dev[0], 0);
+			rc = set_preferred_primary(add_args[0], 0);
 		else if (strcmp(cmd, "raid-create") == 0)
-			rc = raid_create(dev, num_devs);
+			rc = raid_create(add_args, num_add_args);
 		else if (strcmp(cmd, "raid-delete") == 0)
-			rc = raid_delete(dev, num_devs);
+			rc = raid_delete(add_args, num_add_args);
 		else if (strcmp(cmd, "status") == 0)
-			rc = print_status(dev[0]);
+			rc = print_status(add_args[0]);
 		else {
 			exit_func();
 			usage();
