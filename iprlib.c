@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.70.2.1 2005/07/29 19:41:59 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.70.2.2 2005/10/13 20:44:56 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -4114,7 +4114,7 @@ static int ipr_get_hotplug_dir()
 	if (end)
 		*end = '\0';
 
-	hotplug_dir = realloc(hotplug_dir, strlen(loc + 1));
+	hotplug_dir = realloc(hotplug_dir, strlen(loc) + 1);
 
 	if (!hotplug_dir)
 		return -ENOMEM;

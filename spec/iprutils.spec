@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Oct 7 2005 Anton Blanchard <anton@samba.org>
+- Fix string length calculation in ipr_get_hotplug_dir
 * Wed Aug 17 2005 Brian King <brking@us.ibm.com> 2.0.15.4
 - Fix a couple of uninitialized variable compile errors
 * Wed Jul 27 2005 Brian King <brking@us.ibm.com> 2.0.15.3
