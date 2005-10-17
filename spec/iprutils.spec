@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.15.4
+Version: 2.0.15.5
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon Oct 17 2005 Brian King <brking@us.ibm.com> 2.0.15.5
+- Don't show enclosures in list of devices to remove in
+  concurrent remove screens of iprconfig.
+* Thu Oct 13 2005 Brian King <brking@us.ibm.com>
+- Fix concurrent disk remove function in iprconfig for
+  certain disk enclosures.
 * Fri Oct 7 2005 Anton Blanchard <anton@samba.org>
 - Fix string length calculation in ipr_get_hotplug_dir
 * Wed Aug 17 2005 Brian King <brking@us.ibm.com> 2.0.15.4

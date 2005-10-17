@@ -4848,12 +4848,6 @@ int process_conc_maint(i_container *i_con, int action)
 		ses_data.overall_status_identify = 0;
 	}
 
-	rc = ipr_send_diagnostics(&ioa->dev[j], &ses_data,
-				  sizeof(struct ipr_encl_status_ctl_pg));
-
-	if (rc)
-		return 30 | EXIT_FLAG;
-
 	if (action == IPR_VERIFY_CONC_REMOVE)
 		n_screen = &n_verify_conc_remove;
 	else if (action == IPR_VERIFY_CONC_ADD)
@@ -4867,6 +4861,17 @@ int process_conc_maint(i_container *i_con, int action)
 	for (k = 0; k < 2; k++) {
 		buffer[k] = __body_init_status(n_screen->header, &header_lines, k);
 		buffer[k] = print_device(ipr_dev, buffer[k], "1", ioa, k);
+	}
+
+	rc = ipr_send_diagnostics(&ioa->dev[j], &ses_data,
+				  sizeof(struct ipr_encl_status_ctl_pg));
+
+	if (rc) {
+		for (k = 0; k < 2; k++) {
+			free(buffer[k]);
+			buffer[k] = NULL;
+		}
+		return 30 | EXIT_FLAG;
 	}
 
 	/* call screen driver */
@@ -5086,6 +5091,10 @@ int start_conc_maint(i_container *i_con, int action)
 					}
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
+						if (&ioa->dev[l].scsi_dev_data &&
+						    ioa->dev[l].scsi_dev_data->type == TYPE_ENCLOSURE)
+							break;
+
 						if (action == IPR_CONC_REMOVE) {
 							if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
 								break;
