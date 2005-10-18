@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.73 2005/09/28 04:28:58 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.74 2005/10/18 14:29:09 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -770,6 +770,11 @@ static struct ipr_dev *_find_dev(char *blk, int (*compare) (struct ipr_dev *, ch
 		sprintf(name, "%s", blk);
 
 	for_each_ioa(ioa) {
+		if (!compare(&ioa->ioa, name)) {
+			free(name);
+			return &ioa->ioa;
+		}
+
 		for_each_dev(ioa, dev) {
 			if (!compare(dev, name)) {
 				free(name);
@@ -4171,7 +4176,7 @@ static int ipr_get_hotplug_dir()
 	if (end)
 		*end = '\0';
 
-	hotplug_dir = realloc(hotplug_dir, strlen(loc + 1));
+	hotplug_dir = realloc(hotplug_dir, strlen(loc) + 1);
 
 	if (!hotplug_dir)
 		return -ENOMEM;

@@ -1763,6 +1763,7 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	} else {
 		ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 		ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+		serial_num[0] = '\0';
 	}
 
 	body = add_line_to_body(body,"", NULL);
@@ -1791,7 +1792,8 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 		body = add_line_to_body(body,_("Level"), buffer);
 	}
 
-	body = add_line_to_body(body,_("Serial Number"), serial_num);
+	if (serial_num[0] != '\0')
+		body = add_line_to_body(body, _("Serial Number"), serial_num);
 
 	memset(&read_cap, 0, sizeof(read_cap));
 	rc = ipr_read_capacity(dev, &read_cap);
@@ -4670,12 +4672,6 @@ int process_conc_maint(i_container *i_con, int action)
 		ses_data.overall_status_identify = 0;
 	}
 
-	rc = ipr_send_diagnostics(ses, &ses_data,
-				  sizeof(struct ipr_encl_status_ctl_pg));
-
-	if (rc)
-		return 30 | EXIT_FLAG;
-
 	if (action == IPR_VERIFY_CONC_REMOVE)
 		n_screen = &n_verify_conc_remove;
 	else if (action == IPR_VERIFY_CONC_ADD)
@@ -4689,6 +4685,17 @@ int process_conc_maint(i_container *i_con, int action)
 	for (k = 0; k < 2; k++) {
 		buffer[k] = __body_init_status(n_screen->header, &header_lines, k);
 		buffer[k] = print_device(dev, buffer[k], "1", ioa, k);
+	}
+
+	rc = ipr_send_diagnostics(ses, &ses_data,
+				  sizeof(struct ipr_encl_status_ctl_pg));
+
+	if (rc) {
+		for (k = 0; k < 2; k++) {
+			free(buffer[k]);
+			buffer[k] = NULL;
+		}
+		return 30 | EXIT_FLAG;
 	}
 
 	/* call screen driver */
@@ -4861,6 +4868,10 @@ int start_conc_maint(i_container *i_con, int action)
 						scsi_dbg(dev, "Cannot find resource address\n");
 						continue;
 					}
+					if (dev->scsi_dev_data &&
+					    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
+						break;
+
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
 						if (action == IPR_CONC_REMOVE) {
@@ -8912,6 +8923,48 @@ static int raid_delete(char **args, int num_args)
 	return rc;
 }
 
+static int query_raid_create(char **args, int num_args)
+{
+	if (num_args != 1) {
+		syslog(LOG_ERR, _("Specify one IOA at a time\n"));
+		return -EINVAL;
+	}
+
+}
+
+static void show_dev_details(struct ipr_dev *dev)
+{
+	char *body = NULL;
+
+	if (dev->scsi_dev_data && dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+		body = ioa_details(body, dev);
+	else if (ipr_is_volume_set(dev))
+		body = vset_details(body, dev);
+	else
+		body = disk_details(body, dev);
+
+	printf("%s\n", body);
+	free(body);
+}
+
+static int show_details(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	int i;
+
+	for (i = 0; i < num_args; i++) {
+		dev = find_dev(args[i]);
+		if (!dev) {
+			fprintf(stderr, "Missing device: %s\n", args[i]);
+			continue;
+		}
+
+		show_dev_details(dev);
+	}
+
+	return 0;
+}
+
 static int print_status(char *name)
 {
 	struct ipr_dev *dev = find_dev(name);
@@ -8980,6 +9033,17 @@ static int show_config(int type)
 	for_each_ioa(ioa)
 		printf_ioa(ioa, type);
 	return 0;
+}
+
+static int query_ioas()
+{
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa)
+		printf("%s ", ioa->ioa.gen_name);
+
+	if (num_ioas)
+		printf("\b\n");
 }
 
 int main(int argc, char *argv[])
@@ -9051,6 +9115,8 @@ int main(int argc, char *argv[])
 			rc = show_config(0);
 		else if (strcmp(cmd, "show-alt-config") == 0)
 			rc = show_config(1);
+		else if (strcmp(cmd, "query-ioas") == 0)
+			rc = query_ioas();
 		else if (num_add_args == 0) {
 			exit_func();
 			usage();
@@ -9065,6 +9131,10 @@ int main(int argc, char *argv[])
 			rc = raid_delete(add_args, num_add_args);
 		else if (strcmp(cmd, "status") == 0)
 			rc = print_status(add_args[0]);
+		else if (strcmp(cmd, "show-details") == 0)
+			rc = show_details(add_args, num_add_args);
+		else if (strcmp(cmd, "query-raid-create") == 0)
+			rc = query_raid_create(add_args, num_add_args);
 		else {
 			exit_func();
 			usage();
