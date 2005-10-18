@@ -8722,10 +8722,8 @@ static struct sysfs_dev *tail_sdev;
 
 static struct ipr_dev *find_and_add_dev(char *name)
 {
-	struct ipr_dev *dev = find_blk_dev(name);
+	struct ipr_dev *dev = find_dev(name);
 
-	if (!dev)
-		dev = find_gen_dev(name);
 	if (!dev) {
 		syslog(LOG_ERR, _("Invalid device specified: %s\n"), name);
 		return NULL;
@@ -8895,16 +8893,6 @@ static int raid_delete(char **args, int num_args)
 	int rc;
 	struct ipr_dev *dev;
 
-	if (num_args != 1) {
-		syslog(LOG_ERR, _("Specify one array at a time to delete\n"));
-		return -EINVAL;
-	}
-
-	if (strncmp(args[0], "/dev", 4)) {
-		syslog(LOG_ERR, _("Invalid argument: %s\n"), args[0]);
-		return -EINVAL;
-	}
-
 	dev = find_and_add_dev(args[0]);
 
 	if (!dev) {
@@ -8912,6 +8900,7 @@ static int raid_delete(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	/* xxx can I remove this? */
 	curses_init();
 
 	dev->array_rcd->issue_cmd = 1;
@@ -8925,11 +8914,123 @@ static int raid_delete(char **args, int num_args)
 
 static int query_raid_create(char **args, int num_args)
 {
-	if (num_args != 1) {
-		syslog(LOG_ERR, _("Specify one IOA at a time\n"));
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+	int num;
+
+	dev = find_gen_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
+	ioa = dev->ioa;
+
+	if (!ioa->start_array_qac_entry)
+		return 0;
+
+	for_each_af_dasd(ioa, dev) {
+		if (!dev->scsi_dev_data)
+			continue;
+
+		if (dev->dev_rcd->start_cand && device_supported(dev)) {
+			printf("%s ", dev->gen_name);
+			num++;
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_raid_delete(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+	int num;
+
+	dev = find_gen_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+
+	for_each_vset(ioa, dev) {
+		if (!dev->array_rcd->stop_cand)
+			continue;
+		if (is_array_in_use(ioa, dev->array_rcd->array_id))
+			continue;
+		if (strlen(dev->dev_name))
+			printf("%s ", dev->dev_name);
+		else
+			printf("%s ", dev->gen_name);
+		num++;
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_hot_spare_create(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+	int num;
+
+	dev = find_gen_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+
+	for_each_af_dasd(ioa, dev) {
+		if (!dev->dev_rcd->add_hot_spare_cand)
+			continue;
+
+		printf("%s ", dev->gen_name);
+		num++;
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_hot_spare_delete(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+	int num;
+
+	dev = find_gen_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+
+	for_each_hot_spare(ioa, dev) {
+		if (!dev->dev_rcd->rmv_hot_spare_cand)
+			continue;
+
+		printf("%s ", dev->gen_name);
+		num++;
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
 }
 
 static void show_dev_details(struct ipr_dev *dev)
@@ -8949,25 +9050,21 @@ static void show_dev_details(struct ipr_dev *dev)
 
 static int show_details(char **args, int num_args)
 {
-	struct ipr_dev *dev;
-	int i;
+	struct ipr_dev *dev = find_dev(args[0]);
 
-	for (i = 0; i < num_args; i++) {
-		dev = find_dev(args[i]);
-		if (!dev) {
-			fprintf(stderr, "Missing device: %s\n", args[i]);
-			continue;
-		}
-
-		show_dev_details(dev);
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Missing device: %s\n", args[0]);
+		return -EINVAL;
 	}
 
+	show_dev_details(dev);
 	return 0;
 }
 
-static int print_status(char *name)
+static int print_status(char **args, int num_args)
 {
-	struct ipr_dev *dev = find_dev(name);
+	struct ipr_dev *dev = find_dev(args[0]);
 	char buf[100];
 
 	if (!dev) {
@@ -9025,7 +9122,7 @@ static void printf_ioa(struct ipr_ioa *ioa, int type)
 	printf_vsets(ioa, type);
 }
 
-static int show_config(int type)
+static int __show_config(int type)
 {
 	struct ipr_ioa *ioa;
 
@@ -9035,7 +9132,17 @@ static int show_config(int type)
 	return 0;
 }
 
-static int query_ioas()
+static int show_config(char **args, int num_args)
+{
+	return __show_config(0);
+}
+
+static int show_alt_config(char **args, int num_args)
+{
+	return __show_config(1);
+}
+
+static int query_ioas(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
 
@@ -9044,6 +9151,71 @@ static int query_ioas()
 
 	if (num_ioas)
 		printf("\b\n");
+	return 0;
+}
+
+static int set_primary(char **args, int num_args)
+{
+	return set_preferred_primary(args[0], 1);
+}
+
+static int set_secondary(char **args, int num_args)
+{
+	return set_preferred_primary(args[0], 0);
+}
+
+static const struct {
+	char *cmd;
+	int min_args;
+	int max_args;
+	int (*func)(char **, int);
+} command [] = {
+	{ "show-config",				0, 0, show_config },
+	{ "show-alt-config",			0, 0, show_alt_config },
+	{ "query-ioas",				0, 0, query_ioas },
+	{ "primary",				1, 1, set_primary },
+	{ "secondary",				1, 1, set_secondary },
+	{ "raid-create",				1, 100, raid_create },
+	{ "raid-delete",				1, 1, raid_delete },
+	{ "status",					1, 1, print_status },
+	{ "show-details",				1, 1, show_details },
+	{ "query-raid-create",			1, 1, query_raid_create },
+	{ "query-raid-delete",			1, 1, query_raid_delete },
+	{ "query-hot-spare-create",		1, 1, query_hot_spare_create },
+	{ "query-hot-spare-delete",		1, 1, query_hot_spare_delete }
+};
+
+static int non_interactive_cmd(char *cmd, char **args, int num_args)
+{
+	int rc, i;
+
+	exit_func = cmdline_exit_func;
+	closelog();
+	openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
+	check_current_config(false);
+
+	for (i = 0; i < ARRAY_SIZE(command); i++) {
+		if (strcmp(cmd, command[i].cmd) != 0)
+			continue;
+
+		if (num_args < command[i].min_args) {
+			fprintf(stderr, "You must specify a device\n");
+			return -EINVAL;
+		}
+
+		if (num_args > command[i].max_args) {
+			fprintf(stderr, "Too many arguments specified.\n");
+			return -EINVAL;
+		}
+
+		rc = command[i].func(args, num_args);
+		exit_func();
+		return rc;
+	}
+
+	exit_func();
+	usage();
+	return -EINVAL;
 }
 
 int main(int argc, char *argv[])
@@ -9105,44 +9277,8 @@ int main(int argc, char *argv[])
 	exit_func = tool_exit_func;
 	tool_init(0);
 
-	if (non_interactive) {
-		exit_func = cmdline_exit_func;
-		closelog();
-		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-		check_current_config(false);
-
-		if (strcmp(cmd, "show-config") == 0)
-			rc = show_config(0);
-		else if (strcmp(cmd, "show-alt-config") == 0)
-			rc = show_config(1);
-		else if (strcmp(cmd, "query-ioas") == 0)
-			rc = query_ioas();
-		else if (num_add_args == 0) {
-			exit_func();
-			usage();
-			return -EINVAL;
-		} else if (strcmp(cmd, "primary") == 0)
-			rc = set_preferred_primary(add_args[0], 1);
-		else if (strcmp(cmd, "secondary") == 0)
-			rc = set_preferred_primary(add_args[0], 0);
-		else if (strcmp(cmd, "raid-create") == 0)
-			rc = raid_create(add_args, num_add_args);
-		else if (strcmp(cmd, "raid-delete") == 0)
-			rc = raid_delete(add_args, num_add_args);
-		else if (strcmp(cmd, "status") == 0)
-			rc = print_status(add_args[0]);
-		else if (strcmp(cmd, "show-details") == 0)
-			rc = show_details(add_args, num_add_args);
-		else if (strcmp(cmd, "query-raid-create") == 0)
-			rc = query_raid_create(add_args, num_add_args);
-		else {
-			exit_func();
-			usage();
-			return -EINVAL;
-		}
-		exit_func();
-		return rc;
-	}
+	if (non_interactive)
+		return non_interactive_cmd(cmd, add_args, num_add_args);
 
 	curses_init();
 	cbreak(); /* take input chars one at a time, no wait for \n */
