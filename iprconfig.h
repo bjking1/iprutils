@@ -306,7 +306,6 @@ s_node n_raid_stop_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o The disks are currently in use.\n"), /* xxx? */
 		"" }
 };
 
@@ -495,7 +494,6 @@ s_node n_af_include_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o The disks are currently in use.\n"), /* xxx */
 		"" }
 };
 
@@ -515,7 +513,6 @@ s_node n_af_remove_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o The disks are currently in use.\n"),
 		"" }
 };
 
@@ -552,7 +549,6 @@ s_node n_remove_hot_spare_fail = {
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system.  Retry the operation.\n"),
 		__("o The disks are missing.\n"),
-		__("o The disks are currently in use.\n"),
 		"" }
 };
 

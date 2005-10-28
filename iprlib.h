@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.58 2005/09/28 04:28:58 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.59 2005/10/28 18:54:47 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1096,6 +1096,10 @@ struct ipr_ioa {
 #define for_each_standalone_disk(i, d) \
       for_each_disk(i, d) \
            if (!ipr_is_hot_spare(d) && !ipr_is_array_member(dev))
+
+#define for_each_jbod_disk(i, d) \
+      for_each_disk(i, d) \
+          if (ipr_is_gscsi(d))
 
 struct ipr_dasd_inquiry_page3 {
 	u8 peri_qual_dev_type;

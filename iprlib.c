@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.74 2005/10/18 14:29:09 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.75 2005/10/28 18:54:47 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -705,6 +705,9 @@ static const char *jbod_desc = "PCI-X SCSI Adapter";
 static const char *sas_raid_desc = "PCI-X SAS RAID Adapter";
 static const char *sas_jbod_desc = "PCI-X SAS Adapter";
 
+/* xxx 
+static const char *aux_cache_desc = "PCI-X Aux Cache Adapter";
+*/
 const char *get_ioa_desc(struct ipr_ioa *ioa)
 {
 	const struct ioa_details *details = get_ioa_details(ioa);
