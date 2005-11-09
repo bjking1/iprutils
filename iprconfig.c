@@ -4892,12 +4892,13 @@ int start_conc_maint(i_container *i_con, int action)
 						scsi_dbg(dev, "Cannot find resource address\n");
 						continue;
 					}
-					if (dev->scsi_dev_data &&
-					    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
-						break;
 
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
+						if (dev->scsi_dev_data &&
+						    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
+							break;
+
 						if (action == IPR_CONC_REMOVE) {
 							if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
 								break;
@@ -5746,6 +5747,10 @@ int reclaim_result(i_container *i_con)
 					    _("IOA cache storage reclamation has completed. "
 					       "The number of lost sectors could not be determined.\n"),
 					    "", NULL);
+	} else {
+		body = add_string_to_body(body,
+					  _("IOA cache storage reclamation has failed.\n"),
+					  "", NULL);
 	}
 
 	n_reclaim_result.body = body;
