@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.17 2005/09/26 20:19:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.18 2005/11/10 19:28:20 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -83,12 +83,18 @@ struct ipr_flit {
 
 static FILE *outfile;
 
-static int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
+static int debug_ioctl(struct ipr_ioa *ioa, enum iprdbg_cmd cmd, int ioa_adx, int mask,
 		       int *buffer, int len)
 {
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
-	int rc;
+	int rc, fd;
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd < 0) {
+		syslog(LOG_ERR, "Error opening %s. %m\n", ioa->ioa.gen_name);
+		return fd;
+	}
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -119,6 +125,7 @@ static int debug_ioctl(int fd, enum iprdbg_cmd cmd, int ioa_adx, int mask,
 
 	if (rc != 0)
 		fprintf(stderr, "Debug IOCTL failed. %d\n", errno);
+	close(fd);
 
 	return rc;
 }
@@ -215,19 +222,140 @@ static void ipr_fgets(char *buf, int size, FILE *stream)
 	strcat(buf, "\n");
 }
 
-int main(int argc, char *argv[])
+static void dump_data(unsigned int adx, unsigned int *buf, int len)
 {
-	int num_args, address, prev_address = 0;
-	int length, prev_length = 0;
-	int ioa_num = 0;
-	int rc, fd, i, j, k, bus, num_buses;
-	int arg[16], write_buf[16], bus_speed;
-	int *buffer;
-	char cmd[100], prev_cmd[100], cmd_line[1000];
-	struct ipr_ioa *ioa;
 	char ascii_buffer[17];
-	struct ipr_flit flit;
+	int i, k, j;
+
+	for (i = 0; i < (len / 4);) {
+		iprprint("%08X: ", adx+(i*4));
+
+		memset(ascii_buffer, '\0', sizeof(ascii_buffer));
+
+		for (j = 0; i < (len / 4) && j < 4; j++, i++) {
+			iprprint("%08X ", ntohl(buf[i]));
+			memcpy(&ascii_buffer[j*4], &buf[i], 4);
+			for (k = 0; k < 4; k++) {
+				if (!isprint(ascii_buffer[(j*4)+k]))
+					ascii_buffer[(j*4)+k] = '.';
+			}
+		}
+
+		for (;j < 4; j++) {
+			iprprint("         ");
+			strncat(ascii_buffer, "....", sizeof(ascii_buffer)-1);
+		}
+
+		iprprint("   |%s|\n", ascii_buffer);
+	}
+}
+
+static int mw4(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	unsigned int *buf;
+	unsigned int adx;
+	unsigned int write_buf[16];
+	int rc, i;
+
+	if ((adx % 4) != 0) {
+		iprprint("Address must be 4 byte aligned\n");
+		return -EINVAL;
+	}
+
+	adx = strtoul(argv[0], NULL, 16);
+
+	/* Byte swap everything */
+	for (i = 0; i < argc-2; i++)
+		write_buf[i] = htonl(argv[i]);
+
+	return debug_ioctl(ioa, IPRDBG_WRITE, adx, 0, write_buf, (num_args-2)*4);
+}
+
+static int __mr4(struct ipr_ioa *ioa, unsigned int adx, int len)
+{
+	unsigned int *buf;
+	int rc;
+
+	if ((adx % 4) != 0) {
+		iprprint("Length must be 4 byte multiple\n");
+		return -EINVAL;
+	}
+
+	buf = calloc(len/4, 4);
+
+	if (!buf) {
+		syslog(LOG_ERR, "Memory allocation error\n");
+		return -ENOMEM;
+	}
+
+	rc = debug_ioctl(ioa, IPRDBG_READ, adx, 0, buf, len);
+
+	if (!rc)
+		dump_data(adx, buf, len);
+
+	free(buf);
+	return rc;
+}
+
+static int mr4(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	unsigned int adx;
+	int len = 4;
+
+	adx = strtoul(argv[0], NULL, 16);
+	if (argc == 2)
+		len = strtoul(argv[1], NULL, 16);
+	return __mr4(ioa, adx, len);
+}
+
+static const struct {
+	char *cmd;
+	int min_args;
+	int max_args;
+	int (*func)(struct ipr_ioa *,int argc, char *argv[]);
+} command [] = {
+	{ "mr4",			1, 2, mr4 },
+	{ "mw4",			2, 17, mw4 },
+	{ "bm4",			1, 1, mw4 },
+	{ "flit",			0, 0, flit },
+};
+
+static int main_cmd_line(int argc, char *argv[])
+{
+	int i;
+	struct ipr_dev *dev;
+	int num_args = argc - 3;
+
+	dev = find_dev(argv[argc-1]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid IOA specified: %s\n", argv[argc-1]);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(command); i++) {
+		if (strcmp(cmd, command[i].cmd) != 0)
+			continue;
+
+		if (num_args < command[i].min_args) {
+			fprintf(stderr, "You must specify a device\n");
+			return -EINVAL;
+		}
+
+		if (num_args > command[i].max_args) {
+			fprintf(stderr, "Too many arguments specified.\n");
+			return -EINVAL;
+		}
+
+		rc = command[i].func(dev->ioa, num_args, &argv[2]);
+		return rc;
+	}
+}
+
+static int term_init()
+{
 	char *term_type;
+	int rc;
 
 	term_type = getenv ("TERM");
 	if (!term_type) {
@@ -241,23 +369,16 @@ int main(int argc, char *argv[])
 		return -EIO;
 	}
 
-
 	k_up = tgetstr ("ku", NULL);
 	k_down = tgetstr ("kd", NULL);
+	return 0;
+}
 
-	openlog("iprdbg",
-		LOG_PERROR | /* Print error to stderr as well */
-		LOG_PID |    /* Include the PID with each error */
-		LOG_CONS,    /* Write to system console if there is an error
-			      sending to system logger */
-		LOG_USER);
-
-	outfile = fopen(".iprdbglog", "a");
-	tool_init(0);
-	check_current_config(false);
-
-	if (num_ioas == 0)
-		return -ENXIO;
+static struct ipr_ioa *select_ioa()
+{
+	int i, num_args, ioa_num = 0;
+	struct ipr_ioa *ioa;
+	char cmd_line[1000];
 
 	if (num_ioas > 1) {
 		printf("\nSelect adapter to debug:\n");
@@ -272,20 +393,50 @@ int main(int argc, char *argv[])
 		num_args = sscanf(cmd_line, "%d\n", &ioa_num);
 
 		if (ioa_num == i)
-			return 0;
+			return NULL;
 		if (num_args != 1 || ioa_num > num_ioas)
-			return -EINVAL;
+			return NULL;
 
 		for (ioa = ipr_ioa_head, i = 1; i < ioa_num; ioa = ioa->next, i++) {}
 	} else
 		ioa = ipr_ioa_head;
 
-	fd = open(ioa->ioa.gen_name, O_RDWR);
+	return ioa;
+}
 
-	if (fd < 0) {
-		syslog(LOG_ERR, "Error opening %s. %m\n", ioa->ioa.gen_name);
-		return -1;
-	}
+int main(int argc, char *argv[])
+{
+	int num_args, address, prev_address = 0;
+	int length, prev_length = 0;
+	int ioa_num = 0;
+	int rc, i, j, k, bus, num_buses;
+	int arg[16], write_buf[16], bus_speed;
+	int *buffer;
+	char cmd[100], prev_cmd[100], cmd_line[1000];
+	struct ipr_ioa *ioa;
+	char ascii_buffer[17];
+	struct ipr_flit flit;
+
+	if ((rc = term_init()))
+		return rc;
+
+	openlog("iprdbg",
+		LOG_PERROR | /* Print error to stderr as well */
+		LOG_PID |    /* Include the PID with each error */
+		LOG_CONS,    /* Write to system console if there is an error
+			      sending to system logger */
+		LOG_USER);
+
+	outfile = fopen(".iprdbglog", "a");
+	tool_init(0);
+	check_current_config(false);
+
+	if (argc > 1)
+		return main_cmd_line(argc, argv);
+
+	ioa = select_ioa();
+	if (!ioa)
+		return -ENXIO;
 
 	closelog();
 	openlog("iprdbg", LOG_PID, LOG_USER);
@@ -344,7 +495,7 @@ int main(int argc, char *argv[])
 				num_buses = 2;
 
 			for (bus = 0, address = 0xF0016380; bus < num_buses; bus++) {
-				rc = debug_ioctl(fd, IPRDBG_READ, address, 0,
+				rc = debug_ioctl(ioa, IPRDBG_READ, address, 0,
 						 buffer, length);
 
 				if (!rc) {
@@ -386,39 +537,7 @@ int main(int argc, char *argv[])
 			} else
 				length = arg[0];
 
-			buffer = calloc(length/4, 4);
-
-			if (!buffer) {
-				syslog(LOG_ERR, "Memory allocation error\n");
-				continue;
-			}
-
-			rc = debug_ioctl(fd, IPRDBG_READ, address, 0,
-					 buffer, length);
-
-			for (i = 0; !rc && i < (length / 4);) {
-				iprprint("%08X: ", address+(i*4));
-
-				memset(ascii_buffer, '\0', sizeof(ascii_buffer));
-
-				for (j = 0; i < (length / 4) && j < 4; j++, i++) {
-					iprprint("%08X ", ntohl(buffer[i]));
-					memcpy(&ascii_buffer[j*4], &buffer[i], 4);
-					for (k = 0; k < 4; k++) {
-						if (!isprint(ascii_buffer[(j*4)+k]))
-							ascii_buffer[(j*4)+k] = '.';
-					}
-				}
-
-				for (;j < 4; j++) {
-					iprprint("         ");
-					strncat(ascii_buffer, "....", sizeof(ascii_buffer)-1);
-				}
-
-				iprprint("   |%s|\n", ascii_buffer);
-			}
-
-			free(buffer);
+			__mr4(ioa, address, length);
 
 			prev_address = address;
 			prev_length = length;
@@ -428,11 +547,12 @@ int main(int argc, char *argv[])
 				continue;
 			}
 
+			__mw4(ioa, num_args, arg);
 			/* Byte swap everything */
 			for (i = 0; i < num_args-2; i++)
 				write_buf[i] = htonl(arg[i]);
 
-			debug_ioctl(fd, IPRDBG_WRITE, address, 0,
+			debug_ioctl(ioa, IPRDBG_WRITE, address, 0,
 				    write_buf, (num_args-2)*4);
 		} else if (!strcmp(cmd, "bm4")) {
 			if (num_args < 3) {
@@ -443,10 +563,10 @@ int main(int argc, char *argv[])
 			/* Byte swap the data */
 			write_buf[0] = htonl(arg[0]);
 
-			debug_ioctl(fd, IPRDBG_WRITE, address, arg[1],
+			debug_ioctl(ioa, IPRDBG_WRITE, address, arg[1],
 				    write_buf, 4);
 		} else if (!strcmp(cmd, "flit")) {
-			rc = debug_ioctl(fd, IPRDBG_FLIT, 0, 0,
+			rc = debug_ioctl(ioa, IPRDBG_FLIT, 0, 0,
 					 (int *)&flit, sizeof(flit));
 
 			if (rc != 0)
