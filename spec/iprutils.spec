@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.15.5
+Version: 2.0.15.6
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Nov 15 2005 Brian King <brking@us.ibm.com> 2.0.15.6
+- Fix concurrent maintenance with disk drawers reporting
+  multiple SES devices on the same SCSI bus.
 * Mon Oct 17 2005 Brian King <brking@us.ibm.com> 2.0.15.5
 - Don't show enclosures in list of devices to remove in
   concurrent remove screens of iprconfig.

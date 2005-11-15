@@ -4834,7 +4834,8 @@ int process_conc_maint(i_container *i_con, int action)
 			}
 		}
 
-		break;
+		if (found)
+			break;
 	}
 
 	if (!found)
@@ -5091,7 +5092,7 @@ int start_conc_maint(i_container *i_con, int action)
 					}
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == ses_data.elem_status[i].scsi_id) {
-						if (&ioa->dev[l].scsi_dev_data &&
+						if (ioa->dev[l].scsi_dev_data &&
 						    ioa->dev[l].scsi_dev_data->type == TYPE_ENCLOSURE)
 							break;
 
