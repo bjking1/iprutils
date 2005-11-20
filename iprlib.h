@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.59 2005/10/28 18:54:47 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.60 2005/11/20 17:14:44 brking Exp $
  */
 
 #include <stdarg.h>
@@ -102,6 +102,8 @@
 #define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
 #define   IPR_IOA_DEBUG_WRITE_IOA_MEM        0x01u
 #define   IPR_IOA_DEBUG_READ_FLIT            0x03u
+#define   IPR_IOA_DEBUG_ENABLE_DBG_FUNC      0x0Au
+#define   IPR_IOA_DEBUG_DISABLE_DBG_FUNC     0x0Bu
 
 #define IPR_STD_INQ_Z0_TERM_LEN      8
 #define IPR_STD_INQ_Z1_TERM_LEN      12

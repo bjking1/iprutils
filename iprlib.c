@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.75 2005/10/28 18:54:47 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.76 2005/11/20 17:14:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1157,6 +1157,8 @@ void tool_init(int save_state)
 
 	if (ipr_devs != NULL) {
 		dlist_for_each_data(ipr_devs, pci_address, char) {
+			if (!strcmp(pci_address, "ipr"))
+				continue;
 
 			ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
 			memset(ipr_ioa,0,sizeof(struct ipr_ioa));

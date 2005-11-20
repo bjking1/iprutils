@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.18 2005/11/10 19:28:20 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.19 2005/11/20 17:14:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -36,7 +36,9 @@ char *tool_name = "iprdbg";
 enum iprdbg_cmd {
 	IPRDBG_READ = IPR_IOA_DEBUG_READ_IOA_MEM,
 	IPRDBG_WRITE = IPR_IOA_DEBUG_WRITE_IOA_MEM,
-	IPRDBG_FLIT = IPR_IOA_DEBUG_READ_FLIT
+	IPRDBG_FLIT = IPR_IOA_DEBUG_READ_FLIT,
+	IPRDBG_EDF = IPR_IOA_DEBUG_ENABLE_DBG_FUNC,
+	IPRDBG_DDF = IPR_IOA_DEBUG_DISABLE_DBG_FUNC
 };
 
 struct ipr_bus_speeds {
@@ -77,8 +79,16 @@ struct ipr_flit {
 	struct ipr_flit_entry flit_entry[IPR_MAX_FLIT_ENTRIES];
 };              
 
+struct dbg_macro {
+	char *cmd;
+};
+
+static struct dbg_macro *macro;
+static int num_macros;
+
 #define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 #define iprprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
+#define ipr_err(...) {fprintf(stderr, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 #define iprloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 
 static FILE *outfile;
@@ -89,6 +99,7 @@ static int debug_ioctl(struct ipr_ioa *ioa, enum iprdbg_cmd cmd, int ioa_adx, in
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc, fd;
+	u32 direction = SG_DXFER_NONE;
 
 	fd = open(ioa->ioa.gen_name, O_RDWR);
 	if (fd < 0) {
@@ -113,18 +124,17 @@ static int debug_ioctl(struct ipr_ioa *ioa, enum iprdbg_cmd cmd, int ioa_adx, in
 	cdb[12] = (len >> 8) & 0xff;
 	cdb[13] = len & 0xff;
 
-	if (cmd == IPRDBG_WRITE) {
-		rc = sg_ioctl_noretry(fd, cdb, buffer,
-				      len, SG_DXFER_TO_DEV,
-				      &sense_data, IPR_INTERNAL_TIMEOUT);
-	} else {
-		rc = sg_ioctl_noretry(fd, cdb, buffer,
-				      len, SG_DXFER_FROM_DEV,
-				      &sense_data, IPR_INTERNAL_TIMEOUT);
-	}
+	if (cmd == IPRDBG_WRITE)
+		direction = SG_DXFER_TO_DEV;
+	else if (len > 0)
+		direction = SG_DXFER_FROM_DEV;
+
+	rc = sg_ioctl_noretry(fd, cdb, buffer,
+			      len, direction,
+			      &sense_data, IPR_INTERNAL_TIMEOUT);
 
 	if (rc != 0)
-		fprintf(stderr, "Debug IOCTL failed. %d\n", errno);
+		ipr_err("Debug IOCTL failed. %d\n", errno);
 	close(fd);
 
 	return rc;
@@ -157,7 +167,7 @@ static int format_flit(struct ipr_flit *flit)
 				  "%184s ", buf1, buf2, lid_name, path);
 
 		if (num_args != 4) {
-			syslog(LOG_ERR, "Cannot parse flit\n");
+			ipr_err("Cannot parse flit\n");
 			return 1;
 		}
 
@@ -250,26 +260,144 @@ static void dump_data(unsigned int adx, unsigned int *buf, int len)
 	}
 }
 
+static int flit(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	struct ipr_flit flit;
+	int rc;
+
+	rc = debug_ioctl(ioa, IPRDBG_FLIT, 0, 0, (int *)&flit, sizeof(flit));
+
+	if (!rc)
+		format_flit(&flit);
+
+	return rc;
+}
+
+static int speeds(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	unsigned int length = 64;
+	unsigned int *buffer = calloc(length/4, 4);
+	unsigned int adx, bus_speed;
+	int num_buses, bus, i, j, rc;
+
+	if (!buffer) {
+		ipr_err("Memory allocation error\n");
+		return -ENOMEM;
+	}
+
+	if ((ioa->ccin == 0x2780) ||
+	    (ioa->ccin == 0x2757))
+		num_buses = 4;
+	else
+		num_buses = 2;
+
+	for (bus = 0, adx = 0xF0016380; bus < num_buses; bus++) {
+		rc = debug_ioctl(ioa, IPRDBG_READ, adx, 0, buffer, length);
+
+		if (!rc) {
+			iprprint("\nBus %d speeds:\n", bus);
+
+			for (i = 0; i < 16; i++) {
+				bus_speed = ntohl(buffer[i]) & 0x0000000f;
+
+				for (j = 0; j < sizeof(bus_speeds)/sizeof(struct ipr_bus_speeds); j++) {
+					if (bus_speed == bus_speeds[j].speed)
+						iprprint("Target %d: %s\n", i, bus_speeds[j].description);
+				}
+			}
+		}
+
+		switch(bus) {
+		case 0:
+			adx = 0xF001e380;
+			break;
+		case 1:
+			adx = 0xF4016380;
+			break;
+		case 2:
+			adx = 0xF401E380;
+			break;
+		};
+	}
+
+	free(buffer);
+	return 0;
+}
+
+static int eddf(struct ipr_ioa *ioa, enum iprdbg_cmd cmd, int argc, char *argv[])
+{
+	unsigned int parm1 = strtoul(argv[0], NULL, 16);
+	unsigned int parm2 = 0;
+
+	if (argc == 2)
+		parm2 = strtoul(argv[1], NULL, 16);
+	return debug_ioctl(ioa, cmd, parm1, parm2, NULL, 0);
+}
+
+static int edf(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	return eddf(ioa, IPRDBG_EDF, argc, argv);
+}
+
+static int ddf(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	return eddf(ioa, IPRDBG_DDF, argc, argv);
+}
+
+static int raw_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	int i, rc;
+	unsigned int parm[4] = { 0 };
+	unsigned int *buf = NULL;
+
+	for (i = 0; i < argc; i++)
+		parm[i] = strtoul(argv[i], NULL, 16);
+
+	if (argc == 4 && parm[3])
+		buf = calloc(parm[3]/4, 4);
+
+	rc = debug_ioctl(ioa, parm[0], parm[1], parm[2], buf, parm[3]);
+
+	if (!rc && buf)
+		dump_data(0, buf, parm[3]);
+
+	free(buf);
+	return rc;
+}
+
+static int bm4(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	unsigned int adx = strtoul(argv[0], NULL, 16);
+	unsigned int write_buf = htonl(strtoul(argv[1], NULL, 16));
+	unsigned int mask = strtoul(argv[2], NULL, 16);
+
+	if ((adx % 4) != 0) {
+		ipr_err("Address must be 4 byte aligned\n");
+		return -EINVAL;
+	}
+
+	return debug_ioctl(ioa, IPRDBG_WRITE, adx, mask, &write_buf, 4);
+}
+
 static int mw4(struct ipr_ioa *ioa, int argc, char *argv[])
 {
-	unsigned int *buf;
-	unsigned int adx;
+	int i;
 	unsigned int write_buf[16];
-	int rc, i;
+	unsigned int adx = strtoul(argv[0], NULL, 16);
 
 	if ((adx % 4) != 0) {
 		iprprint("Address must be 4 byte aligned\n");
 		return -EINVAL;
 	}
 
-	adx = strtoul(argv[0], NULL, 16);
+	for (i = 0; i < (argc-1); i++)
+		write_buf[i] = htonl(strtoul(argv[i+1], NULL, 16));
 
-	/* Byte swap everything */
-	for (i = 0; i < argc-2; i++)
-		write_buf[i] = htonl(argv[i]);
-
-	return debug_ioctl(ioa, IPRDBG_WRITE, adx, 0, write_buf, (num_args-2)*4);
+	return debug_ioctl(ioa, IPRDBG_WRITE, adx, 0, write_buf, (argc-1)*4);
 }
+
+static unsigned int last_adx;
+static unsigned int last_len;
 
 static int __mr4(struct ipr_ioa *ioa, unsigned int adx, int len)
 {
@@ -277,17 +405,19 @@ static int __mr4(struct ipr_ioa *ioa, unsigned int adx, int len)
 	int rc;
 
 	if ((adx % 4) != 0) {
-		iprprint("Length must be 4 byte multiple\n");
+		ipr_err("Length must be 4 byte multiple\n");
 		return -EINVAL;
 	}
 
 	buf = calloc(len/4, 4);
 
 	if (!buf) {
-		syslog(LOG_ERR, "Memory allocation error\n");
+		ipr_err("Memory allocation error\n");
 		return -ENOMEM;
 	}
 
+	last_len = len;
+	last_adx = adx;
 	rc = debug_ioctl(ioa, IPRDBG_READ, adx, 0, buf, len);
 
 	if (!rc)
@@ -302,10 +432,66 @@ static int mr4(struct ipr_ioa *ioa, int argc, char *argv[])
 	unsigned int adx;
 	int len = 4;
 
-	adx = strtoul(argv[0], NULL, 16);
-	if (argc == 2)
-		len = strtoul(argv[1], NULL, 16);
+	if (argc == 0) {
+		if (!last_len) {
+			ipr_err("Not enough parameters specified\n");
+			return -EINVAL;
+		}
+		adx = last_adx + last_len;
+		len = last_len;
+	} else {
+		adx = strtoul(argv[0], NULL, 16);
+		if (argc == 2)
+			len = strtoul(argv[1], NULL, 16);
+	}
 	return __mr4(ioa, adx, len);
+}
+
+static int help(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	printf("\n");
+	printf("mr4 address length                  "
+	       "- Read memory\n");
+	printf("mw4 address data                    "
+	       "- Write memory\n");
+	printf("bm4 address data preserve_mask      "
+	       "- Modify bits set to 0 in preserve_mask\n");
+	printf("edf parm1 parm2                     "
+	       "- Enable debug function\n");
+	printf("ddf parm1 parm2                     "
+	       "- Disable debug function\n");
+	printf("raw cmd [parm1] [parm2] [length]    "
+	       "- Manually execute IOA debug command\n");
+	printf("speeds                              "
+	       "- Current bus speeds for each device\n");
+	printf("flit                                "
+	       "- Format the flit\n");
+	printf("exit                                "
+	       "- Exit the program\n\n");
+	return 0;
+}
+
+static int quit(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	closelog();
+	openlog("iprdbg", LOG_PID, LOG_USER);
+	iprloginfo("iprdbg on %s exited\n", ioa->pci_address);
+	closelog();
+	exit(0);
+	return 0;
+}
+
+static int macros(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	int i;
+
+	if (num_macros == 0)
+		printf("No macros loaded. Place macros in ~/.iprdbg\n");
+
+	for (i = 0; i < num_macros; i++)
+		printf("%s\n", macro[i].cmd);
+
+	return 0;
 }
 
 static const struct {
@@ -314,42 +500,153 @@ static const struct {
 	int max_args;
 	int (*func)(struct ipr_ioa *,int argc, char *argv[]);
 } command [] = {
-	{ "mr4",			1, 2, mr4 },
-	{ "mw4",			2, 17, mw4 },
-	{ "bm4",			1, 1, mw4 },
-	{ "flit",			0, 0, flit },
+	{ "mr4",		0, 2,		mr4 },
+	{ "mw4",		2, 17,	mw4 },
+	{ "bm4",		1, 1,		bm4 },
+	{ "edf",		1, 2,		edf },
+	{ "ddf",		1, 2,		ddf },
+	{ "raw",		0, 4,		raw_cmd },
+	{ "flit",		0, 0,		flit },
+	{ "speeds",		0, 0,		speeds },
+	{ "help",		0, 0,		help },
+	{ "quit",		0, 0,		quit },
+	{ "q",		0, 0,		quit },
+	{ "exit",		0, 0,		quit },
+	{ "x",		0, 0,		quit },
+	{ "macros",		0, 0,		macros },
 };
+
+static int last_cmd = -1;
+
+static int exec_cmd(struct ipr_ioa *ioa, int cmd, int argc, char *argv[])
+{
+	int num_args = argc - 1;
+
+	if (num_args < command[cmd].min_args) {
+		ipr_err("You must specify a device\n");
+		return -EINVAL;
+	}
+
+	if (num_args > command[cmd].max_args) {
+		ipr_err("Too many arguments specified.\n");
+		return -EINVAL;
+	}
+
+	if (last_cmd != cmd)
+		last_len = 0;
+	last_cmd = cmd;
+	return command[cmd].func(ioa, num_args, &argv[1]);
+}
+
+static int cmd_to_args(char *cmd, int *rargc, char ***rargv)
+{
+	char *p;
+	char **argv = NULL;
+	int len = 0;
+	int total_len = strlen(cmd);
+
+	if (cmd[total_len-1] == '\n') {
+		cmd[total_len-1] = '\0';
+		total_len--;
+	}
+
+	if (*cmd == '\0')
+		return 0;
+
+	for (p = strrchr(cmd, ' '); p; p = strrchr(cmd, ' '))
+		*p = '\0';
+
+	for (p = strrchr(cmd, '\t'); p; p = strrchr(cmd, '\t'))
+		*p = '\0';
+
+	for (p = cmd, len = 0; p < cmd + total_len; p += (strlen(p) + 1), len++) {
+		if (strlen(p) == 0) {
+			len--;
+			continue;
+		}
+		argv = realloc(argv, sizeof(char *)*(len+1));
+		argv[len] = p;
+	}
+
+	*rargv = argv;
+	*rargc = len;
+	return len;
+}
+
+static int exec_macro(struct ipr_ioa *ioa, char *cmd)
+{
+	int i, argc;
+	char **argv = NULL;
+	char *copy = malloc(strlen(cmd) + 1);
+	int rc = -EINVAL;
+
+	if (!copy)
+		return -ENOMEM;
+
+	strcpy(copy, cmd);
+
+	if (!cmd_to_args(cmd, &argc, &argv))
+		goto out_free_argv;
+
+	for (i = 0; i < ARRAY_SIZE(command); i++) {
+		if (strcmp(argv[1], command[i].cmd) != 0)
+			continue;
+
+		rc = exec_cmd(ioa, i, argc - 1, &argv[1]);
+		goto out_free_all;
+	}
+
+	iprprint("Invalid command %s. Use \"help\" for a list "
+		 "of valid commands\n", argv[0]);
+
+out_free_all:
+	free(copy);
+out_free_argv:
+	free(argv);
+	return rc;
+}
+
+static int parse_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(command); i++) {
+		if (strcmp(argv[0], command[i].cmd) != 0)
+			continue;
+
+		return exec_cmd(ioa, i, argc, argv);
+	}
+
+	for (i = 0; i < num_macros; i++) {
+		if (strncmp(argv[0], macro[i].cmd, strlen(argv[0])) != 0)
+			continue;
+
+		return exec_macro(ioa, macro[i].cmd);
+	}
+
+	iprprint("Invalid command %s. Use \"help\" for a list "
+		 "of valid commands\n", argv[0]);
+
+	return -EINVAL;
+}
 
 static int main_cmd_line(int argc, char *argv[])
 {
-	int i;
 	struct ipr_dev *dev;
-	int num_args = argc - 3;
+
+	if (argc < 3) {
+		ipr_err("Invalid option\n");
+		return -EINVAL;
+	}
 
 	dev = find_dev(argv[argc-1]);
 
 	if (!dev) {
-		fprintf(stderr, "Invalid IOA specified: %s\n", argv[argc-1]);
+		ipr_err("Invalid IOA specified: %s\n", argv[argc-1]);
 		return -EINVAL;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(command); i++) {
-		if (strcmp(cmd, command[i].cmd) != 0)
-			continue;
-
-		if (num_args < command[i].min_args) {
-			fprintf(stderr, "You must specify a device\n");
-			return -EINVAL;
-		}
-
-		if (num_args > command[i].max_args) {
-			fprintf(stderr, "Too many arguments specified.\n");
-			return -EINVAL;
-		}
-
-		rc = command[i].func(dev->ioa, num_args, &argv[2]);
-		return rc;
-	}
+	return parse_cmd(dev->ioa, argc-2, &argv[1]);
 }
 
 static int term_init()
@@ -359,18 +656,19 @@ static int term_init()
 
 	term_type = getenv ("TERM");
 	if (!term_type) {
-		fprintf(stderr, "Cannot determine terminal type. Is TERM set?\n");
+		ipr_err("Cannot determine terminal type. Is TERM set?\n");
 		return -EIO;
 	}
 
 	rc = tgetent (term, term_type);
 	if (rc < 0) {
-		fprintf(stderr, "Cannot determine terminal type\n");
+		ipr_err("Cannot determine terminal type\n");
 		return -EIO;
 	}
 
 	k_up = tgetstr ("ku", NULL);
 	k_down = tgetstr ("kd", NULL);
+
 	return 0;
 }
 
@@ -384,8 +682,8 @@ static struct ipr_ioa *select_ioa()
 		printf("\nSelect adapter to debug:\n");
 		i = 1;
 		for_each_ioa(ioa)
-			printf("%d. IBM %X: Location: %s\n",
-			       i++, ioa->ccin, ioa->pci_address);
+			printf("%d. IBM %X: Location: %s %s\n",
+			       i++, ioa->ccin, ioa->pci_address, ioa->ioa.gen_name);
 
 		printf("%d to quit\n", i);
 		printf("\nSelection: ");
@@ -404,18 +702,61 @@ static struct ipr_ioa *select_ioa()
 	return ioa;
 }
 
+static int exec_shell_cmd(struct ipr_ioa *ioa, char *cmd)
+{
+	char **argv = NULL;
+	int argc, rc;
+
+	if (!cmd_to_args(cmd, &argc, &argv))
+		return mr4(ioa, 0, NULL);
+
+	rc = parse_cmd(ioa, argc, argv);
+	free(argv);
+	return rc;
+}
+
+static void add_new_macro(char *cmd)
+{
+	char *buf = malloc(strlen(cmd) + 1);
+
+	if (!buf)
+		return;
+
+	macro = realloc(macro, (num_macros + 1) * sizeof(struct dbg_macro));
+
+	if (!macro) {
+		free(buf);
+		return;
+	}
+
+	strcpy(buf, cmd);
+	if (buf[strlen(buf) - 1] == '\n')
+		buf[strlen(buf) - 1] = '\0';
+	macro[num_macros++].cmd = buf;
+}
+
+static void load_config()
+{
+	char buf[2000];
+	FILE *config = fopen("/root/.iprdbg", "r");
+
+	if (!config)
+		return;
+
+	while (!feof(config)) {
+		if (!fgets(buf, sizeof(buf), config))
+			break;
+		add_new_macro(buf);
+	}
+
+	fclose(config);
+}
+
 int main(int argc, char *argv[])
 {
-	int num_args, address, prev_address = 0;
-	int length, prev_length = 0;
-	int ioa_num = 0;
-	int rc, i, j, k, bus, num_buses;
-	int arg[16], write_buf[16], bus_speed;
-	int *buffer;
-	char cmd[100], prev_cmd[100], cmd_line[1000];
+	int rc;
+	char cmd_line[1000];
 	struct ipr_ioa *ioa;
-	char ascii_buffer[17];
-	struct ipr_flit flit;
 
 	if ((rc = term_init()))
 		return rc;
@@ -431,6 +772,7 @@ int main(int argc, char *argv[])
 	tool_init(0);
 	check_current_config(false);
 
+	load_config();
 	if (argc > 1)
 		return main_cmd_line(argc, argv);
 
@@ -448,160 +790,11 @@ int main(int argc, char *argv[])
 	       "Use at your own risk!\n");
 	printf("\nUse \"quit\" to exit the program.\n\n");
 
-	memset(cmd, 0, sizeof(cmd));
-	memset(prev_cmd, 0, sizeof(prev_cmd));
-
 	while(1) {
 		printf("IPRDB(%X)> ", ioa->ccin);
-
-		memset(cmd, 0, sizeof(cmd));
-		memset(cmd_line, 0, sizeof(cmd_line));
-		memset(arg, 0, sizeof(arg));
-		address = 0;
-
 		ipr_fgets(cmd_line, 999, stdin);
-
 		logtofile("\n%s\n", cmd_line);
-
-		num_args = sscanf(cmd_line, "%80s %x %x %x %x %x %x %x %x "
-				  "%x %x %x %x %x %x %x %x %x\n",
-				  cmd, &address, &arg[0],
-				  &arg[1], &arg[2], &arg[3],
-				  &arg[4], &arg[5], &arg[6],
-				  &arg[7], &arg[8], &arg[9],
-				  &arg[10], &arg[11], &arg[12],
-				  &arg[13], &arg[14], &arg[15]);
-
-		if ((cmd[0] == '\0') && !strncmp("mr4", prev_cmd, 3)) {
-			strcpy(cmd, prev_cmd);
-			address = prev_address + prev_length;
-			num_args = 3;
-			arg[0] = prev_length;
-		}
-
-		if (!strcmp(cmd, "speeds")) {
-			length = 64;
-			buffer = calloc(length/4, 4);
-
-			if (buffer == NULL) {
-				syslog(LOG_ERR, "Memory allocation error\n");
-				continue;
-			}
-
-			if ((ioa->ccin == 0x2780) ||
-			    (ioa->ccin == 0x2757))
-				num_buses = 4;
-			else
-				num_buses = 2;
-
-			for (bus = 0, address = 0xF0016380; bus < num_buses; bus++) {
-				rc = debug_ioctl(ioa, IPRDBG_READ, address, 0,
-						 buffer, length);
-
-				if (!rc) {
-					iprprint("\nBus %d speeds:\n", bus);
-
-					for (i = 0; i < 16; i++) {
-						bus_speed = ntohl(buffer[i]) & 0x0000000f;
-
-						for (j = 0; j < sizeof(bus_speeds)/sizeof(struct ipr_bus_speeds); j++) {
-							if (bus_speed == bus_speeds[j].speed)
-								iprprint("Target %d: %s\n", i, bus_speeds[j].description);
-						}
-					}
-				}
-
-				switch(bus) {
-				case 0:
-					address = 0xF001e380;
-					break;
-				case 1:
-					address = 0xF4016380;
-					break;
-				case 2:
-					address = 0xF401E380;
-					break;
-				};
-			}
-
-			free(buffer);
-		} else if (!strcmp(cmd, "mr4")) {
-			if (num_args < 2) {
-				iprprint("Invalid syntax\n");
-				continue;
-			} else if (num_args == 2) {
-				length = 4;
-			} else if ((arg[0] % 4) != 0) {
-				iprprint("Length must be 4 byte multiple\n");
-				continue;
-			} else
-				length = arg[0];
-
-			__mr4(ioa, address, length);
-
-			prev_address = address;
-			prev_length = length;
-		} else if (!strcmp(cmd, "mw4")) {
-			if (num_args < 3) {
-				iprprint("Invalid syntax\n");
-				continue;
-			}
-
-			__mw4(ioa, num_args, arg);
-			/* Byte swap everything */
-			for (i = 0; i < num_args-2; i++)
-				write_buf[i] = htonl(arg[i]);
-
-			debug_ioctl(ioa, IPRDBG_WRITE, address, 0,
-				    write_buf, (num_args-2)*4);
-		} else if (!strcmp(cmd, "bm4")) {
-			if (num_args < 3) {
-				iprprint("Invalid syntax\n");
-				continue;
-			}
-
-			/* Byte swap the data */
-			write_buf[0] = htonl(arg[0]);
-
-			debug_ioctl(ioa, IPRDBG_WRITE, address, arg[1],
-				    write_buf, 4);
-		} else if (!strcmp(cmd, "flit")) {
-			rc = debug_ioctl(ioa, IPRDBG_FLIT, 0, 0,
-					 (int *)&flit, sizeof(flit));
-
-			if (rc != 0)
-				continue;
-
-			format_flit(&flit);
-		} else if (!strcmp(cmd, "help")) {
-			printf("\n");
-			printf("mr4 address length                  "
-			       "- Read memory\n");
-			printf("mw4 address data                    "
-			       "- Write memory\n");
-			printf("bm4 address data preserve_mask      "
-			       "- Modify bits set to 0 in preserve_mask\n");
-			printf("speeds                              "
-			       "- Current bus speeds for each device\n");
-			printf("flit                                "
-			       "- Format the flit\n");
-			printf("exit                                "
-			       "- Exit the program\n\n");
-			continue;
-		} else if (!strcmp(cmd, "exit") || !strcmp(cmd, "quit") ||
-			   !strcmp(cmd, "q") || !strcmp(cmd, "x")) {
-			closelog();
-			openlog("iprdbg", LOG_PID, LOG_USER);
-			iprloginfo("iprdbg on %s exited\n", ioa->pci_address);
-			closelog();
-			return 0;
-		} else {
-			iprprint("Invalid command %s. Use \"help\" for a list "
-				 "of valid commands\n", cmd);
-			continue;
-		}
-
-		strcpy(prev_cmd, cmd);
+		exec_shell_cmd(ioa, cmd_line);
 	}
 
 	return 0;

@@ -4682,7 +4682,8 @@ int process_conc_maint(i_container *i_con, int action)
 			}
 		}
 
-		break;
+		if (found)
+			break;
 	}
 
 	if (!found)
@@ -5684,6 +5685,48 @@ int reclaim_warning(i_container *i_con)
 	return rc;
 }
 
+static char *get_reclaim_results(struct ipr_reclaim_query_data *buf)
+{
+	char *body = NULL;
+	char buffer[32];
+
+	if (buf->reclaim_known_performed) {
+		body = add_string_to_body(body,
+					  _("IOA cache storage reclamation has completed. "
+					    "Use the number of lost sectors to decide whether "
+					    "to restore data from the most recent save media "
+					    "or to continue with possible data loss.\n"),
+					  "", NULL);
+
+		if (buf->num_blocks_needs_multiplier)
+			sprintf(buffer, "%12d", ntohs(buf->num_blocks) *
+				IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER);
+		else
+			sprintf(buffer, "%12d", ntohs(buf->num_blocks));
+
+		body = add_line_to_body(body, _("Number of lost sectors"), buffer);
+	} else if (buf->reclaim_unknown_performed) {
+		body = add_string_to_body(body,
+					  _("IOA cache storage reclamation has completed. "
+					    "The number of lost sectors could not be determined.\n"),
+					  "", NULL);
+	} else {
+		body = add_string_to_body(body,
+					  _("IOA cache storage reclamation has failed.\n"),
+					  "", NULL);
+	}
+
+	return body;
+}
+
+static void print_reclaim_results(struct ipr_reclaim_query_data *buf)
+{
+	char *body = get_reclaim_results(buf);
+
+	printf(body);
+	free(body);
+}
+
 int reclaim_result(i_container *i_con)
 {
 	int rc;
@@ -5691,8 +5734,6 @@ int reclaim_result(i_container *i_con)
 	int max_y,max_x;
 	struct screen_output *s_out;
 	int action;
-	char buffer[32];
-	char *body = NULL;
 
 	reclaim_ioa = (struct ipr_ioa *) i_con->data;
 
@@ -5724,36 +5765,7 @@ int reclaim_result(i_container *i_con)
 		/* "Reclaim IOA Cache Storage failed" */
 		return (EXIT_FLAG | 37); 
 
-	if (reclaim_ioa->reclaim_data->reclaim_known_performed) {
-		body = add_string_to_body(body,
-					    _("IOA cache storage reclamation has completed. "
-					      "Use the number of lost sectors to decide whether "
-					      "to restore data from the most recent save media "
-					      "or to continue with possible data loss.\n"),
-					  "", NULL);
-
-		if (reclaim_ioa->reclaim_data->num_blocks_needs_multiplier)
-			sprintf(buffer, "%12d",
-				ntohs(reclaim_ioa->reclaim_data->num_blocks) *
-				IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER);
-		else
-			sprintf(buffer, "%12d",
-				ntohs(reclaim_ioa->reclaim_data->num_blocks));
-
-		body = add_line_to_body(body,_("Number of lost sectors"),buffer);
-
-	} else if (reclaim_ioa->reclaim_data->reclaim_unknown_performed) {
-		body = add_string_to_body(body,
-					    _("IOA cache storage reclamation has completed. "
-					       "The number of lost sectors could not be determined.\n"),
-					    "", NULL);
-	} else {
-		body = add_string_to_body(body,
-					  _("IOA cache storage reclamation has failed.\n"),
-					  "", NULL);
-	}
-
-	n_reclaim_result.body = body;
+	n_reclaim_result.body = get_reclaim_results(reclaim_ioa->reclaim_data);
 	s_out = screen_driver(&n_reclaim_result,0,NULL);
 	free(s_out);
 
@@ -9071,7 +9083,7 @@ static int query_raid_delete(char **args, int num_args)
 {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
-	int num;
+	int num = 0;
 
 	dev = find_gen_dev(args[0]);
 	if (!dev) {
@@ -9086,10 +9098,9 @@ static int query_raid_delete(char **args, int num_args)
 			continue;
 		if (is_array_in_use(ioa, dev->array_rcd->array_id))
 			continue;
-		if (strlen(dev->dev_name))
-			printf("%s ", dev->dev_name);
-		else
-			printf("%s ", dev->gen_name);
+		if (!num)
+			printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+		printf_device(dev, 3);
 		num++;
 	}
 
@@ -9176,6 +9187,72 @@ static int query_raid_consistency_check(char **args, int num_args)
 	return 0;
 }
 
+static int __reclaim(char **args, int num_args, int action)
+{
+	struct ipr_reclaim_query_data buf;
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+	int rc;
+
+	dev = find_gen_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+
+	rc = ipr_reclaim_cache_store(ioa, action, &buf);
+
+	if (rc != 0)
+		return rc;
+
+	memset(&buf, 0, sizeof(buf));
+	rc = ipr_reclaim_cache_store(ioa, IPR_RECLAIM_QUERY, &buf);
+
+	if (rc != 0)
+		return rc; 
+
+	print_reclaim_results(&buf);
+	return 0;
+}
+
+static int reclaim(char **args, int num_args)
+{
+	return __reclaim(args, num_args, IPR_RECLAIM_PERFORM);
+}
+
+static int reclaim_unknown(char **args, int num_args)
+{
+	return __reclaim(args, num_args,
+			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
+}
+
+static int query_reclaim(char **args, int num_args)
+{
+	struct ipr_reclaim_query_data buf;
+	struct ipr_ioa *ioa;
+	int num = 0, rc;
+
+	for_each_ioa(ioa) {
+		memset(&buf, 0, sizeof(buf));
+		rc = ipr_reclaim_cache_store(ioa, IPR_RECLAIM_QUERY, &buf);
+
+		if (rc != 0)
+			continue;
+
+		if (buf.reclaim_known_needed || buf.reclaim_unknown_needed) {
+			printf("%s ", ioa->ioa.gen_name);
+			num++;
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
 static int query_format_for_jbod(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9213,6 +9290,26 @@ static void show_dev_details(struct ipr_dev *dev)
 
 	printf("%s\n", body);
 	free(body);
+}
+
+static int show_hot_spares(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int hdr = 0;
+
+	for_each_ioa(ioa) {
+		for_each_hot_spare(ioa, dev) {
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			}
+
+			printf_device(dev, 3);
+		}
+	}
+
+	return 0;
 }
 
 static int show_details(char **args, int num_args)
@@ -9347,12 +9444,16 @@ static const struct {
 	{ "show-arrays",				0, 0, show_arrays },
 	{ "show-battery-info",			1, 1, battery_info },
 	{ "show-details",				1, 1, show_details },
+	{ "show-hot-spares",			0, 0, show_hot_spares },
 	{ "query-raid-create",			1, 1, query_raid_create },
 	{ "query-raid-delete",			1, 1, query_raid_delete },
 	{ "query-hot-spare-create",		1, 1, query_hot_spare_create },
 	{ "query-hot-spare-delete",		1, 1, query_hot_spare_delete },
 	{ "query-raid-consistency-check",	0, 0, query_raid_consistency_check },
 	{ "query-format-for-jbod",		0, 0, query_format_for_jbod },
+	{ "query-reclaim",			0, 0, query_reclaim },
+	{ "reclaim-cache",			1, 1, reclaim },
+	{ "reclaim_unknown_cache",		1, 1, reclaim_unknown },
 	{ "primary",				1, 1, set_primary },
 	{ "secondary",				1, 1, set_secondary },
 	{ "raid-create",				1, 100, raid_create },
