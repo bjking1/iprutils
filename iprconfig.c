@@ -8970,6 +8970,34 @@ static int raid_create(char **args, int num_args)
 	return raid_start_complete();
 }
 
+static int hot_spare_delete(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	dev->dev_rcd->issue_cmd = 1;
+	return ipr_remove_hot_spare(dev->ioa);
+}
+
+static int hot_spare_create(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	dev->dev_rcd->issue_cmd = 1;
+	return ipr_add_hot_spare(dev->ioa);
+}
+
 static int raid_delete(char **args, int num_args)
 {
 	int rc;
@@ -9187,6 +9215,33 @@ static int query_raid_consistency_check(char **args, int num_args)
 	return 0;
 }
 
+static int raid_consistency_check(char **args, int num_args)
+{
+	struct ipr_dev *vset = find_dev(args[0]);
+
+	if (!vset) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	vset->array_rcd->issue_cmd = 1;
+	return ipr_resync_array(vset->ioa);
+}
+
+static int raid_rebuild_cmd(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	enable_af(dev);
+	dev->dev_rcd->issue_cmd = 1;
+	return ipr_rebuild_device_data(dev->ioa);
+}
+
 static int __reclaim(char **args, int num_args, int action)
 {
 	struct ipr_reclaim_query_data buf;
@@ -9226,6 +9281,167 @@ static int reclaim_unknown(char **args, int num_args)
 {
 	return __reclaim(args, num_args,
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
+}
+
+static int query_format_for_raid(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int num = 0;
+
+	for_each_ioa(ioa) {
+		for_each_disk(ioa, dev) {
+			if (ipr_is_hot_spare(dev) || !device_supported(dev))
+				continue;
+			if (ipr_is_array_member(dev) && !dev->dev_rcd->no_cfgte_vol)
+				continue;
+			if (ipr_is_af_dasd_device(dev) && ipr_device_is_zeroed(dev))
+				continue;
+			if (!ipr_is_af_dasd_device(dev)) {
+				/* If on a JBOD adapter */
+				if (!ioa->qac_data->num_records)
+					continue;
+				if (is_af_blocked(dev, 0))
+					continue;
+			}
+
+			if (!is_format_allowed(dev))
+				continue;
+
+			if (strlen(dev->dev_name))
+				printf("%s ", dev->dev_name);
+			else
+				printf("%s ", dev->gen_name);
+			num++;
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_raid_rebuild(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int num = 0;
+
+	for_each_ioa(ioa) {
+		for_each_af_dasd(ioa, dev) {
+			if (!dev->dev_rcd->rebuild_cand)
+				continue;
+
+			/* xxx - enable_af(dev) before the actual rebuild */
+			printf("%s ", dev->gen_name);
+			num++;
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_recovery_format(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int num = 0;
+
+	for_each_ioa(ioa) {
+		for_each_disk(ioa, dev) {
+			if (ipr_is_hot_spare(dev) || !device_supported(dev))
+				continue;
+			if (ipr_is_array_member(dev) && !dev->dev_rcd->no_cfgte_vol)
+				continue;;
+			if (!is_format_allowed(dev))
+				continue;
+
+			if (strlen(dev->dev_name))
+				printf("%s ", dev->dev_name);
+			else
+				printf("%s ", dev->gen_name);
+			num++;
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_devices_include(char **args, int num_args)
+{
+	int rc, i, num = 0;;
+	struct ipr_array_query_data qac_data;
+	struct ipr_dev *dev;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset = find_dev(args[0]);
+	struct ipr_dev_record *dev_rcd;
+
+	if (!vset) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = vset->ioa;
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	rc = ipr_query_array_config(ioa, 0, 1, vset->array_rcd->array_id, &qac_data);
+
+	if (rc)
+		return rc;
+
+	for_each_dev_rcd(dev_rcd, i, &qac_data) {
+		for_each_disk(ioa, dev) {
+			if (dev->scsi_dev_data->handle == dev_rcd->resource_handle &&
+			    dev_rcd->include_cand && device_supported(dev)) {
+				printf("%s ", dev->gen_name);
+				num++;
+				break;
+			}
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
+}
+
+static int query_arrays_include(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset;
+	struct ipr_array_cap_entry *cap_entry;
+	struct ipr_array_record *array_rcd;
+	int num = 0;
+
+	for_each_ioa(ioa) {
+		if (ioa->is_secondary) /* xxx */
+			continue;
+
+		for_each_vset(ioa, vset) {
+			array_rcd = vset->array_rcd;
+			cap_entry = get_raid_cap_entry(ioa->supported_arrays,
+						       array_rcd->raid_level);
+
+			if (!cap_entry || !cap_entry->include_allowed || !array_rcd->established)
+				continue;
+
+			printf("%s ", vset->dev_name);
+			num++;
+		}
+	}
+
+	if (num)
+		printf("\b\n");
+
+	return 0;
 }
 
 static int query_reclaim(char **args, int num_args)
@@ -9290,6 +9506,46 @@ static void show_dev_details(struct ipr_dev *dev)
 
 	printf("%s\n", body);
 	free(body);
+}
+
+static int show_jbod_disks(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int hdr = 0;
+
+	for_each_ioa(ioa) {
+		for_each_jbod_disk(ioa, dev) {
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			}
+
+			printf_device(dev, 3);
+		}
+	}
+
+	return 0;
+}
+
+static int show_af_disks(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int hdr = 0;
+
+	for_each_ioa(ioa) {
+		for_each_af_dasd(ioa, dev) {
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			}
+
+			printf_device(dev, 3);
+		}
+	}
+
+	return 0;
 }
 
 static int show_hot_spares(char **args, int num_args)
@@ -9391,7 +9647,6 @@ static int show_arrays(char **args, int num_args)
 	}
 
 	return 0;
-
 }
 
 static int battery_info(char **args, int num_args)
@@ -9445,6 +9700,9 @@ static const struct {
 	{ "show-battery-info",			1, 1, battery_info },
 	{ "show-details",				1, 1, show_details },
 	{ "show-hot-spares",			0, 0, show_hot_spares },
+	{ "show-af-disks",			0, 0, show_af_disks },
+	{ "show-jbod-disks",			0, 0, show_jbod_disks },
+	{ "status",					1, 1, print_status },
 	{ "query-raid-create",			1, 1, query_raid_create },
 	{ "query-raid-delete",			1, 1, query_raid_delete },
 	{ "query-hot-spare-create",		1, 1, query_hot_spare_create },
@@ -9452,13 +9710,21 @@ static const struct {
 	{ "query-raid-consistency-check",	0, 0, query_raid_consistency_check },
 	{ "query-format-for-jbod",		0, 0, query_format_for_jbod },
 	{ "query-reclaim",			0, 0, query_reclaim },
-	{ "reclaim-cache",			1, 1, reclaim },
-	{ "reclaim_unknown_cache",		1, 1, reclaim_unknown },
+	{ "query-arrays-raid-include",	0, 0, query_arrays_include },
+	{ "query-devices-raid-include",	1, 1, query_devices_include },
+	{ "query-recovery-format",		0, 0, query_recovery_format },
+	{ "query-raid-rebuild",			0, 0, query_raid_rebuild },
+	{ "query-format-for-raid",		0, 0, query_format_for_raid },
 	{ "primary",				1, 1, set_primary },
 	{ "secondary",				1, 1, set_secondary },
 	{ "raid-create",				1, 100, raid_create },
 	{ "raid-delete",				1, 1, raid_delete },
-	{ "status",					1, 1, print_status },
+	{ "hot-spare-create",			1, 1, hot_spare_create },
+	{ "hot-spare-delete",			1, 1, hot_spare_delete },
+	{ "reclaim-cache",			1, 1, reclaim },
+	{ "reclaim-unknown-cache",		1, 1, reclaim_unknown },
+	{ "raid-consistency-check",		1, 1, raid_consistency_check },
+	{ "raid-rebuild",				1, 1, raid_rebuild_cmd },
 };
 
 static int non_interactive_cmd(char *cmd, char **args, int num_args)

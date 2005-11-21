@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.60 2005/11/20 17:14:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.61 2005/11/21 04:04:11 brking Exp $
  */
 
 #include <stdarg.h>
@@ -729,16 +729,16 @@ struct ipr_dev_record {
 };
 
 #define for_each_qac_entry(rcd, i, qac) \
-      for (i = 0, rcd = (struct ipr_common_record *)qac->data; i < qac->num_records; \
+      for (i = 0, rcd = (struct ipr_common_record *)(qac)->data; i < (qac)->num_records; \
            i++, rcd = (struct ipr_common_record *)((unsigned long)rcd + ntohs(rcd->record_len)))
 
 #define for_each_dev_rcd(rcd, i, qac) \
-      for (i = 0, rcd = (struct ipr_dev_record *)qac->data; i < qac->num_records; \
+      for (i = 0, rcd = (struct ipr_dev_record *)(qac)->data; i < (qac)->num_records; \
            i++, rcd = (struct ipr_dev_record *)((unsigned long)rcd + ntohs(rcd->common.record_len))) \
               if (rcd->common.record_id == IPR_RECORD_ID_DEVICE_RECORD)
 
 #define for_each_array_rcd(rcd, i, qac) \
-      for (i = 0, rcd = (struct ipr_array_record *)qac->data; i < qac->num_records; \
+      for (i = 0, rcd = (struct ipr_array_record *)(qac)->data; i < (qac)->num_records; \
            i++, rcd = (struct ipr_array_record *)((unsigned long)rcd + ntohs(rcd->common.record_len))) \
               if (rcd->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
 
