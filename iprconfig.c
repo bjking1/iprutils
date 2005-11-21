@@ -9132,9 +9132,6 @@ static int query_raid_delete(char **args, int num_args)
 		num++;
 	}
 
-	if (num)
-		printf("\b\n");
-
 	return 0;
 }
 
@@ -9142,7 +9139,7 @@ static int query_hot_spare_create(char **args, int num_args)
 {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
-	int num;
+	int hdr = 0;
 
 	dev = find_gen_dev(args[0]);
 	if (!dev) {
@@ -9156,12 +9153,13 @@ static int query_hot_spare_create(char **args, int num_args)
 		if (!dev->dev_rcd->add_hot_spare_cand)
 			continue;
 
-		printf("%s ", dev->gen_name);
-		num++;
-	}
+		if (!hdr) {
+			hdr = 1;
+			printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+		}
 
-	if (num)
-		printf("\b\n");
+		printf_device(dev, 2);
+	}
 
 	return 0;
 }
@@ -9170,7 +9168,7 @@ static int query_hot_spare_delete(char **args, int num_args)
 {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
-	int num;
+	int hdr = 0;
 
 	dev = find_gen_dev(args[0]);
 	if (!dev) {
@@ -9184,12 +9182,13 @@ static int query_hot_spare_delete(char **args, int num_args)
 		if (!dev->dev_rcd->rmv_hot_spare_cand)
 			continue;
 
-		printf("%s ", dev->gen_name);
-		num++;
-	}
+		if (!hdr) {
+			hdr = 1;
+			printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+		}
 
-	if (num)
-		printf("\b\n");
+		printf_device(dev, 2);
+	}
 
 	return 0;
 }
@@ -9198,19 +9197,20 @@ static int query_raid_consistency_check(char **args, int num_args)
 {
 	struct ipr_dev *vset;
 	struct ipr_ioa *ioa;
-	int num = 0;
+	int hdr = 0;
 
 	for_each_ioa(ioa) {
 		for_each_vset(ioa, vset) {
 			if (vset->array_rcd->resync_cand) {
-				printf("%s ", vset->dev_name);
-				num++;
+				if (!hdr) {
+					hdr = 1;
+					printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+				}
+
+				printf_device(vset, 1);
 			}
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9283,11 +9283,23 @@ static int reclaim_unknown(char **args, int num_args)
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
+static int query_ucode_level(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	/* xxx */
+}
+
 static int query_format_for_raid(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
-	int num = 0;
+	int hdr = 0;
 
 	for_each_ioa(ioa) {
 		for_each_disk(ioa, dev) {
@@ -9308,16 +9320,17 @@ static int query_format_for_raid(char **args, int num_args)
 			if (!is_format_allowed(dev))
 				continue;
 
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+			}
+
 			if (strlen(dev->dev_name))
-				printf("%s ", dev->dev_name);
+				printf_device(dev, 0);
 			else
-				printf("%s ", dev->gen_name);
-			num++;
+				printf_device(dev, 2);
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9326,21 +9339,21 @@ static int query_raid_rebuild(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
-	int num = 0;
+	int hdr = 0;
 
 	for_each_ioa(ioa) {
 		for_each_af_dasd(ioa, dev) {
 			if (!dev->dev_rcd->rebuild_cand)
 				continue;
 
-			/* xxx - enable_af(dev) before the actual rebuild */
-			printf("%s ", dev->gen_name);
-			num++;
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+			}
+
+			printf_device(dev, 2);
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9349,7 +9362,7 @@ static int query_recovery_format(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
-	int num = 0;
+	int hdr = 0;
 
 	for_each_ioa(ioa) {
 		for_each_disk(ioa, dev) {
@@ -9360,16 +9373,17 @@ static int query_recovery_format(char **args, int num_args)
 			if (!is_format_allowed(dev))
 				continue;
 
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+			}
+
 			if (strlen(dev->dev_name))
-				printf("%s ", dev->dev_name);
+				printf_device(dev, 0);
 			else
-				printf("%s ", dev->gen_name);
-			num++;
+				printf_device(dev, 2);
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9439,7 +9453,7 @@ static int query_arrays_include(char **args, int num_args)
 				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
 			}
 
-			printf_device(dev, 1);
+			printf_device(vset, 1);
 		}
 	}
 
@@ -9465,7 +9479,7 @@ static int query_reclaim(char **args, int num_args)
 				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
 			}
 
-			printf_device(dev, 2);
+			printf_device(&ioa->ioa, 2);
 		}
 	}
 
@@ -9719,6 +9733,7 @@ static const struct {
 	{ "query-recovery-format",		0, 0, query_recovery_format },
 	{ "query-raid-rebuild",			0, 0, query_raid_rebuild },
 	{ "query-format-for-raid",		0, 0, query_format_for_raid },
+	{ "query-ucode-level",			1, 1, query_ucode_level },
 	{ "primary",				1, 1, set_primary },
 	{ "secondary",				1, 1, set_secondary },
 	{ "raid-create",				1, 100, raid_create },
