@@ -9376,7 +9376,7 @@ static int query_recovery_format(char **args, int num_args)
 
 static int query_devices_include(char **args, int num_args)
 {
-	int rc, i, num = 0;;
+	int rc, i, hdr = 0;;
 	struct ipr_array_query_data qac_data;
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
@@ -9400,15 +9400,16 @@ static int query_devices_include(char **args, int num_args)
 		for_each_disk(ioa, dev) {
 			if (dev->scsi_dev_data->handle == dev_rcd->resource_handle &&
 			    dev_rcd->include_cand && device_supported(dev)) {
-				printf("%s ", dev->gen_name);
-				num++;
+				if (!hdr) {
+					hdr = 1;
+					printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+				}
+
+				printf_device(dev, 2);
 				break;
 			}
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9419,7 +9420,7 @@ static int query_arrays_include(char **args, int num_args)
 	struct ipr_dev *vset;
 	struct ipr_array_cap_entry *cap_entry;
 	struct ipr_array_record *array_rcd;
-	int num = 0;
+	int hdr = 0;
 
 	for_each_ioa(ioa) {
 		if (ioa->is_secondary) /* xxx */
@@ -9433,13 +9434,14 @@ static int query_arrays_include(char **args, int num_args)
 			if (!cap_entry || !cap_entry->include_allowed || !array_rcd->established)
 				continue;
 
-			printf("%s ", vset->dev_name);
-			num++;
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			}
+
+			printf_device(dev, 1);
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9448,7 +9450,7 @@ static int query_reclaim(char **args, int num_args)
 {
 	struct ipr_reclaim_query_data buf;
 	struct ipr_ioa *ioa;
-	int num = 0, rc;
+	int hdr = 0, rc;
 
 	for_each_ioa(ioa) {
 		memset(&buf, 0, sizeof(buf));
@@ -9458,13 +9460,14 @@ static int query_reclaim(char **args, int num_args)
 			continue;
 
 		if (buf.reclaim_known_needed || buf.reclaim_unknown_needed) {
-			printf("%s ", ioa->ioa.gen_name);
-			num++;
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+			}
+
+			printf_device(dev, 2);
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9473,22 +9476,23 @@ static int query_format_for_jbod(char **args, int num_args)
 {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
-	int num = 0;
+	int hdr = 0;
 
 	for_each_ioa(ioa) {
 		for_each_af_dasd(ioa, dev) {
 			if (ipr_device_is_zeroed(dev))
 				continue;
 			if ((ipr_is_array_member(dev) && dev->dev_rcd->no_cfgte_vol) ||
-			    is_format_allowed(dev)) {
-				printf("%s ", dev->gen_name);
-				num++;
+			    (!ipr_is_array_member(dev) && is_format_allowed(dev))) {
+				if (!hdr) {
+					hdr = 1;
+					printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+				}
+
+				printf_device(dev, 2);
 			}
 		}
 	}
-
-	if (num)
-		printf("\b\n");
 
 	return 0;
 }
@@ -9518,10 +9522,10 @@ static int show_jbod_disks(char **args, int num_args)
 		for_each_jbod_disk(ioa, dev) {
 			if (!hdr) {
 				hdr = 1;
-				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
 			}
 
-			printf_device(dev, 3);
+			printf_device(dev, 0);
 		}
 	}
 
@@ -9535,13 +9539,13 @@ static int show_af_disks(char **args, int num_args)
 	int hdr = 0;
 
 	for_each_ioa(ioa) {
-		for_each_af_dasd(ioa, dev) {
+		for_each_standalone_disk(ioa, dev) {
 			if (!hdr) {
 				hdr = 1;
-				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
 			}
 
-			printf_device(dev, 3);
+			printf_device(dev, 2);
 		}
 	}
 
@@ -9558,10 +9562,10 @@ static int show_hot_spares(char **args, int num_args)
 		for_each_hot_spare(ioa, dev) {
 			if (!hdr) {
 				hdr = 1;
-				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
 			}
 
-			printf_device(dev, 3);
+			printf_device(dev, 2);
 		}
 	}
 
