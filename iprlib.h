@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.61 2005/11/21 04:04:11 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.62 2005/11/22 19:33:45 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1549,6 +1549,7 @@ void ipr_del_zeroed_dev(struct ipr_dev *);
 int ipr_device_is_zeroed(struct ipr_dev *);
 struct ipr_array_cap_entry *get_raid_cap_entry(struct ipr_supported_arrays *, u8 );
 char *get_prot_level_str(struct ipr_supported_arrays *, int);
+int get_dev_fw_version(struct ipr_dev *);
 u32 get_ioa_fw_version(struct ipr_ioa *);
 int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
@@ -1572,6 +1573,7 @@ void ipr_del_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev *
 struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *);
 struct ipr_array_cap_entry *get_cap_entry(struct ipr_supported_arrays *, char *);
 int ipr_get_blk_size(struct ipr_dev *);
+u32 get_ioa_ucode_version(char *);
 
 /*---------------------------------------------------------------------------
  * Purpose: Identify Advanced Function DASD present

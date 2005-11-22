@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.76 2005/11/20 17:14:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.77 2005/11/22 19:33:45 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -4097,7 +4097,7 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	return 0;
 }
 
-static u32 get_ioa_ucode_version(char *ucode_file)
+u32 get_ioa_ucode_version(char *ucode_file)
 {
 	int fd, rc;
 	struct stat ucode_stats;
@@ -4197,6 +4197,7 @@ static int ipr_get_hotplug_dir()
 u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 {
 	int fd;
+	unsigned int len;
 	struct stat ucode_stats;
 	struct ipr_dasd_ucode_header *hdr;
 	char *tmp;
@@ -4225,23 +4226,47 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 			return 0;
 		}
 
-		rc = (hdr->modification_level[0] << 24) |
-			(hdr->modification_level[1] << 16) |
-			(hdr->modification_level[2] << 8) |
-			hdr->modification_level[3];
+		len = (hdr->length[0] << 16) | (hdr->length[1] << 8) | hdr->length[2];
 
-		munmap(hdr, ucode_stats.st_size);
-		close(fd);
-	} else {
-		tmp = strrchr(ucode_file, '.');
+		if (len == ucode_stats.st_size) {
+			rc = (hdr->modification_level[0] << 24) |
+				(hdr->modification_level[1] << 16) |
+				(hdr->modification_level[2] << 8) |
+				hdr->modification_level[3];
 
-		if (!tmp)
-			return 0;
-
-		rc = strtoul(tmp+1, NULL, 16);
+			munmap(hdr, ucode_stats.st_size);
+			close(fd);
+			return rc;
+		}
 	}
 
+	tmp = strrchr(ucode_file, '.');
+
+	if (!tmp)
+		return 0;
+
+	rc = strtoul(tmp+1, NULL, 16);
+
 	return rc;
+}
+
+int get_dev_fw_version(struct ipr_dev *dev)
+{
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	char buf[5];
+	int rc;
+
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+
+	if (rc != 0) {
+		scsi_dbg(dev, "Inquiry failed\n");
+		return rc;
+	}
+
+	memcpy(buf, page3_inq.release_level, 4);
+	buf[4] = '\0';
+	return strtoul(buf, NULL, 16);
 }
 
 u32 get_ioa_fw_version(struct ipr_ioa *ioa)
@@ -4594,12 +4619,11 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 {
 	int rc = 0;
 	struct stat ucode_stats;
-	int fd, img_size, img_off;
+	int fd;
 	struct ipr_dasd_ucode_header *img_hdr;
 	struct ipr_dasd_inquiry_page3 page3_inq;
 	struct ipr_std_inq_data std_inq_data;
 	struct unsupported_af_dasd *unsupp_af;
-	void *buffer;
 	u32 level;
 
 	memset(&std_inq_data, 0, sizeof(std_inq_data));
@@ -4625,11 +4649,6 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 			return;
 	}
 
-	if (image->has_header)
-		img_off = sizeof(struct ipr_dasd_ucode_header);
-	else
-		img_off = 0;
-
 	fd = open(image->file, O_RDONLY);
 
 	if (fd < 0) {
@@ -4654,14 +4673,6 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 		return;
 	}
 
-	if (img_off && memcmp(img_hdr->load_id, page3_inq.load_id, 4) &&
-	    !memcmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8)) {
-		syslog(LOG_ERR, "Firmware file corrupt: %s.\n", image->file);
-		munmap(img_hdr, ucode_stats.st_size);
-		close(fd);
-		return;
-	}
-
 	level = htonl(image->version);
 
 	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
@@ -4674,10 +4685,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 			  image->version, image->version >> 24, (image->version >> 16) & 0xff,
 			  (image->version >> 8) & 0xff, image->version & 0xff);
 
-		buffer = (void *)img_hdr + img_off;
-		img_size = ucode_stats.st_size - img_off;
-
-		rc = ipr_write_buffer(dev, buffer, img_size);
+		rc = ipr_write_buffer(dev, img_hdr, ucode_stats.st_size);
 		ipr_init_dev(dev);
 	}
 

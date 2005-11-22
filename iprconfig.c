@@ -236,6 +236,18 @@ static void add_raid_cmd_tail(struct ipr_ioa *ioa, struct ipr_dev *dev, u8 array
 	raid_cmd_tail->dev = dev;
 }
 
+static void free_raid_cmds()
+{
+	struct array_cmd_data *cur = raid_cmd_head;
+
+	while(cur) {
+		free(cur->qac);
+		cur = cur->next;
+		free(raid_cmd_head);
+		raid_cmd_head = cur;
+	}
+}
+
 static void free_devs_to_init()
 {
 	struct devs_to_init_t *dev = dev_init_head;
@@ -1914,17 +1926,10 @@ int device_details(i_container *i_con)
 int raid_screen(i_container *i_con)
 {
 	int rc;
-	struct array_cmd_data *cur_raid_cmd;
 	struct screen_output *s_out;
 	int loop;
 
-	cur_raid_cmd = raid_cmd_head;
-
-	while(cur_raid_cmd) {
-		cur_raid_cmd = cur_raid_cmd->next;
-		free(raid_cmd_head);
-		raid_cmd_head = cur_raid_cmd;
-	}
+	free_raid_cmds();
 
 	for (loop = 0; loop < n_raid_screen.num_opts; loop++) {
 		n_raid_screen.body =
@@ -2279,7 +2284,6 @@ int raid_start(i_container *i_con)
 {
 	int rc, k;
 	int found = 0;
-	struct array_cmd_data *cur_raid_cmd;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
 	struct screen_output *s_out;
@@ -2328,13 +2332,7 @@ int raid_start(i_container *i_con)
 		rc = s_out->rc;
 		free(s_out);
 
-		cur_raid_cmd = raid_cmd_head;
-
-		while(cur_raid_cmd) {
-			cur_raid_cmd = cur_raid_cmd->next;
-			free(raid_cmd_head);
-			raid_cmd_head = cur_raid_cmd;
-		}
+		free_raid_cmds();
 	}
 
 	for (k = 0; k < 2; k++) {
@@ -3067,7 +3065,6 @@ int raid_rebuild(i_container *i_con)
 {
 	int rc, k;
 	int found = 0;
-	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_dev *dev;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
@@ -3121,13 +3118,7 @@ int raid_rebuild(i_container *i_con)
 		rc = s_out->rc;
 		free(s_out);
 
-		cur_raid_cmd = raid_cmd_head;
-
-		while(cur_raid_cmd) {
-			cur_raid_cmd = cur_raid_cmd->next;
-			free(raid_cmd_head);
-			raid_cmd_head = cur_raid_cmd;
-		}
+		free_raid_cmds();
 	}
 
 	for (k = 0; k < 2; k++) {
@@ -3289,7 +3280,6 @@ int raid_resync(i_container *i_con)
 {
 	int rc, k;
 	int found = 0;
-	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_dev *dev;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
@@ -3339,14 +3329,7 @@ int raid_resync(i_container *i_con)
 
 		rc = s_out->rc;
 		free(s_out);
-
-		cur_raid_cmd = raid_cmd_head;
-
-		while(cur_raid_cmd) {
-			cur_raid_cmd = cur_raid_cmd->next;
-			free(raid_cmd_head);
-			raid_cmd_head = cur_raid_cmd;
-		}
+		free_raid_cmds();
 	}
 
 	for (k = 0; k < 2; k++) {
@@ -3440,7 +3423,6 @@ int raid_include(i_container *i_con)
 	int k;
 	int found = 0;
 	struct ipr_array_record *array_rcd;
-	struct array_cmd_data *cur_raid_cmd;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
@@ -3499,19 +3481,7 @@ int raid_include(i_container *i_con)
 
 		rc = s_out->rc;
 		free(s_out);
-
-		cur_raid_cmd = raid_cmd_head;
-
-		while(cur_raid_cmd) {
-			if (cur_raid_cmd->qac) {
-				free(cur_raid_cmd->qac);
-				cur_raid_cmd->qac = NULL;
-			}
-
-			cur_raid_cmd = cur_raid_cmd->next;
-			free(raid_cmd_head);
-			raid_cmd_head = cur_raid_cmd;
-		}
+		free_raid_cmds();
 	}
 
 	for (k = 0; k < 2; k++) {
@@ -4329,13 +4299,7 @@ int hot_spare(i_container *i_con, int action)
 	}
 
 	n_screen->body = NULL;
-
-	cur_raid_cmd = raid_cmd_head;
-	while(cur_raid_cmd) {
-		cur_raid_cmd = cur_raid_cmd->next;
-		free(raid_cmd_head);
-		raid_cmd_head = cur_raid_cmd;
-	}
+	free_raid_cmds();
 
 	return rc;
 }
@@ -9228,6 +9192,103 @@ static int raid_consistency_check(char **args, int num_args)
 	return ipr_resync_array(vset->ioa);
 }
 
+static int set_qdepth(char **args, int num_args)
+{
+	int rc;
+	struct ipr_disk_attr attr;
+	struct ipr_dev *dev = find_dev(args[1]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[1]);
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	rc = ipr_modify_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	attr.queue_depth = strtoul(args[0], NULL, 10);
+
+	return ipr_set_dev_attr(dev, &attr, 1);
+}
+
+static int set_format_timeout(char **args, int num_args)
+{
+	int rc;
+	struct ipr_disk_attr attr;
+	struct ipr_dev *dev = find_dev(args[1]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[1]);
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	rc = ipr_modify_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	attr.format_timeout = strtoul(args[0], NULL, 10) * 3600;
+
+	return ipr_set_dev_attr(dev, &attr, 1);
+}
+
+static int update_ioa_ucode(struct ipr_ioa *ioa, char *file)
+{
+	struct ipr_fw_images image;
+
+	strcpy(image.file, file);
+	image.version = get_ioa_ucode_version(file);
+	image.has_header = 0;
+
+	ipr_update_ioa_fw(ioa, &image, 1);
+
+	if (image.version != get_ioa_fw_version(ioa))
+		return -EIO;
+	return 0;
+}
+
+static int update_dev_ucode(struct ipr_dev *dev, char *file)
+{
+	struct ipr_fw_images image;
+
+	strcpy(image.file, file);
+	image.version = get_dasd_ucode_version(file, 1);
+	image.has_header = 1;
+
+	ipr_update_disk_fw(dev, &image, 1);
+
+	if (image.version != get_dev_fw_version(dev))
+		return -EIO;
+	return 0;
+}
+
+static int update_ucode_cmd(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (&dev->ioa->ioa == dev)
+		return update_ioa_ucode(dev->ioa, args[1]);
+	else
+		return update_dev_ucode(dev, args[1]);
+}
+
 static int raid_rebuild_cmd(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -9283,8 +9344,10 @@ static int reclaim_unknown(char **args, int num_args)
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
-static int query_ucode_level(char **args, int num_args)
+static int query_qdepth(char **args, int num_args)
 {
+	int rc;
+	struct ipr_disk_attr attr;
 	struct ipr_dev *dev = find_dev(args[0]);
 
 	if (!dev) {
@@ -9292,7 +9355,60 @@ static int query_ucode_level(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	/* xxx */
+	rc = ipr_get_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	printf("%d\n", attr.queue_depth);
+	return 0;
+}
+
+static int query_format_timeout(char **args, int num_args)
+{
+	int rc;
+	struct ipr_disk_attr attr;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	rc = ipr_modify_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	printf("%d hr\n", attr.format_timeout / 3600);
+	return 0;
+}
+
+static int query_ucode_level(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	int rc = 0;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (&dev->ioa->ioa == dev)
+		printf("%08X\n", get_ioa_fw_version(dev->ioa));
+	else {
+		rc = get_dev_fw_version(dev);
+		if (rc < 0)
+			return rc;
+		printf("%04X\n", rc);
+	}
+
+	return 0;
 }
 
 static int query_format_for_raid(char **args, int num_args)
@@ -9734,6 +9850,8 @@ static const struct {
 	{ "query-raid-rebuild",			0, 0, query_raid_rebuild },
 	{ "query-format-for-raid",		0, 0, query_format_for_raid },
 	{ "query-ucode-level",			1, 1, query_ucode_level },
+	{ "query-format-timeout",		1, 1, query_format_timeout },
+	{ "query-qdepth",				1, 1, query_qdepth },
 	{ "primary",				1, 1, set_primary },
 	{ "secondary",				1, 1, set_secondary },
 	{ "raid-create",				1, 100, raid_create },
@@ -9744,6 +9862,9 @@ static const struct {
 	{ "reclaim-unknown-cache",		1, 1, reclaim_unknown },
 	{ "raid-consistency-check",		1, 1, raid_consistency_check },
 	{ "raid-rebuild",				1, 1, raid_rebuild_cmd },
+	{ "update-ucode",				2, 2, update_ucode_cmd },
+	{ "set-format-timeout",			2, 2, set_format_timeout },
+	{ "set-qdepth",				2, 2, set_qdepth },
 };
 
 static int non_interactive_cmd(char *cmd, char **args, int num_args)
