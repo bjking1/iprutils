@@ -8824,6 +8824,64 @@ static void curses_init()
 	initscr();
 }
 
+static int format_devices(char **args, int num_args, int blksz)
+{
+	int i;
+	struct ipr_dev *dev;
+
+	for (i = 0; i < num_args; i++) {
+		dev = find_dev(args[i]);
+		if (!dev) {
+			fprintf(stderr, "Invalid device: %s\n", args[i]);
+			continue;
+		}
+
+		if (!ipr_is_af_dasd_device(dev) && !ipr_is_gscsi(dev))
+			continue;
+
+		if (ipr_is_af_dasd_device(dev)) {
+			if (ipr_is_array_member(dev) && !dev->dev_rcd->no_cfgte_vol)
+				continue;
+			if (!is_format_allowed(dev))
+				continue;
+		} else {
+			if (!is_format_allowed(dev))
+				continue;
+		}
+
+		add_format_device(dev, blksz);
+		dev_init_tail->do_init = 1;
+	}
+
+	send_dev_inits(NULL);
+	free_devs_to_init();
+	return 0;
+}
+
+static int recovery_format(char **args, int num_args)
+{
+	return format_devices(args, num_args, 0);
+}
+
+static int format_for_jbod(char **args, int num_args)
+{
+	return format_devices(args, num_args, IPR_JBOD_BLOCK_SIZE);
+}
+
+static int format_for_raid(char **args, int num_args)
+{
+	int i;
+
+	for (i = 0; i < num_args; i++) {
+		if (raid_create_add_dev(args[i]))
+			return -EIO;
+	}
+
+	send_dev_inits(NULL);
+	free_devs_to_init();
+	return 0;
+}
+
 static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
@@ -8856,7 +8914,7 @@ static int raid_create(char **args, int num_args)
 		} else if (next_qdepth) {
 			next_qdepth = 0;
 			qdepth = strtoul(args[i], NULL, 10);
-		} else if (strncmp(args[i], "/dev", 4) == 0) {
+		} else if (find_dev(args[i])) {
 			num_devs++;
 			if (raid_create_add_dev(args[i]))
 				return -EIO;
@@ -8960,6 +9018,34 @@ static int hot_spare_create(char **args, int num_args)
 
 	dev->dev_rcd->issue_cmd = 1;
 	return ipr_add_hot_spare(dev->ioa);
+}
+
+static int raid_include_cmd(char **args, int num_args)
+{
+	int i;
+	struct ipr_dev *dev, *vset = NULL;
+
+	for (i = 0; i < num_args; i++) {
+		dev = find_dev(args[i]);
+		if (!dev) {
+			fprintf(stderr, "Invalid device: %s\n", args[i]);
+			return -EINVAL;
+		}
+
+		if (ipr_is_volume_set(dev)) {
+			if (vset) {
+				fprintf(stderr, "Invalid parameters. Only one disk array can "
+					"specified at once\n");
+				return -EINVAL;
+			}
+
+			vset = dev;
+		}
+
+		
+	}
+
+	return 0;
 }
 
 static int raid_delete(char **args, int num_args)
@@ -9192,6 +9278,101 @@ static int raid_consistency_check(char **args, int num_args)
 	return ipr_resync_array(vset->ioa);
 }
 
+static int identify_disk(char **args, int num_args)
+{
+	struct ipr_dev *ses;
+	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_res_addr res_addr;
+	struct ipr_dev *dev = find_dev(args[0]);
+	int on = strtoul(args[1], NULL, 10);
+	int rc, found, i;
+
+	if (get_res_addr(dev, &res_addr)) {
+		fprintf(stderr, "Invalid device\n");
+		return -EINVAL;
+	}
+
+	for_each_ses(dev->ioa, ses) {
+		rc = ipr_receive_diagnostics(ses, 2, &ses_data,
+					     sizeof(struct ipr_encl_status_ctl_pg));
+
+		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
+			continue;
+
+		found = 0;
+		for_each_elem_status(i, &ses_data) {
+			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
+				found++;
+				ses_data.elem_status[i].select = 1;
+				ses_data.elem_status[i].identify = on;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	if (!found) {
+		fprintf(stderr, "Cannot find SES device for specified device\n");
+		return -EINVAL;
+	}
+
+	rc = ipr_send_diagnostics(ses, &ses_data,
+				  sizeof(struct ipr_encl_status_ctl_pg));
+
+	return rc;
+}
+
+static int set_log_level_cmd(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (&dev->ioa->ioa != dev) {
+		fprintf(stderr, "Device is not an IOA\n");
+		return -EINVAL;
+	}
+
+	set_log_level(dev->ioa, args[1]);
+	return 0;
+}
+
+static int set_tcq_enable(char **args, int num_args)
+{
+	int rc;
+	struct ipr_disk_attr attr;
+	struct ipr_dev *dev = find_dev(args[1]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[1]);
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	rc = ipr_modify_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	attr.tcq_enabled = strtoul(args[0], NULL, 10);
+
+	if (attr.tcq_enabled != 0 && attr.tcq_enabled != 1) {
+		fprintf(stderr, "Invalid parameter\n");
+		return -EINVAL;
+	}
+
+	return ipr_set_dev_attr(dev, &attr, 1);
+}
+
 static int set_qdepth(char **args, int num_args)
 {
 	int rc;
@@ -9342,6 +9523,44 @@ static int reclaim_unknown(char **args, int num_args)
 {
 	return __reclaim(args, num_args,
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
+}
+
+static int query_log_level(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (&dev->ioa->ioa != dev) {
+		fprintf(stderr, "Device is not an IOA\n");
+		return -EINVAL;
+	}
+
+	printf("%d\n", get_log_level(dev->ioa));
+	return 0;
+}
+
+static int query_tcq_enable(char **args, int num_args)
+{
+	int rc;
+	struct ipr_disk_attr attr;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+
+	if (rc)
+		return rc;
+
+	printf("%d\n", attr.tcq_enabled);
+	return 0;
 }
 
 static int query_qdepth(char **args, int num_args)
@@ -9824,47 +10043,57 @@ static int set_secondary(char **args, int num_args)
 static const struct {
 	char *cmd;
 	int min_args;
+	int unlimited_max;
 	int max_args;
 	int (*func)(char **, int);
 } command [] = {
-	{ "show-config",				0, 0, show_config },
-	{ "show-alt-config",			0, 0, show_alt_config },
-	{ "show-ioas",				0, 0, show_ioas },
-	{ "show-arrays",				0, 0, show_arrays },
-	{ "show-battery-info",			1, 1, battery_info },
-	{ "show-details",				1, 1, show_details },
-	{ "show-hot-spares",			0, 0, show_hot_spares },
-	{ "show-af-disks",			0, 0, show_af_disks },
-	{ "show-jbod-disks",			0, 0, show_jbod_disks },
-	{ "status",					1, 1, print_status },
-	{ "query-raid-create",			1, 1, query_raid_create },
-	{ "query-raid-delete",			1, 1, query_raid_delete },
-	{ "query-hot-spare-create",		1, 1, query_hot_spare_create },
-	{ "query-hot-spare-delete",		1, 1, query_hot_spare_delete },
-	{ "query-raid-consistency-check",	0, 0, query_raid_consistency_check },
-	{ "query-format-for-jbod",		0, 0, query_format_for_jbod },
-	{ "query-reclaim",			0, 0, query_reclaim },
-	{ "query-arrays-raid-include",	0, 0, query_arrays_include },
-	{ "query-devices-raid-include",	1, 1, query_devices_include },
-	{ "query-recovery-format",		0, 0, query_recovery_format },
-	{ "query-raid-rebuild",			0, 0, query_raid_rebuild },
-	{ "query-format-for-raid",		0, 0, query_format_for_raid },
-	{ "query-ucode-level",			1, 1, query_ucode_level },
-	{ "query-format-timeout",		1, 1, query_format_timeout },
-	{ "query-qdepth",				1, 1, query_qdepth },
-	{ "primary",				1, 1, set_primary },
-	{ "secondary",				1, 1, set_secondary },
-	{ "raid-create",				1, 100, raid_create },
-	{ "raid-delete",				1, 1, raid_delete },
-	{ "hot-spare-create",			1, 1, hot_spare_create },
-	{ "hot-spare-delete",			1, 1, hot_spare_delete },
-	{ "reclaim-cache",			1, 1, reclaim },
-	{ "reclaim-unknown-cache",		1, 1, reclaim_unknown },
-	{ "raid-consistency-check",		1, 1, raid_consistency_check },
-	{ "raid-rebuild",				1, 1, raid_rebuild_cmd },
-	{ "update-ucode",				2, 2, update_ucode_cmd },
-	{ "set-format-timeout",			2, 2, set_format_timeout },
-	{ "set-qdepth",				2, 2, set_qdepth },
+	{ "show-config",				0, 0, 0, show_config },
+	{ "show-alt-config",			0, 0, 0, show_alt_config },
+	{ "show-ioas",				0, 0, 0, show_ioas },
+	{ "show-arrays",				0, 0, 0, show_arrays },
+	{ "show-battery-info",			1, 0, 1, battery_info },
+	{ "show-details",				1, 0, 1, show_details },
+	{ "show-hot-spares",			0, 0, 0, show_hot_spares },
+	{ "show-af-disks",			0, 0, 0, show_af_disks },
+	{ "show-jbod-disks",			0, 0, 0, show_jbod_disks },
+	{ "status",					1, 0, 1, print_status },
+	{ "query-raid-create",			1, 0, 1, query_raid_create },
+	{ "query-raid-delete",			1, 0, 1, query_raid_delete },
+	{ "query-hot-spare-create",		1, 0, 1, query_hot_spare_create },
+	{ "query-hot-spare-delete",		1, 0, 1, query_hot_spare_delete },
+	{ "query-raid-consistency-check",	0, 0, 0, query_raid_consistency_check },
+	{ "query-format-for-jbod",		0, 0, 0, query_format_for_jbod },
+	{ "query-reclaim",			0, 0, 0, query_reclaim },
+	{ "query-arrays-raid-include",	0, 0, 0, query_arrays_include },
+	{ "query-devices-raid-include",	1, 0, 1, query_devices_include },
+	{ "query-recovery-format",		0, 0, 0, query_recovery_format },
+	{ "query-raid-rebuild",			0, 0, 0, query_raid_rebuild },
+	{ "query-format-for-raid",		0, 0, 0, query_format_for_raid },
+	{ "query-ucode-level",			1, 0, 1, query_ucode_level },
+	{ "query-format-timeout",		1, 0, 1, query_format_timeout },
+	{ "query-qdepth",				1, 0, 1, query_qdepth },
+	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable },
+	{ "query-log-level",			1, 0, 1, query_log_level },
+	{ "primary",				1, 0, 1, set_primary },
+	{ "secondary",				1, 0, 1, set_secondary },
+	{ "raid-create",				1, 1, 0, raid_create },
+	{ "raid-delete",				1, 0, 1, raid_delete },
+	{ "raid-include",				2, 0, 16, raid_include_cmd },
+	{ "format-for-raid",			1, 1, 0, format_for_raid },
+	{ "format-for-jbod",			1, 1, 0, format_for_jbod },
+	{ "recovery-format",			1, 1, 0, recovery_format },
+	{ "hot-spare-create",			1, 0, 1, hot_spare_create },
+	{ "hot-spare-delete",			1, 0, 1, hot_spare_delete },
+	{ "reclaim-cache",			1, 0, 1, reclaim },
+	{ "reclaim-unknown-cache",		1, 0, 1, reclaim_unknown },
+	{ "raid-consistency-check",		1, 0, 1, raid_consistency_check },
+	{ "raid-rebuild",				1, 0, 1, raid_rebuild_cmd },
+	{ "update-ucode",				2, 0, 2, update_ucode_cmd },
+	{ "set-format-timeout",			2, 0, 2, set_format_timeout },
+	{ "set-qdepth",				2, 0, 2, set_qdepth },
+	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable },
+	{ "set-log-level",			2, 0, 2, set_log_level_cmd },
+	{ "identify-disk",			2, 0, 2, identify_disk },
 };
 
 static int non_interactive_cmd(char *cmd, char **args, int num_args)
@@ -9885,7 +10114,7 @@ static int non_interactive_cmd(char *cmd, char **args, int num_args)
 			return -EINVAL;
 		}
 
-		if (num_args > command[i].max_args) {
+		if (!command[i].unlimited_max && num_args > command[i].max_args) {
 			fprintf(stderr, "Too many arguments specified.\n");
 			return -EINVAL;
 		}
