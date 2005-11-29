@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.77 2005/11/22 19:33:45 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.78 2005/11/29 23:23:27 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -4250,10 +4250,9 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 	return rc;
 }
 
-int get_dev_fw_version(struct ipr_dev *dev)
+u32 get_dev_fw_version(struct ipr_dev *dev)
 {
 	struct ipr_dasd_inquiry_page3 page3_inq;
-	char buf[5];
 	int rc;
 
 	memset(&page3_inq, 0, sizeof(page3_inq));
@@ -4261,12 +4260,12 @@ int get_dev_fw_version(struct ipr_dev *dev)
 
 	if (rc != 0) {
 		scsi_dbg(dev, "Inquiry failed\n");
-		return rc;
+		return 0;
 	}
 
-	memcpy(buf, page3_inq.release_level, 4);
-	buf[4] = '\0';
-	return strtoul(buf, NULL, 16);
+	rc = page3_inq.release_level[0] << 24 | page3_inq.release_level[1] << 16 |
+		page3_inq.release_level[2] << 8 | page3_inq.release_level[3];
+	return rc;
 }
 
 u32 get_ioa_fw_version(struct ipr_ioa *ioa)

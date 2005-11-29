@@ -3795,19 +3795,50 @@ static int update_include_qac_data(struct ipr_array_query_data *old_qac,
 	return 0;
 }
 
+static int do_array_include(struct ipr_ioa *ioa, int array_id,
+			    struct ipr_array_query_data *qac)
+{
+	int fd, rc;
+	struct ipr_array_query_data qac_data;
+
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd <= 1)
+		return -EIO;
+
+	rc = flock(fd, LOCK_EX);
+	if (rc)
+		goto out;
+
+	rc = __ipr_query_array_config(ioa, fd, 0, 1, array_id, &qac_data);
+
+	if (rc)
+		goto out;
+
+	rc = update_include_qac_data(qac, &qac_data);
+	if (rc)
+		goto out;
+
+	rc = ipr_add_array_device(ioa, fd, &qac_data);
+
+out:
+	close(fd);
+	return rc;
+}
+
 int dev_include_complete(u8 num_devs)
 {
 	int done_bad;
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
 	int not_done = 0;
-	int rc, fd;
+	int rc;
 	struct devs_to_init_t *cur_dev_init;
 	u32 percent_cmplt = 0;
 	struct ipr_ioa *ioa;
 	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_common_record *common_record;
-	struct ipr_array_query_data qac_data;
 
 	n_dev_include_complete.body = n_dev_include_complete.header[0];
 
@@ -3862,43 +3893,11 @@ int dev_include_complete(u8 num_devs)
 		if (!cur_raid_cmd->do_cmd)
 			continue;
 
-		ioa = cur_raid_cmd->ioa;
-		memset(&qac_data, 0, sizeof(qac_data));
-
-		fd = open(ioa->ioa.gen_name, O_RDWR);
-		if (fd <= 1) {
+		if (do_array_include(cur_raid_cmd->ioa,
+				     cur_raid_cmd->array_id, cur_raid_cmd->qac)) {
 			rc = 26;
 			continue;
 		}
-
-		rc = flock(fd, LOCK_EX);
-		if (rc) {
-			rc = 26;
-			close(fd);
-			continue;
-		}
-
-		rc = __ipr_query_array_config(ioa, fd, 0, 1,
-					      cur_raid_cmd->array_id, &qac_data);
-
-		if (rc != 0) {
-			rc = 26;
-			close(fd);
-			continue;
-		}
-
-		rc = update_include_qac_data(cur_raid_cmd->qac, &qac_data);
-		if (rc != 0) {
-			close(fd);
-			continue;
-		}
-
-		rc = ipr_add_array_device(ioa, fd, &qac_data);
-
-		if (rc != 0)
-			rc = 26;
-
-		close(fd);
 	}
 
 	not_done = 0;
@@ -9022,15 +9021,22 @@ static int hot_spare_create(char **args, int num_args)
 
 static int raid_include_cmd(char **args, int num_args)
 {
-	int i;
+	int i, zeroed = 0;
 	struct ipr_dev *dev, *vset = NULL;
+	struct ipr_ioa *ioa;
 
 	for (i = 0; i < num_args; i++) {
-		dev = find_dev(args[i]);
-		if (!dev) {
-			fprintf(stderr, "Invalid device: %s\n", args[i]);
+		if (!strcmp(args[i], "-z"))
+			zeroed = 1;
+	}
+
+	for (i = 0; i < num_args; i++) {
+		if (!strcmp(args[i], "-z"))
+			continue;
+
+		dev = find_and_add_dev(args[i]);
+		if (!dev)
 			return -EINVAL;
-		}
 
 		if (ipr_is_volume_set(dev)) {
 			if (vset) {
@@ -9040,12 +9046,40 @@ static int raid_include_cmd(char **args, int num_args)
 			}
 
 			vset = dev;
+			ioa = vset->ioa;
+			continue;
 		}
 
-		
+		if (!ipr_is_af_dasd_device(dev)) {
+			fprintf(stderr, "Invalid device specified. Device must be formatted "
+				"to Advanced Function Format\n");
+			return -EINVAL;
+		}
+
+		dev->dev_rcd->issue_cmd = 1;
+		if (!zeroed) {
+			if (!is_format_allowed(dev)) {
+				fprintf(stderr, "Format not allowed to %s\n", args[i]);
+				return -EIO;
+			}
+
+			add_format_device(dev, 0);
+			dev_init_tail->do_init = 1;
+		}
 	}
 
-	return 0;
+	if (!vset) {
+		fprintf(stderr, "Invalid parameters. A disk array must be specified\n");
+		return -EINVAL;
+	}
+
+	if (!zeroed) {
+		send_dev_inits(NULL);
+		free_devs_to_init();
+	}
+
+	return do_array_include(vset->ioa, vset->array_rcd->array_id,
+				vset->ioa->qac_data);
 }
 
 static int raid_delete(char **args, int num_args)
@@ -9314,7 +9348,7 @@ static int identify_disk(char **args, int num_args)
 	}
 
 	if (!found) {
-		fprintf(stderr, "Cannot find SES device for specified device\n");
+		fprintf(stderr, "Cannot find SES device for %s\n", args[0]);
 		return -EINVAL;
 	}
 
@@ -9326,6 +9360,7 @@ static int identify_disk(char **args, int num_args)
 
 static int set_log_level_cmd(char **args, int num_args)
 {
+	char buf[4];
 	struct ipr_dev *dev = find_dev(args[0]);
 
 	if (!dev) {
@@ -9338,7 +9373,8 @@ static int set_log_level_cmd(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	set_log_level(dev->ioa, args[1]);
+	snprintf(buf, sizeof(buf), "%s\n", args[1]);
+	set_log_level(dev->ioa, buf);
 	return 0;
 }
 
@@ -9604,14 +9640,15 @@ static int query_format_timeout(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	printf("%d hr\n", attr.format_timeout / 3600);
+	printf("%d\n", attr.format_timeout / 3600);
 	return 0;
 }
 
 static int query_ucode_level(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
-	int rc = 0;
+	u32 level, level_sw;
+	char *asc;
 
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
@@ -9621,10 +9658,15 @@ static int query_ucode_level(char **args, int num_args)
 	if (&dev->ioa->ioa == dev)
 		printf("%08X\n", get_ioa_fw_version(dev->ioa));
 	else {
-		rc = get_dev_fw_version(dev);
-		if (rc < 0)
-			return rc;
-		printf("%04X\n", rc);
+		level = get_dev_fw_version(dev);
+		level_sw = htonl(level);
+		asc = (char *)&level_sw;
+		if (isprint(asc[0]) && isprint(asc[1]) &&
+		    isprint(asc[2]) && isprint(asc[3]))
+			printf("%.8X (%c%c%c%c)\n", level, asc[0],
+			       asc[1], asc[2], asc[3]);
+		else
+			printf("%.8X\n", level);
 	}
 
 	return 0;
@@ -10078,7 +10120,7 @@ static const struct {
 	{ "secondary",				1, 0, 1, set_secondary },
 	{ "raid-create",				1, 1, 0, raid_create },
 	{ "raid-delete",				1, 0, 1, raid_delete },
-	{ "raid-include",				2, 0, 16, raid_include_cmd },
+	{ "raid-include",				2, 0, 17, raid_include_cmd },
 	{ "format-for-raid",			1, 1, 0, format_for_raid },
 	{ "format-for-jbod",			1, 1, 0, format_for_jbod },
 	{ "recovery-format",			1, 1, 0, recovery_format },

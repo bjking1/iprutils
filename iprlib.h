@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.62 2005/11/22 19:33:45 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.63 2005/11/29 23:23:27 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1549,7 +1549,7 @@ void ipr_del_zeroed_dev(struct ipr_dev *);
 int ipr_device_is_zeroed(struct ipr_dev *);
 struct ipr_array_cap_entry *get_raid_cap_entry(struct ipr_supported_arrays *, u8 );
 char *get_prot_level_str(struct ipr_supported_arrays *, int);
-int get_dev_fw_version(struct ipr_dev *);
+u32 get_dev_fw_version(struct ipr_dev *);
 u32 get_ioa_fw_version(struct ipr_ioa *);
 int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
