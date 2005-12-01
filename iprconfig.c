@@ -9312,6 +9312,73 @@ static int raid_consistency_check(char **args, int num_args)
 	return ipr_resync_array(vset->ioa);
 }
 
+static int remove_disk(char **args, int num_args)
+{
+	struct ipr_dev *ses;
+	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_res_addr res_addr;
+	struct ipr_dev *dev = find_dev(args[0]);
+	int on = strtoul(args[1], NULL, 10);
+	int rc, found, i;
+
+	if (get_res_addr(dev, &res_addr)) {
+		fprintf(stderr, "Invalid device\n");
+		return -EINVAL;
+	}
+
+	if (!on && ipr_is_af_dasd_device(dev)) {
+		rc = ipr_suspend_device_bus(dev->ioa, &res_addr,
+					    IPR_SDB_CHECK_ONLY);
+
+		if (rc) {
+			fprintf(stderr, "Cannot remove %s\n", args[0]);
+			return -EINVAL;
+		}
+	}
+
+	for_each_ses(dev->ioa, ses) {
+		rc = ipr_receive_diagnostics(ses, 2, &ses_data,
+					     sizeof(struct ipr_encl_status_ctl_pg));
+
+		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
+			continue;
+
+		found = 0;
+		for_each_elem_status(i, &ses_data) {
+			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
+				found++;
+				ses_data.elem_status[i].select = 1;
+				ses_data.elem_status[i].remove = on;
+				ses_data.elem_status[i].insert = 0;
+				ses_data.elem_status[i].identify = 0;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	if (!found) {
+		fprintf(stderr, "Cannot find SES device for %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ses_data.overall_status_select = 1;
+	ses_data.overall_status_disable_resets = on;
+
+	rc = ipr_send_diagnostics(ses, &ses_data,
+				  sizeof(struct ipr_encl_status_ctl_pg));
+
+	if (!on) {
+		ipr_write_dev_attr(dev, "delete", "1");
+		evaluate_device(dev, dev->ioa, 0);
+		ipr_del_zeroed_dev(dev);
+	}
+
+	return rc;
+}
+
 static int identify_disk(char **args, int num_args)
 {
 	struct ipr_dev *ses;
@@ -9339,6 +9406,8 @@ static int identify_disk(char **args, int num_args)
 				found++;
 				ses_data.elem_status[i].select = 1;
 				ses_data.elem_status[i].identify = on;
+				ses_data.elem_status[i].insert = 0;
+				ses_data.elem_status[i].remove = 0;
 				break;
 			}
 		}
@@ -10136,6 +10205,7 @@ static const struct {
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable },
 	{ "set-log-level",			2, 0, 2, set_log_level_cmd },
 	{ "identify-disk",			2, 0, 2, identify_disk },
+	{ "remove-disk",				2, 0, 2, remove_disk },
 };
 
 static int non_interactive_cmd(char *cmd, char **args, int num_args)

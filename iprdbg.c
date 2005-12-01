@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.19 2005/11/20 17:14:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.20 2005/12/01 21:49:42 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -205,7 +205,7 @@ static void ipr_fgets(char *buf, int size, FILE *stream)
 			break;
 
 		buf[i] = ch;
-
+/* xxx
 		if (!strcmp(buf, k_up)) {
 			rewind(stdin);
 			if (history[hindex]) {
@@ -221,6 +221,7 @@ static void ipr_fgets(char *buf, int size, FILE *stream)
 				i = strlen(buf) + 1;
 			}
 		}
+*/
 	}
 
 	buf[i] = '\0';
@@ -653,6 +654,8 @@ static int term_init()
 {
 	char *term_type;
 	int rc;
+
+	return 0;
 
 	term_type = getenv ("TERM");
 	if (!term_type) {
