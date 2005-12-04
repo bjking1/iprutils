@@ -4780,6 +4780,158 @@ static int format_in_prog(struct ipr_dev *dev)
 	return 0;
 }
 
+static void free_conc_devs(struct ipr_dev **ary)
+{
+}
+
+static void add_conc_dev(struct ipr_dev **ary, int sz, struct ipr_dev *dev)
+{
+}
+
+static int get_conc_devs(struct ipr_dev **ret, int action)
+{
+	int rc, i, k;
+	struct ipr_ioa *ioa;
+	struct scsi_dev_data *scsi_dev_data;
+	struct ipr_res_addr res_addr;
+	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_dev **local_dev = NULL;
+	struct ipr_dev *ses, *dev;
+	int local_dev_count = 0;
+	int num_devs = 0;
+	u8 ses_channel;
+	u8 scsi_id_found;
+
+	*ret = NULL;
+
+	for_each_ioa(ioa) {
+		if (ioa->is_secondary)
+			continue;
+		for_each_ses(ioa, ses) {
+			rc = ipr_receive_diagnostics(ses, 2, &ses_data,
+						     sizeof(struct ipr_encl_status_ctl_pg));
+
+			if (rc)
+				continue;
+
+			ses_channel = ses->scsi_dev_data->channel;
+			scsi_id_found = 0;
+
+			for_each_elem_status(i, &ses_data) {
+				if (scsi_id_found & (1 << ses_data.elem_status[i].scsi_id))
+					continue;
+				scsi_id_found |= (1 << ses_data.elem_status[i].scsi_id);
+
+				if (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
+					local_dev = realloc(local_dev, (sizeof(void *) *
+									local_dev_count) + 1);
+					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
+					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
+					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
+					scsi_dev_data->host = ioa->host_num;
+					scsi_dev_data->channel = ses_channel;
+					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
+					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
+					local_dev[local_dev_count]->ioa = ioa;
+
+					add_conc_dev(ret, local_dev);
+					num_devs++;
+					continue;
+				}
+
+				for_each_dev(ioa, dev) {
+					if (get_res_addr(dev, &res_addr)) {
+						scsi_dbg(dev, "Cannot find resource address\n");
+						continue;
+					}
+
+					if (res_addr.bus == ses_channel &&
+					    res_addr.target == ses_data.elem_status[i].scsi_id) {
+						if (dev->scsi_dev_data &&
+						    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
+							break;
+
+						if (action == IPR_CONC_REMOVE) {
+							if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
+								break;
+							if (format_in_prog(dev))
+								break;
+						} else if (dev->scsi_dev_data)
+							break;
+						print_dev(k, dev, buffer, "%1", k);
+						i_con = add_i_con(i_con,"\0", dev);
+
+						num_lines++;
+						break;
+					}
+				}
+
+				if ((dev - ioa->dev) == ioa->num_devices) {
+					local_dev = realloc(local_dev, (sizeof(void *) *
+									local_dev_count) + 1);
+					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
+					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
+					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
+					scsi_dev_data->host = ioa->host_num;
+					scsi_dev_data->channel = ses_channel;
+					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
+					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
+					local_dev[local_dev_count]->ioa = ioa;
+
+					print_dev(k, local_dev[local_dev_count], buffer, "%1", k);
+					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count]);
+
+					num_lines++;
+				}
+			}
+		}
+	}
+
+	if (num_lines == 0) {
+		for (k = 0; k < 2; k++) 
+			buffer[k] = add_string_to_body(buffer[k], _("(No Eligible Devices Found)"),
+						       "", NULL);
+	}
+
+	do {
+		n_screen->body = buffer[toggle&1];
+		s_out = screen_driver(n_screen,header_lines,i_con);
+		toggle++;
+	} while (s_out->rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_screen->body = NULL;
+
+	if (!s_out->rc) {
+		if (action == IPR_CONC_REMOVE)
+			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_REMOVE);
+		else
+			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_ADD);
+	}
+
+	if (rc & CANCEL_FLAG) {
+		s_status.index = (rc & ~CANCEL_FLAG);
+		rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
+	}
+
+	for (k = 0; k < local_dev_count; k++) {
+		if (!local_dev[k])
+			continue;
+		if (local_dev[k]->scsi_dev_data)
+			free(local_dev[k]->scsi_dev_data);
+		free(local_dev[k]);
+	}
+
+	free(local_dev);
+	free(s_out);
+	return rc;  
+
+}
+
 int start_conc_maint(i_container *i_con, int action)
 {
 	int rc, i, k;
@@ -9630,6 +9782,27 @@ static int reclaim_unknown(char **args, int num_args)
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
+static int query_add_device(char **args, int num_args)
+{
+	int rc, i;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+	struct ipr_encl_status_ctl_pg ses_data;
+
+	for_each_ioa(ioa) {
+		if (ioa->is_secondary)
+			continue;
+		for_each_ses(ioa, ses) {
+			rc = ipr_receive_diagnostics(ses, 2, &ses_data,
+						     sizeof(struct ipr_encl_status_ctl_pg));
+
+			if (rc)
+				continue;
+		}
+	}
+
+}
+
 static int query_log_level(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10185,6 +10358,7 @@ static const struct {
 	{ "query-qdepth",				1, 0, 1, query_qdepth },
 	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable },
 	{ "query-log-level",			1, 0, 1, query_log_level },
+	{ "query-add-device",			0, 0, 0, query_add_device },
 	{ "primary",				1, 0, 1, set_primary },
 	{ "secondary",				1, 0, 1, set_secondary },
 	{ "raid-create",				1, 1, 0, raid_create },

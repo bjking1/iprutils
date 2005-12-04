@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.20 2005/12/01 21:49:42 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.21 2005/12/04 23:22:13 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -655,6 +655,7 @@ static int term_init()
 	char *term_type;
 	int rc;
 
+	/* xxx only check for term type when running non interactively */
 	return 0;
 
 	term_type = getenv ("TERM");
