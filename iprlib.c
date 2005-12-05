@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.79 2005/12/05 14:38:19 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.80 2005/12/05 23:20:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3162,6 +3162,7 @@ void check_current_config(bool allow_rebuild_refresh)
 							break;
 						}
 					}                    
+					k++;
 				}
 
 				/* Send Test Unit Ready to start device if its a volume set */
@@ -3170,7 +3171,6 @@ void check_current_config(bool allow_rebuild_refresh)
 					ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
 				device_count++;
-				k++;
 			} else if (scsi_dev_data->type == IPR_TYPE_ADAPTER) {
 				ioa->ioa.ioa = ioa;
 				ioa->ioa.scsi_dev_data = scsi_dev_data;

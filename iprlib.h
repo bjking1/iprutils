@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.66 2005/12/05 18:43:45 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.67 2005/12/05 23:20:44 brking Exp $
  */
 
 #include <stdarg.h>
@@ -732,9 +732,9 @@ struct ipr_dev_record {
 
 #define __for_each_qac_entry(rcd, qac, type) \
       for (rcd = (type *)(qac)->data; \
-           (unsigned long)rcd < ((qac)->data + ntohs((qac)->resp_len)) && \
-           (unsigned long)rcd < ((qac)->data + sizeof((qac)->data)); \
-           rcd = (type *)((unsigned long)rcd + ntohs(rcd->record_len)))
+           ((unsigned long)rcd) < ((unsigned long)((unsigned long)(qac) + ntohs((qac)->resp_len))) && \
+           ((unsigned long)rcd) < ((unsigned long)((qac)->data + sizeof(*(qac)))); \
+           rcd = (type *)((unsigned long)rcd + ntohs(((struct ipr_common_record *)rcd)->record_len)))
 
 #define for_each_qac_entry(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_common_record)
@@ -1085,8 +1085,8 @@ struct ipr_ioa {
            if (ipr_is_af_dasd_device(d))
 
 #define for_each_dev_in_vset(v, d) \
-      for_each_af_dasd(v->ioa, d) \
-           if (ipr_is_array_member(d) && d->dev_rcd->array_id == v->array_rcd->array_id)
+      for_each_af_dasd((v)->ioa, d) \
+           if (ipr_is_array_member(d) && d->dev_rcd->array_id == (v)->array_rcd->array_id)
 
 #define for_each_vset(i, d) \
       for_each_dev(i, d) \
@@ -1481,14 +1481,8 @@ struct ipr_encl_status_ctl_pg
 
 #define for_each_elem_status(elem, sd) \
         for (elem = (sd)->elem_status; \
-             elem < &((sd)->elem_status[(ntohs((sd)->byte_count)-8)/sizeof((sd)->elem_status)]) && \
+             elem < &((sd)->elem_status[(ntohs((sd)->byte_count)-8)/sizeof((sd)->elem_status[0])]) && \
              elem < &((sd)->elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES]); elem++)
-
-/* xxx delete 
-#define for_each_elem_status(i, ses_data) \
-        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) && \
-             i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++)
-*/
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);

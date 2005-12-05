@@ -651,6 +651,7 @@ s_node n_disk_unit_recovery = {
 #define IPR_VERIFY_CONC_ADD    4
 #define IPR_WAIT_CONC_REMOVE   5
 #define IPR_WAIT_CONC_ADD      6
+#define IPR_CONC_IDENTIFY      7
 s_node n_concurrent_remove_device = {
 	.rc_flags = (CANCEL_FLAG),
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),

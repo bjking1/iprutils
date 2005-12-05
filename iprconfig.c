@@ -2600,7 +2600,7 @@ int configure_raid_parameters(i_container *i_con)
 	prot_level_list = malloc(sizeof(struct prot_level));
 	prot_level_list[raid_index].is_valid = 0;
 
-	for_each_cap_entry(i, cap_entry, supported_arrays) {
+	for_each_cap_entry(cap_entry, supported_arrays) {
 		if (selected_count <= cap_entry->max_num_array_devices &&
 		    selected_count >= cap_entry->min_num_array_devices &&
 		    ((selected_count % cap_entry->min_mult_array_devices) == 0)) {
@@ -4576,6 +4576,7 @@ int process_conc_maint(i_container *i_con, int action)
 	int i, k, rc;
 	struct ipr_dev_record *dev_rcd;
 	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
 	char *buffer[2];
 	int header_lines;
 	int toggle=1;
@@ -4626,23 +4627,25 @@ int process_conc_maint(i_container *i_con, int action)
 			continue;
 
 		found = 0;
-		for_each_elem_status(i, &ses_data) {
-			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
+		i = 0;
+		for_each_elem_status(elem_status, &ses_data) {
+			if (res_addr.target == elem_status->scsi_id) {
 				found++;
 
 				if ((action == IPR_VERIFY_CONC_REMOVE)  ||
 				    (action == IPR_VERIFY_CONC_ADD)) {
-					ses_data.elem_status[i].select = 1;
-					ses_data.elem_status[i].identify = 1;
+					elem_status->select = 1;
+					elem_status->identify = 1;
 				} else if (action == IPR_WAIT_CONC_REMOVE) {
-					ses_data.elem_status[i].select = 1;
-					ses_data.elem_status[i].remove = 1;
+					elem_status->select = 1;
+					elem_status->remove = 1;
 				} else if (action == IPR_WAIT_CONC_ADD) {
-					ses_data.elem_status[i].select = 1;
-					ses_data.elem_status[i].insert = 1;
+					elem_status->select = 1;
+					elem_status->insert = 1;
 				}
 				break;
 			}
+			i++;
 		}
 
 		if (found)
@@ -4860,7 +4863,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 								break;
 							if (format_in_prog(dev))
 								break;
-						} else if (dev->scsi_dev_data)
+						} else if (dev->scsi_dev_data && action != IPR_CONC_IDENTIFY)
 							break;
 						devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
 						devs[num_devs] = dev;
@@ -4954,172 +4957,6 @@ int start_conc_maint(i_container *i_con, int action)
 	free(s_out);
 	return rc;  
 }
-
-#if 0
-int start_conc_maint(i_container *i_con, int action)
-{
-	int rc, i, k;
-	char *buffer[2];
-	int num_lines = 0;
-	struct ipr_ioa *ioa;
-	struct scsi_dev_data *scsi_dev_data;
-	struct ipr_res_addr res_addr;
-	struct screen_output *s_out;
-	struct ipr_encl_status_ctl_pg ses_data;
-	struct ipr_drive_elem_status *elem_status;
-	struct ipr_dev **local_dev = NULL;
-	struct ipr_dev *ses, *dev;
-	int local_dev_count = 0;
-	u8 ses_channel;
-	int toggle = 1;
-	s_node *n_screen;
-	int header_lines;
-	u8 scsi_id_found;
-
-	processing();
-
-	rc = RC_SUCCESS;
-	i_con = free_i_con(i_con);
-
-	check_current_config(false);
-
-	/* Setup screen title */
-	if (action == IPR_CONC_REMOVE)
-		n_screen = &n_concurrent_remove_device;
-	else
-		n_screen = &n_concurrent_add_device;
-
-	body_init_status(buffer, n_screen->header, &header_lines);
-
-	for_each_ioa(ioa) {
-		if (ioa->is_secondary)
-			continue;
-		for_each_ses(ioa, ses) {
-			rc = ipr_receive_diagnostics(ses, 2, &ses_data,
-						     sizeof(struct ipr_encl_status_ctl_pg));
-
-			if (rc)
-				continue;
-
-			ses_channel = ses->scsi_dev_data->channel;
-			scsi_id_found = 0;
-
-			for_each_elem_status(elem_status, &ses_data) {
-				if (scsi_id_found & (1 << elem_status->scsi_id))
-					continue;
-				scsi_id_found |= (1 << elem_status->scsi_id);
-
-				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
-					local_dev = realloc(local_dev, (sizeof(void *) *
-									local_dev_count) + 1);
-					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
-					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
-					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
-					scsi_dev_data->host = ioa->host_num;
-					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = elem_status->scsi_id;
-					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
-					local_dev[local_dev_count]->ioa = ioa;
-
-					print_dev(k, local_dev[local_dev_count], buffer, "%1", k);
-					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count]);
-
-					num_lines++;
-					continue;
-				}
-
-				for_each_dev(ioa, dev) {
-					if (get_res_addr(dev, &res_addr)) {
-						scsi_dbg(dev, "Cannot find resource address\n");
-						continue;
-					}
-
-					if (res_addr.bus == ses_channel &&
-					    res_addr.target == elem_status->scsi_id) {
-						if (dev->scsi_dev_data &&
-						    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
-							break;
-
-						if (action == IPR_CONC_REMOVE) {
-							if (ipr_suspend_device_bus(ioa, &res_addr, IPR_SDB_CHECK_ONLY))
-								break;
-							if (format_in_prog(dev))
-								break;
-						} else if (dev->scsi_dev_data)
-							break;
-						print_dev(k, dev, buffer, "%1", k);
-						i_con = add_i_con(i_con,"\0", dev);
-
-						num_lines++;
-						break;
-					}
-				}
-
-				if ((dev - ioa->dev) == ioa->num_devices) {
-					local_dev = realloc(local_dev, (sizeof(void *) *
-									local_dev_count) + 1);
-					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
-					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
-					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
-					scsi_dev_data->host = ioa->host_num;
-					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = elem_status->scsi_id;
-					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
-					local_dev[local_dev_count]->ioa = ioa;
-
-					print_dev(k, local_dev[local_dev_count], buffer, "%1", k);
-					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count]);
-
-					num_lines++;
-				}
-			}
-		}
-	}
-
-	if (num_lines == 0) {
-		for (k = 0; k < 2; k++) 
-			buffer[k] = add_string_to_body(buffer[k], _("(No Eligible Devices Found)"),
-						     "", NULL);
-	}
-
-	do {
-		n_screen->body = buffer[toggle&1];
-		s_out = screen_driver(n_screen,header_lines,i_con);
-		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	for (k = 0; k < 2; k++) {
-		free(buffer[k]);
-		buffer[k] = NULL;
-	}
-
-	n_screen->body = NULL;
-
-	if (!s_out->rc) {
-		if (action == IPR_CONC_REMOVE)
-			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_REMOVE);
-		else
-			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_ADD);
-	}
-
-	if (rc & CANCEL_FLAG) {
-		s_status.index = (rc & ~CANCEL_FLAG);
-		rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
-	}
-
-	for (k = 0; k < local_dev_count; k++) {
-		if (!local_dev[k])
-			continue;
-		if (local_dev[k]->scsi_dev_data)
-			free(local_dev[k]->scsi_dev_data);
-		free(local_dev[k]);
-	}
-
-	free(local_dev);
-	free(s_out);
-	return rc;  
-}
-#endif
 
 int concurrent_add_device(i_container *i_con)
 {
@@ -9463,14 +9300,14 @@ static int query_raid_consistency_check(char **args, int num_args)
 
 	for_each_ioa(ioa) {
 		for_each_vset(ioa, vset) {
-			if (vset->array_rcd->resync_cand) {
-				if (!hdr) {
-					hdr = 1;
-					printf("%s\n%s\n", status_hdr[3], status_sep[3]);
-				}
-
-				printf_device(vset, 1);
+			if (!vset->array_rcd->resync_cand)
+				continue;
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
 			}
+
+			printf_device(vset, 1);
 		}
 	}
 
@@ -9490,13 +9327,93 @@ static int raid_consistency_check(char **args, int num_args)
 	return ipr_resync_array(vset->ioa);
 }
 
-static int remove_disk(char **args, int num_args)
+static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot)
+{
+	int i;
+	char buf[100];
+	struct ipr_res_addr res_addr;
+
+	for (i = 0; i < num_devs; i++) {
+		get_res_addr(devs[i], &res_addr);
+		sprintf(buf, "%s/%d:%d:%d:", devs[i]->ioa->pci_address, devs[i]->ioa->host_num,
+			res_addr.bus, res_addr.target);
+
+		if (!strncmp(buf, slot, strlen(buf)))
+			return devs[i];
+	}
+
+	return NULL;
+}
+
+static int __add_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses;
 	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
 	struct ipr_res_addr res_addr;
-	struct ipr_dev *dev = find_dev(args[0]);
-	int on = strtoul(args[1], NULL, 10);
+	int rc, found, i;
+	int time = 12;
+
+	if (get_res_addr(dev, &res_addr)) {
+		fprintf(stderr, "Invalid device\n");
+		return -EINVAL;
+	}
+
+	for_each_ses(dev->ioa, ses) {
+		rc = ipr_receive_diagnostics(ses, 2, &ses_data,
+					     sizeof(struct ipr_encl_status_ctl_pg));
+
+		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
+			continue;
+
+		found = 0;
+		for_each_elem_status(elem_status, &ses_data) {
+			if (res_addr.target == elem_status->scsi_id) {
+				found++;
+				elem_status->select = 1;
+				elem_status->remove = 0;
+				elem_status->insert = on;
+				elem_status->identify = 0;
+				break;
+			}
+		}
+
+		if (found)
+			break;
+	}
+
+	if (!found) {
+		scsi_err(dev, "Cannot find SES device for specified device\n");
+		return -EINVAL;
+	}
+
+	ses_data.overall_status_select = 1;
+	ses_data.overall_status_disable_resets = on;
+
+	rc = ipr_send_diagnostics(ses, &ses_data,
+				  sizeof(struct ipr_encl_status_ctl_pg));
+
+	if (!on) {
+		ipr_scan(dev->ioa, res_addr.bus, res_addr.target, res_addr.lun);
+		while (time--) {
+			check_current_config(false);
+			if ((dev = get_dev_from_addr(&res_addr))) {
+				ipr_init_new_dev(dev);
+				break;
+			}
+			sleep(5);
+		}
+	}
+
+	return rc;
+}
+
+static int __remove_device(struct ipr_dev *dev, int on)
+{
+	struct ipr_dev *ses;
+	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
+	struct ipr_res_addr res_addr;
 	int rc, found, i;
 
 	if (get_res_addr(dev, &res_addr)) {
@@ -9509,7 +9426,7 @@ static int remove_disk(char **args, int num_args)
 					    IPR_SDB_CHECK_ONLY);
 
 		if (rc) {
-			fprintf(stderr, "Cannot remove %s\n", args[0]);
+			scsi_err(dev, "Cannot remove device\n");
 			return -EINVAL;
 		}
 	}
@@ -9522,13 +9439,13 @@ static int remove_disk(char **args, int num_args)
 			continue;
 
 		found = 0;
-		for_each_elem_status(i, &ses_data) {
-			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
+		for_each_elem_status(elem_status, &ses_data) {
+			if (res_addr.target == elem_status->scsi_id) {
 				found++;
-				ses_data.elem_status[i].select = 1;
-				ses_data.elem_status[i].remove = on;
-				ses_data.elem_status[i].insert = 0;
-				ses_data.elem_status[i].identify = 0;
+				elem_status->select = 1;
+				elem_status->remove = on;
+				elem_status->insert = 0;
+				elem_status->identify = 0;
 				break;
 			}
 		}
@@ -9538,7 +9455,7 @@ static int remove_disk(char **args, int num_args)
 	}
 
 	if (!found) {
-		fprintf(stderr, "Cannot find SES device for %s\n", args[0]);
+		scsi_err(dev, "Cannot find SES device for specified device\n");
 		return -EINVAL;
 	}
 
@@ -9557,13 +9474,65 @@ static int remove_disk(char **args, int num_args)
 	return rc;
 }
 
-static int identify_disk(char **args, int num_args)
+static int add_slot(char **args, int num_args)
+{
+	int num_devs, rc;
+	struct ipr_dev *dev, **devs;
+	int on = strtoul(args[1], NULL, 10);
+
+	num_devs = get_conc_devs(&devs, IPR_CONC_ADD);
+	dev = find_slot(devs, num_devs, args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid location %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	rc = __add_device(dev, on);
+	free_empty_slots(devs, num_devs);
+	free(devs);
+	return rc;
+}
+
+static int remove_slot(char **args, int num_args)
+{
+	int num_devs, rc;
+	struct ipr_dev *dev, **devs;
+	int on = strtoul(args[1], NULL, 10);
+
+	num_devs = get_conc_devs(&devs, IPR_CONC_REMOVE);
+	dev = find_slot(devs, num_devs, args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid location %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	rc = __remove_device(dev, on);
+	free_empty_slots(devs, num_devs);
+	free(devs);
+	return rc;
+}
+
+static int remove_disk(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	int on = strtoul(args[1], NULL, 10);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	return __remove_device(dev, on);
+}
+
+static int __identify_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses;
 	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
 	struct ipr_res_addr res_addr;
-	struct ipr_dev *dev = find_dev(args[0]);
-	int on = strtoul(args[1], NULL, 10);
 	int rc, found, i;
 
 	if (get_res_addr(dev, &res_addr)) {
@@ -9579,13 +9548,13 @@ static int identify_disk(char **args, int num_args)
 			continue;
 
 		found = 0;
-		for_each_elem_status(i, &ses_data) {
-			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
+		for_each_elem_status(elem_status, &ses_data) {
+			if (res_addr.target == elem_status->scsi_id) {
 				found++;
-				ses_data.elem_status[i].select = 1;
-				ses_data.elem_status[i].identify = on;
-				ses_data.elem_status[i].insert = 0;
-				ses_data.elem_status[i].remove = 0;
+				elem_status->select = 1;
+				elem_status->identify = on;
+				elem_status->insert = 0;
+				elem_status->remove = 0;
 				break;
 			}
 		}
@@ -9595,7 +9564,7 @@ static int identify_disk(char **args, int num_args)
 	}
 
 	if (!found) {
-		fprintf(stderr, "Cannot find SES device for %s\n", args[0]);
+		scsi_err(dev, "Cannot find SES device for specified device\n");
 		return -EINVAL;
 	}
 
@@ -9603,6 +9572,38 @@ static int identify_disk(char **args, int num_args)
 				  sizeof(struct ipr_encl_status_ctl_pg));
 
 	return rc;
+}
+
+static int identify_slot(char **args, int num_args)
+{
+	int num_devs, rc;
+	struct ipr_dev *dev, **devs;
+	int on = strtoul(args[1], NULL, 10);
+
+	num_devs = get_conc_devs(&devs, IPR_CONC_IDENTIFY);
+	dev = find_slot(devs, num_devs, args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid location %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	rc = __identify_device(dev, on);
+	free_empty_slots(devs, num_devs);
+	free(devs);
+	return rc;
+}
+
+static int identify_disk(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	return __identify_device(dev, strtoul(args[1], NULL, 10));
 }
 
 static int set_log_level_cmd(char **args, int num_args)
@@ -9808,25 +9809,35 @@ static int reclaim_unknown(char **args, int num_args)
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
-static int query_add_device(char **args, int num_args)
+static int query_add_remove(int action)
 {
-	int rc, i;
-	struct ipr_ioa *ioa;
-	struct ipr_dev *ses;
-	struct ipr_encl_status_ctl_pg ses_data;
+	int i, num_devs;
+	struct ipr_dev **devs;
 
-	for_each_ioa(ioa) {
-		if (ioa->is_secondary)
-			continue;
-		for_each_ses(ioa, ses) {
-			rc = ipr_receive_diagnostics(ses, 2, &ses_data,
-						     sizeof(struct ipr_encl_status_ctl_pg));
+	num_devs = get_conc_devs(&devs, action);
 
-			if (rc)
-				continue;
-		}
+	for (i = 0; i < num_devs; i++) {
+		if (i == 0)
+			printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+
+		printf_device(devs[i], 1);
 	}
 
+	free_empty_slots(devs, num_devs);
+	free(devs);
+
+	return 0;
+
+}
+
+static int query_remove_device(char **args, int num_args)
+{
+	return query_add_remove(IPR_CONC_REMOVE);
+}
+
+static int query_add_device(char **args, int num_args)
+{
+	return query_add_remove(IPR_CONC_ADD);
 }
 
 static int query_log_level(char **args, int num_args)
@@ -10385,6 +10396,7 @@ static const struct {
 	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable },
 	{ "query-log-level",			1, 0, 1, query_log_level },
 	{ "query-add-device",			0, 0, 0, query_add_device },
+	{ "query-remove-device",		0, 0, 0, query_remove_device },
 	{ "primary",				1, 0, 1, set_primary },
 	{ "secondary",				1, 0, 1, set_secondary },
 	{ "raid-create",				1, 1, 0, raid_create },
@@ -10405,7 +10417,10 @@ static const struct {
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable },
 	{ "set-log-level",			2, 0, 2, set_log_level_cmd },
 	{ "identify-disk",			2, 0, 2, identify_disk },
+	{ "identify-slot",			2, 0, 2, identify_slot },
 	{ "remove-disk",				2, 0, 2, remove_disk },
+	{ "remove-slot",				2, 0, 2, remove_slot },
+	{ "add-slot",				2, 0, 2, add_slot },
 };
 
 static int non_interactive_cmd(char *cmd, char **args, int num_args)
