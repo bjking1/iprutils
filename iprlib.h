@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.65 2005/12/05 15:58:12 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.66 2005/12/05 18:43:45 brking Exp $
  */
 
 #include <stdarg.h>
@@ -604,7 +604,9 @@ struct ipr_array_cap_entry {
 };
 
 #define for_each_cap_entry(cap, supp) \
-        for (cap = (supp)->entry; cap < (supp)->entry[ntohs((supp)->num_entries)]; cap++)
+        for (cap = (supp)->entry; \
+             (unsigned long)cap < ((unsigned long)((supp)->entry) + (ntohs((supp)->num_entries) * ntohs((supp)->entry_length))); \
+             cap = (struct ipr_array_cap_entry *)((unsigned long)cap + ntohs((supp)->entry_length)))
 
 struct ipr_array_record {
 	struct ipr_common_record common;
