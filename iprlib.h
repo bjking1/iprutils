@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.64 2005/12/05 14:38:19 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.65 2005/12/05 15:58:12 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1072,6 +1072,10 @@ struct ipr_ioa {
 
 #define __for_each_ioa(ioa, head) for (ioa = head; ioa; ioa = ioa->next)
 #define for_each_ioa(ioa) __for_each_ioa(ioa, ipr_ioa_head)
+#define for_each_primary_ioa(ioa) \
+        __for_each_ioa(ioa, ipr_ioa_head) \
+           if (!ioa->is_secondary)
+
 #define for_each_dev(i, d) for (d = (i)->dev; (d - (i)->dev) < (i)->num_devices; d++)
 
 #define for_each_af_dasd(i, d) \
@@ -1656,6 +1660,15 @@ static inline int ipr_is_gscsi(struct ipr_dev *dev)
 	if (!dev->qac_entry &&
 	    dev->scsi_dev_data &&
 	    dev->scsi_dev_data->type == TYPE_DISK)
+		return 1;
+	else
+		return 0;
+}
+
+static inline int ipr_is_ses(struct ipr_dev *dev)
+{
+	if (dev->scsi_dev_data &&
+	    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
 		return 1;
 	else
 		return 0;

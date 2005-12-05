@@ -4780,12 +4780,39 @@ static int format_in_prog(struct ipr_dev *dev)
 	return 0;
 }
 
-static void free_conc_devs(struct ipr_dev **ary)
+static void free_conc_devs(struct ipr_dev **dev, int num)
 {
+	int i;
+
+	for (i = 0; i < num; i++) {
+		if (!dev[i])
+			continue;
+		if (dev[i]->scsi_dev_data)
+			free(dev[i]->scsi_dev_data);
+		dev[i]->scsi_dev_data = NULL;
+		free(dev[i]);
+		dev[i] = NULL;
+	}
 }
 
 static void add_conc_dev(struct ipr_dev **ary, int sz, struct ipr_dev *dev)
 {
+}
+
+static struct ipr_dev *alloc_empty_slot(struct ipr_ioa *ioa, int bus, int id)
+{
+	struct ipr_dev *dev;
+	struct scsi_dev_data *scsi_dev_data;
+
+	dev = calloc(1, sizeof(*dev));
+	scsi_dev_data = calloc(1, sizeof(*scsi_dev_data));
+	scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
+	scsi_dev_data->host = ioa->host_num;
+	scsi_dev_data->channel = bus;
+	scsi_dev_data->id = id;
+	dev->scsi_dev_data = scsi_dev_data;
+	dev->ioa = ioa;
+	return dev;
 }
 
 static int get_conc_devs(struct ipr_dev **ret, int action)
@@ -4805,9 +4832,7 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 
 	*ret = NULL;
 
-	for_each_ioa(ioa) {
-		if (ioa->is_secondary)
-			continue;
+	for_each_primary_ioa(ioa) {
 		for_each_ses(ioa, ses) {
 			rc = ipr_receive_diagnostics(ses, 2, &ses_data,
 						     sizeof(struct ipr_encl_status_ctl_pg));
@@ -4824,18 +4849,12 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 				scsi_id_found |= (1 << elem_status->scsi_id);
 
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
-					local_dev = realloc(local_dev, (sizeof(void *) *
+					local_dev = realloc(local_dev, (sizeof(struct ipr_dev *) *
 									local_dev_count) + 1);
-					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
-					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
-					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
-					scsi_dev_data->host = ioa->host_num;
-					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = elem_status->scsi_id;
-					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
-					local_dev[local_dev_count]->ioa = ioa;
+					local_dev[local_dev_count] = alloc_empty_slot(ioa, ses_channel,
+										      elem_status->scsi_id);
 
-					add_conc_dev(ret, local_dev);
+					local_dev_count++;
 					num_devs++;
 					continue;
 				}
@@ -4848,8 +4867,7 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 
 					if (res_addr.bus == ses_channel &&
 					    res_addr.target == elem_status->scsi_id) {
-						if (dev->scsi_dev_data &&
-						    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
+						if (ipr_is_ses(dev))
 							break;
 
 						if (action == IPR_CONC_REMOVE) {
@@ -4870,63 +4888,20 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 				if ((dev - ioa->dev) == ioa->num_devices) {
 					local_dev = realloc(local_dev, (sizeof(void *) *
 									local_dev_count) + 1);
-					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
-					scsi_dev_data = calloc(1, sizeof(struct scsi_dev_data));
-					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
-					scsi_dev_data->host = ioa->host_num;
-					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = elem_status->scsi_id;
-					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
-					local_dev[local_dev_count]->ioa = ioa;
+					local_dev[local_dev_count] = alloc_empty_slot(ioa, ses_channel,
+										      elem_status->scsi_id);
 
 					print_dev(k, local_dev[local_dev_count], buffer, "%1", k);
 					i_con = add_i_con(i_con,"\0", local_dev[local_dev_count]);
 
+					local_dev_count++;
 					num_lines++;
 				}
 			}
 		}
 	}
 
-	if (num_lines == 0) {
-		for (k = 0; k < 2; k++) 
-			buffer[k] = add_string_to_body(buffer[k], _("(No Eligible Devices Found)"),
-						       "", NULL);
-	}
-
-	do {
-		n_screen->body = buffer[toggle&1];
-		s_out = screen_driver(n_screen,header_lines,i_con);
-		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	for (k = 0; k < 2; k++) {
-		free(buffer[k]);
-		buffer[k] = NULL;
-	}
-
-	n_screen->body = NULL;
-
-	if (!s_out->rc) {
-		if (action == IPR_CONC_REMOVE)
-			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_REMOVE);
-		else
-			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_ADD);
-	}
-
-	if (rc & CANCEL_FLAG) {
-		s_status.index = (rc & ~CANCEL_FLAG);
-		rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
-	}
-
-	for (k = 0; k < local_dev_count; k++) {
-		if (!local_dev[k])
-			continue;
-		if (local_dev[k]->scsi_dev_data)
-			free(local_dev[k]->scsi_dev_data);
-		free(local_dev[k]);
-	}
-
+	free_conc_devs(local_dev, local_dev_count);
 	free(local_dev);
 	free(s_out);
 	return rc;  
