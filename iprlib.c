@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.78 2005/11/29 23:23:27 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.79 2005/12/05 14:38:19 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -385,10 +385,9 @@ static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 struct ipr_array_cap_entry *
 get_cap_entry(struct ipr_supported_arrays *supported_arrays, char *raid_level)
 {
-	int i;
 	struct ipr_array_cap_entry *cap;
 
-	for_each_cap_entry(i, cap, supported_arrays) {
+	for_each_cap_entry(cap, supported_arrays) {
 		if (!strcmp(cap->prot_level_str, raid_level))
 			return cap;
 	}
@@ -399,13 +398,12 @@ get_cap_entry(struct ipr_supported_arrays *supported_arrays, char *raid_level)
 struct ipr_array_cap_entry *
 get_raid_cap_entry(struct ipr_supported_arrays *supported_arrays, u8 prot_level)
 {
-	int i;
 	struct ipr_array_cap_entry *cap;
 
 	if (!supported_arrays)
 		return NULL;
 
-	for_each_cap_entry(i, cap, supported_arrays) {
+	for_each_cap_entry(cap, supported_arrays) {
 		if (cap->prot_level == prot_level)
 			return cap;
 	}
@@ -3143,7 +3141,8 @@ void check_current_config(bool allow_rebuild_refresh)
 				       scsi_dev_data->gen_name);
 
 				/* find array config data matching resource entry */
-				for_each_qac_entry(common_record, k, qac_data) {
+				k = 0;
+				for_each_qac_entry(common_record, qac_data) {
 					if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 						device_record = (struct ipr_dev_record *)common_record;
 						if (device_record->resource_addr.bus == scsi_dev_data->channel &&
@@ -3171,6 +3170,7 @@ void check_current_config(bool allow_rebuild_refresh)
 					ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
 				device_count++;
+				k++;
 			} else if (scsi_dev_data->type == IPR_TYPE_ADAPTER) {
 				ioa->ioa.ioa = ioa;
 				ioa->ioa.scsi_dev_data = scsi_dev_data;
@@ -3179,7 +3179,8 @@ void check_current_config(bool allow_rebuild_refresh)
 
 		/* now scan qac device and array entries to see which ones have
 		 not been referenced */
-		for_each_qac_entry(common_record, k, qac_data) {
+		k = 0;
+		for_each_qac_entry(common_record, qac_data) {
 			if (qac_entry_ref[k] > 1)
 				syslog(LOG_ERR,
 				       "Query Array Config entry referenced more than once\n");
@@ -3204,6 +3205,7 @@ void check_current_config(bool allow_rebuild_refresh)
 					device_count++;
 				}
 			}
+			k++;
 		}
 
 		ioa->num_devices = device_count;

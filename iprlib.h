@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.63 2005/11/29 23:23:27 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.64 2005/12/05 14:38:19 brking Exp $
  */
 
 #include <stdarg.h>
@@ -603,8 +603,8 @@ struct ipr_array_cap_entry {
 	u8   prot_level_str[8];
 };
 
-#define for_each_cap_entry(i, cap, supp) \
-        for (i = 0, cap = supported_arrays->entry; i < ntohs(supp->num_entries); i++, cap++)
+#define for_each_cap_entry(cap, supp) \
+        for (cap = (supp)->entry; cap < (supp)->entry[ntohs((supp)->num_entries)]; cap++)
 
 struct ipr_array_record {
 	struct ipr_common_record common;
@@ -728,18 +728,21 @@ struct ipr_dev_record {
 	u32 reserved5;
 };
 
-#define for_each_qac_entry(rcd, i, qac) \
-      for (i = 0, rcd = (struct ipr_common_record *)(qac)->data; i < (qac)->num_records; \
-           i++, rcd = (struct ipr_common_record *)((unsigned long)rcd + ntohs(rcd->record_len)))
+#define __for_each_qac_entry(rcd, qac, type) \
+      for (rcd = (type *)(qac)->data; \
+           (unsigned long)rcd < ((qac)->data + ntohs((qac)->resp_len)) && \
+           (unsigned long)rcd < ((qac)->data + sizeof((qac)->data)); \
+           rcd = (type *)((unsigned long)rcd + ntohs(rcd->record_len)))
 
-#define for_each_dev_rcd(rcd, i, qac) \
-      for (i = 0, rcd = (struct ipr_dev_record *)(qac)->data; i < (qac)->num_records; \
-           i++, rcd = (struct ipr_dev_record *)((unsigned long)rcd + ntohs(rcd->common.record_len))) \
+#define for_each_qac_entry(rcd, qac) \
+      __for_each_qac_entry(rcd, qac, struct ipr_common_record)
+
+#define for_each_dev_rcd(rcd, qac) \
+      __for_each_qac_entry(rcd, qac, struct ipr_dev_record) \
               if (rcd->common.record_id == IPR_RECORD_ID_DEVICE_RECORD)
 
-#define for_each_array_rcd(rcd, i, qac) \
-      for (i = 0, rcd = (struct ipr_array_record *)(qac)->data; i < (qac)->num_records; \
-           i++, rcd = (struct ipr_array_record *)((unsigned long)rcd + ntohs(rcd->common.record_len))) \
+#define for_each_array_rcd(rcd, qac) \
+      __for_each_qac_entry(rcd, qac, struct ipr_array_record) \
               if (rcd->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
 
 struct ipr_std_inq_data {
@@ -1470,9 +1473,16 @@ struct ipr_encl_status_ctl_pg
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };
 
+#define for_each_elem_status(elem, sd) \
+        for (elem = (sd)->elem_status; \
+             elem < &((sd)->elem_status[(ntohs((sd)->byte_count)-8)/sizeof((sd)->elem_status)]) && \
+             elem < &((sd)->elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES]); elem++)
+
+/* xxx delete 
 #define for_each_elem_status(i, ses_data) \
         for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) && \
              i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++)
+*/
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);

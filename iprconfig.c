@@ -3553,7 +3553,7 @@ int configure_raid_include(i_container *i_con)
 		if (cap_entry)
 			min_mult_array_devices = cap_entry->min_mult_array_devices;
 
-		for_each_dev_rcd(dev_rcd, i, qac_data) {
+		for_each_dev_rcd(dev_rcd, qac_data) {
 			for_each_dev(ioa, dev) {
 				scsi_dev_data = dev->scsi_dev_data;
 				if (!scsi_dev_data)
@@ -3771,14 +3771,14 @@ static int update_include_qac_data(struct ipr_array_query_data *old_qac,
 				   struct ipr_array_query_data *new_qac)
 {
 	struct ipr_dev_record *old_dev_rcd, *new_dev_rcd;
-	int found, i, j;
+	int found;
 
-	for_each_dev_rcd(old_dev_rcd, i, old_qac) {
+	for_each_dev_rcd(old_dev_rcd, old_qac) {
 		if (!old_dev_rcd->issue_cmd)
 			continue;
 
 		found = 0;
-		for_each_dev_rcd(new_dev_rcd, j, new_qac) {
+		for_each_dev_rcd(new_dev_rcd, new_qac) {
 			if (new_dev_rcd->resource_handle != old_dev_rcd->resource_handle)
 				continue;
 
@@ -4795,6 +4795,7 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_res_addr res_addr;
 	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
 	struct ipr_dev **local_dev = NULL;
 	struct ipr_dev *ses, *dev;
 	int local_dev_count = 0;
@@ -4817,12 +4818,12 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 			ses_channel = ses->scsi_dev_data->channel;
 			scsi_id_found = 0;
 
-			for_each_elem_status(i, &ses_data) {
-				if (scsi_id_found & (1 << ses_data.elem_status[i].scsi_id))
+			for_each_elem_status(elem_status, &ses_data) {
+				if (scsi_id_found & (1 << elem_status->scsi_id))
 					continue;
-				scsi_id_found |= (1 << ses_data.elem_status[i].scsi_id);
+				scsi_id_found |= (1 << elem_status->scsi_id);
 
-				if (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
+				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					local_dev = realloc(local_dev, (sizeof(void *) *
 									local_dev_count) + 1);
 					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
@@ -4830,7 +4831,7 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
 					scsi_dev_data->host = ioa->host_num;
 					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
+					scsi_dev_data->id = elem_status->scsi_id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
 					local_dev[local_dev_count]->ioa = ioa;
 
@@ -4846,7 +4847,7 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 					}
 
 					if (res_addr.bus == ses_channel &&
-					    res_addr.target == ses_data.elem_status[i].scsi_id) {
+					    res_addr.target == elem_status->scsi_id) {
 						if (dev->scsi_dev_data &&
 						    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
 							break;
@@ -4874,7 +4875,7 @@ static int get_conc_devs(struct ipr_dev **ret, int action)
 					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
 					scsi_dev_data->host = ioa->host_num;
 					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
+					scsi_dev_data->id = elem_status->scsi_id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
 					local_dev[local_dev_count]->ioa = ioa;
 
@@ -4942,6 +4943,7 @@ int start_conc_maint(i_container *i_con, int action)
 	struct ipr_res_addr res_addr;
 	struct screen_output *s_out;
 	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
 	struct ipr_dev **local_dev = NULL;
 	struct ipr_dev *ses, *dev;
 	int local_dev_count = 0;
@@ -4979,12 +4981,12 @@ int start_conc_maint(i_container *i_con, int action)
 			ses_channel = ses->scsi_dev_data->channel;
 			scsi_id_found = 0;
 
-			for_each_elem_status(i, &ses_data) {
-				if (scsi_id_found & (1 << ses_data.elem_status[i].scsi_id))
+			for_each_elem_status(elem_status, &ses_data) {
+				if (scsi_id_found & (1 << elem_status->scsi_id))
 					continue;
-				scsi_id_found |= (1 << ses_data.elem_status[i].scsi_id);
+				scsi_id_found |= (1 << elem_status->scsi_id);
 
-				if (ses_data.elem_status[i].status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
+				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					local_dev = realloc(local_dev, (sizeof(void *) *
 									local_dev_count) + 1);
 					local_dev[local_dev_count] = calloc(1,sizeof(struct ipr_dev));
@@ -4992,7 +4994,7 @@ int start_conc_maint(i_container *i_con, int action)
 					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
 					scsi_dev_data->host = ioa->host_num;
 					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
+					scsi_dev_data->id = elem_status->scsi_id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
 					local_dev[local_dev_count]->ioa = ioa;
 
@@ -5010,7 +5012,7 @@ int start_conc_maint(i_container *i_con, int action)
 					}
 
 					if (res_addr.bus == ses_channel &&
-					    res_addr.target == ses_data.elem_status[i].scsi_id) {
+					    res_addr.target == elem_status->scsi_id) {
 						if (dev->scsi_dev_data &&
 						    dev->scsi_dev_data->type == TYPE_ENCLOSURE)
 							break;
@@ -5038,7 +5040,7 @@ int start_conc_maint(i_container *i_con, int action)
 					scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
 					scsi_dev_data->host = ioa->host_num;
 					scsi_dev_data->channel = ses_channel;
-					scsi_dev_data->id = ses_data.elem_status[i].scsi_id;
+					scsi_dev_data->id = elem_status->scsi_id;
 					local_dev[local_dev_count]->scsi_dev_data = scsi_dev_data;
 					local_dev[local_dev_count]->ioa = ioa;
 
@@ -10009,7 +10011,7 @@ static int query_recovery_format(char **args, int num_args)
 
 static int query_devices_include(char **args, int num_args)
 {
-	int rc, i, hdr = 0;;
+	int rc, hdr = 0;;
 	struct ipr_array_query_data qac_data;
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
@@ -10029,7 +10031,7 @@ static int query_devices_include(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	for_each_dev_rcd(dev_rcd, i, &qac_data) {
+	for_each_dev_rcd(dev_rcd, &qac_data) {
 		for_each_disk(ioa, dev) {
 			if (dev->scsi_dev_data->handle == dev_rcd->resource_handle &&
 			    dev_rcd->include_cand && device_supported(dev)) {
