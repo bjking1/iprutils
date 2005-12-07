@@ -3,7 +3,7 @@
 .\" All Rights Reserved. This program and the accompanying
 .\" materials are made available under the terms of the
 .\" Common Public License v1.0 which accompanies this distribution.
-.TH IPRCONFIG 8 "February 2005"
+.TH IPRCONFIG 8 "December 2005"
 .SH NAME
 iprconfig \- IBM Power RAID storage adapter configuration/recovery utility
 .SH SYNOPSIS
@@ -150,6 +150,196 @@ Default is /var/log.
 .TP
 .B -c command
 Command line, non-interactive commands. Currently supported commands include:
+.RS
+.TP
+.B show-config
+.br
+Show ipr configuration.
+.TP
+.B show-alt-config
+.br
+Show alternate ipr configuration information.
+.TP
+.B show-ioas
+.br
+Show all ipr adapters.
+.TP
+.B show-arrays
+.br
+Show all ipr arrays.
+.TP
+.B show-battery-info [IOA]
+.br
+Show cache battery information for specified IOA. Example:
+.br
+.B iprconfig -c show-battery-info sg5
+.TP
+.B show-details [device]
+.br
+Show device details for specified device. Example:
+.br
+.B iprconfig -c show-details sda
+.TP
+.B show-hot-spares
+.br
+Show all configured hot spares.
+.TP
+.B show-af-disks
+.br
+Show all disks formatted for Advanced Function
+.TP
+.B show-jbod-disks
+.br
+Show all disks formatted for JBOD Function.
+.TP
+.B status [device]
+.br
+Show the status of the specified device. This is the same status as which shows
+up in the last column of the Display hardware status menu. Can specify either a 
+/dev/sdX name or a /dev/sgX name. Example:
+.br
+.B iprconfig -c status /dev/sda
+.br
+.TP
+.B query-raid-create [IOA]
+.br
+Show all devices attached to the specified IOA that are candidates for being
+used in a RAID array. Example:
+.br
+.B iprconfig -c query-raid-create sg5
+.TP
+.B query-raid-delete [IOA]
+.br
+Show all RAID arrays attached to the specified IOA that can be deleted.
+.br
+.B iprconfig -c query-raid-delete sg5
+.TP
+.B query-hot-spare-create [IOA]
+.br
+Show all devices attached to the specified IOA that are candidates for being
+hot spares.
+.TP
+.B query-hot-spare-delete [IOA]
+.br
+Show all hot spares attached to the specified IOA that can be deleted.
+.TP
+.B query-raid-consistency-check
+.br
+Show all RAID arrays that are candidates for a RAID consistency check.
+.TP
+.B query-format-for-jbod
+.br
+Show all disks that can be reformatted for JBOD function.
+.TP
+.B query-reclaim
+.br
+Show all IOAs that may need a reclaim cache storage.
+.TP
+.B query-arrays-raid-include
+.br
+Show all RAID arrays that can have disks included in them to increase
+their capacity.
+.TP
+.B query-devices-raid-include [array]
+.br
+Show all disks that can be added to the specified array to increase its
+capacity.
+.TP
+.B query-supported-raid-levels [IOA]
+.br
+Show all RAID levels supported by the specified adapter.
+.TP
+.B query-include-allowed [IOA] [raid level]
+.br
+Some RAID levels allow for adding additional disks to existing disk
+arrays to increase their capacity. Prints "yes" to stdout if the specified
+RAID level supports this function, else prints "no".
+.TP
+.B query-max-devices-in-array [IOA] [raid level]
+.br
+Print the maximum number of devices allowed in a RAID array of the specified
+RAID level for the specified RAID adapter.
+.TP
+.B query-min-devices-in-array [IOA] [raid level]
+.br
+Print the minimum number of devices allowed in a RAID array of the specified
+RAID level for the specified RAID adapter.
+.TP
+.B query-min-mult-in-array [IOA] [raid level]
+.br
+Print the minimum multiple of devices required in a RAID array of the specified
+RAID level for the specified RAID adapter.
+.TP
+.B query-supp-stripe-sizes [IOA] [raid level]
+.br
+Print all supported stripe sizes supported for RAID arrays of the specified
+RAID level on the specified RAID adapter. Stripe sizes are printed in
+units of KB.
+.TP
+.B query-recommended-stripe-size [IOA] [raid level]
+.br
+Print the default/recommended stripe size for RAID arrays of the specified
+RAID level on the specified RAID adapter. Stripe size is in units of KB.
+.TP
+.B query-recovery-format
+.br
+Show all disks that can be formatted for error recovery purposes.
+.TP
+.B query-raid-rebuild
+.br
+Show all disks in RAID arrays that can be rebuilt.
+.TP
+.B query-format-for-raid
+.br
+Show all disks that can be formatted such that they can be used
+in a RAID array or as a hot spare.
+.TP
+.B query-ucode-level [device]
+.br
+Show the microcode level that is currently loaded on the specified device.
+Note: The device specified may be the sg device associated with an IOA,
+in which case the IOA's microcode level will be shown.
+.TP
+.B query-format-timeout [device]
+.br
+Show the current format timeout to be used when formatting the specified disk.
+This value is only applicable when the device is currently in Advanced Function
+format.
+.TP
+.B query-qdepth [device]
+.br
+Show the queue depth currently being used for the specified disk.
+.TP
+.B query-tcq-enable [device]
+.br
+Print 1 to stdout if tagged queuing is enabled for the specified device,
+else print 0 to stdout.
+.TP
+.B query-log-level [IOA]
+.br
+Print the current log level being used for the specified IOA. Can be a number
+from 0 to n.
+.TP
+.B query-add-device
+.br
+Show all empty disk slots that can have a disk concurrently added.
+.TP
+.B query-remove-device
+.br
+Show all disk slots which are either empty or have disks in them which can
+be concurrently removed from the running system.
+.TP
+.B query-initiator-id [IOA] [busno]
+.br
+Show the current SCSI initiator ID used by the IOA for the specified SCSI bus.
+.TP
+.B query-bus-speed [IOA] [busno]
+.br
+Show the current maximum SCSI bus speed allowed on the specified SCSI bus.
+.TP
+.B query-bus-speed [IOA] [busno]
+.br
+Show the current SCSI bus width in units of bits for the specified SCSI bus.
 .TP
 .B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
@@ -173,14 +363,151 @@ name. Only 1 array can be deleted with a single command. Example:
 .br
 This would delete the disk array represented by /dev/sda
 .TP
-.B status [device]
+.B raid-include [array] [disk] ... [disk]
 .br
-Prints the status of the specified device. This is the same status as which shows
-up in the last column of the Display hardware status menu. Can specify either a 
-/dev/sdX name or a /dev/sgX name. Example:
+Add the specified devices to the specified disk array to increase its capacity.
+Example:
 .br
-.B iprconfig -c status /dev/sda
+.B iprconfig -c raid-include sda sg6 sg7
+.TP
+.B format-for-raid [disk] ... [disk]
 .br
+Format the specified disks for Advanced Function so they can be used in
+a RAID array or as a hot spare.
+.TP
+.B format-for-jbod [disk] ... [disk]
+.br
+Format the specified disks for JBOD Function so they can be used as
+standalone disks.
+.TP
+.B recovery-format [disk] ... [disk]
+.br
+Format the specified disks as directed by the reference guide for error
+recovery purposes.
+.TP
+.B hot-spare-create [disk]
+.br
+Create a hot spare using the specified Advanced Function disk.
+.TP
+.B hot-spare-delete [disk]
+.br
+Delete the specified hot spare.
+.TP
+.B reclaim-cache [IOA]
+.br
+Reclaim the specified IOA's write cache.
+.B ATTENTION:
+Use this option with care. This is used to discard data from the cache
+and may result in data loss. This option is designed to be used by
+authorized IBM hardware customer engineers.
+.TP
+.B reclaim-unknown-cache [IOA]
+.br
+Reclaim the specified IOA's write cache and allow unknown data loss.
+.B ATTENTION:
+Use this option with care. This is used to discard data from the cache
+and WILL result in data loss. This option is designed to be used by
+authorized IBM hardware customer engineers.
+.TP
+.B raid-consistency-check [array]
+.br
+Force a full RAID consistency check on the specified array. This command
+will return before the RAID consistency check has completed. Use the 
+.B status
+command to check the status of the command.
+.TP
+.B raid-rebuild [disk]
+.br
+Following a disk replacement for a failed disk in a RAID array, use
+this command to rebuild the failed disk's data onto the new disk and
+return the disk array to the 
+.B Active
+state.
+.TP
+.B update-ucode [device] [microcode file]
+.br
+Update the microcode on the specified device (IOA or disk) with
+the specified microcode file. 
+.B ATTENTION:
+Limited checking of the microcode image is done. Make sure the
+specified microcode file is the correct file for the specified device.
+.TP
+.B set-format-timeout [disk] [timeout in hours]
+.br
+Set the format timeout to be used when formatting the specified disk.
+.TP
+.B set-qdepth [device] [queue depth]
+.br
+Set the queue depth for the specified device or disk array.
+.TP
+.B set-tcq-enable [device] [0 = disable, 1 = enable]
+.br
+Enable/disable tagged command queueing for the specified device.
+.TP
+.B set-log-level [IOA] [log level]
+.br
+Set the error logging verbosity to use for the specified IOA.
+Default is 2.
+.TP
+.B identify-disk [disk] [0 = turn off identify LED, 1 = turn on identify LED]
+.br
+Turn on/off the disk identify LED for the specified disk. This function
+may or may not be available depending on the hardware packaging.
+.TP
+.B identify-slot [location] [0 = turn off identify LED, 1 = turn on identify LED]
+.br
+Turn on/off the disk identify LED for the specified location. This function
+may or may not be available depending on the hardware packaging. Example:
+.br
+.B iprconfig -c identify-slot 0000:d8:01.0/0:1:1: 1
+.TP
+.B remove-disk [disk] [0 = turn off identify LED, 1 = turn on identify LED]
+.br
+Turn on/off the disk remove identify LED for the specified device. When 1
+is specified as the second argument, the specified disk is set to the remove
+state. When in this state, the disk may be removed. Once the disk has been
+physically removed, iprconfig must be invoked again with the second argument
+set to 0. This turns off the slot identifier light and logically removes
+the disk from the host operating system.
+.TP
+.B remove-slot [location] [0 = turn off identify LED, 1 = turn on identify LED]
+.br
+Turn on/off the disk remove identify LED for the specified location. When 1
+is specified as the second argument, the specified location is set to the remove
+state. When in this state, the disk may be removed. Once the disk has been
+physically removed, iprconfig must be invoked again with the second argument
+set to 0. This turns off the slot identifier light and logically removes
+the disk from the host operating system. Example:
+.br
+.B iprconfig -c remove-slot 0000:d8:01.0/0:1:1: 1
+.TP
+.B add-slot [location] [0 = turn off identify LED, 1 = turn on identify LED]
+.br
+Turn on/off the disk insert identify LED for the specified location. When 1
+is specified as the second argument, the specified location is set to the insert
+state. When in this state, the disk may be inserted. Once the disk has been
+physically inserted, iprconfig must be invoked again with the second argument
+set to 0. This turns off the slot identifier light and logically adds
+the disk to the host operating system. Example:
+.br
+.B iprconfig -c add-slot 0000:d8:01.0/0:1:1: 1
+.TP
+.B set-initiator-id [IOA] [busno] [initiator id]
+.br
+Set the IOA's SCSI initiator ID for the specified bus. Must be a value
+between 0 and 7 and must not conflict with any other device on the SCSI bus.
+.TP
+.B set-bus-speed [IOA] [busno] [speed in MB/sec]
+.br
+Set the maximum SCSI bus speed allowed on the specified SCSI bus.
+.TP
+.B set-bus-width [IOA] [busno] [bus width in # bits]
+.br
+Set the SCSI bus width to use for the specified SCSI bus. Example:
+.br
+.B iprconfig -c set-bus-width sg5 0 16
+.RE
+
 .TP
 .B \-\-version
 Print version number of 

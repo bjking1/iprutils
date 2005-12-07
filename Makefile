@@ -9,8 +9,7 @@ CC = gcc
 
 include version.mk
 
-CFLAGS = -g -Wno-pointer-sign $(IPR_DEFINES)
-#CFLAGS = -g $(IPR_DEFINES)
+CFLAGS = -g -Wall $(IPR_DEFINES)
 UTILS_VER = $(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL)
 TAR = cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS --exclude applied-patches --exclude series --exclude txt --exclude pc --exclude patches --exclude debug --exclude *~* iprutils
 
@@ -29,7 +28,7 @@ iprinit:iprinit.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprinit iprlib.o iprinit.c -lsysfs
 
 iprdbg:iprdbg.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs -lncurses
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs
 
 iprucode:iprucode.c iprlib.o
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprucode iprlib.o iprucode.c -lsysfs
@@ -41,7 +40,7 @@ iprlib.o: iprlib.c iprlib.h
 	gzip -f -c $< > $<.gz
 
 %.nroff : %.8
-	nroff -man $< > $@
+	nroff -Tascii -man $< > $@
 
 %.ps : %.nroff
 	a2ps -B --columns=1 -R -o $@ $<
@@ -49,9 +48,14 @@ iprlib.o: iprlib.c iprlib.h
 %.pdf : %.ps
 	ps2pdf $< $@
 
+%.html : %.8
+	groff -Thtml -man $< > $@
+
 docs : $(patsubst %.8,%.8.gz,$(wildcard *.8))
 
 pdfs : $(patsubst %.8,%.pdf,$(wildcard *.8))
+
+htmldocs : $(patsubst %.8,%.html,$(wildcard *.8))
 
 utils: ./*.c ./*.h
 	cd ..
@@ -59,7 +63,7 @@ utils: ./*.c ./*.h
 
 clean:
 	rm -f iprupdate iprconfig iprdump iprinit iprdbg *.o
-	rm -f *.ps *.pdf *.nroff *.gz *.tgz *.rpm
+	rm -f *.ps *.pdf *.nroff *.gz *.tgz *.rpm *.html
 
 install: all
 	install -d $(INSTALL_MOD_PATH)/sbin

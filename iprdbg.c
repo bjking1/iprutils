@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.21 2005/12/04 23:22:13 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.22 2005/12/07 23:27:50 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -24,8 +24,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <curses.h>
-#include <term.h>
 
 #define IPR_MAX_FLIT_ENTRIES 59
 #define IPR_FLIT_TIMESTAMP_LEN 12
@@ -85,6 +83,10 @@ struct dbg_macro {
 
 static struct dbg_macro *macro;
 static int num_macros;
+static unsigned int last_adx;
+static unsigned int last_len;
+static unsigned int last_data;
+static unsigned int disable_dump;
 
 #define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 #define iprprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
@@ -94,7 +96,7 @@ static int num_macros;
 static FILE *outfile;
 
 static int debug_ioctl(struct ipr_ioa *ioa, enum iprdbg_cmd cmd, int ioa_adx, int mask,
-		       int *buffer, int len)
+		       unsigned int *buffer, int len)
 {
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
@@ -146,21 +148,21 @@ static int format_flit(struct ipr_flit *flit)
 	struct ipr_flit_entry *flit_entry;
 
 	signed int len;
-	u8 filename[IPR_FLIT_FILENAME_LEN+1];
-	u8 time[IPR_FLIT_TIMESTAMP_LEN+1];
-	u8 buf1[IPR_FLIT_FILENAME_LEN+1];
-	u8 buf2[IPR_FLIT_FILENAME_LEN+1];
-	u8 lid_name[IPR_FLIT_FILENAME_LEN+1];
-	u8 path[IPR_FLIT_FILENAME_LEN+1];
+	char filename[IPR_FLIT_FILENAME_LEN+1];
+	char time[IPR_FLIT_TIMESTAMP_LEN+1];
+	char buf1[IPR_FLIT_FILENAME_LEN+1];
+	char buf2[IPR_FLIT_FILENAME_LEN+1];
+	char lid_name[IPR_FLIT_FILENAME_LEN+1];
+	char path[IPR_FLIT_FILENAME_LEN+1];
 	int num_args, i;
 
 	for (i = 0, flit_entry = flit->flit_entry;
 	     (i < num_entries) && (*flit_entry->timestamp);
 	     flit_entry++, i++) {
-		snprintf(time, IPR_FLIT_TIMESTAMP_LEN, flit_entry->timestamp);
+		snprintf(time, IPR_FLIT_TIMESTAMP_LEN, (char *)flit_entry->timestamp);
 		time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
 
-		snprintf(filename, IPR_FLIT_FILENAME_LEN, flit_entry->filename);
+		snprintf(filename, IPR_FLIT_FILENAME_LEN, (char *)flit_entry->filename);
 		filename[IPR_FLIT_FILENAME_LEN] = '\0';
 
 		num_args = sscanf(filename, "%184s " "%184s " "%184s "
@@ -189,12 +191,6 @@ static int format_flit(struct ipr_flit *flit)
 	return 0;
 } 
 
-static char *term;
-static char *k_up;
-static char *k_down;
-static unsigned char hindex;
-static char *history[256];
-
 static void ipr_fgets(char *buf, int size, FILE *stream)
 {
 	int i, ch = 0;
@@ -205,31 +201,9 @@ static void ipr_fgets(char *buf, int size, FILE *stream)
 			break;
 
 		buf[i] = ch;
-/* xxx
-		if (!strcmp(buf, k_up)) {
-			rewind(stdin);
-			if (history[hindex]) {
-				fprintf(stdout, "%s", history[--hindex]);
-				strcpy(buf, history[hindex]);
-				i = strlen(buf) + 1;
-			}
-		} else if (!strcmp(buf, k_down)) {
-			rewind(stdin);
-			if (history[hindex]) {
-				fprintf(stdout, "%s", history[++hindex]);
-				strcpy(buf, history[hindex]);
-				i = strlen(buf) + 1;
-			}
-		}
-*/
 	}
 
 	buf[i] = '\0';
-
-	if (history[hindex])
-		free(history[hindex]);
-	history[hindex] = malloc(strlen(buf) + 2);
-	strcpy(history[hindex++], buf);
 	strcat(buf, "\n");
 }
 
@@ -237,6 +211,9 @@ static void dump_data(unsigned int adx, unsigned int *buf, int len)
 {
 	char ascii_buffer[17];
 	int i, k, j;
+
+	if (disable_dump)
+		return;
 
 	for (i = 0; i < (len / 4);) {
 		iprprint("%08X: ", adx+(i*4));
@@ -266,7 +243,7 @@ static int flit(struct ipr_ioa *ioa, int argc, char *argv[])
 	struct ipr_flit flit;
 	int rc;
 
-	rc = debug_ioctl(ioa, IPRDBG_FLIT, 0, 0, (int *)&flit, sizeof(flit));
+	rc = debug_ioctl(ioa, IPRDBG_FLIT, 0, 0, (unsigned int *)&flit, sizeof(flit));
 
 	if (!rc)
 		format_flit(&flit);
@@ -359,18 +336,36 @@ static int raw_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
 
 	rc = debug_ioctl(ioa, parm[0], parm[1], parm[2], buf, parm[3]);
 
-	if (!rc && buf)
+	if (!rc && buf) {
 		dump_data(0, buf, parm[3]);
+		last_data = ntohl(buf[0]);
+	}
 
 	free(buf);
 	return rc;
 }
 
+static unsigned int get_adx(char *arg)
+{
+	if (arg[0] == '@') {
+		if (arg[1] == '+')
+			return last_data + strtoul(&arg[2], NULL, 16);
+		else if (arg[1] == '-')
+			return last_data - strtoul(&arg[2], NULL, 16);
+		else
+			return last_data;
+	}
+
+	return strtoul(arg, NULL, 16);
+}
+
 static int bm4(struct ipr_ioa *ioa, int argc, char *argv[])
 {
-	unsigned int adx = strtoul(argv[0], NULL, 16);
+	unsigned int adx;
 	unsigned int write_buf = htonl(strtoul(argv[1], NULL, 16));
 	unsigned int mask = strtoul(argv[2], NULL, 16);
+
+	adx = get_adx(argv[0]);
 
 	if ((adx % 4) != 0) {
 		ipr_err("Address must be 4 byte aligned\n");
@@ -384,7 +379,9 @@ static int mw4(struct ipr_ioa *ioa, int argc, char *argv[])
 {
 	int i;
 	unsigned int write_buf[16];
-	unsigned int adx = strtoul(argv[0], NULL, 16);
+	unsigned int adx;
+
+	adx = get_adx(argv[0]);
 
 	if ((adx % 4) != 0) {
 		iprprint("Address must be 4 byte aligned\n");
@@ -397,16 +394,18 @@ static int mw4(struct ipr_ioa *ioa, int argc, char *argv[])
 	return debug_ioctl(ioa, IPRDBG_WRITE, adx, 0, write_buf, (argc-1)*4);
 }
 
-static unsigned int last_adx;
-static unsigned int last_len;
-
 static int __mr4(struct ipr_ioa *ioa, unsigned int adx, int len)
 {
 	unsigned int *buf;
 	int rc;
 
 	if ((adx % 4) != 0) {
-		ipr_err("Length must be 4 byte multiple\n");
+		ipr_err("Address must be 4 byte aligned\n");
+		return -EINVAL;
+	}
+
+	if ((len % 4) != 0) {
+		ipr_err("Length must be a 4 byte multiple\n");
 		return -EINVAL;
 	}
 
@@ -421,8 +420,10 @@ static int __mr4(struct ipr_ioa *ioa, unsigned int adx, int len)
 	last_adx = adx;
 	rc = debug_ioctl(ioa, IPRDBG_READ, adx, 0, buf, len);
 
-	if (!rc)
+	if (!rc) {
 		dump_data(adx, buf, len);
+		last_data = ntohl(buf[0]);
+	}
 
 	free(buf);
 	return rc;
@@ -441,10 +442,12 @@ static int mr4(struct ipr_ioa *ioa, int argc, char *argv[])
 		adx = last_adx + last_len;
 		len = last_len;
 	} else {
-		adx = strtoul(argv[0], NULL, 16);
+		adx = get_adx(argv[0]);
+
 		if (argc == 2)
 			len = strtoul(argv[1], NULL, 16);
 	}
+
 	return __mr4(ioa, adx, len);
 }
 
@@ -503,7 +506,7 @@ static const struct {
 } command [] = {
 	{ "mr4",		0, 2,		mr4 },
 	{ "mw4",		2, 17,	mw4 },
-	{ "bm4",		1, 1,		bm4 },
+	{ "bm4",		3, 3,		bm4 },
 	{ "edf",		1, 2,		edf },
 	{ "ddf",		1, 2,		ddf },
 	{ "raw",		0, 4,		raw_cmd },
@@ -574,9 +577,65 @@ static int cmd_to_args(char *cmd, int *rargc, char ***rargv)
 	return len;
 }
 
+static int exec_macro(struct ipr_ioa *ioa, char *cmd);
+
+static int __parse_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(command); i++) {
+		if (strcasecmp(argv[0], command[i].cmd) != 0)
+			continue;
+
+		return exec_cmd(ioa, i, argc, argv);
+	}
+
+	for (i = 0; i < num_macros; i++) {
+		if (strncasecmp(argv[0], macro[i].cmd, strlen(argv[0])) != 0)
+			continue;
+
+		return exec_macro(ioa, macro[i].cmd);
+	}
+
+	iprprint("Invalid command %s. Use \"help\" for a list "
+		 "of valid commands\n", argv[0]);
+
+	return -EINVAL;
+}
+
+static int parse_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
+{
+	int i, rc = 0;
+	int index = 0;
+	char *end;
+
+	for (i = 0; i < argc; i++) {
+		end = strchr(argv[i], ':');
+		if (!end)
+			end = strchr(argv[i], ';');
+		if (!end)
+			continue;
+
+		disable_dump = 1;
+		if (strlen(argv[i]) == 1) {
+			rc = __parse_cmd(ioa, i - index, &argv[index]);
+		} else {
+			*end = '\0';
+			rc = __parse_cmd(ioa, (i + 1) - index, &argv[index]);
+		}
+		disable_dump = 0;
+		index = i + 1;
+
+		if (rc)
+			return rc;
+	}
+
+	return __parse_cmd(ioa, i - index, &argv[index]);
+}
+
 static int exec_macro(struct ipr_ioa *ioa, char *cmd)
 {
-	int i, argc;
+	int argc;
 	char **argv = NULL;
 	char *copy = malloc(strlen(cmd) + 1);
 	int rc = -EINVAL;
@@ -589,46 +648,12 @@ static int exec_macro(struct ipr_ioa *ioa, char *cmd)
 	if (!cmd_to_args(cmd, &argc, &argv))
 		goto out_free_argv;
 
-	for (i = 0; i < ARRAY_SIZE(command); i++) {
-		if (strcmp(argv[1], command[i].cmd) != 0)
-			continue;
+	rc = parse_cmd(ioa, argc - 1, &argv[1]);
 
-		rc = exec_cmd(ioa, i, argc - 1, &argv[1]);
-		goto out_free_all;
-	}
-
-	iprprint("Invalid command %s. Use \"help\" for a list "
-		 "of valid commands\n", argv[0]);
-
-out_free_all:
 	free(copy);
 out_free_argv:
 	free(argv);
 	return rc;
-}
-
-static int parse_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(command); i++) {
-		if (strcmp(argv[0], command[i].cmd) != 0)
-			continue;
-
-		return exec_cmd(ioa, i, argc, argv);
-	}
-
-	for (i = 0; i < num_macros; i++) {
-		if (strncmp(argv[0], macro[i].cmd, strlen(argv[0])) != 0)
-			continue;
-
-		return exec_macro(ioa, macro[i].cmd);
-	}
-
-	iprprint("Invalid command %s. Use \"help\" for a list "
-		 "of valid commands\n", argv[0]);
-
-	return -EINVAL;
 }
 
 static int main_cmd_line(int argc, char *argv[])
@@ -648,32 +673,6 @@ static int main_cmd_line(int argc, char *argv[])
 	}
 
 	return parse_cmd(dev->ioa, argc-2, &argv[1]);
-}
-
-static int term_init()
-{
-	char *term_type;
-	int rc;
-
-	/* xxx only check for term type when running non interactively */
-	return 0;
-
-	term_type = getenv ("TERM");
-	if (!term_type) {
-		ipr_err("Cannot determine terminal type. Is TERM set?\n");
-		return -EIO;
-	}
-
-	rc = tgetent (term, term_type);
-	if (rc < 0) {
-		ipr_err("Cannot determine terminal type\n");
-		return -EIO;
-	}
-
-	k_up = tgetstr ("ku", NULL);
-	k_down = tgetstr ("kd", NULL);
-
-	return 0;
 }
 
 static struct ipr_ioa *select_ioa()
@@ -758,12 +757,8 @@ static void load_config()
 
 int main(int argc, char *argv[])
 {
-	int rc;
 	char cmd_line[1000];
 	struct ipr_ioa *ioa;
-
-	if ((rc = term_init()))
-		return rc;
 
 	openlog("iprdbg",
 		LOG_PERROR | /* Print error to stderr as well */

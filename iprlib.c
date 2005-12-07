@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.80 2005/12/05 23:20:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.81 2005/12/07 23:27:51 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -388,7 +388,7 @@ get_cap_entry(struct ipr_supported_arrays *supported_arrays, char *raid_level)
 	struct ipr_array_cap_entry *cap;
 
 	for_each_cap_entry(cap, supported_arrays) {
-		if (!strcmp(cap->prot_level_str, raid_level))
+		if (!strcmp((char *)cap->prot_level_str, raid_level))
 			return cap;
 	}
 
@@ -419,7 +419,7 @@ char *get_prot_level_str(struct ipr_supported_arrays *supported_arrays,
 	cap = get_raid_cap_entry(supported_arrays, prot_level);
 
 	if (cap)
-		return cap->prot_level_str;
+		return (char *)cap->prot_level_str;
 
 	return NULL;
 }

@@ -1,7 +1,7 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
 Version: 2.1.0
-Release: cvs
+Release: 1
 License: CPL
 Group: System Environment/Base
 Vendor: IBM
@@ -56,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Dec 7 2005 Brian King <brking@us.ibm.com>
+- Add command line options to iprconfig to perform virtually
+  every iprconfig function available in the ncurses interface.
 * Tue Nov 15 2005 Brian King <brking@us.ibm.com> 2.0.15.6
 - Fix concurrent maintenance with disk drawers reporting
   multiple SES devices on the same SCSI bus.

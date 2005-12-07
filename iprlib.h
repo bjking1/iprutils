@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.67 2005/12/05 23:20:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.68 2005/12/07 23:27:52 brking Exp $
  */
 
 #include <stdarg.h>
@@ -194,7 +194,7 @@ extern struct sysfs_dev *tail_zdev;
 
 struct sysfs_dev
 {
-	u8 sysfs_device_name[16];
+	char sysfs_device_name[16];
 	struct sysfs_dev *next, *prev;
 };
 
@@ -943,9 +943,9 @@ struct scsi_dev_data {
 	int busy;
 	int online;
 	u32 handle;
-	u8 vendor_id[IPR_VENDOR_ID_LEN + 1];
-	u8 product_id[IPR_PROD_ID_LEN + 1];
-	u8 sysfs_device_name[16];
+	char vendor_id[IPR_VENDOR_ID_LEN + 1];
+	char product_id[IPR_PROD_ID_LEN + 1];
+	char sysfs_device_name[16];
 	char dev_name[64];
 	char gen_name[64];
 };
@@ -1023,7 +1023,7 @@ struct ipr_ioa_attr {
 struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
-	u8 prot_level_str[8];
+	char prot_level_str[8];
 	u32 is_reclaim_cand:1;
 	u32 should_init:1;
 	u32 init_not_allowed:1;

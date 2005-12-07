@@ -1574,14 +1574,14 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	sprintf(buffer,"%08X", fw_level);
 	body = add_line_to_body(body,_("Firmware Version"), buffer);
 	if (!dev->ioa->ioa_dead) {
-		ipr_strncpy_0(buffer, ioa_vpd.std_inq_data.serial_num, IPR_SERIAL_NUM_LEN);
+		ipr_strncpy_0(buffer, (char *)ioa_vpd.std_inq_data.serial_num, IPR_SERIAL_NUM_LEN);
 		body = add_line_to_body(body,_("Serial Number"), buffer);
-		ipr_strncpy_0(buffer, ioa_vpd.ascii_part_num, IPR_VPD_PART_NUM_LEN);
+		ipr_strncpy_0(buffer, (char *)ioa_vpd.ascii_part_num, IPR_VPD_PART_NUM_LEN);
 		body = add_line_to_body(body,_("Part Number"), buffer);
-		ipr_strncpy_0(buffer, ioa_vpd.ascii_plant_code, IPR_VPD_PLANT_CODE_LEN);
+		ipr_strncpy_0(buffer, (char *)ioa_vpd.ascii_plant_code, IPR_VPD_PLANT_CODE_LEN);
 		body = add_line_to_body(body,_("Plant of Manufacturer"), buffer);
 		if (cfc_vpd.cache_size[0]) {
-			ipr_strncpy_0(buffer, cfc_vpd.cache_size, IPR_VPD_CACHE_SIZE_LEN);
+			ipr_strncpy_0(buffer, (char  *)cfc_vpd.cache_size, IPR_VPD_CACHE_SIZE_LEN);
 			cache_size = strtoul(buffer, NULL, 16);
 			sprintf(buffer,"%d MB", cache_size);
 			body = add_line_to_body(body,_("Cache Size"), buffer);
@@ -1607,12 +1607,12 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 		body = add_line_to_body(body,_("Preferred Dual Adapter State"),
 					dev->ioa->preferred_dual_state);
 		if (ntohl(dev->ioa->ioa_status.num_entries)) {
-			ipr_strncpy_0(buffer, ioa_entry->remote_vendor_id, IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0(buffer, (char *)ioa_entry->remote_vendor_id, IPR_VENDOR_ID_LEN);
 			body = add_line_to_body(body,_("Remote Adapter Manufacturer"), buffer);
-			ipr_strncpy_0(buffer, ioa_entry->remote_prod_id, IPR_PROD_ID_LEN);
+			ipr_strncpy_0(buffer, (char *)ioa_entry->remote_prod_id, IPR_PROD_ID_LEN);
 			body = add_line_to_body(body,_("Remote Adapter Machine Type And Model"),
 						buffer);
-			ipr_strncpy_0(buffer, ioa_entry->remote_sn, IPR_SERIAL_NUM_LEN);
+			ipr_strncpy_0(buffer, (char *)ioa_entry->remote_sn, IPR_SERIAL_NUM_LEN);
 			body = add_line_to_body(body,_("Remote Adapter Serial Number"), buffer);
 		}
 	}
@@ -1643,7 +1643,7 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 
 	body = add_line_to_body(body,"", NULL);
 
-	ipr_strncpy_0(buffer, array_rcd->vendor_id, IPR_VENDOR_ID_LEN);
+	ipr_strncpy_0(buffer, (char *)array_rcd->vendor_id, IPR_VENDOR_ID_LEN);
 	body = add_line_to_body(body,_("Manufacturer"), buffer);
 
 	sprintf(buffer,"RAID %s", dev->prot_level_str);
@@ -1715,36 +1715,36 @@ static char *disk_extended_details(char *body, struct ipr_dev *dev,
 			body = add_line_to_body(body,"", NULL);
 			body = add_line_to_body(body,_("Extended Details"), NULL);
 
-			ipr_strncpy_0(buffer, std_inq->fru_number, IPR_STD_INQ_FRU_NUM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->fru_number, IPR_STD_INQ_FRU_NUM_LEN);
 			body = add_line_to_body(body,_("FRU Number"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->ec_level, IPR_STD_INQ_EC_LEVEL_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->ec_level, IPR_STD_INQ_EC_LEVEL_LEN);
 			body = add_line_to_body(body,_("EC Level"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->part_number, IPR_STD_INQ_PART_NUM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->part_number, IPR_STD_INQ_PART_NUM_LEN);
 			body = add_line_to_body(body,_("Part Number"), buffer);
 
-			hex = (u8 *)&std_inq->std_inq_data;
+			hex = (char *)&std_inq->std_inq_data;
 			sprintf(buffer, "%02X%02X%02X%02X%02X%02X%02X%02X",
 				hex[0], hex[1], hex[2], hex[3], hex[4], hex[5],	hex[6], hex[7]);
 			body = add_line_to_body(body,_("Device Specific (Z0)"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->z1_term, IPR_STD_INQ_Z1_TERM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->z1_term, IPR_STD_INQ_Z1_TERM_LEN);
 			body = add_line_to_body(body,_("Device Specific (Z1)"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->z2_term, IPR_STD_INQ_Z2_TERM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->z2_term, IPR_STD_INQ_Z2_TERM_LEN);
 			body = add_line_to_body(body,_("Device Specific (Z2)"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->z3_term, IPR_STD_INQ_Z3_TERM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->z3_term, IPR_STD_INQ_Z3_TERM_LEN);
 			body = add_line_to_body(body,_("Device Specific (Z3)"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->z4_term, IPR_STD_INQ_Z4_TERM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->z4_term, IPR_STD_INQ_Z4_TERM_LEN);
 			body = add_line_to_body(body,_("Device Specific (Z4)"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->z5_term, IPR_STD_INQ_Z5_TERM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->z5_term, IPR_STD_INQ_Z5_TERM_LEN);
 			body = add_line_to_body(body,_("Device Specific (Z5)"), buffer);
 
-			ipr_strncpy_0(buffer, std_inq->z6_term, IPR_STD_INQ_Z6_TERM_LEN);
+			ipr_strncpy_0(buffer, (char *)std_inq->z6_term, IPR_STD_INQ_Z6_TERM_LEN);
 			body = add_line_to_body(body,_("Device Specific (Z6)"), buffer);
 			break;
 		}
@@ -1763,9 +1763,9 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	struct ipr_query_res_state res_state;
 	long double device_capacity; 
 	double lba_divisor;
-	u8 product_id[IPR_PROD_ID_LEN+1];
-	u8 vendor_id[IPR_VENDOR_ID_LEN+1];
-	u8 serial_num[IPR_SERIAL_NUM_LEN+1];
+	char product_id[IPR_PROD_ID_LEN+1];
+	char vendor_id[IPR_VENDOR_ID_LEN+1];
+	char serial_num[IPR_SERIAL_NUM_LEN+1];
 	char buffer[100];
 	int len, scsi_channel, scsi_id, scsi_lun;
 
@@ -1787,16 +1787,16 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	rc = ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
 
 	if (!rc) {
-		ipr_strncpy_0(vendor_id, std_inq.std_inq_data.vpids.vendor_id,
+		ipr_strncpy_0(vendor_id, (char *)std_inq.std_inq_data.vpids.vendor_id,
 			      IPR_VENDOR_ID_LEN);
-		ipr_strncpy_0(product_id, std_inq.std_inq_data.vpids.product_id,
+		ipr_strncpy_0(product_id, (char *)std_inq.std_inq_data.vpids.product_id,
 			      IPR_PROD_ID_LEN);
-		ipr_strncpy_0(serial_num, std_inq.std_inq_data.serial_num,
+		ipr_strncpy_0(serial_num, (char *)std_inq.std_inq_data.serial_num,
 			      IPR_SERIAL_NUM_LEN);
 	} else if (device_record) {
-		ipr_strncpy_0(vendor_id, device_record->vendor_id, IPR_VENDOR_ID_LEN);
-		ipr_strncpy_0(product_id, device_record->product_id, IPR_PROD_ID_LEN);
-		ipr_strncpy_0(serial_num, device_record->serial_num, IPR_SERIAL_NUM_LEN);
+		ipr_strncpy_0(vendor_id, (char *)device_record->vendor_id, IPR_VENDOR_ID_LEN);
+		ipr_strncpy_0(product_id, (char *)device_record->product_id, IPR_PROD_ID_LEN);
+		ipr_strncpy_0(serial_num, (char *)device_record->serial_num, IPR_SERIAL_NUM_LEN);
 	} else {
 		ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 		ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
@@ -2607,9 +2607,9 @@ int configure_raid_parameters(i_container *i_con)
 			prot_level_list[raid_index].array_cap_entry = cap_entry;
 			prot_level_list[raid_index].is_valid = 1;
 			if (raid_index_default == -1 &&
-			    !strcmp(cap_entry->prot_level_str, "10"))
+			    !strcmp((char *)cap_entry->prot_level_str, "10"))
 				raid_index_default = raid_index;
-			else if (!strcmp(cap_entry->prot_level_str, IPR_DEFAULT_RAID_LVL))
+			else if (!strcmp((char *)cap_entry->prot_level_str, IPR_DEFAULT_RAID_LVL))
 				raid_index_default = raid_index;
 
 			raid_index++;
@@ -3496,7 +3496,7 @@ int raid_include(i_container *i_con)
 
 int configure_raid_include(i_container *i_con)
 {
-	int k, i;
+	int k;
 	int found = 0;
 	struct array_cmd_data *cur_raid_cmd = NULL;
 	struct ipr_array_query_data *qac_data = calloc(1,sizeof(struct ipr_array_query_data));
@@ -4818,7 +4818,6 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_ioa *ioa, int bus, int id)
 static int get_conc_devs(struct ipr_dev ***ret, int action)
 {
 	struct ipr_ioa *ioa;
-	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_res_addr ra;
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_drive_elem_status *elem_status;
@@ -5830,8 +5829,8 @@ static char *get_battery_info(struct ipr_ioa *ioa)
 	char buffer[128];
 	struct ipr_ioa_vpd ioa_vpd;
 	struct ipr_cfc_vpd cfc_vpd;
-	u8 product_id[IPR_PROD_ID_LEN+1];
-	u8 serial_num[IPR_SERIAL_NUM_LEN+1];
+	char product_id[IPR_PROD_ID_LEN+1];
+	char serial_num[IPR_SERIAL_NUM_LEN+1];
 	char *body = NULL;
 
 	memset(&ioa_vpd, 0, sizeof(ioa_vpd));
@@ -5839,9 +5838,9 @@ static char *get_battery_info(struct ipr_ioa *ioa)
 	ipr_inquiry(&ioa->ioa, IPR_STD_INQUIRY, &ioa_vpd, sizeof(ioa_vpd));
 	ipr_inquiry(&ioa->ioa, 1, &cfc_vpd, sizeof(cfc_vpd));
 	ipr_strncpy_0(product_id,
-		      ioa_vpd.std_inq_data.vpids.product_id,
+		      (char *)ioa_vpd.std_inq_data.vpids.product_id,
 		      IPR_PROD_ID_LEN);
-	ipr_strncpy_0(serial_num, cfc_vpd.serial_num,
+	ipr_strncpy_0(serial_num, (char *)cfc_vpd.serial_num,
 		      IPR_SERIAL_NUM_LEN);
 
 	body = add_line_to_body(body,"", NULL);
@@ -6209,6 +6208,7 @@ static void get_changeable_bus_attr(struct ipr_ioa *ioa,
 				    struct ipr_scsi_buses *page28, int num_buses)
 {
 	int j;
+	struct ipr_dev *dev;
 
 	for (j = 0; j < num_buses; j++) {
 		page28->bus[j].qas_capability = 0;
@@ -6216,7 +6216,21 @@ static void get_changeable_bus_attr(struct ipr_ioa *ioa,
 			page28->bus[j].scsi_id = 1;
 		else
 			page28->bus[j].scsi_id = 0;
+
 		page28->bus[j].bus_width = 1;
+
+		for_each_dev(ioa, dev) {
+			if (!dev->scsi_dev_data)
+				continue;
+			if (j != dev->scsi_dev_data->channel)
+				continue;
+			if (dev->scsi_dev_data->id <= 7)
+				continue;
+
+			page28->bus[j].bus_width = 0;
+			break;
+		}
+
 		page28->bus[j].max_xfer_rate = 1;
 	}
 
@@ -6413,11 +6427,9 @@ int change_bus_attr(i_container *i_con)
 int confirm_change_bus_attr(i_container *i_con)
 {
 	struct ipr_ioa *ioa;
-	struct ipr_dev *dev;
 	int rc, j;
 	struct ipr_scsi_buses *page_28_cur;
 	struct ipr_scsi_buses page_28_chg;
-	struct scsi_dev_data *scsi_dev_data;
 	char scsi_id_str[5][16];
 	char max_xfer_rate_str[5][16];
 	int header_lines = 0;
@@ -6451,19 +6463,6 @@ int confirm_change_bus_attr(i_container *i_con)
 		if (page_28_chg.bus[j].scsi_id) {
 			sprintf(scsi_id_str[j],"%d",page_28_cur->bus[j].scsi_id);
 			body = add_line_to_body(body,_("Host SCSI ID"), scsi_id_str[j]);
-		}
-		if (page_28_chg.bus[j].bus_width)	{
-			/* check if 8 bit bus is allowable with current configuration before
-			 enabling option */
-			for_each_dev(ioa, dev) {
-				scsi_dev_data = dev->scsi_dev_data;
-
-				if (scsi_dev_data && (scsi_dev_data->id & 0xF8) &&
-				    (j == scsi_dev_data->channel)) {
-					page_28_chg.bus[j].bus_width = 0;
-					break;
-				}
-			}
 		}
 		if (page_28_chg.bus[j].bus_width)	{
 			if (page_28_cur->bus[j].bus_width == 16)
@@ -8613,7 +8612,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
 	int i;
 	struct ipr_res_addr res_addr;
-	u8 ioctl_buffer[255];
+	char ioctl_buffer[255];
 	char raid_str[48];
 	char *dev_name = dev->dev_name;
 	char *gen_name = dev->gen_name;
@@ -8680,12 +8679,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			common_record = dev->qac_entry;
 			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 				device_record = (struct ipr_dev_record *)common_record;
-				ipr_strncpy_0(vendor_id, device_record->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , device_record->product_id, IPR_PROD_ID_LEN);
+				ipr_strncpy_0(vendor_id, (char *)device_record->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , (char *)device_record->product_id, IPR_PROD_ID_LEN);
 			} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
 				array_record = (struct ipr_array_record *)common_record;
-				ipr_strncpy_0(vendor_id, array_record->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , array_record->product_id,
+				ipr_strncpy_0(vendor_id, (char *)array_record->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , (char *)array_record->product_id,
 					      IPR_PROD_ID_LEN);
 			}
 		}
@@ -9327,6 +9326,186 @@ static int raid_consistency_check(char **args, int num_args)
 	return ipr_resync_array(vset->ioa);
 }
 
+static int start_ioa_cache(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_reclaim_query_data reclaim_buffer;
+	int rc;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	rc =  ipr_reclaim_cache_store(dev->ioa,
+				      IPR_RECLAIM_RESET_BATTERY_ERROR | IPR_RECLAIM_EXTENDED_INFO,
+				      &reclaim_buffer);
+
+	if (rc)
+		return rc;
+
+	if (reclaim_buffer.action_status != IPR_ACTION_SUCCESSFUL)
+		rc = -EIO;
+
+	return rc;
+}
+
+static int force_cache_battery_error(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_reclaim_query_data reclaim_buffer;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	return ipr_reclaim_cache_store(dev->ioa, IPR_RECLAIM_FORCE_BATTERY_ERROR,
+				       &reclaim_buffer);
+}
+
+static int set_bus_width(char **args, int num_args)
+{
+	int rc;
+	struct ipr_scsi_buses page_28_cur;
+	struct ipr_scsi_buses page_28_chg;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev = find_dev(args[0]);
+	int bus = strtoul(args[1], NULL, 10);
+	int width = strtoul(args[2], NULL, 10);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+	memset(&page_28_cur, 0, sizeof(page_28_cur));
+	memset(&page_28_chg, 0, sizeof(page_28_chg));
+
+	rc = ipr_get_bus_attr(ioa, &page_28_cur);
+
+	if (rc)
+		return rc;
+
+	if (bus > page_28_cur.num_buses) {
+		fprintf(stderr, "Invalid bus specified: %d\n", bus);
+		return -EINVAL;
+	}
+
+	get_changeable_bus_attr(ioa, &page_28_chg, page_28_cur.num_buses);
+
+	if (!page_28_chg.bus[bus].bus_width) {
+		fprintf(stderr, "Bus width not changeable for this device\n");
+		return -EINVAL;
+	}
+
+	page_28_cur.bus[bus].bus_width = width;
+	return ipr_set_bus_attr(ioa, &page_28_cur, 1);
+}
+
+static int set_bus_speed(char **args, int num_args)
+{
+	int rc, max_xfer_rate, new_xfer_rate;
+	struct ipr_scsi_buses page_28_cur;
+	struct ipr_scsi_buses page_28_chg;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev = find_dev(args[0]);
+	int bus = strtoul(args[1], NULL, 10);
+	int speed = strtoul(args[2], NULL, 10);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+	memset(&page_28_cur, 0, sizeof(page_28_cur));
+	memset(&page_28_chg, 0, sizeof(page_28_chg));
+
+	rc = ipr_get_bus_attr(ioa, &page_28_cur);
+
+	if (rc)
+		return rc;
+
+	if (bus > page_28_cur.num_buses) {
+		fprintf(stderr, "Invalid bus specified: %d\n", bus);
+		return -EINVAL;
+	}
+
+	get_changeable_bus_attr(ioa, &page_28_chg, page_28_cur.num_buses);
+
+	max_xfer_rate = get_max_bus_speed(ioa, bus);
+	new_xfer_rate = IPR_BUS_THRUPUT_TO_XFER_RATE(speed,
+						     page_28_cur.bus[bus].bus_width);
+
+	if (new_xfer_rate > max_xfer_rate) {
+		fprintf(stderr, "Max speed allowed: %d MB/sec\n",
+			IPR_BUS_XFER_RATE_TO_THRUPUT(max_xfer_rate,
+						     page_28_cur.bus[bus].bus_width));
+		return -EINVAL;
+	}
+
+	page_28_cur.bus[bus].max_xfer_rate = new_xfer_rate;
+	return ipr_set_bus_attr(ioa, &page_28_cur, 1);
+}
+
+static int set_initiator_id(char **args, int num_args)
+{
+	int rc;
+	struct ipr_scsi_buses page_28_cur;
+	struct ipr_scsi_buses page_28_chg;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev = find_dev(args[0]);
+	int bus = strtoul(args[1], NULL, 10);
+	int scsi_id = strtoul(args[2], NULL, 10);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (scsi_id > 7) {
+		fprintf(stderr, "Host scsi id must be < 7\n");
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+	memset(&page_28_cur, 0, sizeof(page_28_cur));
+	memset(&page_28_chg, 0, sizeof(page_28_chg));
+
+	rc = ipr_get_bus_attr(ioa, &page_28_cur);
+
+	if (rc)
+		return rc;
+
+	if (bus > page_28_cur.num_buses) {
+		fprintf(stderr, "Invalid bus specified: %d\n", bus);
+		return -EINVAL;
+	}
+
+	get_changeable_bus_attr(ioa, &page_28_chg, page_28_cur.num_buses);
+
+	if (!page_28_chg.bus[bus].scsi_id) {
+		fprintf(stderr, "SCSI ID is not changeable for this adapter.\n");
+		return -EINVAL;
+	}
+
+	for_each_dev(ioa, dev) {
+		if (!dev->scsi_dev_data)
+			continue;
+
+		if (scsi_id == dev->scsi_dev_data->id &&
+		    bus == dev->scsi_dev_data->channel) {
+			fprintf(stderr, "SCSI ID %d conflicts with a device\n", scsi_id);
+			return -EINVAL;
+		}
+	}
+
+	page_28_cur.bus[bus].scsi_id = scsi_id;
+	return ipr_set_bus_attr(ioa, &page_28_cur, 1);
+}
+
 static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot)
 {
 	int i;
@@ -9351,7 +9530,7 @@ static int __add_device(struct ipr_dev *dev, int on)
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_drive_elem_status *elem_status;
 	struct ipr_res_addr res_addr;
-	int rc, found, i;
+	int rc, found;
 	int time = 12;
 
 	if (get_res_addr(dev, &res_addr)) {
@@ -9414,7 +9593,7 @@ static int __remove_device(struct ipr_dev *dev, int on)
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_drive_elem_status *elem_status;
 	struct ipr_res_addr res_addr;
-	int rc, found, i;
+	int rc, found;
 
 	if (get_res_addr(dev, &res_addr)) {
 		fprintf(stderr, "Invalid device\n");
@@ -9533,7 +9712,7 @@ static int __identify_device(struct ipr_dev *dev, int on)
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_drive_elem_status *elem_status;
 	struct ipr_res_addr res_addr;
-	int rc, found, i;
+	int rc, found;
 
 	if (get_res_addr(dev, &res_addr)) {
 		fprintf(stderr, "Invalid device\n");
@@ -9809,6 +9988,256 @@ static int reclaim_unknown(char **args, int num_args)
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
+static int query_recommended_stripe_size(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays)
+		return -EINVAL;
+
+	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
+
+	if (cap)
+		printf("%d\n", ntohs(cap->recommended_stripe_size));
+
+	return 0;
+}
+
+static int query_supp_stripe_sizes(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+	int i;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays)
+		return -EINVAL;
+
+	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
+
+	if (!cap)
+		return 0;
+
+	for (i = 0; i < (sizeof(cap->supported_stripe_sizes) * 8); i++)
+		if (ntohs(cap->supported_stripe_sizes) & (1 << i))
+			printf("%d ", (1 << i));
+
+	printf("\n");
+
+	return 0;
+}
+
+static int query_min_mult_in_array(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays)
+		return -EINVAL;
+
+	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
+
+	if (cap)
+		printf("%d\n", cap->min_mult_array_devices);
+
+	return 0;
+}
+
+static int query_min_array_devices(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays)
+		return -EINVAL;
+
+	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
+
+	if (cap)
+		printf("%d\n", cap->min_num_array_devices);
+
+	return 0;
+}
+
+static int query_max_array_devices(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays)
+		return -EINVAL;
+
+	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
+
+	if (cap)
+		printf("%d\n", cap->max_num_array_devices);
+
+	return 0;
+}
+
+static int query_include_allowed(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays) {
+		printf("no\n");
+		return 0;
+	}
+
+	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
+
+	if (!cap) {
+		printf("no\n");
+		return 0;
+	}
+
+	if (cap->include_allowed)
+		printf("yes\n");
+	else
+		printf("no\n");
+	return 0;
+}
+
+static int query_raid_levels(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_array_cap_entry *cap;
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!dev->ioa->supported_arrays)
+		return 0;
+
+	for_each_cap_entry(cap, dev->ioa->supported_arrays)
+		printf("%s ", cap->prot_level_str);
+
+	printf("\n");
+	return 0;
+}
+
+static int query_bus_width(char **args, int num_args)
+{
+	int rc, bus;
+	struct ipr_scsi_buses page_28;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	memset(&page_28, 0, sizeof(struct ipr_scsi_buses));
+
+	rc = ipr_get_bus_attr(dev->ioa, &page_28);
+
+	if (rc)
+		return rc;
+
+	bus = strtoul(args[1], NULL, 10);
+
+	if (bus > page_28.num_buses) {
+		fprintf(stderr, "Invalid bus specified: %d\n", bus);
+		return -EINVAL;
+	}
+
+	fprintf(stdout, "%d\n", page_28.bus[bus].bus_width);
+	return 0;
+}
+
+static int query_bus_speed(char **args, int num_args)
+{
+	int rc, bus;
+	struct ipr_scsi_buses page_28;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	memset(&page_28, 0, sizeof(struct ipr_scsi_buses));
+
+	rc = ipr_get_bus_attr(dev->ioa, &page_28);
+
+	if (rc)
+		return rc;
+
+	bus = strtoul(args[1], NULL, 10);
+
+	if (bus > page_28.num_buses) {
+		fprintf(stderr, "Invalid bus specified: %d\n", bus);
+		return -EINVAL;
+	}
+
+	fprintf(stdout, "%d\n",
+		IPR_BUS_XFER_RATE_TO_THRUPUT(page_28.bus[bus].max_xfer_rate,
+					     page_28.bus[bus].bus_width));
+	return 0;
+}
+
+static int query_initiator_id(char **args, int num_args)
+{
+	int rc, bus;
+	struct ipr_scsi_buses page_28;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	memset(&page_28, 0, sizeof(struct ipr_scsi_buses));
+
+	rc = ipr_get_bus_attr(dev->ioa, &page_28);
+
+	if (rc)
+		return rc;
+
+	bus = strtoul(args[1], NULL, 10);
+
+	if (bus > page_28.num_buses) {
+		fprintf(stderr, "Invalid bus specified: %d\n", bus);
+		return -EINVAL;
+	}
+
+	fprintf(stdout, "%d\n", page_28.bus[bus].scsi_id);
+	return 0;
+}
+
 static int query_add_remove(int action)
 {
 	int i, num_devs;
@@ -9957,7 +10386,7 @@ static int query_format_for_raid(char **args, int num_args)
 	struct ipr_dev *dev;
 	int hdr = 0;
 
-	for_each_ioa(ioa) {
+	for_each_primary_ioa(ioa) {
 		for_each_disk(ioa, dev) {
 			if (ipr_is_hot_spare(dev) || !device_supported(dev))
 				continue;
@@ -10092,10 +10521,7 @@ static int query_arrays_include(char **args, int num_args)
 	struct ipr_array_record *array_rcd;
 	int hdr = 0;
 
-	for_each_ioa(ioa) {
-		if (ioa->is_secondary) /* xxx */
-			continue;
-
+	for_each_primary_ioa(ioa) {
 		for_each_vset(ioa, vset) {
 			array_rcd = vset->array_rcd;
 			cap_entry = get_raid_cap_entry(ioa->supported_arrays,
@@ -10148,7 +10574,7 @@ static int query_format_for_jbod(char **args, int num_args)
 	struct ipr_ioa *ioa;
 	int hdr = 0;
 
-	for_each_ioa(ioa) {
+	for_each_primary_ioa(ioa) {
 		for_each_af_dasd(ioa, dev) {
 			if (ipr_device_is_zeroed(dev))
 				continue;
@@ -10367,60 +10793,76 @@ static const struct {
 	int unlimited_max;
 	int max_args;
 	int (*func)(char **, int);
+	char *usage;
 } command [] = {
-	{ "show-config",				0, 0, 0, show_config },
-	{ "show-alt-config",			0, 0, 0, show_alt_config },
-	{ "show-ioas",				0, 0, 0, show_ioas },
-	{ "show-arrays",				0, 0, 0, show_arrays },
-	{ "show-battery-info",			1, 0, 1, battery_info },
-	{ "show-details",				1, 0, 1, show_details },
-	{ "show-hot-spares",			0, 0, 0, show_hot_spares },
-	{ "show-af-disks",			0, 0, 0, show_af_disks },
-	{ "show-jbod-disks",			0, 0, 0, show_jbod_disks },
-	{ "status",					1, 0, 1, print_status },
-	{ "query-raid-create",			1, 0, 1, query_raid_create },
-	{ "query-raid-delete",			1, 0, 1, query_raid_delete },
-	{ "query-hot-spare-create",		1, 0, 1, query_hot_spare_create },
-	{ "query-hot-spare-delete",		1, 0, 1, query_hot_spare_delete },
-	{ "query-raid-consistency-check",	0, 0, 0, query_raid_consistency_check },
-	{ "query-format-for-jbod",		0, 0, 0, query_format_for_jbod },
-	{ "query-reclaim",			0, 0, 0, query_reclaim },
-	{ "query-arrays-raid-include",	0, 0, 0, query_arrays_include },
-	{ "query-devices-raid-include",	1, 0, 1, query_devices_include },
-	{ "query-recovery-format",		0, 0, 0, query_recovery_format },
-	{ "query-raid-rebuild",			0, 0, 0, query_raid_rebuild },
-	{ "query-format-for-raid",		0, 0, 0, query_format_for_raid },
-	{ "query-ucode-level",			1, 0, 1, query_ucode_level },
-	{ "query-format-timeout",		1, 0, 1, query_format_timeout },
-	{ "query-qdepth",				1, 0, 1, query_qdepth },
-	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable },
-	{ "query-log-level",			1, 0, 1, query_log_level },
-	{ "query-add-device",			0, 0, 0, query_add_device },
-	{ "query-remove-device",		0, 0, 0, query_remove_device },
-	{ "primary",				1, 0, 1, set_primary },
-	{ "secondary",				1, 0, 1, set_secondary },
-	{ "raid-create",				1, 1, 0, raid_create },
-	{ "raid-delete",				1, 0, 1, raid_delete },
-	{ "raid-include",				2, 0, 17, raid_include_cmd },
-	{ "format-for-raid",			1, 1, 0, format_for_raid },
-	{ "format-for-jbod",			1, 1, 0, format_for_jbod },
-	{ "recovery-format",			1, 1, 0, recovery_format },
-	{ "hot-spare-create",			1, 0, 1, hot_spare_create },
-	{ "hot-spare-delete",			1, 0, 1, hot_spare_delete },
-	{ "reclaim-cache",			1, 0, 1, reclaim },
-	{ "reclaim-unknown-cache",		1, 0, 1, reclaim_unknown },
-	{ "raid-consistency-check",		1, 0, 1, raid_consistency_check },
-	{ "raid-rebuild",				1, 0, 1, raid_rebuild_cmd },
-	{ "update-ucode",				2, 0, 2, update_ucode_cmd },
-	{ "set-format-timeout",			2, 0, 2, set_format_timeout },
-	{ "set-qdepth",				2, 0, 2, set_qdepth },
-	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable },
-	{ "set-log-level",			2, 0, 2, set_log_level_cmd },
-	{ "identify-disk",			2, 0, 2, identify_disk },
-	{ "identify-slot",			2, 0, 2, identify_slot },
-	{ "remove-disk",				2, 0, 2, remove_disk },
-	{ "remove-slot",				2, 0, 2, remove_slot },
-	{ "add-slot",				2, 0, 2, add_slot },
+	{ "show-config",				0, 0, 0, show_config, "" },
+	{ "show-alt-config",			0, 0, 0, show_alt_config, "" },
+	{ "show-ioas",				0, 0, 0, show_ioas, "" },
+	{ "show-arrays",				0, 0, 0, show_arrays, "" },
+	{ "show-battery-info",			1, 0, 1, battery_info, "sg5" },
+	{ "show-details",				1, 0, 1, show_details, "sda" },
+	{ "show-hot-spares",			0, 0, 0, show_hot_spares, "" },
+	{ "show-af-disks",			0, 0, 0, show_af_disks, "" },
+	{ "show-jbod-disks",			0, 0, 0, show_jbod_disks, "" },
+	{ "status",					1, 0, 1, print_status, "sda" },
+	{ "query-raid-create",			1, 0, 1, query_raid_create, "sg5" },
+	{ "query-raid-delete",			1, 0, 1, query_raid_delete, "sg5" },
+	{ "query-hot-spare-create",		1, 0, 1, query_hot_spare_create, "sg5" },
+	{ "query-hot-spare-delete",		1, 0, 1, query_hot_spare_delete, "sg5" },
+	{ "query-raid-consistency-check",	0, 0, 0, query_raid_consistency_check, "" },
+	{ "query-format-for-jbod",		0, 0, 0, query_format_for_jbod, "" },
+	{ "query-reclaim",			0, 0, 0, query_reclaim, "" },
+	{ "query-arrays-raid-include",	0, 0, 0, query_arrays_include, "" },
+	{ "query-devices-raid-include",	1, 0, 1, query_devices_include, "sdb" },
+	{ "query-recovery-format",		0, 0, 0, query_recovery_format, "" },
+	{ "query-raid-rebuild",			0, 0, 0, query_raid_rebuild, "" },
+	{ "query-format-for-raid",		0, 0, 0, query_format_for_raid, "" },
+	{ "query-ucode-level",			1, 0, 1, query_ucode_level, "sda" },
+	{ "query-format-timeout",		1, 0, 1, query_format_timeout, "sda" },
+	{ "query-qdepth",				1, 0, 1, query_qdepth, "sda" },
+	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable, "sda" },
+	{ "query-log-level",			1, 0, 1, query_log_level, "sg5" },
+	{ "query-add-device",			0, 0, 0, query_add_device, "" },
+	{ "query-remove-device",		0, 0, 0, query_remove_device, "" },
+	{ "query-initiator-id",			2, 0, 2, query_initiator_id, "sg5 0" },
+	{ "query-bus-speed",			2, 0, 2, query_bus_speed, "sg5 0" },
+	{ "query-bus-width",			2, 0, 2, query_bus_width, "sg5 0" },
+	{ "query-supported-raid-levels",	1, 0, 1, query_raid_levels, "sg5" },
+	{ "query-include-allowed",		2, 0, 2, query_include_allowed, "sg5 5" },
+	{ "query-max-devices-in-array",	2, 0, 2, query_max_array_devices, "sg5 5" },
+	{ "query-min-devices-in-array",	2, 0, 2, query_min_array_devices, "sg5 5" },
+	{ "query-min-mult-in-array",		2, 0, 2, query_min_mult_in_array, "sg5 5" },
+	{ "query-supp-stripe-sizes",		2, 0, 2, query_supp_stripe_sizes, "sg5 5" },
+	{ "query-recommended-stripe-size",	2, 0, 2, query_recommended_stripe_size, "sg5 5" },
+	{ "primary",				1, 0, 1, set_primary, "sg5" },
+	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
+	{ "raid-create",				1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
+	{ "raid-delete",				1, 0, 1, raid_delete, "sdb" },
+	{ "raid-include",				2, 0, 17, raid_include_cmd, "sda sg6 sg7" },
+	{ "format-for-raid",			1, 1, 0, format_for_raid, "sda sdb sdc" },
+	{ "format-for-jbod",			1, 1, 0, format_for_jbod, "sg6 sg7 sg8" },
+	{ "recovery-format",			1, 1, 0, recovery_format, "sda sg7" },
+	{ "hot-spare-create",			1, 0, 1, hot_spare_create, "sg6" },
+	{ "hot-spare-delete",			1, 0, 1, hot_spare_delete, "sg6" },
+	{ "reclaim-cache",			1, 0, 1, reclaim, "sg5" },
+	{ "reclaim-unknown-cache",		1, 0, 1, reclaim_unknown, "sg5" },
+	{ "force-cache-battery-error",	1, 0, 1, force_cache_battery_error, "sg5" },
+	{ "start-ioa-cache",			1, 0, 1, start_ioa_cache, "sg5" },
+	{ "raid-consistency-check",		1, 0, 1, raid_consistency_check, "sg5" },
+	{ "raid-rebuild",				1, 0, 1, raid_rebuild_cmd, "sg6" },
+	{ "update-ucode",				2, 0, 2, update_ucode_cmd, "sg5 /root/ucode.bin" },
+	{ "set-format-timeout",			2, 0, 2, set_format_timeout, "sg6 4" },
+	{ "set-qdepth",				2, 0, 2, set_qdepth, "sda 16" },
+	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable, "sda 0" },
+	{ "set-log-level",			2, 0, 2, set_log_level_cmd, "sg5 2" },
+	{ "identify-disk",			2, 0, 2, identify_disk, "sda 1" },
+	{ "identify-slot",			2, 0, 2, identify_slot, "0000:d8:01.0/0:1:1: 1" },
+	{ "remove-disk",				2, 0, 2, remove_disk, "sda 1" },
+	{ "remove-slot",				2, 0, 2, remove_slot, "0000:d8:01.0/0:1:1: 1" },
+	{ "add-slot",				2, 0, 2, add_slot, "0000:d8:01.0/0:1:1: 1" },
+	{ "set-initiator-id",			3, 0, 3, set_initiator_id, "sg5 0 7" },
+	{ "set-bus-speed",			3, 0, 3, set_bus_speed, "sg5 0 320" },
+	{ "set-bus-width",			3, 0, 3, set_bus_width, "sg5 0 16" },
 };
 
 static int non_interactive_cmd(char *cmd, char **args, int num_args)
