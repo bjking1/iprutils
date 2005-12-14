@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.81 2005/12/07 23:27:51 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.82 2005/12/14 22:29:10 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3112,8 +3112,10 @@ void check_current_config(bool allow_rebuild_refresh)
 		/* Get Query Array Config Data */
 		rc = ipr_query_array_config(ioa, allow_rebuild_refresh, 0, 0, qac_data);
 
-		if (rc != 0)
+		if (rc != 0) {
 			qac_data->num_records = 0;
+			qac_data->resp_len = htons(4);
+		}
 
 		ioa->qac_data = qac_data;
 		ioa->start_array_qac_entry = NULL;
