@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.22 2005/12/07 23:27:50 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.23 2005/12/14 18:48:55 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -28,6 +28,7 @@
 #define IPR_MAX_FLIT_ENTRIES 59
 #define IPR_FLIT_TIMESTAMP_LEN 12
 #define IPR_FLIT_FILENAME_LEN 184
+#define IPRDBG_CONF "/etc/iprdbg.conf"
 
 char *tool_name = "iprdbg";
 
@@ -86,7 +87,6 @@ static int num_macros;
 static unsigned int last_adx;
 static unsigned int last_len;
 static unsigned int last_data;
-static unsigned int disable_dump;
 
 #define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
 #define iprprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
@@ -211,9 +211,6 @@ static void dump_data(unsigned int adx, unsigned int *buf, int len)
 {
 	char ascii_buffer[17];
 	int i, k, j;
-
-	if (disable_dump)
-		return;
 
 	for (i = 0; i < (len / 4);) {
 		iprprint("%08X: ", adx+(i*4));
@@ -470,6 +467,8 @@ static int help(struct ipr_ioa *ioa, int argc, char *argv[])
 	       "- Current bus speeds for each device\n");
 	printf("flit                                "
 	       "- Format the flit\n");
+	printf("macros                              "
+	       "- List currently loaded macros\n");
 	printf("exit                                "
 	       "- Exit the program\n\n");
 	return 0;
@@ -490,7 +489,7 @@ static int macros(struct ipr_ioa *ioa, int argc, char *argv[])
 	int i;
 
 	if (num_macros == 0)
-		printf("No macros loaded. Place macros in ~/.iprdbg\n");
+		printf("No macros loaded. Place macros in "IPRDBG_CONF"\n");
 
 	for (i = 0; i < num_macros; i++)
 		printf("%s\n", macro[i].cmd);
@@ -509,10 +508,11 @@ static const struct {
 	{ "bm4",		3, 3,		bm4 },
 	{ "edf",		1, 2,		edf },
 	{ "ddf",		1, 2,		ddf },
-	{ "raw",		0, 4,		raw_cmd },
+	{ "raw",		1, 4,		raw_cmd },
 	{ "flit",		0, 0,		flit },
 	{ "speeds",		0, 0,		speeds },
 	{ "help",		0, 0,		help },
+	{ "?",		0, 0,		help },
 	{ "quit",		0, 0,		quit },
 	{ "q",		0, 0,		quit },
 	{ "exit",		0, 0,		quit },
@@ -527,7 +527,7 @@ static int exec_cmd(struct ipr_ioa *ioa, int cmd, int argc, char *argv[])
 	int num_args = argc - 1;
 
 	if (num_args < command[cmd].min_args) {
-		ipr_err("You must specify a device\n");
+		ipr_err("Not enough arguments specified.\n");
 		return -EINVAL;
 	}
 
@@ -616,14 +616,13 @@ static int parse_cmd(struct ipr_ioa *ioa, int argc, char *argv[])
 		if (!end)
 			continue;
 
-		disable_dump = 1;
 		if (strlen(argv[i]) == 1) {
 			rc = __parse_cmd(ioa, i - index, &argv[index]);
 		} else {
 			*end = '\0';
 			rc = __parse_cmd(ioa, (i + 1) - index, &argv[index]);
 		}
-		disable_dump = 0;
+
 		index = i + 1;
 
 		if (rc)
@@ -741,7 +740,7 @@ static void add_new_macro(char *cmd)
 static void load_config()
 {
 	char buf[2000];
-	FILE *config = fopen("/root/.iprdbg", "r");
+	FILE *config = fopen(IPRDBG_CONF, "r");
 
 	if (!config)
 		return;
@@ -749,6 +748,8 @@ static void load_config()
 	while (!feof(config)) {
 		if (!fgets(buf, sizeof(buf), config))
 			break;
+		if (buf[0] == '#')
+			continue;
 		add_new_macro(buf);
 	}
 
