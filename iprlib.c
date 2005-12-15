@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.82 2005/12/14 22:29:10 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.83 2005/12/15 02:10:07 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -4154,8 +4154,12 @@ static int ipr_get_hotplug_dir()
 	file = fopen(FIRMWARE_HOTPLUG_CONFIG_FILE, "r");
 
 	if (!file) {
-		syslog(LOG_ERR, "Failed to open %s. %m\n", FIRMWARE_HOTPLUG_CONFIG_FILE);
-		return -EIO;
+		hotplug_dir = realloc(hotplug_dir, strlen(FIRMWARE_HOTPLUG_DEFAULT_DIR) + 1);
+		if (!hotplug_dir)
+			return -ENOMEM;
+
+		strcpy(hotplug_dir, FIRMWARE_HOTPLUG_DEFAULT_DIR);
+		return 0;
 	}
 
 	clearerr(file);
