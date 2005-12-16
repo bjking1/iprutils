@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/debug/iprwritebuffer.c,v 1.1 2005/09/26 20:19:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/debug/iprwritebuffer.c,v 1.2 2005/12/16 17:04:41 brking Exp $
  */
 
 #include <unistd.h>
@@ -37,7 +37,7 @@ static int ipr_update_ucode(struct ipr_dev *dev, char *fname)
 
 	if (fd < 0) {
 		syslog_dbg("Could not open firmware file %s.\n", fname);
-		return;
+		return fd;
 	}
 
 	rc = fstat(fd, &ucode_stats);

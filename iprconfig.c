@@ -130,6 +130,62 @@ char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int);
         for (i = 0; i < 2; i++) \
             (buf)[i] = print_device(dev, (buf)[i], fmt, type);
 
+static int is_format_allowed(struct ipr_dev *dev)
+{
+	int rc;
+	struct ipr_cmd_status cmd_status;
+	struct ipr_cmd_status_record *status_record;
+	struct sense_data_t sense_data;
+
+	if (ipr_is_af_dasd_device(dev)) {
+		rc = ipr_query_command_status(dev, &cmd_status);
+		if (rc == 0 && cmd_status.num_records != 0) {
+			status_record = cmd_status.record;
+			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
+			    (status_record->status != IPR_CMD_STATUS_FAILED))
+				return 0;
+		}
+	} else {
+		rc = ipr_test_unit_ready(dev, &sense_data);
+
+		if (rc == CHECK_CONDITION && (sense_data.error_code & 0x7F) == 0x70) {
+			if (sense_data.add_sense_code == 0x31 &&
+			    sense_data.add_sense_code_qual == 0x00)
+				return 1;
+			else if ((sense_data.sense_key & 0x0F) == 0x02)
+				return 0;
+
+		}
+	}
+
+	return 1;
+}
+
+static int can_format_for_raid(struct ipr_dev *dev)
+{
+	if (dev->ioa->is_secondary)
+		return 0;
+	if (!ipr_is_gscsi(dev) && !ipr_is_af_dasd_device(dev))
+		return 0;
+	if (ipr_is_hot_spare(dev) || !device_supported(dev))
+		return 0;
+	if (ipr_is_array_member(dev) && !dev->dev_rcd->no_cfgte_vol)
+		return 0;
+	if (ipr_is_af_dasd_device(dev) && ipr_device_is_zeroed(dev))
+		return 0;
+	if (!ipr_is_af_dasd_device(dev)) {
+		/* If on a JBOD adapter */
+		if (!dev->ioa->qac_data->num_records)
+			return 0;
+		if (is_af_blocked(dev, 0))
+			return 0;
+	}
+
+	if (!is_format_allowed(dev))
+		return 0;
+	return 1;
+}
+
 /* not needed after screen_driver can do menus */
 static void flush_stdscr()
 {
@@ -1146,6 +1202,7 @@ static int __complete_screen_driver_curses(s_node *n_screen, char *complete, int
 static int __complete_screen_driver(s_node *n_screen, char *complete, int allow_exit)
 {
 	fprintf(stdout, "\r%s", complete);
+	fflush(stdout);
 	return 0;
 }
 
@@ -1188,37 +1245,6 @@ static int time_screen_driver(s_node *n_screen, unsigned long seconds, int allow
 	free(comp_str);
 
 	return rc;
-}
-
-static int is_format_allowed(struct ipr_dev *dev)
-{
-	int rc;
-	struct ipr_cmd_status cmd_status;
-	struct ipr_cmd_status_record *status_record;
-	struct sense_data_t sense_data;
-
-	if (ipr_is_af_dasd_device(dev)) {
-		rc = ipr_query_command_status(dev, &cmd_status);
-		if (rc == 0 && cmd_status.num_records != 0) {
-			status_record = cmd_status.record;
-			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
-			    (status_record->status != IPR_CMD_STATUS_FAILED))
-				return 0;
-		}
-	} else {
-		rc = ipr_test_unit_ready(dev, &sense_data);
-
-		if (rc == CHECK_CONDITION && (sense_data.error_code & 0x7F) == 0x70) {
-			if (sense_data.add_sense_code == 0x31 &&
-			    sense_data.add_sense_code_qual == 0x00)
-				return 1;
-			else if ((sense_data.sense_key & 0x0F) == 0x02)
-				return 0;
-
-		}
-	}
-
-	return 1;
 }
 
 static void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa,
@@ -5312,9 +5338,11 @@ int send_dev_inits(i_container *i_con)
 	int max_y, max_x;
 	u8 length;
 
-	getmaxyx(stdscr,max_y,max_x);
-	mvaddstr(max_y-1,0,wait_for_next_screen);
-	refresh();
+	if (use_curses) {
+		getmaxyx(stdscr,max_y,max_x);
+		mvaddstr(max_y-1,0,wait_for_next_screen);
+		refresh();
+	}
 
 	for_each_dev_to_init(cur_dev_init) {
 		if (cur_dev_init->do_init &&
@@ -8884,10 +8912,17 @@ static int format_for_jbod(char **args, int num_args)
 static int format_for_raid(char **args, int num_args)
 {
 	int i;
+	struct ipr_dev *dev;
 
 	for (i = 0; i < num_args; i++) {
-		if (raid_create_add_dev(args[i]))
-			return -EIO;
+		dev = find_and_add_dev(args[i]);
+		if (!dev || !can_format_for_raid(dev)) {
+			fprintf(stderr, "Invalid device: %s\n", args[i]);
+			return -EINVAL;
+		}
+
+		add_format_device(dev, dev->ioa->af_block_size);
+		dev_init_tail->do_init = 1;
 	}
 
 	send_dev_inits(NULL);
@@ -10388,21 +10423,7 @@ static int query_format_for_raid(char **args, int num_args)
 
 	for_each_primary_ioa(ioa) {
 		for_each_disk(ioa, dev) {
-			if (ipr_is_hot_spare(dev) || !device_supported(dev))
-				continue;
-			if (ipr_is_array_member(dev) && !dev->dev_rcd->no_cfgte_vol)
-				continue;
-			if (ipr_is_af_dasd_device(dev) && ipr_device_is_zeroed(dev))
-				continue;
-			if (!ipr_is_af_dasd_device(dev)) {
-				/* If on a JBOD adapter */
-				if (!ioa->qac_data->num_records)
-					continue;
-				if (is_af_blocked(dev, 0))
-					continue;
-			}
-
-			if (!is_format_allowed(dev))
+			if (!can_format_for_raid(dev))
 				continue;
 
 			if (!hdr) {

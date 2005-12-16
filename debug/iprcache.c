@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/debug/iprcache.c,v 1.1 2005/09/26 20:19:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/debug/iprcache.c,v 1.2 2005/12/16 17:04:41 brking Exp $
  */
 
 #include <unistd.h>
@@ -84,7 +84,6 @@ static int set_caching_page(struct ipr_dev *dev)
 int main(int argc, char *argv[])
 {
 	struct ipr_dev *dev;
-	int rc;
 
 	openlog("iprcache", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 	tool_init(1);

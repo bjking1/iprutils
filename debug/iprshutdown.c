@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/debug/iprshutdown.c,v 1.1 2005/09/26 20:19:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/debug/iprshutdown.c,v 1.2 2005/12/16 17:04:41 brking Exp $
  */
 
 #include <unistd.h>
@@ -26,16 +26,6 @@
 #include <sys/mman.h>
 
 char *tool_name = "iprshutdown";
-
-static void init_all()
-{
-	struct ipr_ioa *ioa;
-
-	tool_init(1);
-	check_current_config(false);
-	for_each_ioa(ioa)
-		ipr_init_ioa(ioa);
-}
 
 static int ipr_ioa_flush(struct ipr_ioa *ioa)
 {
@@ -63,7 +53,7 @@ static int ipr_ioa_flush(struct ipr_ioa *ioa)
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
 	if (rc != 0)
-		ioa_cmd_err(ioa, &sense_data, 0xF7, rc);
+		ioa_cmd_err(ioa, &sense_data, "IOA Shutdown", rc);
 
 	close(fd);
 	return rc;
