@@ -189,8 +189,11 @@ static int can_format_for_raid(struct ipr_dev *dev)
 /* not needed after screen_driver can do menus */
 static void flush_stdscr()
 {
-	if (!use_curses)
+	if (!use_curses) {
+		fprintf(stdout, "\n");
+		fflush(stdout);
 		return;
+	}
 
 	nodelay(stdscr, TRUE);
 
@@ -9423,7 +9426,7 @@ static int set_bus_width(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	if (bus > page_28_cur.num_buses) {
+	if (bus >= page_28_cur.num_buses) {
 		fprintf(stderr, "Invalid bus specified: %d\n", bus);
 		return -EINVAL;
 	}
@@ -9463,7 +9466,7 @@ static int set_bus_speed(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	if (bus > page_28_cur.num_buses) {
+	if (bus >= page_28_cur.num_buses) {
 		fprintf(stderr, "Invalid bus specified: %d\n", bus);
 		return -EINVAL;
 	}
@@ -9514,7 +9517,7 @@ static int set_initiator_id(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	if (bus > page_28_cur.num_buses) {
+	if (bus >= page_28_cur.num_buses) {
 		fprintf(stderr, "Invalid bus specified: %d\n", bus);
 		return -EINVAL;
 	}
@@ -10204,7 +10207,7 @@ static int query_bus_width(char **args, int num_args)
 
 	bus = strtoul(args[1], NULL, 10);
 
-	if (bus > page_28.num_buses) {
+	if (bus >= page_28.num_buses) {
 		fprintf(stderr, "Invalid bus specified: %d\n", bus);
 		return -EINVAL;
 	}
@@ -10233,7 +10236,7 @@ static int query_bus_speed(char **args, int num_args)
 
 	bus = strtoul(args[1], NULL, 10);
 
-	if (bus > page_28.num_buses) {
+	if (bus >= page_28.num_buses) {
 		fprintf(stderr, "Invalid bus specified: %d\n", bus);
 		return -EINVAL;
 	}
@@ -10264,7 +10267,7 @@ static int query_initiator_id(char **args, int num_args)
 
 	bus = strtoul(args[1], NULL, 10);
 
-	if (bus > page_28.num_buses) {
+	if (bus >= page_28.num_buses) {
 		fprintf(stderr, "Invalid bus specified: %d\n", bus);
 		return -EINVAL;
 	}
@@ -10900,7 +10903,7 @@ static int non_interactive_cmd(char *cmd, char **args, int num_args)
 			continue;
 
 		if (num_args < command[i].min_args) {
-			fprintf(stderr, "You must specify a device\n");
+			fprintf(stderr, "Not enough arguments specified.\n");
 			return -EINVAL;
 		}
 
