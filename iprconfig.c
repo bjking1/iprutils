@@ -6152,7 +6152,7 @@ int bus_config(i_container *i_con)
 	body_init_status(buffer, n_bus_config.header, &header_lines);
 
 	for_each_ioa(ioa) {
-		if (!is_spi(ioa) && !ipr_debug)
+		if ((!is_spi(ioa) || ioa->is_aux_cache) && !ipr_debug)
 			continue;
 
 		/* mode sense page28 to focal point */
@@ -9211,7 +9211,7 @@ static int query_raid_create(char **args, int num_args)
 	struct ipr_ioa *ioa;
 	int num = 0;
 
-	dev = find_gen_dev(args[0]);
+	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
@@ -9246,7 +9246,7 @@ static int query_raid_delete(char **args, int num_args)
 	struct ipr_ioa *ioa;
 	int num = 0;
 
-	dev = find_gen_dev(args[0]);
+	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
@@ -9274,7 +9274,7 @@ static int query_hot_spare_create(char **args, int num_args)
 	struct ipr_ioa *ioa;
 	int hdr = 0;
 
-	dev = find_gen_dev(args[0]);
+	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
@@ -9303,7 +9303,7 @@ static int query_hot_spare_delete(char **args, int num_args)
 	struct ipr_ioa *ioa;
 	int hdr = 0;
 
-	dev = find_gen_dev(args[0]);
+	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
@@ -9414,6 +9414,9 @@ static int set_bus_width(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	if (!is_spi(dev->ioa) || dev->ioa->is_aux_cache)
+		return -EINVAL;
+
 	ioa = dev->ioa;
 	memset(&page_28_cur, 0, sizeof(page_28_cur));
 	memset(&page_28_chg, 0, sizeof(page_28_chg));
@@ -9453,6 +9456,9 @@ static int set_bus_speed(char **args, int num_args)
 		fprintf(stderr, "Invalid device %s\n", args[0]);
 		return -EINVAL;
 	}
+
+	if (!is_spi(dev->ioa) || dev->ioa->is_aux_cache)
+		return -EINVAL;
 
 	ioa = dev->ioa;
 	memset(&page_28_cur, 0, sizeof(page_28_cur));
@@ -9499,6 +9505,9 @@ static int set_initiator_id(char **args, int num_args)
 		fprintf(stderr, "Invalid device %s\n", args[0]);
 		return -EINVAL;
 	}
+
+	if (!is_spi(dev->ioa) || dev->ioa->is_aux_cache)
+		return -EINVAL;
 
 	if (scsi_id > 7) {
 		fprintf(stderr, "Host scsi id must be < 7\n");
@@ -9989,7 +9998,7 @@ static int __reclaim(char **args, int num_args, int action)
 	struct ipr_ioa *ioa;
 	int rc;
 
-	dev = find_gen_dev(args[0]);
+	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
@@ -10033,7 +10042,7 @@ static int query_recommended_stripe_size(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays)
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays)
 		return -EINVAL;
 
 	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
@@ -10055,7 +10064,7 @@ static int query_supp_stripe_sizes(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays)
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays)
 		return -EINVAL;
 
 	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
@@ -10082,7 +10091,7 @@ static int query_min_mult_in_array(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays)
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays)
 		return -EINVAL;
 
 	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
@@ -10103,7 +10112,7 @@ static int query_min_array_devices(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays)
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays)
 		return -EINVAL;
 
 	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
@@ -10124,7 +10133,7 @@ static int query_max_array_devices(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays)
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays)
 		return -EINVAL;
 
 	cap = get_cap_entry(dev->ioa->supported_arrays, args[1]);
@@ -10145,7 +10154,7 @@ static int query_include_allowed(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays) {
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays) {
 		printf("no\n");
 		return 0;
 	}
@@ -10174,7 +10183,7 @@ static int query_raid_levels(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!dev->ioa->supported_arrays)
+	if (dev->ioa->is_aux_cache || !dev->ioa->supported_arrays)
 		return 0;
 
 	for_each_cap_entry(cap, dev->ioa->supported_arrays)
@@ -10194,6 +10203,9 @@ static int query_bus_width(char **args, int num_args)
 		fprintf(stderr, "Invalid device %s\n", args[0]);
 		return -EINVAL;
 	}
+
+	if (!is_spi(dev->ioa) || dev->ioa->is_aux_cache)
+		return -EINVAL;
 
 	memset(&page_28, 0, sizeof(struct ipr_scsi_buses));
 
@@ -10223,6 +10235,9 @@ static int query_bus_speed(char **args, int num_args)
 		fprintf(stderr, "Invalid device %s\n", args[0]);
 		return -EINVAL;
 	}
+
+	if (!is_spi(dev->ioa) || dev->ioa->is_aux_cache)
+		return -EINVAL;
 
 	memset(&page_28, 0, sizeof(struct ipr_scsi_buses));
 
@@ -10254,6 +10269,9 @@ static int query_initiator_id(char **args, int num_args)
 		fprintf(stderr, "Invalid device %s\n", args[0]);
 		return -EINVAL;
 	}
+
+	if (!is_spi(dev->ioa) || dev->ioa->is_aux_cache)
+		return -EINVAL;
 
 	memset(&page_28, 0, sizeof(struct ipr_scsi_buses));
 
@@ -10649,6 +10667,26 @@ static int show_jbod_disks(char **args, int num_args)
 	return 0;
 }
 
+static int show_all_af_disks(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int hdr = 0;
+
+	for_each_ioa(ioa) {
+		for_each_af_dasd(ioa, dev) {
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+			}
+
+			printf_device(dev, 2);
+		}
+	}
+
+	return 0;
+}
+
 static int show_af_disks(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -10656,7 +10694,7 @@ static int show_af_disks(char **args, int num_args)
 	int hdr = 0;
 
 	for_each_ioa(ioa) {
-		for_each_standalone_disk(ioa, dev) {
+		for_each_standalone_af_disk(ioa, dev) {
 			if (!hdr) {
 				hdr = 1;
 				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
@@ -10703,7 +10741,7 @@ static int show_details(char **args, int num_args)
 	return 0;
 }
 
-static int print_status(char **args, int num_args)
+static int __print_status(char **args, int num_args, int percent)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
 	char buf[100];
@@ -10713,9 +10751,19 @@ static int print_status(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	get_status(dev, buf, 0);
+	get_status(dev, buf, percent);
 	printf("%s\n", buf);
 	return 0;
+}
+
+static int print_alt_status(char **args, int num_args)
+{
+	return __print_status(args, num_args, 1);
+}
+
+static int print_status(char **args, int num_args)
+{
+	return __print_status(args, num_args, 0);
 }
 
 static int __show_config(int type)
@@ -10777,7 +10825,7 @@ static int battery_info(char **args, int num_args)
 	char *buf;
 	int rc;
 
-	dev = find_gen_dev(args[0]);
+	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
@@ -10824,8 +10872,10 @@ static const struct {
 	{ "show-details",				1, 0, 1, show_details, "sda" },
 	{ "show-hot-spares",			0, 0, 0, show_hot_spares, "" },
 	{ "show-af-disks",			0, 0, 0, show_af_disks, "" },
+	{ "show-all-af-disks",			0, 0, 0, show_all_af_disks, "" },
 	{ "show-jbod-disks",			0, 0, 0, show_jbod_disks, "" },
 	{ "status",					1, 0, 1, print_status, "sda" },
+	{ "alt-status",				1, 0, 1, print_alt_status, "sda" },
 	{ "query-raid-create",			1, 0, 1, query_raid_create, "sg5" },
 	{ "query-raid-delete",			1, 0, 1, query_raid_delete, "sg5" },
 	{ "query-hot-spare-create",		1, 0, 1, query_hot_spare_create, "sg5" },

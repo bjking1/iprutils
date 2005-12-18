@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.84 2005/12/18 00:26:51 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.85 2005/12/18 20:42:48 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -702,16 +702,16 @@ static const char *raid_desc = "PCI-X SCSI RAID Adapter";
 static const char *jbod_desc = "PCI-X SCSI Adapter";
 static const char *sas_raid_desc = "PCI-X SAS RAID Adapter";
 static const char *sas_jbod_desc = "PCI-X SAS Adapter";
-
-/* xxx 
 static const char *aux_cache_desc = "PCI-X Aux Cache Adapter";
-*/
+
 const char *get_ioa_desc(struct ipr_ioa *ioa)
 {
 	const struct ioa_details *details = get_ioa_details(ioa);
 
 	if (details)
 		return details->ioa_desc;
+	else if (ioa->is_aux_cache)
+		return aux_cache_desc;
 	else if (!is_spi(ioa)){
 		if (ioa->qac_data->num_records)
 			return sas_raid_desc;
@@ -3051,6 +3051,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 				}
 			}
 			ioa->af_block_size = get_af_block_size(&ioa_cap);
+			if (ioa_cap.is_aux_cache)
+				ioa->is_aux_cache = 1;
 		}
 	} else
 		ioa->ioa_dead = 1;

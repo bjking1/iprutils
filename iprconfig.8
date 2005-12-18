@@ -186,6 +186,11 @@ Show all configured hot spares.
 .TP
 .B show-af-disks
 .br
+Show disks formatted for Advanced Function that are not
+configured in an array or as a hot spare.
+.TP
+.B show-all-af-disks
+.br
 Show all disks formatted for Advanced Function
 .TP
 .B show-jbod-disks
@@ -199,6 +204,13 @@ up in the last column of the Display hardware status menu. Can specify either a
 /dev/sdX name or a /dev/sgX name. Example:
 .br
 .B iprconfig -c status /dev/sda
+.br
+.TP
+.B alt-status [device]
+.br
+Show the status of the specified device. This is the same status as above with
+the exception of when a long running command is executing to the device, in
+which case the percent complete for the long running command is printed.
 .br
 .TP
 .B query-raid-create [IOA]
