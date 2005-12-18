@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.83 2005/12/15 02:10:07 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.84 2005/12/18 00:26:51 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3507,6 +3507,7 @@ static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
 
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
+	int rc;
 	char temp[100];
 	struct ipr_mode_pages mode_pages;
 	struct ipr_ioa_mode_page *page;
@@ -3537,6 +3538,9 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 		attr->tcq_enabled = is_tagged(dev);
 
 	attr->format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
+	rc = ipr_get_saved_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp);
+	if (rc == RC_SUCCESS)
+		sscanf(temp, "%d", &attr->format_timeout);
 
 	return 0;
 }

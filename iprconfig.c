@@ -190,7 +190,7 @@ static int can_format_for_raid(struct ipr_dev *dev)
 static void flush_stdscr()
 {
 	if (!use_curses) {
-		fprintf(stdout, "\n");
+		fprintf(stdout, "\r");
 		fflush(stdout);
 		return;
 	}
@@ -7097,9 +7097,6 @@ int disk_config(i_container * i_con)
 			    ipr_is_array_member(dev))
 				continue;
 
-			if (ipr_is_af_dasd_device(dev))
-				continue;
-
 			print_dev(k, dev, buffer, "%1", k);
 			i_con = add_i_con(i_con, "\0", dev);  
 
@@ -9847,10 +9844,10 @@ static int set_tcq_enable(char **args, int num_args)
 {
 	int rc;
 	struct ipr_disk_attr attr;
-	struct ipr_dev *dev = find_dev(args[1]);
+	struct ipr_dev *dev = find_dev(args[0]);
 
 	if (!dev) {
-		fprintf(stderr, "Cannot find %s\n", args[1]);
+		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
@@ -9864,7 +9861,7 @@ static int set_tcq_enable(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	attr.tcq_enabled = strtoul(args[0], NULL, 10);
+	attr.tcq_enabled = strtoul(args[1], NULL, 10);
 
 	if (attr.tcq_enabled != 0 && attr.tcq_enabled != 1) {
 		fprintf(stderr, "Invalid parameter\n");
@@ -9878,10 +9875,10 @@ static int set_qdepth(char **args, int num_args)
 {
 	int rc;
 	struct ipr_disk_attr attr;
-	struct ipr_dev *dev = find_dev(args[1]);
+	struct ipr_dev *dev = find_dev(args[0]);
 
 	if (!dev) {
-		fprintf(stderr, "Cannot find %s\n", args[1]);
+		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
@@ -9895,7 +9892,7 @@ static int set_qdepth(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	attr.queue_depth = strtoul(args[0], NULL, 10);
+	attr.queue_depth = strtoul(args[1], NULL, 10);
 
 	return ipr_set_dev_attr(dev, &attr, 1);
 }
@@ -9904,10 +9901,10 @@ static int set_format_timeout(char **args, int num_args)
 {
 	int rc;
 	struct ipr_disk_attr attr;
-	struct ipr_dev *dev = find_dev(args[1]);
+	struct ipr_dev *dev = find_dev(args[0]);
 
 	if (!dev) {
-		fprintf(stderr, "Cannot find %s\n", args[1]);
+		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
@@ -9921,7 +9918,7 @@ static int set_format_timeout(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	attr.format_timeout = strtoul(args[0], NULL, 10) * 3600;
+	attr.format_timeout = strtoul(args[1], NULL, 10) * 3600;
 
 	return ipr_set_dev_attr(dev, &attr, 1);
 }
@@ -10376,12 +10373,12 @@ static int query_format_timeout(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	if (!ipr_is_af_dasd_device(dev)) {
+		dprintf("%s is not an Advanced Function disk\n", args[0]);
+		return -EINVAL;
+	}
+
 	rc = ipr_get_dev_attr(dev, &attr);
-
-	if (rc)
-		return rc;
-
-	rc = ipr_modify_dev_attr(dev, &attr);
 
 	if (rc)
 		return rc;
@@ -10842,7 +10839,7 @@ static const struct {
 	{ "query-raid-rebuild",			0, 0, 0, query_raid_rebuild, "" },
 	{ "query-format-for-raid",		0, 0, 0, query_format_for_raid, "" },
 	{ "query-ucode-level",			1, 0, 1, query_ucode_level, "sda" },
-	{ "query-format-timeout",		1, 0, 1, query_format_timeout, "sda" },
+	{ "query-format-timeout",		1, 0, 1, query_format_timeout, "sg6" },
 	{ "query-qdepth",				1, 0, 1, query_qdepth, "sda" },
 	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable, "sda" },
 	{ "query-log-level",			1, 0, 1, query_log_level, "sg5" },

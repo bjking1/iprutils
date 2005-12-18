@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.69 2005/12/15 02:10:07 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.70 2005/12/18 00:26:51 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1686,6 +1686,12 @@ static inline void ipr_strncpy_0n(char *dest, char *source, int length)
 	if (ch)
 		*ch = '\0';
 }
+
+#define dprintf(...) \
+do { \
+if (ipr_debug) \
+fprintf(stderr, __VA_ARGS__);\
+} while(0)
 
 #define syslog_dbg(...) \
 do { \
