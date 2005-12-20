@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.1.0
+Version: 2.1.1
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Dec 20 2005 Brian King <brking@us.ibm.com> 2.1.1
+- Fix compile error in iprconfig
 * Thu Dec 18 2005 Brian King <brking@us.ibm.com> 2.1.0
 - Updates for aux cache IOAs
 - Updates for SAS adapters

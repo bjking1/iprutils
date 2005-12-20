@@ -2859,7 +2859,7 @@ int configure_raid_parameters(i_container *i_con)
 			i = 0;
 			while (raid_item[i] != NULL)
 				free_item(raid_item[i++]);
-			realloc(raid_item, 0);
+			free(raid_item);
 			raid_item = NULL;
 
 			if (rc == EXIT_FLAG)
