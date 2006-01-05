@@ -4768,6 +4768,7 @@ int process_conc_maint(i_container *i_con, int action)
 	struct ipr_res_addr res_addr;
 	int time = 12;
 	int max_y, max_x;
+	u8 diag_buf[2048];
 
 	for_each_icon(temp_i_con) {
 		input = temp_i_con->field_data;
@@ -4807,15 +4808,22 @@ int process_conc_maint(i_container *i_con, int action)
 
 		if (!scsi_dev_data || scsi_dev_data->type != TYPE_ENCLOSURE)
 			continue;
+		if (res_addr.bus != scsi_dev_data->channel)
+			continue;
 
 		rc = ipr_receive_diagnostics(&ioa->dev[j], 2, &ses_data,
 					     sizeof(struct ipr_encl_status_ctl_pg));
 
-		if (rc || res_addr.bus != scsi_dev_data->channel)
+		if (rc)
+			continue;
+
+		rc = ipr_receive_diagnostics(&ioa->dev[j], 1, diag_buf, sizeof(diag_buf));
+
+		if (rc)
 			continue;
 
 		found = 0;
-		for_each_elem_status(i, &ses_data) {
+		for_each_elem_status(i, &ses_data, diag_buf) {
 			if (res_addr.target == ses_data.elem_status[i].scsi_id) {
 				found++;
 
@@ -5026,6 +5034,7 @@ int start_conc_maint(i_container *i_con, int action)
 	s_node *n_screen;
 	int header_lines;
 	u8 scsi_id_found;
+	u8 diag_buf[2048];
 
 	processing();
 
@@ -5050,6 +5059,11 @@ int start_conc_maint(i_container *i_con, int action)
 			if (!scsi_dev_data || scsi_dev_data->type != TYPE_ENCLOSURE)
 				continue;
 
+			rc = ipr_receive_diagnostics(&ioa->dev[j], 1, diag_buf, sizeof(diag_buf));
+
+			if (rc)
+				continue;
+
 			rc = ipr_receive_diagnostics(&ioa->dev[j], 2, &ses_data,
 						     sizeof(struct ipr_encl_status_ctl_pg));
 
@@ -5059,7 +5073,7 @@ int start_conc_maint(i_container *i_con, int action)
 			ses_channel = scsi_dev_data->channel;
 			scsi_id_found = 0;
 
-			for_each_elem_status(i, &ses_data) {
+			for_each_elem_status(i, &ses_data, diag_buf) {
 				get_dev_raid_level(ioa);
 
 				if (scsi_id_found & (1 << ses_data.elem_status[i].scsi_id))

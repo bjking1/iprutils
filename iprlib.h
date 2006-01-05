@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.55.2.1 2005/07/29 19:42:01 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.55.2.2 2006/01/05 16:46:03 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1348,6 +1348,14 @@ struct ipr_dram_vpd {
 	u8 dram_size[IPR_VPD_DRAM_SIZE_LEN];
 };
 
+struct ipr_ses_type_desc {
+	u8 elem_type;
+#define IPR_SES_DEVICE_ELEM	0x01
+	u8 num_elems;
+	u8 subenclosure_id;
+	u8 text_len;
+};
+
 struct ipr_drive_elem_status
 {
 #if defined (__BIG_ENDIAN_BITFIELD)
@@ -1442,8 +1450,56 @@ struct ipr_encl_status_ctl_pg
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };
 
-#define for_each_elem_status(i, ses_data) \
-        for (i = 0; i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) && \
+static inline int ipr_dev_elem_offset(u8 *diag)
+{
+	int i, off;
+	struct ipr_ses_type_desc *desc;
+
+	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
+
+	for (i = 0, off = 0; i < diag[10]; off += (desc->num_elems + 1), i++, desc++)
+		if (desc->elem_type == IPR_SES_DEVICE_ELEM)
+			return off;
+
+	return 0;
+}
+
+static inline struct ipr_ses_type_desc *ipr_get_dev_elem(u8 *diag)
+{
+	int i;
+	struct ipr_ses_type_desc *desc;
+
+	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
+
+	for (i = 0; i < diag[10]; i++, desc++)
+		if (desc->elem_type == IPR_SES_DEVICE_ELEM)
+			return desc;
+
+	return NULL;
+}
+
+static inline int ipr_max_dev_elems(u8 *diag)
+{
+	int i;
+	struct ipr_ses_type_desc *desc = ipr_get_dev_elem(diag);
+
+	if (desc) {
+		for (i = 0; i < diag[10]; i++, desc++) {
+			if (desc->elem_type != IPR_SES_DEVICE_ELEM)
+				continue;
+			if (desc->num_elems < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES)
+				return desc->num_elems;
+			return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
+		}
+	}
+
+	return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
+}
+
+#define for_each_elem_status(i, ses_data, diag) \
+        for (i = ipr_dev_elem_offset(diag); \
+             i < ((ntohs((ses_data)->byte_count)-8)/sizeof(struct ipr_drive_elem_status)) && \
+             (i - ipr_dev_elem_offset(diag)) < ipr_max_dev_elems(diag) && \
              i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++)
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
