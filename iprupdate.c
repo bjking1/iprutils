@@ -10,7 +10,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.21 2005/03/25 22:21:02 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprupdate.c,v 1.22 2006/01/05 20:20:48 brking Exp $
  */
 
 #include <unistd.h>
@@ -70,47 +70,48 @@ static int dev_needs_update(struct ipr_dev *dev)
 	return 1;
 }
 
-static void update_ioa_fw(struct ipr_ioa *ioa, int force)
+static int update_ioa_fw(struct ipr_ioa *ioa, int force)
 {
 	int rc;
 	struct ipr_fw_images *list;
 
-	if (!ioa_needs_update(ioa, 1))
-		return;
+	if (!ioa_needs_update(ioa, 1) && !force)
+		return 0;
 
 	rc = get_ioa_firmware_image_list(ioa, &list);
 
 	if (rc < 1) {
 		if (ioa->should_init)
 			ipr_log_ucode_error(ioa);
-		return;
+		return rc;
 	}
 
-	ipr_update_ioa_fw(ioa, list, force);
+	rc = ipr_update_ioa_fw(ioa, list, force);
 	free(list);
+	return rc;
 }
 
-static void update_disk_fw(struct ipr_dev *dev)
+static int update_disk_fw(struct ipr_dev *dev)
 {
 	int rc;
 	struct ipr_fw_images *list;
 
 	if (polling_mode && !dev->should_init)
-		return;
+		return 0;
 
 	if (!dev->scsi_dev_data || ipr_is_volume_set(dev) ||
 	    (dev->scsi_dev_data->type != TYPE_DISK &&
 	     dev->scsi_dev_data->type != IPR_TYPE_AF_DISK))
-		return;
+		return 0;
 
 	rc = get_dasd_firmware_image_list(dev, &list);
 
 	if (rc > 0) {
-		ipr_update_disk_fw(dev, list, force_devs);
+		rc = ipr_update_disk_fw(dev, list, force_devs);
 		free(list);
 	}
 
-	return;
+	return rc;
 }
 
 static int download_needed(struct ipr_ioa *ioa)
@@ -140,22 +141,26 @@ static int any_download_needed()
 	return rc;
 }
 
-static void update_ioa(struct ipr_ioa *ioa)
+static int update_ioa(struct ipr_ioa *ioa)
 {
 	struct ipr_dev *dev;
+	int rc = 0;
 
 	if (polling_mode && !ioa->should_init)
-		return;
+		return 0;
 
-	update_ioa_fw(ioa, force_ioas);
+	rc |= update_ioa_fw(ioa, force_ioas);
 
 	for_each_dev(ioa, dev)
-		update_disk_fw(dev);
+		rc |= update_disk_fw(dev);
+
+	return rc;
 }
 
-static void update_all()
+static int __update_all()
 {
 	struct ipr_ioa *ioa;
+	int rc = 0;
 
 	polling_mode = 1;
 
@@ -163,7 +168,14 @@ static void update_all()
 	check_current_config(false);
 
 	for_each_ioa(ioa)
-		update_ioa(ioa);
+		rc |= update_ioa(ioa);
+
+	return rc;
+}
+
+static void update_all()
+{
+	__update_all();
 }
 
 static void kevent_handler(char *buf)
@@ -180,7 +192,7 @@ static void kevent_handler(char *buf)
 
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, rc;
 	int check_levels = 0;
 
 	openlog("iprupdate", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
@@ -211,10 +223,10 @@ int main(int argc, char *argv[])
 	if (check_levels)
 		return any_download_needed();
 
-	update_all();
+	rc = __update_all();
 
 	if (!daemonize)
-		return 0;
+		return rc;
 
 	force_devs = force_ioas = 0;
 	ipr_daemonize();

@@ -56,6 +56,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Jan 5 2006 Brian King <brking@us.ibm.com>
+- Make iprupdate return success/failure indication
+  when invoked with --force.
+* Tue Jan 3 2006 Brian King <brking@us.ibm.com>
+- Concurrent maintenance fix for 7031-D24/T24.
 * Tue Dec 20 2005 Brian King <brking@us.ibm.com> 2.1.1
 - Fix compile error in iprconfig
 * Thu Dec 18 2005 Brian King <brking@us.ibm.com> 2.1.0

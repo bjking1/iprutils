@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.85 2005/12/18 20:42:48 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.86 2006/01/05 20:20:48 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -4540,8 +4540,8 @@ void ipr_log_ucode_error(struct ipr_ioa *ioa)
 	}
 }
 
-void ipr_update_ioa_fw(struct ipr_ioa *ioa,
-		       struct ipr_fw_images *image, int force)
+int ipr_update_ioa_fw(struct ipr_ioa *ioa,
+		      struct ipr_fw_images *image, int force)
 {
 	struct sysfs_class_device *class_device;
 	struct sysfs_attribute *attr;
@@ -4557,16 +4557,16 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	fw_version = get_ioa_fw_version(ioa);
 
 	if (fw_version >= ioa->msl && !force)
-		return;
+		return 0;
 
 	if (ipr_get_hotplug_dir())
-		return;
+		return 0;
 
 	fd = open(image->file, O_RDONLY);
 
 	if (fd < 0) {
 		syslog(LOG_ERR, "Could not open firmware file %s.\n", image->file);
-		return;
+		return fd;
 	}
 
 	rc = fstat(fd, &ucode_stats);
@@ -4574,7 +4574,7 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	if (rc != 0) {
 		syslog(LOG_ERR, "Failed to stat IOA firmware file: %s.\n", image->file);
 		close(fd);
-		return;
+		return rc;
 	}
 
 	image_hdr = mmap(NULL, ucode_stats.st_size, PROT_READ, MAP_SHARED, fd, 0);
@@ -4582,7 +4582,7 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	if (image_hdr == MAP_FAILED) {
 		syslog(LOG_ERR, "Error mapping IOA firmware file: %s.\n", image->file);
 		close(fd);
-		return;
+		return -EIO;
 	}
 
 	if (ntohl(image_hdr->rev_level) > fw_version || force) {
@@ -4596,7 +4596,7 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 			syslog(LOG_ERR, "Failed to open %s. %m\n", hotplug_dir);
 			munmap(image_hdr, ucode_stats.st_size);
 			close(fd);
-			return;
+			return -EIO;
 		}
 		closedir(dir);
 		sprintf(ucode_file, "%s/.%s", hotplug_dir, tmp);
@@ -4623,12 +4623,13 @@ void ipr_update_ioa_fw(struct ipr_ioa *ioa,
 
 	munmap(image_hdr, ucode_stats.st_size);
 	close(fd);
+	return rc;
 }
 
 /* xxx make a general routine to do write buffer that takes a
  struct ipr_fw_images as input */
-void ipr_update_disk_fw(struct ipr_dev *dev,
-			struct ipr_fw_images *image, int force)
+int ipr_update_disk_fw(struct ipr_dev *dev,
+		       struct ipr_fw_images *image, int force)
 {
 	int rc = 0;
 	struct stat ucode_stats;
@@ -4644,29 +4645,29 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 			 &std_inq_data, sizeof(std_inq_data));
 
 	if (rc != 0)
-		return;
+		return rc;
 
 	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
 
 	if (rc != 0) {
 		scsi_dbg(dev, "Inquiry failed\n");
-		return;
+		return rc;
 	}
 
 	if (!force) {
 		unsupp_af = get_unsupp_af(&std_inq_data, &page3_inq);
 		if (!unsupp_af)
-			return;
+			return 0;
 
 		if (!disk_needs_msl(unsupp_af, &std_inq_data))
-			return;
+			return 0;
 	}
 
 	fd = open(image->file, O_RDONLY);
 
 	if (fd < 0) {
 		syslog_dbg("Could not open firmware file %s.\n", image->file);
-		return;
+		return fd;
 	}
 
 	rc = fstat(fd, &ucode_stats);
@@ -4674,7 +4675,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 	if (rc != 0) {
 		syslog(LOG_ERR, "Failed to stat firmware file: %s.\n", image->file);
 		close(fd);
-		return;
+		return rc;
 	}
 
 	img_hdr = mmap(NULL, ucode_stats.st_size,
@@ -4683,7 +4684,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 	if (img_hdr == MAP_FAILED) {
 		syslog(LOG_ERR, "Error reading firmware file: %s.\n", image->file);
 		close(fd);
-		return;
+		return -EIO;
 	}
 
 	level = htonl(image->version);
@@ -4706,6 +4707,7 @@ void ipr_update_disk_fw(struct ipr_dev *dev,
 		syslog(LOG_ERR, "munmap failed.\n");
 
 	close(fd);
+	return rc;
 }
 
 static int mode_select(struct ipr_dev *dev, void *buff, int length)
@@ -5033,10 +5035,10 @@ static void init_ioa_dev(struct ipr_dev *dev)
 		return;
 }
 
-void ipr_init_dev(struct ipr_dev *dev)
+int ipr_init_dev(struct ipr_dev *dev)
 {
 	if (!dev->scsi_dev_data)
-		return;
+		return 0;
 
 	switch (dev->scsi_dev_data->type) {
 	case TYPE_DISK:
@@ -5055,6 +5057,8 @@ void ipr_init_dev(struct ipr_dev *dev)
 	default:
 		break;
 	};
+
+	return 0;
 }
 
 void ipr_init_new_dev(struct ipr_dev *dev)
@@ -5079,21 +5083,22 @@ void ipr_init_new_dev(struct ipr_dev *dev)
 	ipr_init_dev(dev);
 }
 
-void ipr_init_ioa(struct ipr_ioa *ioa)
+int ipr_init_ioa(struct ipr_ioa *ioa)
 {
 	int i = 0;
 
 	if (ioa->ioa_dead)
-		return;
+		return 0;
 
 	for (i = 0; i < ioa->num_devices; i++)
 		ipr_init_dev(&ioa->dev[i]);
 
 	init_ioa_dev(&ioa->ioa);
+	return 0;
 }
 
 void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
-		     void (*func)(struct ipr_dev *))
+		     int (*func)(struct ipr_dev *))
 {
 	struct ipr_dev *dev;
 	char *name;
@@ -5117,7 +5122,7 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 	func(dev);
 }
 
-void scsi_host_kevent(char *buf, void (*func)(struct ipr_ioa *))
+void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 {
 	struct ipr_ioa *ioa;
 	char *c;

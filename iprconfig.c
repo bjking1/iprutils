@@ -4602,10 +4602,10 @@ int process_conc_maint(i_container *i_con, int action)
 	struct ipr_dev *dev, *ses;
 	char *input;
 	struct ipr_ioa *ioa;
-	int i, k, rc;
+	int k, rc;
 	struct ipr_dev_record *dev_rcd;
 	struct ipr_encl_status_ctl_pg ses_data;
-	struct ipr_drive_elem_status *elem_status;
+	struct ipr_drive_elem_status *elem_status, *overall;
 	char *buffer[2];
 	int header_lines;
 	int toggle=1;
@@ -4614,6 +4614,7 @@ int process_conc_maint(i_container *i_con, int action)
 	struct ipr_res_addr res_addr;
 	int time = 12;
 	int max_y, max_x;
+	u8 diag_buf[2048];
 
 	for_each_icon(temp_i_con) {
 		input = temp_i_con->field_data;
@@ -4655,9 +4656,13 @@ int process_conc_maint(i_container *i_con, int action)
 		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
 			continue;
 
+		rc = ipr_receive_diagnostics(ses, 1, diag_buf, sizeof(diag_buf));
+
+		if (rc)
+			continue;
+
 		found = 0;
-		i = 0;
-		for_each_elem_status(elem_status, &ses_data) {
+		for_each_elem_status(elem_status, &ses_data, diag_buf) {
 			if (res_addr.target == elem_status->scsi_id) {
 				found++;
 
@@ -4674,7 +4679,6 @@ int process_conc_maint(i_container *i_con, int action)
 				}
 				break;
 			}
-			i++;
 		}
 
 		if (found)
@@ -4685,11 +4689,12 @@ int process_conc_maint(i_container *i_con, int action)
 		return INVALID_OPTION_STATUS;
 
 	if (action == IPR_WAIT_CONC_REMOVE || action == IPR_WAIT_CONC_ADD) {
-		ses_data.overall_status_select = 1;
-		ses_data.overall_status_disable_resets = 1;
-		ses_data.overall_status_insert = 0;
-		ses_data.overall_status_remove = 0;
-		ses_data.overall_status_identify = 0;
+		overall = ipr_get_overall_elem(&ses_data, diag_buf);
+		overall->select = 1;
+		overall->disable_resets = 1;
+		overall->insert = 0;
+		overall->remove = 0;
+		overall->identify = 0;
 	}
 
 	if (action == IPR_VERIFY_CONC_REMOVE)
@@ -4734,15 +4739,16 @@ int process_conc_maint(i_container *i_con, int action)
 	n_screen->body = NULL;
 
 	/* turn light off flashing light */
-	ses_data.overall_status_select = 1;
-	ses_data.overall_status_disable_resets = 0;
-	ses_data.overall_status_insert = 0;
-	ses_data.overall_status_remove = 0;
-	ses_data.overall_status_identify = 0;
-	ses_data.elem_status[i].select = 1;
-	ses_data.elem_status[i].insert = 0;
-	ses_data.elem_status[i].remove = 0;
-	ses_data.elem_status[i].identify = 0;
+	overall = ipr_get_overall_elem(&ses_data, diag_buf);
+	overall->select = 1;
+	overall->disable_resets = 0;
+	overall->insert = 0;
+	overall->remove = 0;
+	overall->identify = 0;
+	elem_status->select = 1;
+	elem_status->insert = 0;
+	elem_status->remove = 0;
+	elem_status->identify = 0;
 
 	ipr_send_diagnostics(ses, &ses_data,
 			     sizeof(struct ipr_encl_status_ctl_pg));
@@ -4854,16 +4860,20 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	struct ipr_dev *ses, *dev;
 	int num_devs = 0;
 	int ses_bus, scsi_id_found;
+	u8 diag_buf[2048];
 
 	for_each_primary_ioa(ioa) {
 		for_each_ses(ioa, ses) {
 			if (ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
 				continue;
 
+			if (ipr_receive_diagnostics(ses, 1, diag_buf, sizeof(diag_buf)))
+				continue;
+
 			ses_bus = ses->scsi_dev_data->channel;
 			scsi_id_found = 0;
 
-			for_each_elem_status(elem_status, &ses_data) {
+			for_each_elem_status(elem_status, &ses_data, diag_buf) {
 				if (scsi_id_found & (1 << elem_status->scsi_id))
 					continue;
 				scsi_id_found |= (1 << elem_status->scsi_id);
@@ -9572,10 +9582,11 @@ static int __add_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses;
 	struct ipr_encl_status_ctl_pg ses_data;
-	struct ipr_drive_elem_status *elem_status;
+	struct ipr_drive_elem_status *elem_status, *overall;
 	struct ipr_res_addr res_addr;
 	int rc, found;
 	int time = 12;
+	u8 diag_buf[2048];
 
 	if (get_res_addr(dev, &res_addr)) {
 		fprintf(stderr, "Invalid device\n");
@@ -9589,8 +9600,11 @@ static int __add_device(struct ipr_dev *dev, int on)
 		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
 			continue;
 
+		if (ipr_receive_diagnostics(ses, 1, diag_buf, sizeof(diag_buf)))
+			continue;
+
 		found = 0;
-		for_each_elem_status(elem_status, &ses_data) {
+		for_each_elem_status(elem_status, &ses_data, diag_buf) {
 			if (res_addr.target == elem_status->scsi_id) {
 				found++;
 				elem_status->select = 1;
@@ -9610,8 +9624,9 @@ static int __add_device(struct ipr_dev *dev, int on)
 		return -EINVAL;
 	}
 
-	ses_data.overall_status_select = 1;
-	ses_data.overall_status_disable_resets = on;
+	overall = ipr_get_overall_elem(&ses_data, diag_buf); 
+	overall->select = 1;
+	overall->disable_resets = on;
 
 	rc = ipr_send_diagnostics(ses, &ses_data,
 				  sizeof(struct ipr_encl_status_ctl_pg));
@@ -9635,9 +9650,10 @@ static int __remove_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses;
 	struct ipr_encl_status_ctl_pg ses_data;
-	struct ipr_drive_elem_status *elem_status;
+	struct ipr_drive_elem_status *elem_status, *overall;
 	struct ipr_res_addr res_addr;
 	int rc, found;
+	u8 diag_buf[2048];
 
 	if (get_res_addr(dev, &res_addr)) {
 		fprintf(stderr, "Invalid device\n");
@@ -9661,8 +9677,11 @@ static int __remove_device(struct ipr_dev *dev, int on)
 		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
 			continue;
 
+		if (ipr_receive_diagnostics(ses, 1, diag_buf, sizeof(diag_buf)))
+			continue;
+
 		found = 0;
-		for_each_elem_status(elem_status, &ses_data) {
+		for_each_elem_status(elem_status, &ses_data, diag_buf) {
 			if (res_addr.target == elem_status->scsi_id) {
 				found++;
 				elem_status->select = 1;
@@ -9682,8 +9701,9 @@ static int __remove_device(struct ipr_dev *dev, int on)
 		return -EINVAL;
 	}
 
-	ses_data.overall_status_select = 1;
-	ses_data.overall_status_disable_resets = on;
+	overall = ipr_get_overall_elem(&ses_data, diag_buf);
+	overall->select = 1;
+	overall->disable_resets = on;
 
 	rc = ipr_send_diagnostics(ses, &ses_data,
 				  sizeof(struct ipr_encl_status_ctl_pg));
@@ -9757,6 +9777,7 @@ static int __identify_device(struct ipr_dev *dev, int on)
 	struct ipr_drive_elem_status *elem_status;
 	struct ipr_res_addr res_addr;
 	int rc, found;
+	u8 diag_buf[2048];
 
 	if (get_res_addr(dev, &res_addr)) {
 		fprintf(stderr, "Invalid device\n");
@@ -9770,8 +9791,11 @@ static int __identify_device(struct ipr_dev *dev, int on)
 		if (rc || res_addr.bus != ses->scsi_dev_data->channel)
 			continue;
 
+		if (ipr_receive_diagnostics(ses, 1, diag_buf, sizeof(diag_buf)))
+			continue;
+
 		found = 0;
-		for_each_elem_status(elem_status, &ses_data) {
+		for_each_elem_status(elem_status, &ses_data, diag_buf) {
 			if (res_addr.target == elem_status->scsi_id) {
 				found++;
 				elem_status->select = 1;
@@ -9935,31 +9959,33 @@ static int set_format_timeout(char **args, int num_args)
 static int update_ioa_ucode(struct ipr_ioa *ioa, char *file)
 {
 	struct ipr_fw_images image;
+	int rc;
 
 	strcpy(image.file, file);
 	image.version = get_ioa_ucode_version(file);
 	image.has_header = 0;
 
-	ipr_update_ioa_fw(ioa, &image, 1);
+	rc = ipr_update_ioa_fw(ioa, &image, 1);
 
 	if (image.version != get_ioa_fw_version(ioa))
 		return -EIO;
-	return 0;
+	return rc;
 }
 
 static int update_dev_ucode(struct ipr_dev *dev, char *file)
 {
 	struct ipr_fw_images image;
+	int rc;
 
 	strcpy(image.file, file);
 	image.version = get_dasd_ucode_version(file, 1);
 	image.has_header = 1;
 
-	ipr_update_disk_fw(dev, &image, 1);
+	rc = ipr_update_disk_fw(dev, &image, 1);
 
 	if (image.version != get_dev_fw_version(dev))
 		return -EIO;
-	return 0;
+	return rc;
 }
 
 static int update_ucode_cmd(char **args, int num_args)

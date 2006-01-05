@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.71 2005/12/18 20:42:48 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.72 2006/01/05 20:20:48 brking Exp $
  */
 
 #include <stdarg.h>
@@ -94,7 +94,7 @@
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (2 * 60)     /* 2 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
-#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    15
+#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
 #define IPR_DRIVE_ELEM_STATUS_POPULATED      1
 #define IPR_TIMEOUT_MINUTE_RADIX		0x4000
@@ -1405,6 +1405,14 @@ struct ipr_dram_vpd {
 	u8 dram_size[IPR_VPD_DRAM_SIZE_LEN];
 };
 
+struct ipr_ses_type_desc {
+	u8 elem_type;
+#define IPR_SES_DEVICE_ELEM	0x01
+	u8 num_elems;
+	u8 subenclosure_id;
+	u8 text_len;
+};
+
 struct ipr_drive_elem_status
 {
 #if defined (__BIG_ENDIAN_BITFIELD)
@@ -1426,7 +1434,8 @@ struct ipr_drive_elem_status
 	u8 reserved5:1;
 	u8 fault_requested:1;
 	u8 fault_sensed:1;
-	u8 reserved6:5;
+	u8 reserved6:4;
+	u8 disable_resets:1;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 status:4;
 	u8 swap:1;
@@ -1443,7 +1452,8 @@ struct ipr_drive_elem_status
 	u8 insert:1;
 	u8 reserved3:4;
 
-	u8 reserved6:5;
+	u8 disable_resets:1;
+	u8 reserved6:4;
 	u8 fault_sensed:1;
 	u8 fault_requested:1;
 	u8 reserved5:1;
@@ -1456,52 +1466,65 @@ struct ipr_encl_status_ctl_pg
 	u8 health_status;
 	u16 byte_count;
 	u8 reserved1[4];
-
-#if defined (__BIG_ENDIAN_BITFIELD)
-	u8 overall_status_select:1;
-	u8 overall_status_predictive_fault:1;
-	u8 overall_status_reserved:1;
-	u8 overall_status_swap:1;
-	u8 overall_status_reserved2:4;
-
-	u8 overall_status_reserved3;
-
-	u8 overall_status_reserved4:4;
-	u8 overall_status_insert:1;
-	u8 overall_status_remove:1;
-	u8 overall_status_identify:1;
-	u8 overall_status_reserved5:1;
-
-	u8 overall_status_reserved6:2;
-	u8 overall_status_fault_requested:1;
-	u8 overall_status_reserved7:4;
-	u8 overall_status_disable_resets:1;
-#elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 overall_status_reserved2:4;
-	u8 overall_status_swap:1;
-	u8 overall_status_reserved:1;
-	u8 overall_status_predictive_fault:1;
-	u8 overall_status_select:1;
-
-	u8 overall_status_reserved3;
-
-	u8 overall_status_reserved5:1;
-	u8 overall_status_identify:1;
-	u8 overall_status_remove:1;
-	u8 overall_status_insert:1;
-	u8 overall_status_reserved4:4;
-
-	u8 overall_status_disable_resets:1;
-	u8 overall_status_reserved7:4;
-	u8 overall_status_fault_requested:1;
-	u8 overall_status_reserved6:2;
-#endif
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };
 
-#define for_each_elem_status(elem, sd) \
-        for (elem = (sd)->elem_status; \
-             elem < &((sd)->elem_status[(ntohs((sd)->byte_count)-8)/sizeof((sd)->elem_status[0])]) && \
+static inline int ipr_dev_elem_offset(u8 *diag)
+{
+	int i, off;
+	struct ipr_ses_type_desc *desc;
+
+	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
+
+	for (i = 0, off = 1; i < diag[10]; off += (desc->num_elems + 1), i++, desc++)
+		if (desc->elem_type == IPR_SES_DEVICE_ELEM)
+			return off;
+
+	return 1;
+}
+
+static inline struct ipr_drive_elem_status *
+ipr_get_overall_elem(struct ipr_encl_status_ctl_pg *ses_data, u8 *diag)
+{
+	return &(ses_data->elem_status[ipr_dev_elem_offset(diag) - 1]);
+}
+
+static inline struct ipr_ses_type_desc *ipr_get_dev_elem(u8 *diag)
+{
+	int i;
+	struct ipr_ses_type_desc *desc;
+
+	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
+
+	for (i = 0; i < diag[10]; i++, desc++)
+		if (desc->elem_type == IPR_SES_DEVICE_ELEM)
+			return desc;
+
+	return NULL;
+}
+
+static inline int ipr_max_dev_elems(u8 *diag)
+{
+	int i;
+	struct ipr_ses_type_desc *desc = ipr_get_dev_elem(diag);
+
+	if (desc) {
+		for (i = 0; i < diag[10]; i++, desc++) {
+			if (desc->elem_type != IPR_SES_DEVICE_ELEM)
+				continue;
+			if (desc->num_elems < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES)
+				return desc->num_elems;
+			return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
+		}
+	}
+
+	return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
+}
+
+#define for_each_elem_status(elem, sd, diag) \
+        for (elem = &((sd)->elem_status[ipr_dev_elem_offset(diag)]); \
+             elem < &((sd)->elem_status[(ntohs((sd)->byte_count)-4)/sizeof((sd)->elem_status[0])]) && \
+             elem < &((sd)->elem_status[ipr_dev_elem_offset(diag) + ipr_max_dev_elems(diag)]) && \
              elem < &((sd)->elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES]); elem++)
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
@@ -1559,11 +1582,11 @@ int ipr_set_dasd_timeouts(struct ipr_dev *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 int get_ses_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
-void ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
-void ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
-void ipr_init_dev(struct ipr_dev *);
+int ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
+int ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
+int ipr_init_dev(struct ipr_dev *);
 void ipr_init_new_dev(struct ipr_dev *);
-void ipr_init_ioa(struct ipr_ioa *);
+int ipr_init_ioa(struct ipr_ioa *);
 int device_supported(struct ipr_dev *);
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr);
 struct ipr_dev *get_dev_from_handle(u32 res_handle);
@@ -1594,8 +1617,8 @@ struct ipr_dev *find_blk_dev(char *);
 struct ipr_dev *find_gen_dev(char *);
 struct ipr_dev *find_dev(char *);
 int ipr_cmds_per_lun(struct ipr_ioa *);
-void scsi_host_kevent(char *, void (*)(struct ipr_ioa *));
-void scsi_dev_kevent(char *, struct ipr_dev *(*)(char *), void (*)(struct ipr_dev *));
+void scsi_host_kevent(char *, int (*)(struct ipr_ioa *));
+void scsi_dev_kevent(char *, struct ipr_dev *(*)(char *), int (*)(struct ipr_dev *));
 int format_req(struct ipr_dev *);
 struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *, struct sysfs_dev *);
 void ipr_add_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);

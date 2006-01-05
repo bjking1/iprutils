@@ -1051,7 +1051,7 @@ s_node n_change_bus_attr = {
 	.title    = __("Change SCSI Bus Configuration"),
 	.header   = {
 		__("Current bus configurations are shown. To change "
-		   "setting hit 'c' for options menu. Hightlight "
+		   "setting hit 'c' for options menu. Highlight "
 		   "desired option then hit Enter.\n"),
 		__("  c=Change Setting\n\n"),
 		"" }
@@ -1130,7 +1130,7 @@ s_node n_change_disk_config = {
 	.title    = __("Change Configuration of Disk"),
 	.header   = {
 		__("Current Disk configurations are shown. To change "
-		   "setting hit 'c' for options menu. Hightlight "
+		   "setting hit 'c' for options menu. Highlight "
 		   "desired option then hit Enter.\n"),
 		__("  c=Change Setting\n\n"),
 		"" }
@@ -1164,7 +1164,7 @@ s_node n_change_ioa_config = {
 	.title    = __("Change Configuration of Adapter"),
 	.header   = {
 		__("Current Adapter configurations are shown. To change "
-		   "setting hit 'c' for options menu. Hightlight "
+		   "setting hit 'c' for options menu. Highlight "
 		   "desired option then hit Enter.\n"),
 		__("  c=Change Setting\n\n"),
 		"" }
