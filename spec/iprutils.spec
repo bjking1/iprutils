@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.1.1
+Version: 2.1.2
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,7 +56,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Thu Jan 5 2006 Brian King <brking@us.ibm.com>
+* Thu Jan 5 2006 Brian King <brking@us.ibm.com> 2.1.2
 - Make iprupdate return success/failure indication
   when invoked with --force.
 * Tue Jan 3 2006 Brian King <brking@us.ibm.com>
