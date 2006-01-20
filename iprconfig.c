@@ -9229,7 +9229,7 @@ static int query_raid_create(char **args, int num_args)
 
 	ioa = dev->ioa;
 
-	if (!ioa->start_array_qac_entry)
+	if (!ioa->qac_data->num_records)
 		return 0;
 
 	for_each_disk(ioa, dev) {

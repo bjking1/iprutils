@@ -56,6 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Jan 20 2005 Brian King <brking@us.ibm.com>
+- Fixed a bug in iprconfig query-raid-create that prevented
+  JBOD candidates from being displayed if there were no
+  AF candidates as well.
 * Thu Jan 5 2006 Brian King <brking@us.ibm.com> 2.1.2
 - Make iprupdate return success/failure indication
   when invoked with --force.
