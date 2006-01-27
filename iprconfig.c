@@ -6369,7 +6369,7 @@ int bus_config(i_container *i_con)
 	body_init_status(buffer, n_bus_config.header, &header_lines);
 
 	for_each_ioa(ioa) {
-		if (!is_spi(ioa) && !ipr_debug)
+		if ((!is_spi(ioa) || ioa->is_aux_cache) && !ipr_debug)
 			continue;
 
 		/* mode sense page28 to focal point */
@@ -6524,6 +6524,9 @@ int change_bus_attr(i_container *i_con)
 	header_lines++;
 
 	for (j = 0; j < page_28_cur.num_buses; j++) {
+		if (ioa->protect_last_bus && j == (page_28_cur.num_buses - 1))
+			continue;
+
 		sprintf(buffer,_("  BUS%d"), j);
 		body = add_line_to_body(body, buffer, NULL);
 
@@ -6686,6 +6689,8 @@ int confirm_change_bus_attr(i_container *i_con)
 	header_lines++;
 
 	for (j = 0; j < page_28_cur->num_buses; j++) {
+		if (ioa->protect_last_bus && j == (page_28_cur->num_buses - 1))
+			continue;
 		sprintf(buffer,_("  BUS%d"), j);
 		body = add_line_to_body(body, buffer, NULL);
 

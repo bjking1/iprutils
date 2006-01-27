@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.55.2.2 2006/01/05 16:46:03 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.55.2.3 2006/01/27 19:42:22 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1045,6 +1045,8 @@ struct ipr_ioa {
 	u8 dual_raid_support:1;
 	u8 is_secondary:1;
 	u8 should_init:1;
+	u8 is_aux_cache:1;
+	u8 protect_last_bus:1;
 	u16 pci_vendor;
 	u16 pci_device;
 	u16 subsystem_vendor;
@@ -1280,12 +1282,26 @@ struct ipr_inquiry_ioa_cap {
 	u8 reserved2[3];
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 dual_ioa_raid:1;
-	u8 reserved:7;
-	u8 reserved3[3];
+	u8 dual_ioa_wcache:1;
+	u8 reserved:6;
+
+	u8 can_attach_to_aux_cache:1;
+	u8 is_aux_cache:1;
+	u8 is_dual_wide:1;
+	u8 reserved3:5;
+
+	u8 reserved4[2];
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 reserved:7;
+	u8 reserved:6;
+	u8 dual_ioa_wcache:1;
 	u8 dual_ioa_raid:1;
-	u8 reserved3[3];
+
+	u8 reserved3:5;
+	u8 is_dual_wide:1;
+	u8 is_aux_cache:1;
+	u8 can_attach_to_aux_cache:1;
+
+	u8 reserved4[2];
 #endif
 	u16 af_block_size;
 	u16 af_ext_cap;

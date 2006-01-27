@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.0.15.7
+Version: 2.0.15.8
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Jan 26 2006 Brian King <brking@us.ibm.com> 2.0.15.8
+- Auxiliary cache adapter support
 * Tue Jan 3 2006 Brian King <brking@us.ibm.com> 2.0.15.7
 - Concurrent maintenance fix for 7031-D24/T24.
 * Tue Nov 15 2005 Brian King <brking@us.ibm.com> 2.0.15.6

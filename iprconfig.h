@@ -1070,7 +1070,7 @@ s_node n_confirm_change_bus_attr = {
 	.options  = &confirm_change_bus_attr_opt[0],
 	.title    = __("Confirm Change SCSI Bus Configuration"),
 	.header   = {
-		__("Confirming this action will result in the following"
+		__("Confirming this action will result in the following "
 		   "configuration to become active.\n"),
 		__("  c=Confirm Change SCSI Bus Configration\n\n"),
 		"" }
