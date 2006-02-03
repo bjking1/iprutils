@@ -6253,6 +6253,7 @@ static void get_changeable_bus_attr(struct ipr_ioa *ioa,
 
 	for (j = 0; j < num_buses; j++) {
 		page28->bus[j].qas_capability = 0;
+
 		if (ioa->scsi_id_changeable)
 			page28->bus[j].scsi_id = 1;
 		else
@@ -6275,6 +6276,12 @@ static void get_changeable_bus_attr(struct ipr_ioa *ioa,
 		page28->bus[j].max_xfer_rate = 1;
 	}
 
+	if (ioa->protect_last_bus && num_buses) {
+		page28->bus[num_buses-1].qas_capability = 0;
+		page28->bus[num_buses-1].scsi_id = 0;
+		page28->bus[num_buses-1].bus_width = 0;
+		page28->bus[num_buses-1].max_xfer_rate = 0;
+	}
 }
 
 int change_bus_attr(i_container *i_con)
@@ -6340,6 +6347,8 @@ int change_bus_attr(i_container *i_con)
 	header_lines++;
 
 	for (j = 0; j < page_28_cur.num_buses; j++) {
+		if (ioa->protect_last_bus && j == (page_28_cur.num_buses - 1))
+			continue;
 		sprintf(buffer,_("  BUS%d"), j);
 		body = add_line_to_body(body, buffer, NULL);
 
@@ -6490,6 +6499,8 @@ int confirm_change_bus_attr(i_container *i_con)
 	header_lines++;
 
 	for (j = 0; j < page_28_cur->num_buses; j++) {
+		if (ioa->protect_last_bus && j == (page_28_cur->num_buses - 1))
+			continue;
 		sprintf(buffer,_("  BUS%d"), j);
 		body = add_line_to_body(body, buffer, NULL);
 

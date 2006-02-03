@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.86 2006/01/05 20:20:48 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.87 2006/02/03 17:01:59 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2323,7 +2323,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	close(fd);
 
 	attr.queue_depth = old_qdepth;
-	rc = ipr_set_dev_attr(dev, &attr, 0);
+	ipr_set_dev_attr(dev, &attr, 0);
 
 	return rc;
 }
@@ -3053,6 +3053,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 			ioa->af_block_size = get_af_block_size(&ioa_cap);
 			if (ioa_cap.is_aux_cache)
 				ioa->is_aux_cache = 1;
+			if (ioa_cap.can_attach_to_aux_cache && ioa_cap.is_dual_wide)
+				ioa->protect_last_bus = 1;
 		}
 	} else
 		ioa->ioa_dead = 1;

@@ -56,7 +56,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Fri Jan 20 2005 Brian King <brking@us.ibm.com>
+* Fri Feb 3 2006 Brian King <brking@us.ibm.com>
+- Auxiliary cache adapter fixes.
+* Fri Jan 27 2006 Brian King <brking@us.ibm.com>
+- Fix iprconfig -c update-ucode to properly report an
+  error if the wrong microcode level is specified.
+* Mon Jan 23 2006 Brian King <brking@us.ibm.com>
+- Fixed a compiler issue.
+* Fri Jan 20 2006 Brian King <brking@us.ibm.com>
 - Fixed a bug in iprconfig query-raid-create that prevented
   JBOD candidates from being displayed if there were no
   AF candidates as well.

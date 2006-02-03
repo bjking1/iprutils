@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.72 2006/01/05 20:20:48 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.73 2006/02/03 17:01:59 brking Exp $
  */
 
 #include <stdarg.h>
@@ -734,7 +734,7 @@ struct ipr_dev_record {
 #define __for_each_qac_entry(rcd, qac, type) \
       for (rcd = (type *)(qac)->data; \
            ((unsigned long)rcd) < ((unsigned long)((unsigned long)(qac) + ntohs((qac)->resp_len))) && \
-           ((unsigned long)rcd) < ((unsigned long)((qac)->data + sizeof(*(qac)))); \
+           ((unsigned long)rcd) < ((unsigned long)((qac)->data + sizeof((qac)->data))); \
            rcd = (type *)((unsigned long)rcd + ntohs(((struct ipr_common_record *)rcd)->record_len)))
 
 #define for_each_qac_entry(rcd, qac) \
@@ -1055,6 +1055,7 @@ struct ipr_ioa {
 	u8 is_secondary:1;
 	u8 should_init:1;
 	u8 is_aux_cache:1;
+	u8 protect_last_bus:1;
 	u16 pci_vendor;
 	u16 pci_device;
 	u16 subsystem_vendor;
