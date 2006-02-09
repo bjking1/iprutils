@@ -56,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Feb 9 2006 Brian King <brking@us.ibm.com>
+- Improve robustness of uevents failure handling. Fall
+  back to polling method if needed. 
 * Fri Feb 3 2006 Brian King <brking@us.ibm.com>
 - Auxiliary cache adapter fixes.
 * Fri Jan 27 2006 Brian King <brking@us.ibm.com>

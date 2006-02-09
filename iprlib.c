@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.87 2006/02/03 17:01:59 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.88 2006/02/09 23:12:31 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -819,6 +819,14 @@ struct ipr_dev *find_dev(char *name)
 
 #define NETLINK_KOBJECT_UEVENT        15
 
+static void poll_forever(void (*poll_func) (void), int poll_delay)
+{
+	while (1) {
+		poll_func();
+		sleep(poll_delay);
+	}
+}
+
 int handle_events(void (*poll_func) (void), int poll_delay,
 		  void (*kevent_handler) (char *))
 {
@@ -835,20 +843,23 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 	sock = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
 	if (sock == -1) {
 		syslog_dbg("Failed to get socket\n");
-		return -EIO;
+		poll_forever(poll_func, poll_delay);
+		return 0;
 	}
 
 	rc = bind(sock, (struct sockaddr *)&snl, sizeof(snl));
 
 	if (rc < 0) {
 		syslog_dbg("Failed to bind to socket\n");
-		return -EIO;
+		poll_forever(poll_func, poll_delay);
+		return 0;
 	}
 
 	if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
 		syslog(LOG_ERR, "Failed to fcntl socket\n");
 		close(sock);
-		return -EIO;
+		poll_forever(poll_func, poll_delay);
+		return 0;
 	}
 
 	while (1) {
@@ -861,20 +872,24 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 		}
 
 		if (len < 0) {
-			syslog_dbg("kevent recv failed\n");
-			return -EIO;
+			syslog_dbg("kevent recv failed.\n");
+			poll_func();
+			sleep(poll_delay);
+			continue;
 		}
 
 		if (!uevent_rcvd) {
 			flags = fcntl(sock, F_GETFL);
 			if (flags == -1) {
 				syslog_dbg("F_GETFL Failed\n");
+				poll_func();
 				sleep(poll_delay);
 				continue;
 			}
 
 			if (fcntl(sock, F_SETFL, (flags & ~O_NONBLOCK)) == -1) {
 				syslog_dbg("F_SETFL Failed\n");
+				poll_func();
 				sleep(poll_delay);
 				continue;
 			}
