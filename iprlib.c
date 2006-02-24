@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.88 2006/02/09 23:12:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.89 2006/02/24 14:23:10 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -835,6 +835,11 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 	int uevent_rcvd = ipr_force_uevents;
 	char buf[1024];
 
+	if (ipr_force_polling) {
+		poll_forever(poll_func, poll_delay);
+		return 0;
+	}
+
 	memset(&snl, 0, sizeof(snl));
 	snl.nl_family = AF_NETLINK;
 	snl.nl_pid = getpid();
@@ -865,7 +870,7 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 	while (1) {
 		len = recv(sock, &buf, sizeof(buf), 0);
 
-		if (ipr_force_polling || (!uevent_rcvd && len < 0)) {
+		if (!uevent_rcvd && len < 0) {
 			poll_func();
 			sleep(poll_delay);
 			continue;
@@ -1233,6 +1238,19 @@ void tool_init(int save_state)
 	if (!save_state)
 		free_old_config();
 	return;
+}
+
+static void ipr_send_uevent(struct ipr_ioa *ioa)
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+
+	class_device = sysfs_open_class_device("scsi_host",
+					       ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device,
+				       "uevent");
+	sysfs_write_attribute(attr, "1", 1);
+	sysfs_close_class_device(class_device);
 }
 
 void ipr_reset_adapter(struct ipr_ioa *ioa)
