@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.89 2006/02/24 14:23:10 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.90 2006/02/24 21:11:36 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -817,13 +817,39 @@ struct ipr_dev *find_dev(char *name)
 	return dev;
 }
 
+static int ipr_uevents_supported()
+{
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	struct ipr_ioa *ioa = ipr_ioa_head;
+
+	if (!ioa)
+		return 0;
+
+	class_device = sysfs_open_class_device("scsi_host",
+					       ioa->host_name);
+
+	if (!class_device) {
+		ioa_dbg(ioa, "Failed to open scsi_host device. %m\n");
+		return 0;
+	}
+
+	attr = sysfs_get_classdev_attr(class_device,
+				       "uevent");
+	if (!attr)
+		ioa_dbg(ioa, "Failed to get uevent attribute. %m\n");
+
+	sysfs_close_class_device(class_device);
+	return attr ? 1 : 0;
+}
+
 #define NETLINK_KOBJECT_UEVENT        15
 
 static void poll_forever(void (*poll_func) (void), int poll_delay)
 {
 	while (1) {
-		poll_func();
 		sleep(poll_delay);
+		poll_func();
 	}
 }
 
@@ -856,15 +882,18 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 
 	if (rc < 0) {
 		syslog_dbg("Failed to bind to socket\n");
+		close(sock);
 		poll_forever(poll_func, poll_delay);
 		return 0;
 	}
 
-	if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
-		syslog(LOG_ERR, "Failed to fcntl socket\n");
-		close(sock);
-		poll_forever(poll_func, poll_delay);
-		return 0;
+	if (!ipr_force_uevents && !ipr_uevents_supported()) {
+		if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
+			syslog(LOG_ERR, "Failed to fcntl socket\n");
+			close(sock);
+			poll_forever(poll_func, poll_delay);
+			return 0;
+		}
 	}
 
 	while (1) {
@@ -892,11 +921,13 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 				continue;
 			}
 
-			if (fcntl(sock, F_SETFL, (flags & ~O_NONBLOCK)) == -1) {
-				syslog_dbg("F_SETFL Failed\n");
-				poll_func();
-				sleep(poll_delay);
-				continue;
+			if (flags & O_NONBLOCK) {
+				if (fcntl(sock, F_SETFL, (flags & ~O_NONBLOCK)) == -1) {
+					syslog_dbg("F_SETFL Failed\n");
+					poll_func();
+					sleep(poll_delay);
+					continue;
+				}
 			}
 
 			uevent_rcvd = 1;
@@ -1238,19 +1269,6 @@ void tool_init(int save_state)
 	if (!save_state)
 		free_old_config();
 	return;
-}
-
-static void ipr_send_uevent(struct ipr_ioa *ioa)
-{
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-
-	class_device = sysfs_open_class_device("scsi_host",
-					       ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device,
-				       "uevent");
-	sysfs_write_attribute(attr, "1", 1);
-	sysfs_close_class_device(class_device);
 }
 
 void ipr_reset_adapter(struct ipr_ioa *ioa)
@@ -4627,6 +4645,10 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		tmp = strrchr(image->file, '/');
 		tmp++;
 		dir = opendir(hotplug_dir);
+		if (!dir)
+			mkdir(hotplug_dir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+
+		dir = opendir(hotplug_dir);
 		if (!dir) {
 			syslog(LOG_ERR, "Failed to open %s. %m\n", hotplug_dir);
 			munmap(image_hdr, ucode_stats.st_size);
@@ -4787,8 +4809,7 @@ static int setup_page0x00(struct ipr_dev *dev)
 	int len;
 
 	if (strncmp(dev->scsi_dev_data->vendor_id, "IBM", 3)) {
-		syslog_dbg("Not setting up mode page 0x00 for unknown device %s.\n",
-			   dev->scsi_dev_data->sysfs_device_name);
+		scsi_dbg(dev, "Not setting up mode page 0x00 for unknown device.\n");
 		return 0;
 	}
 
@@ -4822,8 +4843,7 @@ static int setup_page0x00(struct ipr_dev *dev)
 	page->hdr.parms_saveable = 0;
 
 	if (mode_select(dev, &mode_pages, len)) {
-		syslog_dbg("Failed to setup mode page 0x00 for %s.\n",
-			   dev->scsi_dev_data->sysfs_device_name);
+		scsi_dbg(dev, "Failed to setup mode page 0x00\n");
 		return -EIO;
 	}
 	return 0;
@@ -4866,8 +4886,7 @@ static int setup_page0x01(struct ipr_dev *dev)
 
 	if (mode_select(dev, &mode_pages, len)) {
 error:
-		syslog(LOG_ERR, "Failed to setup mode page 0x01 for %s.\n",
-		       dev->scsi_dev_data->sysfs_device_name);
+		scsi_err(dev, "Failed to setup mode page 0x01\n");
 		return -EIO;
 	}
 	return 0;

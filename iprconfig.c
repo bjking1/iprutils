@@ -1880,8 +1880,8 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 
 	rc = ipr_query_resource_state(dev, &res_state);
 
-	if (!rc) {
-		if (is_spi(dev->ioa)) {
+	if (!rc && !res_state.not_oper && !res_state.not_ready) {
+		if (is_spi(dev->ioa) && !res_state.prot_dev_failed) {
 			if (ntohl(res_state.gscsi.data_path_width) == 16)
 				body = add_line_to_body(body, _("Wide Enabled"), _("Yes"));
 			else

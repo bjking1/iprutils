@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.1.2
+Version: 2.1.3
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Feb 24 2006 Brian King <brking@us.ibm.com> 2.1.3
+- More uevent handling improvements.
+- Automatically create hotplug directory if it doesn't
+  already exist so adapter microcode update works.
 * Thu Feb 9 2006 Brian King <brking@us.ibm.com>
 - Improve robustness of uevents failure handling. Fall
   back to polling method if needed. 
