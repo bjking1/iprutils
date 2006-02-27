@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.90 2006/02/24 21:11:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.91 2006/02/27 16:25:17 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -662,8 +662,7 @@ static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 
 	fd = open(name, O_RDWR);
 	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		scsi_dbg(dev, "Could not open %s. %m\n", name);
 		return errno;
 	}
 
@@ -1728,17 +1727,20 @@ int ipr_query_resource_state(struct ipr_dev *dev, void *buff)
 int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 {
 	struct sense_data_t sense_data;
-	int rc = mode_sense(dev, page, buff, &sense_data);
+	int rc;
+
+	memset(&sense_data, 0, sizeof(sense_data));
+	rc = mode_sense(dev, page, buff, &sense_data);
 
 	/* post log if error unless error is device format in progress */
-	if ((rc != 0) &&
+	if ((rc != 0) && (rc != ENOENT) &&
 	    (((sense_data.error_code & 0x7F) != 0x70) ||
 	     ((sense_data.sense_key & 0x0F) != 0x02) || /* NOT READY */
 	     (sense_data.add_sense_code != 0x04) ||     /* LOGICAL UNIT NOT READY */
 	     (sense_data.add_sense_code_qual != 0x04))) /* FORMAT IN PROGRESS */
 		scsi_cmd_err(dev, &sense_data, "Mode Sense", rc);
 
-	return mode_sense(dev, page, buff, &sense_data);
+	return rc;
 }
 
 int ipr_get_blk_size(struct ipr_dev *dev)

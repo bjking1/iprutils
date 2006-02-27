@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.73 2006/02/03 17:01:59 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.74 2006/02/27 16:25:18 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1774,7 +1774,7 @@ do { \
       if ((((sense)->error_code & 0x7F) != 0x70) || \
           (((sense)->sense_key & 0x0F) != 0x05) || ipr_debug) { \
              scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
-                      cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
+                      cmd, rc, (sense)->sense_key & 0x0f, (sense)->add_sense_code, \
                       (sense)->add_sense_code_qual); \
       } \
 } while (0)
@@ -1797,7 +1797,7 @@ if (!ioa->ioa_dead) { \
       if ((((sense)->error_code & 0x7F) != 0x70) || \
           (((sense)->sense_key & 0x0F) != 0x05) || ipr_debug) { \
              ioa_err(ioa, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
-                     cmd, rc, (sense)->sense_key, (sense)->add_sense_code, \
+                     cmd, rc, (sense)->sense_key & 0x0f, (sense)->add_sense_code, \
                      (sense)->add_sense_code_qual); \
       } \
 } \

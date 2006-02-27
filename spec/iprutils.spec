@@ -57,6 +57,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Thu Feb 24 2006 Brian King <brking@us.ibm.com> 2.1.3
+- Prevent duplicate mode sense commands from being issued.
 - More uevent handling improvements.
 - Automatically create hotplug directory if it doesn't
   already exist so adapter microcode update works.

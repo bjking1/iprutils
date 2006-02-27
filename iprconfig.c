@@ -5207,7 +5207,7 @@ static int dev_init_complete(u8 num_devs)
 
 	while(1) {
 		if (pid)
-			rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt,1);
+			rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt,0);
 
 		if (rc & EXIT_FLAG) {
 			pid = fork();
