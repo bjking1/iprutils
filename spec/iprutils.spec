@@ -56,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Mar 2 2006 Brian King <brking@us.ibm.com>
+- Fixup status of RAID 10 arrays to print a better status
+  under multiple failure scenarios.
 * Thu Feb 24 2006 Brian King <brking@us.ibm.com> 2.1.3
 - Prevent duplicate mode sense commands from being issued.
 - More uevent handling improvements.

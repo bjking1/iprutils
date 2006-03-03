@@ -8629,9 +8629,7 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 		else if (res_state.prot_dev_failed)
 			sprintf(buf, "Failed");
 		else if (ipr_is_volume_set(ipr_dev)) {
-			if (res_state.prot_suspended && ipr_is_volume_set(ipr_dev))
-				sprintf(buf, "Degraded");
-			else if (res_state.prot_resuming && ipr_is_volume_set(ipr_dev)) {
+			if (res_state.prot_resuming) {
 				if (!percent || (percent_cmplt == 0))
 					sprintf(buf, "Rebuilding");
 				else
@@ -8641,7 +8639,9 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 					sprintf(buf, "Checking");
 				else
 					sprintf(buf, "%d%% Checked", percent_cmplt);
-			} else if (res_state.degraded_oper || res_state.service_req)
+			} else if (res_state.prot_suspended)
+				sprintf(buf, "Degraded");
+			else if (res_state.degraded_oper || res_state.service_req)
 				sprintf(buf, "Degraded");
 			else
 				sprintf(buf, "Active");
