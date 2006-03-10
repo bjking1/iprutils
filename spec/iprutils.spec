@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Mar 8 2006 Brian King <brking@us.ibm.com>
+- Remove some redundant code in disk hotplug path
 * Thu Mar 2 2006 Brian King <brking@us.ibm.com>
 - Fixup status of RAID 10 arrays to print a better status
   under multiple failure scenarios.

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.74 2006/02/27 16:25:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.75 2006/03/10 16:32:19 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1506,18 +1506,10 @@ static inline struct ipr_ses_type_desc *ipr_get_dev_elem(u8 *diag)
 
 static inline int ipr_max_dev_elems(u8 *diag)
 {
-	int i;
 	struct ipr_ses_type_desc *desc = ipr_get_dev_elem(diag);
 
-	if (desc) {
-		for (i = 0; i < diag[10]; i++, desc++) {
-			if (desc->elem_type != IPR_SES_DEVICE_ELEM)
-				continue;
-			if (desc->num_elems < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES)
-				return desc->num_elems;
-			return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
-		}
-	}
+	if (desc && desc->num_elems < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES)
+		return desc->num_elems;
 
 	return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
 }

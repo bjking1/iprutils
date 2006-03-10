@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.23 2005/12/14 18:48:55 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.24 2006/03/10 16:32:19 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -89,9 +89,9 @@ static unsigned int last_len;
 static unsigned int last_data;
 
 #define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
-#define iprprint(...) {printf(__VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
-#define ipr_err(...) {fprintf(stderr, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
-#define iprloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); if (outfile) {fprintf(outfile, __VA_ARGS__);}}
+#define iprprint(...) {printf(__VA_ARGS__); logtofile(__VA_ARGS__);}
+#define ipr_err(...) {fprintf(stderr, __VA_ARGS__); logtofile(__VA_ARGS__);}
+#define iprloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); logtofile(__VA_ARGS__);}
 
 static FILE *outfile;
 
