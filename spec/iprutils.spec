@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.1.3
+Version: 2.1.4
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Mar 14 2006 Brian King <brking@us.ibm.com> 2.1.4
+- Concurrent maintenance fix for certain iSeries
+  enclosures which would result in non existent
+  drive slots being displayed in iprconfig.
 * Wed Mar 8 2006 Brian King <brking@us.ibm.com>
 - Remove some redundant code in disk hotplug path
 * Thu Mar 2 2006 Brian King <brking@us.ibm.com>

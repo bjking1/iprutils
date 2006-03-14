@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.75 2006/03/10 16:32:19 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.76 2006/03/14 19:17:41 brking Exp $
  */
 
 #include <stdarg.h>
@@ -97,6 +97,7 @@
 #define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
 #define IPR_DRIVE_ELEM_STATUS_POPULATED      1
+#define IPR_DRIVE_ELEM_STATUS_UNSUPP         0
 #define IPR_TIMEOUT_MINUTE_RADIX		0x4000
 
 #define IPR_IOA_DEBUG                        0xDDu

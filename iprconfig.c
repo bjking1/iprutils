@@ -4874,6 +4874,8 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			scsi_id_found = 0;
 
 			for_each_elem_status(elem_status, &ses_data, diag_buf) {
+				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
+					continue;
 				if (scsi_id_found & (1 << elem_status->scsi_id))
 					continue;
 				scsi_id_found |= (1 << elem_status->scsi_id);
