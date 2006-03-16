@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.91 2006/02/27 16:25:17 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.92 2006/03/16 14:39:18 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1166,11 +1166,11 @@ static void resolve_old_config()
 
 void tool_init(int save_state)
 {
-	int rc, temp;
+	int temp;
 	struct ipr_ioa *ipr_ioa;
 	struct sysfs_driver *sysfs_ipr_driver;
 	struct dlist *ipr_devs;
-	char *pci_address, bus[100], buf[100];
+	char *pci_address, buf[100];
 
 	struct sysfs_class *sysfs_host_class;
 	struct sysfs_class *sysfs_device_class;
@@ -1184,17 +1184,10 @@ void tool_init(int save_state)
 
 	save_old_config();
 
-	rc = sysfs_find_driver_bus("ipr", bus, 100);
-	if (rc) {
-		syslog_dbg("Failed to find ipr driver bus. %m\n");
-		return;
-	}
-
-	/* Find all the IPR IOAs attached and save away vital info about them */
-	sysfs_ipr_driver = sysfs_open_driver(bus, "ipr");
+	sysfs_ipr_driver = sysfs_open_driver("pci", "ipr");
 	if (sysfs_ipr_driver == NULL) {
 		syslog_dbg("Failed to open ipr driver bus. %m\n");
-		sysfs_ipr_driver = sysfs_open_driver("ipr", bus);
+		sysfs_ipr_driver = sysfs_open_driver("ipr", "pci");
 		if (sysfs_ipr_driver == NULL) {
 			syslog_dbg("Failed to open ipr driver bus on second attempt. %m\n");
 			return;

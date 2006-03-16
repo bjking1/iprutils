@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Mar 14 2006 Brian King <brking@us.ibm.com>
+- Fix to allow for compiling with libsysfs 2.0.0
 * Tue Mar 14 2006 Brian King <brking@us.ibm.com> 2.1.4
 - Concurrent maintenance fix for certain iSeries
   enclosures which would result in non existent
