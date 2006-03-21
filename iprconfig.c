@@ -4663,7 +4663,7 @@ int process_conc_maint(i_container *i_con, int action)
 
 		found = 0;
 		for_each_elem_status(elem_status, &ses_data, diag_buf) {
-			if (res_addr.target == elem_status->scsi_id) {
+			if (res_addr.target == elem_status->slot_id) {
 				found++;
 
 				if ((action == IPR_VERIFY_CONC_REMOVE)  ||
@@ -4876,14 +4876,14 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			for_each_elem_status(elem_status, &ses_data, diag_buf) {
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
 					continue;
-				if (scsi_id_found & (1 << elem_status->scsi_id))
+				if (scsi_id_found & (1 << elem_status->slot_id))
 					continue;
-				scsi_id_found |= (1 << elem_status->scsi_id);
+				scsi_id_found |= (1 << elem_status->slot_id);
 
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
 					devs[num_devs] = alloc_empty_slot(ioa, ses_bus,
-									  elem_status->scsi_id);
+									  elem_status->slot_id);
 					num_devs++;
 					continue;
 				}
@@ -4894,7 +4894,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 						continue;
 					}
 
-					if (ra.bus == ses_bus && ra.target == elem_status->scsi_id) {
+					if (ra.bus == ses_bus && ra.target == elem_status->slot_id) {
 						if (ipr_is_ses(dev))
 							break;
 
@@ -4915,7 +4915,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 				if ((dev - ioa->dev) == ioa->num_devices) {
 					devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
 					devs[num_devs] = alloc_empty_slot(ioa, ses_bus,
-									  elem_status->scsi_id);
+									  elem_status->slot_id);
 					num_devs++;
 				}
 			}
@@ -8520,7 +8520,9 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 	int resync_in_progress = 0;
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
-		if (ioa->ioa_dead)
+		if (!scsi_dev_data->online)
+			sprintf(buf, "Offline");
+		else if (ioa->ioa_dead)
 			sprintf(buf, "Not Operational");
 		else if (ioa->nr_ioa_microcode)
 			sprintf(buf, "Not Ready");
@@ -8616,7 +8618,9 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 			}
 		}
 
-		if (format_in_progress)
+		if (ioa->ioa_dead)
+			sprintf(buf, "Unknown");
+		else if (format_in_progress)
 			sprintf(buf, "%d%% Formatted", percent_cmplt);
 		else if (!scsi_dev_data && ipr_dev->ioa->is_secondary)
 			sprintf(buf, "Remote");
@@ -8772,6 +8776,8 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				len += sprintf(body + len, "%-25s ", "Enclosure");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
 				len += sprintf(body + len, "%-25s ", "Processor");
+			else if (ioa->ioa_dead)
+				len += sprintf(body + len, "%-25s ", "Unavailable Device");
 			else
 				len += sprintf(body + len, "%-25s ", "Physical Disk");
 		}
@@ -9618,7 +9624,7 @@ static int __add_device(struct ipr_dev *dev, int on)
 
 		found = 0;
 		for_each_elem_status(elem_status, &ses_data, diag_buf) {
-			if (res_addr.target == elem_status->scsi_id) {
+			if (res_addr.target == elem_status->slot_id) {
 				found++;
 				elem_status->select = 1;
 				elem_status->remove = 0;
@@ -9695,7 +9701,7 @@ static int __remove_device(struct ipr_dev *dev, int on)
 
 		found = 0;
 		for_each_elem_status(elem_status, &ses_data, diag_buf) {
-			if (res_addr.target == elem_status->scsi_id) {
+			if (res_addr.target == elem_status->slot_id) {
 				found++;
 				elem_status->select = 1;
 				elem_status->remove = on;
@@ -9809,7 +9815,7 @@ static int __identify_device(struct ipr_dev *dev, int on)
 
 		found = 0;
 		for_each_elem_status(elem_status, &ses_data, diag_buf) {
-			if (res_addr.target == elem_status->scsi_id) {
+			if (res_addr.target == elem_status->slot_id) {
 				found++;
 				elem_status->select = 1;
 				elem_status->identify = on;

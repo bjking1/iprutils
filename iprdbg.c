@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.24 2006/03/10 16:32:19 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.25 2006/03/21 14:53:31 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -24,11 +24,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <time.h>
 
 #define IPR_MAX_FLIT_ENTRIES 59
 #define IPR_FLIT_TIMESTAMP_LEN 12
 #define IPR_FLIT_FILENAME_LEN 184
 #define IPRDBG_CONF "/etc/iprdbg.conf"
+#define IPRDBG_LOG "/var/log/iprdbg"
+#define SEPARATOR "--------------------------------------------------------------------------------"
 
 char *tool_name = "iprdbg";
 
@@ -87,9 +90,37 @@ static int num_macros;
 static unsigned int last_adx;
 static unsigned int last_len;
 static unsigned int last_data;
+static char time_str[100];
 
-#define logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
+static int getcurtime(char *buf, int max)
+{
+	time_t cur_time, rc;
+	struct tm *cur_tm;
+	int len;
+
+	buf[0] = '\0';
+	rc = time(&cur_time);
+	if (rc == ((time_t)-1))
+		return -EIO;
+
+	cur_tm = localtime(&cur_time);
+	if (!cur_tm)
+		return -EIO;
+	len = strftime(buf, max, "%b %d %T", cur_tm);
+	return len;
+}
+
+#define __logtofile(...) {if (outfile) {fprintf(outfile, __VA_ARGS__);}}
+#define logtofile(fmt, ...) \
+do { \
+if (outfile) { \
+     getcurtime(time_str, sizeof(time_str)); \
+     __logtofile("%s: "fmt, time_str, ##__VA_ARGS__); \
+} \
+} while (0)
+
 #define iprprint(...) {printf(__VA_ARGS__); logtofile(__VA_ARGS__);}
+#define __iprprint(...) {printf(__VA_ARGS__); __logtofile(__VA_ARGS__);}
 #define ipr_err(...) {fprintf(stderr, __VA_ARGS__); logtofile(__VA_ARGS__);}
 #define iprloginfo(...) {syslog(LOG_INFO, __VA_ARGS__); logtofile(__VA_ARGS__);}
 
@@ -185,7 +216,7 @@ static int format_flit(struct ipr_flit *flit)
 			 ntohl(flit_entry->data_ptr), ntohl(flit_entry->data_len));
 		iprprint("BSS Segment:   Address %08X,  Length %8X\n",
 			 ntohl(flit_entry->bss_ptr), ntohl(flit_entry->bss_len));
-		iprprint("\n");
+		__iprprint("%s\n", SEPARATOR);
 	}
 
 	return 0;
@@ -218,7 +249,7 @@ static void dump_data(unsigned int adx, unsigned int *buf, int len)
 		memset(ascii_buffer, '\0', sizeof(ascii_buffer));
 
 		for (j = 0; i < (len / 4) && j < 4; j++, i++) {
-			iprprint("%08X ", ntohl(buf[i]));
+			__iprprint("%08X ", ntohl(buf[i]));
 			memcpy(&ascii_buffer[j*4], &buf[i], 4);
 			for (k = 0; k < 4; k++) {
 				if (!isprint(ascii_buffer[(j*4)+k]))
@@ -227,11 +258,11 @@ static void dump_data(unsigned int adx, unsigned int *buf, int len)
 		}
 
 		for (;j < 4; j++) {
-			iprprint("         ");
+			__iprprint("         ");
 			strncat(ascii_buffer, "....", sizeof(ascii_buffer)-1);
 		}
 
-		iprprint("   |%s|\n", ascii_buffer);
+		__iprprint("   |%s|\n", ascii_buffer);
 	}
 }
 
@@ -270,7 +301,8 @@ static int speeds(struct ipr_ioa *ioa, int argc, char *argv[])
 		rc = debug_ioctl(ioa, IPRDBG_READ, adx, 0, buffer, length);
 
 		if (!rc) {
-			iprprint("\nBus %d speeds:\n", bus);
+			__iprprint("%s\n", SEPARATOR);
+			iprprint("Bus %d speeds:\n", bus);
 
 			for (i = 0; i < 16; i++) {
 				bus_speed = ntohl(buffer[i]) & 0x0000000f;
@@ -768,7 +800,9 @@ int main(int argc, char *argv[])
 			      sending to system logger */
 		LOG_USER);
 
-	outfile = fopen(".iprdbglog", "a");
+	outfile = fopen(IPRDBG_LOG, "a");
+	if (!outfile)
+		outfile = fopen(".iprdbglog", "a");
 	tool_init(0);
 	check_current_config(false);
 
@@ -793,7 +827,8 @@ int main(int argc, char *argv[])
 	while(1) {
 		printf("IPRDB(%X)> ", ioa->ccin);
 		ipr_fgets(cmd_line, 999, stdin);
-		logtofile("\n%s\n", cmd_line);
+		__logtofile("%s\n", SEPARATOR);
+		logtofile("%s", cmd_line);
 		exec_shell_cmd(ioa, cmd_line);
 	}
 

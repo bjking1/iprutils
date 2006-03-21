@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.76 2006/03/14 19:17:41 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.77 2006/03/21 14:53:31 brking Exp $
  */
 
 #include <stdarg.h>
@@ -128,7 +128,9 @@
 #define  IPR_CHANGE_MULTI_ADAPTER_ASSIGNMENT 0x02
 #define IPR_QUERY_RESOURCE_STATE             0xC2
 #define IPR_QUERY_COMMAND_STATUS             0xCB
-#define IPR_SUSPEND_DEV_BUS                  0xC8u
+#define IPR_SUSPEND_DEV_BUS                  0xC8
+#define IPR_IOA_SERVICE_ACTION               0xD2
+#define  IPR_QUERY_RES_ADDR_ALIASES          0x10
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ					0xE8
 #define SKIP_WRITE				0xEA
@@ -581,6 +583,11 @@ struct ipr_query_res_state {
 		struct ipr_dasd_res_state dasd;
 		struct ipr_gscsi_res_state gscsi;
 	};
+};
+
+struct ipr_res_addr_aliases {
+	u32 length;
+	struct ipr_res_addr res_addr[10];
 };
 
 struct ipr_array_cap_entry {
@@ -1424,8 +1431,8 @@ struct ipr_drive_elem_status
 	u8 swap:1;
 	u8 status:4;
 
-	u8 reserved2:4;
-	u8 scsi_id:4;
+	u8 reserved2:3;
+	u8 slot_id:5;
 
 	u8 reserved3:4;
 	u8 insert:1;
@@ -1445,8 +1452,8 @@ struct ipr_drive_elem_status
 	u8 predictive_fault:1;
 	u8 select:1;
 
-	u8 scsi_id:4;
-	u8 reserved2:4;
+	u8 slot_id:5;
+	u8 reserved2:3;
 
 	u8 reserved4:1;
 	u8 identify:1;
@@ -1554,6 +1561,7 @@ int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
+int ipr_query_res_addr_aliases(struct ipr_res_addr *, struct ipr_res_addr_aliases *);
 void ipr_reset_adapter(struct ipr_ioa *);
 void ipr_scan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);

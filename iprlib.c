@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.92 2006/03/16 14:39:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.93 2006/03/21 14:53:31 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2254,6 +2254,52 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 
 	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
 		scsi_cmd_err(dev, &sense_data, "Inquiry", rc);
+
+	close(fd);
+	return rc;
+}
+
+int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr,
+			       struct ipr_res_addr_aliases *aliases)
+{
+	int fd, rc;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	char *name = ioa->ioa.gen_name;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_QUERY_RES_ADDR_ALIASES;
+	cdb[3] = res_addr->bus;
+	cdb[4] = res_addr->target;
+	cdb[5] = res_addr->lun;
+	cdb[10] = sizeof(*aliases) >> 24;
+	cdb[11] = (sizeof(*aliases) >> 16) & 0xff;
+	cdb[12] = (sizeof(*aliases) >> 8) & 0xff;
+	cdb[13] = sizeof(*aliases) & 0xff;
+
+	rc = sg_ioctl(fd, cdb, NULL,
+		      length, SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		scsi_cmd_err(dev, &sense_data, "Query Resource Address Aliases", rc);
+	if (rc && sense_data.sense_key != ILLEGAL_REQUEST) {
+		rc = 0;
+		aliases->length = htonl(sizeof(*res_addr));
+		memcpy(aliases->res_addr, res_addr, sizeof(*res_addr));
+	}
 
 	close(fd);
 	return rc;

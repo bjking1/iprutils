@@ -56,6 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Mar 17 2006 Brian King <brking@us.ibm.com>
+- Improve iprdbg's logging
+* Thu Mar 16 2006 Brian King <brking@us.ibm.com>
+- Print better status for devices when IOA is offline/dead.
 * Tue Mar 14 2006 Brian King <brking@us.ibm.com>
 - Fix to allow for compiling with libsysfs 2.0.0
 * Tue Mar 14 2006 Brian King <brking@us.ibm.com> 2.1.4
