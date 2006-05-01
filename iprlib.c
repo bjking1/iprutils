@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.93 2006/03/21 14:53:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.94 2006/05/01 18:29:20 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -646,6 +646,21 @@ static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
 	return NULL;
 }
 
+int ipr_improper_device_type(struct ipr_dev *dev)
+{
+	if (!dev->scsi_dev_data)
+		return 0;
+	if (!dev->ioa->qac_data || !dev->ioa->qac_data->num_records)
+		return 0;
+	if (dev->scsi_dev_data->type == IPR_TYPE_AF_DISK && !dev->qac_entry &&
+	    ipr_get_blk_size(dev) == IPR_JBOD_BLOCK_SIZE)
+		return 1;
+	if (dev->scsi_dev_data->type == TYPE_DISK && dev->qac_entry &&
+	    ipr_get_blk_size(dev) == dev->ioa->af_block_size)
+		return 1;
+	return 0;
+}
+
 static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 		      struct sense_data_t *sense_data)
 {
@@ -680,7 +695,7 @@ static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 	return rc;
 }
 
-int is_spi(struct ipr_ioa *ioa)
+int ioa_is_spi(struct ipr_ioa *ioa)
 {
 	struct ipr_mode_pages mode_pages;
 	struct sense_data_t sense_data;
@@ -711,7 +726,7 @@ const char *get_ioa_desc(struct ipr_ioa *ioa)
 		return details->ioa_desc;
 	else if (ioa->is_aux_cache)
 		return aux_cache_desc;
-	else if (!is_spi(ioa)){
+	else if (!ioa_is_spi(ioa)){
 		if (ioa->qac_data->num_records)
 			return sas_raid_desc;
 		return sas_jbod_desc;
@@ -1736,6 +1751,62 @@ int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 	return rc;
 }
 
+int ipr_log_sense(struct ipr_dev *dev, u8 page, void *buff, u16 length)
+{
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	int fd, rc;
+	char *name = dev->gen_name;
+
+	memset(&sense_data, 0, sizeof(sense_data));
+
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		scsi_dbg(dev, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = LOG_SENSE;
+	cdb[2] = 0x40 | page;
+	cdb[7] = (length >> 8) & 0xff;
+	cdb[8] = length & 0xff;
+
+	rc = sg_ioctl(fd, cdb, buff,
+		      length, SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	scsi_cmd_dbg(dev, &sense_data, cdb, rc);
+	close(fd);
+	return rc;
+}
+
+int ipr_is_log_page_supported(struct ipr_dev *dev, u8 page)
+{
+	struct ipr_supp_log_pages pages;
+	int rc, i;
+
+	memset(&pages, 0, sizeof(pages));
+	rc = ipr_log_sense(dev, 0, &pages, sizeof(pages));
+
+	if (rc)
+		return -EIO;
+
+	for (i = 0; i < ntohs(pages.length); i++) {
+		if (pages.page[i] == page)
+			return 1;
+	}
+
+	return 0;
+}
+
 int ipr_get_blk_size(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages;
@@ -2266,6 +2337,11 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	char *name = ioa->ioa.gen_name;
+	struct ipr_res_addr *ra;
+
+	aliases->length = htonl(sizeof(*res_addr) * IPR_DEV_MAX_PATHS);
+	for_each_ra_alias(ra, aliases)
+		memcpy(ra, res_addr, sizeof(*ra));
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -2290,16 +2366,13 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	cdb[13] = sizeof(*aliases) & 0xff;
 
 	rc = sg_ioctl(fd, cdb, NULL,
-		      length, SG_DXFER_FROM_DEV,
+		      sizeof(*aliases), SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
-		scsi_cmd_err(dev, &sense_data, "Query Resource Address Aliases", rc);
-	if (rc && sense_data.sense_key != ILLEGAL_REQUEST) {
+		ioa_cmd_err(ioa, &sense_data, "Query Resource Address Aliases", rc);
+	if (rc && sense_data.sense_key != ILLEGAL_REQUEST)
 		rc = 0;
-		aliases->length = htonl(sizeof(*res_addr));
-		memcpy(aliases->res_addr, res_addr, sizeof(*res_addr));
-	}
 
 	close(fd);
 	return rc;
@@ -2454,6 +2527,18 @@ int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 	/* FIXME will rc != 0 if sense data */
 	close(fd);
 	return rc;
+}
+
+int ipr_can_remove_device(struct ipr_dev *dev)
+{
+	struct ipr_res_addr *ra;
+
+	for_each_ra(ra, dev) {
+		if (ipr_suspend_device_bus(dev->ioa, ra, IPR_SDB_CHECK_ONLY))
+			return 0;
+	}
+
+	return 1;
 }
 
 int ipr_receive_diagnostics(struct ipr_dev *dev,
@@ -2871,7 +2956,7 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 			return -1;
 		}
 
-		sscanf(sysfs_device_device->name,"%d:%d:%d:%d",
+		sscanf(sysfs_device_device->name,"%d:%d:%hhd:%d",
 		       &scsi_dev_data->host,
 		       &scsi_dev_data->channel,
 		       &scsi_dev_data->id,
@@ -3099,8 +3184,6 @@ static void get_dual_ioa_state(struct ipr_ioa *ioa)
 		ioa->is_secondary = 0;
 }
 
-#define IPR_DEFAULT_AF_BLOCK_SIZE 522
-
 static u16 get_af_block_size(struct ipr_inquiry_ioa_cap *ioa_cap)
 {
 	int sz_off = offsetof(struct ipr_inquiry_ioa_cap, af_block_size);
@@ -3166,6 +3249,47 @@ static void get_prot_levels(struct ipr_ioa *ioa)
 	}
 }
 
+static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
+{
+	struct ipr_dev_record *dev_record = dev->dev_rcd;
+	struct ipr_array_record *array_record = dev->array_rcd;
+
+	if (dev->scsi_dev_data) {
+		res_addr->host = dev->scsi_dev_data->host;
+		res_addr->bus = dev->scsi_dev_data->channel;
+		res_addr->target = dev->scsi_dev_data->id;
+		res_addr->lun = dev->scsi_dev_data->lun;
+	} else if (ipr_is_af_dasd_device(dev)) {
+		if (dev_record && dev_record->no_cfgte_dev) {
+			res_addr->host = dev->ioa->host_num;
+			res_addr->bus = dev_record->last_resource_addr.bus;
+			res_addr->target = dev_record->last_resource_addr.target;
+			res_addr->lun = dev_record->last_resource_addr.lun;
+		} else if (dev_record) {
+			res_addr->host = dev->ioa->host_num;
+			res_addr->bus = dev_record->resource_addr.bus;
+			res_addr->target = dev_record->resource_addr.target;
+			res_addr->lun = dev_record->resource_addr.lun;
+		} else
+			return -1;
+	} else if (ipr_is_volume_set(dev)) {
+		if (array_record && array_record->no_config_entry) {
+			res_addr->host = dev->ioa->host_num;
+			res_addr->bus = array_record->last_resource_addr.bus;
+			res_addr->target = array_record->last_resource_addr.target;
+			res_addr->lun = array_record->last_resource_addr.lun;
+		} else if (array_record) {
+			res_addr->host = dev->ioa->host_num;
+			res_addr->bus = array_record->resource_addr.bus;
+			res_addr->target = array_record->resource_addr.target;
+			res_addr->lun = array_record->resource_addr.lun;
+		} else
+			return -1;
+	} else
+		return -1;
+	return 0;
+}
+
 void check_current_config(bool allow_rebuild_refresh)
 {
 	struct scsi_dev_data *scsi_dev_data;
@@ -3177,6 +3301,8 @@ void check_current_config(bool allow_rebuild_refresh)
 	struct ipr_array_record *array_record;
 	struct ipr_std_inq_data std_inq_data;
 	struct sense_data_t sense_data;
+	struct ipr_res_addr res_addr, *ra;
+	struct ipr_dev *dev;
 	int *qac_entry_ref;
 
 	if (ipr_qac_data == NULL) {
@@ -3309,6 +3435,14 @@ void check_current_config(bool allow_rebuild_refresh)
 		ioa->num_devices = device_count;
 		get_prot_levels(ioa);
 		free(qac_entry_ref);
+	}
+
+	for_each_ioa(ioa) {
+		for_each_dev(ioa, dev) {
+			get_res_addr(dev, &res_addr);
+			for_each_ra(ra, dev)
+				memcpy(ra, &res_addr, sizeof(*ra));
+		}
 	}
 
 	ipr_cleanup_zeroed_devs();
@@ -3755,23 +3889,9 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 
 static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
 	{FORMAT_UNIT, 0, __constant_cpu_to_be16(3 * 60 * 60)},
-	{TEST_UNIT_READY, 0, __constant_cpu_to_be16(30)},
-	{REQUEST_SENSE, 0, __constant_cpu_to_be16(30)},
-	{INQUIRY, 0, __constant_cpu_to_be16(30)},
-	{MODE_SELECT, 0, __constant_cpu_to_be16(30)},
-	{MODE_SENSE, 0, __constant_cpu_to_be16(30)},
-	{READ_CAPACITY, 0, __constant_cpu_to_be16(30)},
 	{READ_10, 0, __constant_cpu_to_be16(30)},
 	{WRITE_10, 0, __constant_cpu_to_be16(30)},
 	{WRITE_VERIFY, 0, __constant_cpu_to_be16(30)},
-	{REASSIGN_BLOCKS, 0, __constant_cpu_to_be16(10 * 60)},
-	{START_STOP, 0, __constant_cpu_to_be16(2 * 60)},
-	{SEND_DIAGNOSTIC, 0, __constant_cpu_to_be16(5 * 60)},
-	{VERIFY, 0, __constant_cpu_to_be16(5 * 60)},
-	{WRITE_BUFFER, 0, __constant_cpu_to_be16(5 * 60)},
-	{WRITE_SAME, 0, __constant_cpu_to_be16(4 * 60 * 60)},
-	{LOG_SENSE, 0, __constant_cpu_to_be16(30)},
-	{REPORT_LUNS, 0, __constant_cpu_to_be16(30)},
 	{SKIP_READ, 0, __constant_cpu_to_be16(30)},
 	{SKIP_WRITE, 0, __constant_cpu_to_be16(30)}
 };
@@ -5178,15 +5298,48 @@ void ipr_init_new_dev(struct ipr_dev *dev)
 	ipr_init_dev(dev);
 }
 
+static int fixup_improper_devs(struct ipr_ioa *ioa)
+{
+	struct ipr_dev *dev;
+	int improper = 0;
+
+	for_each_dev(ioa, dev) {
+		dev->local_flag = 0;
+		if (ipr_improper_device_type(dev)) {
+			improper++;
+			dev->local_flag = 1;
+			scsi_dbg(dev, "Deleting improper device\n");
+			ipr_write_dev_attr(dev, "delete", "1");
+		}
+	}
+
+	if (!improper)
+		return 0;
+
+	sleep(5);
+	for_each_dev(ioa, dev) {
+		if (!dev->local_flag)
+			continue;
+		dev->local_flag = 0;
+		scsi_dbg(dev, "Scanning for new device\n");
+		ipr_scan(ioa, dev->scsi_dev_data->channel,
+			 dev->scsi_dev_data->id, dev->scsi_dev_data->lun);
+	}
+
+	return improper;
+}
+
 int ipr_init_ioa(struct ipr_ioa *ioa)
 {
-	int i = 0;
+	struct ipr_dev *dev;
 
 	if (ioa->ioa_dead)
 		return 0;
+	if (fixup_improper_devs(ioa))
+		return -EAGAIN;
 
-	for (i = 0; i < ioa->num_devices; i++)
-		ipr_init_dev(&ioa->dev[i]);
+	for_each_dev(ioa, dev)
+		ipr_init_dev(dev);
 
 	init_ioa_dev(&ioa->ioa);
 	return 0;
@@ -5197,6 +5350,7 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 {
 	struct ipr_dev *dev;
 	char *name;
+	int i, rc = -EAGAIN;
 
 	name = strrchr(buf, '/');
 	if (!name) {
@@ -5205,16 +5359,18 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 	}
 
 	name++;
-	tool_init(1);
-	check_current_config(false);
-	dev = find_device(name);
+	for (i = 0; i < 2 && rc == -EAGAIN; i++) {
+		tool_init(1);
+		check_current_config(false);
+		dev = find_device(name);
 
-	if (!dev) {
-		syslog_dbg("Failed to find ipr dev %s\n", name);
-		return;
+		if (!dev) {
+			syslog_dbg("Failed to find ipr dev %s\n", name);
+			return;
+		}
+
+		rc = func(dev);
 	}
-
-	func(dev);
 }
 
 void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
@@ -5222,6 +5378,7 @@ void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 	struct ipr_ioa *ioa;
 	char *c;
 	int host;
+	int i, rc = -EAGAIN;
 
 	c = strrchr(buf, '/');
 	if (!c) {
@@ -5232,16 +5389,18 @@ void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 	c += strlen("/host");
 
 	host = strtoul(c, NULL, 10);
-	tool_init(1);
-	check_current_config(false);
-	ioa = find_ioa(host);
+	for (i = 0; i < 2 && rc == -EAGAIN; i++) {
+		tool_init(1);
+		check_current_config(false);
+		ioa = find_ioa(host);
 
-	if (!ioa) {
-		syslog_dbg("Failed to find ipr ioa %d\n", host);
-		return;
+		if (!ioa) {
+			syslog_dbg("Failed to find ipr ioa %d\n", host);
+			return;
+		}
+
+		rc = func(ioa);
 	}
-
-	func(ioa);
 }
 
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)

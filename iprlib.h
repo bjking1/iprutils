@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.77 2006/03/21 14:53:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.78 2006/05/01 18:29:20 brking Exp $
  */
 
 #include <stdarg.h>
@@ -64,6 +64,8 @@
 #define FIRMWARE_HOTPLUG_CONFIG_FILE "/etc/hotplug/firmware.agent"
 #define FIRMWARE_HOTPLUG_DEFAULT_DIR LINUX_UCODE_BASE_DIR
 
+#define IPR_JBOD_BLOCK_SIZE                  512
+#define IPR_DEFAULT_AF_BLOCK_SIZE            522
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
 #define IPR_VENDOR_ID_LEN                    8
@@ -202,10 +204,23 @@ struct sysfs_dev
 	struct sysfs_dev *next, *prev;
 };
 
+struct ipr_phy {
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 box:2;
+	u8 phy:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 phy:6;
+	u8 box:2;
+#endif
+};
+
 struct ipr_res_addr {
 	u8 host;
 	u8 bus;
-	u8 target;
+	union {
+		u8 target;
+		struct ipr_phy phy;
+	};
 	u8 lun;
 #define IPR_GET_PHYSICAL_LOCATOR(res_addr) \
 	(((res_addr)->channel << 16) | ((res_addr)->id << 8) | (res_addr)->lun)
@@ -590,6 +605,12 @@ struct ipr_res_addr_aliases {
 	struct ipr_res_addr res_addr[10];
 };
 
+#define for_each_ra_alias(ra, aliases) \
+          for (ra = (aliases)->res_addr; \
+               ra < ((aliases)->res_addr + (ntohl((aliases)->length) / sizeof(struct ipr_res_addr))) && \
+               ra < ((aliases)->res_addr + ARRAY_SIZE((aliases)->res_addr)); \
+               ra++)
+
 struct ipr_array_cap_entry {
 	u8   prot_level;
 #define IPR_DEFAULT_RAID_LVL "5"
@@ -944,7 +965,10 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 struct scsi_dev_data {
 	int host;
 	int channel;
-	int id;
+	union {
+		u8 id;
+		struct ipr_phy phy;
+	};
 	int lun;
 	int type;
 	int opens;
@@ -1029,6 +1053,7 @@ struct ipr_ioa_attr {
 	int preferred_primary;
 };
 
+#define IPR_DEV_MAX_PATHS	2
 struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
@@ -1036,7 +1061,10 @@ struct ipr_dev {
 	u32 is_reclaim_cand:1;
 	u32 should_init:1;
 	u32 init_not_allowed:1;
+	u32 local_flag:1;
 	struct scsi_dev_data *scsi_dev_data;
+	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
+	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
 	struct ipr_disk_attr attr;
 	union {
 		struct ipr_common_record *qac_entry;
@@ -1045,6 +1073,10 @@ struct ipr_dev {
 	};
 	struct ipr_ioa *ioa;
 };
+
+#define for_each_ra(ra, dev) \
+           for(ra = (dev)->res_addr; \
+                (ra - ((dev)->res_addr)) < IPR_DEV_MAX_PATHS; ra++)
 
 #define IPR_MAX_IOA_DEVICES        (IPR_MAX_NUM_BUSES * 15 * 2 + 1)
 struct ipr_ioa {
@@ -1414,6 +1446,119 @@ struct ipr_dram_vpd {
 	u8 dram_size[IPR_VPD_DRAM_SIZE_LEN];
 };
 
+#define IPR_IOA_MAX_SUPP_LOG_PAGES		16
+struct ipr_supp_log_pages {
+	u8 page_code;
+	u8 reserved;
+	u16 length;
+	u8 page[IPR_IOA_MAX_SUPP_LOG_PAGES];
+};
+
+struct ipr_sas_phy_log_desc {
+	u8 reserved;
+	u8 phy;
+	u8 reserved2[2];
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reseved3:1;
+	u8 attached_dev_type:3;
+	u8 reserved4:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved4:4;
+	u8 attached_dev_type:3;
+	u8 reseved3:1;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved5:4;
+	u8 link_rate:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 link_rate:4;
+	u8 reserved5:4;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved6:4;
+	u8 attached_ssp_initiator_port:1;
+	u8 attached_stp_initiator_port:1;
+	u8 attached_smp_initiator_port:1;
+	u8 reserved7:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved7:1;
+	u8 attached_smp_initiator_port:1;
+	u8 attached_stp_initiator_port:1;
+	u8 attached_ssp_initiator_port:1;
+	u8 reserved6:4;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved8:4;
+	u8 attached_ssp_target_port:1;
+	u8 attached_stp_target_port:1;
+	u8 attached_smp_target_port:1;
+	u8 reserved9:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved9:1;
+	u8 attached_smp_target_port:1;
+	u8 attached_stp_target_port:1;
+	u8 attached_ssp_target_port:1;
+	u8 reserved8:4;
+#endif
+
+	u8 sas_addr[8];
+	u8 attached_sas_addr[8];
+	u8 attached_phy_id;
+	u8 reserved10[7];
+	u32 invalid_dword_count;
+	u32 running_disparity_error_count;
+	u32 loss_of_dword_sync_count;
+	u32 phy_reset_problem_count;
+};
+
+struct ipr_sas_port_log_desc {
+	u16 port_num;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 du:1;
+	u8 ds:1;
+	u8 tsd:1;
+	u8 etc:1;
+	u8 tmc:2;
+	u8 lbin:1;
+	u8 lp:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 lp:1;
+	u8 lbin:1;
+	u8 tmc:2;
+	u8 etc:1;
+	u8 tsd:1;
+	u8 ds:1;
+	u8 du:1;
+#endif
+	u8 length;
+	u8 proto_id;
+#define IPR_SAS_PROTOCOL_ID	0x06
+	u8 reserved[2];
+	u8 num_phys;
+#define IPR_IOA_MAX_PHYS	4
+	struct ipr_sas_phy_log_desc phy[IPR_IOA_MAX_PHYS];
+};
+
+struct ipr_log_page18 {
+	u8 page_code;
+	u8 reserved;
+	u16 length;
+#define IPR_IOA_MAX_PORTS	16
+	struct ipr_sas_port_log_desc port[IPR_IOA_MAX_PORTS];
+};
+
+#define for_each_port(port, log) \
+        for (port = (log)->port; \
+             (unsigned long)port < ((unsigned long)((log)->port) + ntohs(port->length)); \
+             port = (struct ipr_sas_port_log_desc *)((unsigned long)(&port->length) + port->length + 1))
+
+#define for_each_phy(phy, port) \
+        for (phy = (port)->phy; phy < ((port)->phy + (port)->num_phys); phy++)
+
 struct ipr_ses_type_desc {
 	u8 elem_type;
 #define IPR_SES_DEVICE_ELEM	0x01
@@ -1422,8 +1567,7 @@ struct ipr_ses_type_desc {
 	u8 text_len;
 };
 
-struct ipr_drive_elem_status
-{
+struct ipr_drive_elem_status {
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 select:1;
 	u8 predictive_fault:1;
@@ -1431,7 +1575,8 @@ struct ipr_drive_elem_status
 	u8 swap:1;
 	u8 status:4;
 
-	u8 reserved2:3;
+	u8 reserved2:1;
+	u8 device_environment:2;
 	u8 slot_id:5;
 
 	u8 reserved3:4;
@@ -1453,7 +1598,8 @@ struct ipr_drive_elem_status
 	u8 select:1;
 
 	u8 slot_id:5;
-	u8 reserved2:3;
+	u8 device_environment:2;
+	u8 reserved2:1;
 
 	u8 reserved4:1;
 	u8 identify:1;
@@ -1469,8 +1615,7 @@ struct ipr_drive_elem_status
 #endif
 };
 
-struct ipr_encl_status_ctl_pg
-{
+struct ipr_encl_status_ctl_pg {
 	u8 page_code;
 	u8 health_status;
 	u16 byte_count;
@@ -1478,10 +1623,15 @@ struct ipr_encl_status_ctl_pg
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
 };
 
-static inline int ipr_dev_elem_offset(u8 *diag)
+struct ipr_ses_config_pg {
+	u8 buf[2048];
+};
+
+static inline int ipr_dev_elem_offset(struct ipr_ses_config_pg *ses_cfg)
 {
 	int i, off;
 	struct ipr_ses_type_desc *desc;
+	u8 *diag = ses_cfg->buf;
 
 	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
 
@@ -1493,15 +1643,17 @@ static inline int ipr_dev_elem_offset(u8 *diag)
 }
 
 static inline struct ipr_drive_elem_status *
-ipr_get_overall_elem(struct ipr_encl_status_ctl_pg *ses_data, u8 *diag)
+ipr_get_overall_elem(struct ipr_encl_status_ctl_pg *ses_data,
+		     struct ipr_ses_config_pg *ses_cfg)
 {
-	return &(ses_data->elem_status[ipr_dev_elem_offset(diag) - 1]);
+	return &(ses_data->elem_status[ipr_dev_elem_offset(ses_cfg) - 1]);
 }
 
-static inline struct ipr_ses_type_desc *ipr_get_dev_elem(u8 *diag)
+static inline struct ipr_ses_type_desc *ipr_get_dev_elem(struct ipr_ses_config_pg *ses_cfg)
 {
 	int i;
 	struct ipr_ses_type_desc *desc;
+	u8 *diag = ses_cfg->buf;
 
 	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
 
@@ -1512,9 +1664,9 @@ static inline struct ipr_ses_type_desc *ipr_get_dev_elem(u8 *diag)
 	return NULL;
 }
 
-static inline int ipr_max_dev_elems(u8 *diag)
+static inline int ipr_max_dev_elems(struct ipr_ses_config_pg *ses_cfg)
 {
-	struct ipr_ses_type_desc *desc = ipr_get_dev_elem(diag);
+	struct ipr_ses_type_desc *desc = ipr_get_dev_elem(ses_cfg);
 
 	if (desc && desc->num_elems < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES)
 		return desc->num_elems;
@@ -1522,10 +1674,10 @@ static inline int ipr_max_dev_elems(u8 *diag)
 	return IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES;
 }
 
-#define for_each_elem_status(elem, sd, diag) \
-        for (elem = &((sd)->elem_status[ipr_dev_elem_offset(diag)]); \
+#define for_each_elem_status(elem, sd, sc) \
+        for (elem = &((sd)->elem_status[ipr_dev_elem_offset(sc)]); \
              elem < &((sd)->elem_status[(ntohs((sd)->byte_count)-4)/sizeof((sd)->elem_status[0])]) && \
-             elem < &((sd)->elem_status[ipr_dev_elem_offset(diag) + ipr_max_dev_elems(diag)]) && \
+             elem < &((sd)->elem_status[ipr_dev_elem_offset(sc) + ipr_max_dev_elems(sc)]) && \
              elem < &((sd)->elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES]); elem++)
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
@@ -1542,6 +1694,8 @@ int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, int, void *);
 int ipr_query_command_status(struct ipr_dev *, void *);
 int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);
+int ipr_log_sense(struct ipr_dev *, u8, void *, u16);
+int ipr_is_log_page_supported(struct ipr_dev *, u8);
 int ipr_reset_device(struct ipr_dev *);
 int ipr_re_read_partition(struct ipr_dev *);
 int ipr_read_capacity(struct ipr_dev *, void *);
@@ -1561,12 +1715,14 @@ int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
-int ipr_query_res_addr_aliases(struct ipr_res_addr *, struct ipr_res_addr_aliases *);
+int ipr_query_res_addr_aliases(struct ipr_ioa *, struct ipr_res_addr *,
+			       struct ipr_res_addr_aliases *);
 void ipr_reset_adapter(struct ipr_ioa *);
 void ipr_scan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_suspend_device_bus(struct ipr_ioa *, struct ipr_res_addr *, u8);
+int ipr_can_remove_device(struct ipr_dev *);
 int ipr_receive_diagnostics(struct ipr_dev *, u8, void *, int);
 int ipr_send_diagnostics(struct ipr_dev *, void *, int);
 int ipr_get_bus_attr(struct ipr_ioa *, struct ipr_scsi_buses *);
@@ -1610,7 +1766,7 @@ int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
 u32 get_dasd_ucode_version(char *, int);
 const char *get_ioa_desc(struct ipr_ioa *);
-int is_spi(struct ipr_ioa *);
+int ioa_is_spi(struct ipr_ioa *);
 int page0x0a_setup(struct ipr_dev *);
 int handle_events(void (*) (void), int, void (*) (char *));
 struct ipr_ioa *find_ioa(int);
@@ -1629,13 +1785,8 @@ struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *);
 struct ipr_array_cap_entry *get_cap_entry(struct ipr_supported_arrays *, char *);
 int ipr_get_blk_size(struct ipr_dev *);
 u32 get_ioa_ucode_version(char *);
+int ipr_improper_device_type(struct ipr_dev *);
 
-/*---------------------------------------------------------------------------
- * Purpose: Identify Advanced Function DASD present
- * Lock State: N/A
- * Returns: 0 if not AF DASD
- *          1 if AF DASD
- *---------------------------------------------------------------------------*/
 static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
@@ -1774,6 +1925,15 @@ if ((dev)->scsi_dev_data) { \
 do { \
       if ((((sense)->error_code & 0x7F) != 0x70) || \
           (((sense)->sense_key & 0x0F) != 0x05) || ipr_debug) { \
+             scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
+                      cmd, rc, (sense)->sense_key & 0x0f, (sense)->add_sense_code, \
+                      (sense)->add_sense_code_qual); \
+      } \
+} while (0)
+
+#define scsi_cmd_dbg(dev, sense, cmd, rc) \
+do { \
+      if (rc && ipr_debug) { \
              scsi_err(dev, "%s failed. rc=%d, SK: %X ASC: %X ASCQ: %X\n",\
                       cmd, rc, (sense)->sense_key & 0x0f, (sense)->add_sense_code, \
                       (sense)->add_sense_code_qual); \

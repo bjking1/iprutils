@@ -56,6 +56,16 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon May 1 2006 Brian King <brking@us.ibm.com>
+- Add support to iprinit for it to handle disks going
+  from JBOD <-> AF format across an adapter reset. When this
+  is detected, iprinit will now attempt to delete the disk
+  and then rescan that slot.
+- Fixed an ncurses screen drawing bug which resulted in the
+  screen getting paged down if the cursor was on the last item
+  on the screen and 't' was pressed to toggle the display.
+- Added disk concurrent maintenance support for handling
+  dual pathed SAS disks.
 * Fri Mar 17 2006 Brian King <brking@us.ibm.com>
 - Improve iprdbg's logging
 * Thu Mar 16 2006 Brian King <brking@us.ibm.com>
