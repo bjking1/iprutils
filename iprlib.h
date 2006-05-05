@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.78 2006/05/01 18:29:20 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.79 2006/05/05 19:40:28 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1547,7 +1547,7 @@ struct ipr_log_page18 {
 	u8 page_code;
 	u8 reserved;
 	u16 length;
-#define IPR_IOA_MAX_PORTS	16
+#define IPR_IOA_MAX_PORTS	32
 	struct ipr_sas_port_log_desc port[IPR_IOA_MAX_PORTS];
 };
 
@@ -1557,7 +1557,9 @@ struct ipr_log_page18 {
              port = (struct ipr_sas_port_log_desc *)((unsigned long)(&port->length) + port->length + 1))
 
 #define for_each_phy(phy, port) \
-        for (phy = (port)->phy; phy < ((port)->phy + (port)->num_phys); phy++)
+        for (phy = (port)->phy; \
+             (phy < ((port)->phy + (port)->num_phys)) && \
+             (phy < ((port)->phy + IPR_IOA_MAX_PORTS)); phy++)
 
 struct ipr_ses_type_desc {
 	u8 elem_type;
