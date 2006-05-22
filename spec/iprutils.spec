@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.1.4
+Version: 2.2.0
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon May 8 2006 Brian King <brking@us.ibm.com>
+- Use IOA's default format timeout for AF DASD instead
+  of using a hard coded default.
+- Remove RAID support for some older drives that should never
+  have been supported.
 * Mon May 1 2006 Brian King <brking@us.ibm.com>
 - Add support to iprinit for it to handle disks going
   from JBOD <-> AF format across an adapter reset. When this

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.79 2006/05/05 19:40:28 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.80 2006/05/22 22:41:21 brking Exp $
  */
 
 #include <stdarg.h>
@@ -100,7 +100,14 @@
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
 #define IPR_DRIVE_ELEM_STATUS_POPULATED      1
 #define IPR_DRIVE_ELEM_STATUS_UNSUPP         0
+#define IPR_TIMEOUT_SECOND_RADIX		0x0000
 #define IPR_TIMEOUT_MINUTE_RADIX		0x4000
+#define IPR_TIMEOUT_RADIX_MASK		0xC000
+#define IPR_TIMEOUT_RADIX_IS_MINUTE(to) \
+        (((to) & IPR_TIMEOUT_RADIX_MASK) == IPR_TIMEOUT_MINUTE_RADIX)
+#define IPR_TIMEOUT_RADIX_IS_SECONDS(to) \
+        (((to) & IPR_TIMEOUT_RADIX_MASK) == IPR_TIMEOUT_SECOND_RADIX)
+#define IPR_TIMEOUT_MASK			0x3FFF
 
 #define IPR_IOA_DEBUG                        0xDDu
 #define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
@@ -1147,10 +1154,20 @@ struct ipr_ioa {
       for_each_dev(i, d) \
           if ((d)->scsi_dev_data && (ipr_is_af_dasd_device(d) || ipr_is_gscsi(d)))
 
+#define __for_each_disk(i, d) \
+      for_each_dev(i, d) \
+          if ((d)->scsi_dev_data && ((d)->scsi_dev_data->type == TYPE_DISK || \
+              (d)->scsi_dev_data->type == IPR_TYPE_AF_DISK))
+
 #define for_each_standalone_disk(i, d) \
       for_each_disk(i, d) \
            if (!ipr_is_hot_spare(d) && !ipr_is_array_member(d))
 
+#define __for_each_standalone_disk(i, d) \
+      __for_each_disk(i, d) \
+           if (!ipr_is_hot_spare(d) && !ipr_is_volume_set(d) && \
+               !ipr_is_array_member(d))
+           
 #define for_each_standalone_af_disk(i, d) \
       for_each_standalone_disk(i, d) \
           if (ipr_is_af_dasd_device(d))
@@ -1262,6 +1279,11 @@ struct ipr_dasd_timeout_record {
 	u8 op_code;
 	u8 reserved;
 	u16 timeout;
+};
+
+struct ipr_query_dasd_timeouts {
+	u32 length;
+	struct ipr_dasd_timeout_record record[100];
 };
 
 struct ipr_supported_arrays {
@@ -1739,6 +1761,7 @@ int ipr_modify_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
 int ipr_set_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *, int);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int ipr_set_dasd_timeouts(struct ipr_dev *);
+int ipr_query_dasd_timeouts(struct ipr_dev *, struct ipr_query_dasd_timeouts *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 int get_ses_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);

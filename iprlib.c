@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.94 2006/05/01 18:29:20 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.95 2006/05/22 22:41:21 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -127,7 +127,7 @@ struct unsupported_af_dasd unsupported_af[] =
 		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
 		lid: {"SC09"},
 		lid_mask: {1, 1, 1, 1},
-		supported_with_min_ucode_level: true,
+		supported_with_min_ucode_level: false,
 		min_ucode_level: {"C749"},
 		min_ucode_mask: {1, 1, 1, 1}
 	},
@@ -139,7 +139,7 @@ struct unsupported_af_dasd unsupported_af[] =
 		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
 		lid: {"SC18"},
 		lid_mask: {1, 1, 1, 1},
-		supported_with_min_ucode_level: true,
+		supported_with_min_ucode_level: false,
 		min_ucode_level: {"C709"},
 		min_ucode_mask: {1, 1, 1, 1}
 	},
@@ -151,7 +151,7 @@ struct unsupported_af_dasd unsupported_af[] =
 		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
 		lid: {"SC36"},
 		lid_mask: {1, 1, 1, 1},
-		supported_with_min_ucode_level: true,
+		supported_with_min_ucode_level: false,
 		min_ucode_level: {"C709"},
 		min_ucode_mask: {1, 1, 1, 1}
 	},
@@ -163,7 +163,7 @@ struct unsupported_af_dasd unsupported_af[] =
 		compare_product_id_byte: {1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
 		lid: {"SC73"},
 		lid_mask: {1, 1, 1, 1},
-		supported_with_min_ucode_level: true,
+		supported_with_min_ucode_level: false,
 		min_ucode_level: {"C709"},
 		min_ucode_mask: {1, 1, 1, 1}
 	},
@@ -2082,13 +2082,11 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 	return rc;
 }
 
-int ipr_start_stop_start(struct ipr_dev *dev)
+static int ipr_start_stop(struct ipr_dev *dev, u8 start, char *cmd)
 {
-	int fd;
+	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
-	int rc;
-	int length = 0;
 	char *name = dev->gen_name;
 
 	if (strlen(dev->dev_name))
@@ -2107,54 +2105,27 @@ int ipr_start_stop_start(struct ipr_dev *dev)
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
 	cdb[0] = START_STOP;
-	cdb[4] = IPR_START_STOP_START;
+	cdb[4] = start;
 
 	rc = sg_ioctl(fd, cdb, NULL,
-		      length, SG_DXFER_FROM_DEV,
+		      0, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0)
-		scsi_cmd_err(dev, &sense_data, "Start Unit", rc);
+		scsi_cmd_err(dev, &sense_data, cmd, rc);
 
 	close(fd);
 	return rc;
 }
 
+int ipr_start_stop_start(struct ipr_dev *dev)
+{
+	return ipr_start_stop(dev, IPR_START_STOP_START, "Start Unit");
+}
+
 int ipr_start_stop_stop(struct ipr_dev *dev)
 {
-	int fd, rc;
-	u8 cdb[IPR_CCB_CDB_LEN];
-	struct sense_data_t sense_data;
-	int length = 0;
-	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
-	if (strlen(name) == 0)
-		return -ENOENT;
-
-	fd = open(name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", name);
-		return errno;
-	}
-
-	memset(cdb, 0, IPR_CCB_CDB_LEN);
-
-	cdb[0] = START_STOP;
-	cdb[4] = IPR_START_STOP_STOP;
-
-	rc = sg_ioctl(fd, cdb, NULL,
-		      length, SG_DXFER_FROM_DEV,
-		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
-
-	if (rc != 0)
-		scsi_cmd_err(dev, &sense_data, "Stop Unit", rc);
-
-	close(fd);
-	return rc;
+	return ipr_start_stop(dev, IPR_START_STOP_STOP, "Stop Unit");
 }
 
 int __ipr_test_unit_ready(struct ipr_dev *dev,
@@ -2365,7 +2336,7 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	cdb[12] = (sizeof(*aliases) >> 8) & 0xff;
 	cdb[13] = sizeof(*aliases) & 0xff;
 
-	rc = sg_ioctl(fd, cdb, NULL,
+	rc = sg_ioctl(fd, cdb, aliases,
 		      sizeof(*aliases), SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
@@ -3110,13 +3081,13 @@ static void get_sd_names(int num_devs)
 	sysfs_close_class(sysfs_device_class);
 }
 
-static void get_ioa_name(struct ipr_ioa *cur_ioa,
+static void get_ioa_name(struct ipr_ioa *ioa,
 			 int num_sg_devices)
 {
 	int i;
 	int host_no;
 
-	sscanf(cur_ioa->host_name, "host%d", &host_no);
+	sscanf(ioa->host_name, "host%d", &host_no);
 
 	for (i = 0; i < num_sg_devices; i++) {
 		if (scsi_dev_table[i].host == host_no &&
@@ -3124,10 +3095,10 @@ static void get_ioa_name(struct ipr_ioa *cur_ioa,
 		    scsi_dev_table[i].id == 255 &&
 		    scsi_dev_table[i].lun == 255 &&
 		    scsi_dev_table[i].type == IPR_TYPE_ADAPTER) {
-			strcpy(cur_ioa->ioa.dev_name, scsi_dev_table[i].dev_name);
-			strcpy(cur_ioa->ioa.gen_name, scsi_dev_table[i].gen_name);
-			cur_ioa->ioa.scsi_dev_data = &scsi_dev_table[i];
-			cur_ioa->ioa.ioa = cur_ioa;
+			strcpy(ioa->ioa.dev_name, scsi_dev_table[i].dev_name);
+			strcpy(ioa->ioa.gen_name, scsi_dev_table[i].gen_name);
+			ioa->ioa.scsi_dev_data = &scsi_dev_table[i];
+			ioa->ioa.ioa = ioa;
 		}
 	}
 }
@@ -3735,9 +3706,42 @@ static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
 	return -EIO;
 }
 
+static int get_format_timeout(struct ipr_dev *dev)
+{
+	struct ipr_query_dasd_timeouts tos;
+	int rc, i, records, timeout;
+	char temp[100];
+
+	if (ipr_is_af_dasd_device(dev)) {
+		rc = ipr_query_dasd_timeouts(dev, &tos);
+
+		if (!rc) {
+			records = (ntohl(tos.length) - sizeof(tos.length)) / sizeof(tos.record[0]);
+
+			for (i = 0; i < records; i++) {
+				if (tos.record[i].op_code != FORMAT_UNIT)
+					continue;
+				if (IPR_TIMEOUT_RADIX_IS_MINUTE(tos.record[i].timeout))
+					return ((tos.record[i].timeout & IPR_TIMEOUT_MASK) * 60);
+				if (IPR_TIMEOUT_RADIX_IS_SECONDS(tos.record[i].timeout))
+					return tos.record[i].timeout & IPR_TIMEOUT_MASK;
+				scsi_dbg(dev, "Unknown timeout radix: %X\n",
+					 (tos.record[i].timeout & IPR_TIMEOUT_RADIX_MASK));
+				break;
+			}
+		}
+	}
+
+	timeout = IPR_FORMAT_UNIT_TIMEOUT;
+	rc = ipr_get_saved_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp);
+	if (rc == RC_SUCCESS)
+		sscanf(temp, "%d", &timeout);
+
+	return timeout;
+}
+
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
-	int rc;
 	char temp[100];
 	struct ipr_mode_pages mode_pages;
 	struct ipr_ioa_mode_page *page;
@@ -3767,10 +3771,7 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	} else
 		attr->tcq_enabled = is_tagged(dev);
 
-	attr->format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
-	rc = ipr_get_saved_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp);
-	if (rc == RC_SUCCESS)
-		sscanf(temp, "%d", &attr->format_timeout);
+	attr->format_timeout = get_format_timeout(dev);
 
 	return 0;
 }
@@ -3887,8 +3888,44 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	return 0;
 }
 
+int ipr_query_dasd_timeouts(struct ipr_dev *dev,
+			    struct ipr_query_dasd_timeouts *timeouts)
+{
+	int fd, rc;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	char *name = dev->gen_name;
+
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	fd = open(name, O_RDWR);
+
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(timeouts, 0, sizeof(*timeouts));
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+	cdb[0] = QUERY_DASD_TIMEOUTS;
+	cdb[7] = (sizeof(*timeouts) >> 8) & 0xff;
+	cdb[8] = sizeof(*timeouts) & 0xff;
+
+	rc = sg_ioctl(fd, cdb, timeouts,
+		      sizeof(*timeouts), SG_DXFER_FROM_DEV,
+		      &sense_data, SET_DASD_TIMEOUTS_TIMEOUT);
+
+	if (rc != 0)
+		scsi_cmd_err(dev, &sense_data, "Query DASD timeouts", rc);
+
+	close(fd);
+	return rc;
+}
+
 static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
-	{FORMAT_UNIT, 0, __constant_cpu_to_be16(3 * 60 * 60)},
 	{READ_10, 0, __constant_cpu_to_be16(30)},
 	{WRITE_10, 0, __constant_cpu_to_be16(30)},
 	{WRITE_VERIFY, 0, __constant_cpu_to_be16(30)},
@@ -3898,12 +3935,12 @@ static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
 
 struct ipr_dasd_timeouts {
 	u32 length;
-	struct ipr_dasd_timeout_record record[ARRAY_SIZE(ipr_dasd_timeouts)];
+	struct ipr_dasd_timeout_record record[ARRAY_SIZE(ipr_dasd_timeouts) + 1];
 };
 
 int ipr_set_dasd_timeouts(struct ipr_dev *dev)
 {
-	int fd, rc;
+	int fd, rc, len;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	struct ipr_dasd_timeouts timeouts;
@@ -3922,24 +3959,28 @@ int ipr_set_dasd_timeouts(struct ipr_dev *dev)
 	}
 
 	memcpy(timeouts.record, ipr_dasd_timeouts, sizeof(ipr_dasd_timeouts));
-	timeouts.length = htonl(sizeof(timeouts));
+	len = sizeof(timeouts) - sizeof(timeouts.record[0]);
 
 	if (!ipr_get_dev_attr(dev, &attr)) {
-		if (attr.format_timeout >= IPR_TIMEOUT_MINUTE_RADIX) {
-			timeouts.record[0].timeout =
-				(attr.format_timeout / 60) & IPR_TIMEOUT_MINUTE_RADIX;
+		len = sizeof(timeouts);
+
+		if (attr.format_timeout >= IPR_TIMEOUT_MASK) {
+			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
+				(attr.format_timeout / 60) | IPR_TIMEOUT_MINUTE_RADIX;
 		} else {
-			timeouts.record[0].timeout = attr.format_timeout;
+			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
+				attr.format_timeout;
 		}
 	}
 
+	timeouts.length = htonl(len);
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 	cdb[0] = SET_DASD_TIMEOUTS;
-	cdb[7] = (sizeof(timeouts) >> 8) & 0xff;
-	cdb[8] = sizeof(timeouts) & 0xff;
+	cdb[7] = (len >> 8) & 0xff;
+	cdb[8] = len & 0xff;
 
 	rc = sg_ioctl(fd, cdb, &timeouts,
-		      sizeof(timeouts), SG_DXFER_TO_DEV,
+		      len, SG_DXFER_TO_DEV,
 		      &sense_data, SET_DASD_TIMEOUTS_TIMEOUT);
 
 	if (rc != 0)
@@ -4178,7 +4219,7 @@ bool disk_needs_msl(struct unsupported_af_dasd *unsupp_af,
 	return false;
 }
 
-bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
+bool is_af_blocked(struct ipr_dev *dev, int silent)
 {
 	int rc;
 	struct ipr_std_inq_data std_inq_data;
@@ -4187,7 +4228,7 @@ bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 
 	/* Zero out inquiry data */
 	memset(&std_inq_data, 0, sizeof(std_inq_data));
-	rc = ipr_inquiry(ipr_dev, IPR_STD_INQUIRY,
+	rc = ipr_inquiry(dev, IPR_STD_INQUIRY,
 			 &std_inq_data, sizeof(std_inq_data));
 
 	if (rc != 0)
@@ -4195,7 +4236,7 @@ bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 
 	/* Issue page 3 inquiry */
 	memset(&dasd_page3_inq, 0, sizeof(dasd_page3_inq));
-	rc = ipr_inquiry(ipr_dev, 0x03,
+	rc = ipr_inquiry(dev, 0x03,
 			 &dasd_page3_inq, sizeof(dasd_page3_inq));
 
 	if (rc != 0)
@@ -4213,23 +4254,23 @@ bool is_af_blocked(struct ipr_dev *ipr_dev, int silent)
 		if (disk_needs_msl(unsupp_af, &std_inq_data)) {
 			if (ipr_force) {
 				if (!silent)
-					scsi_err(ipr_dev, "Disk %s needs updated microcode "
+					scsi_err(dev, "Disk %s needs updated microcode "
 						 "before transitioning to 522 bytes/sector "
 						 "format. IGNORING SINCE --force USED!",
-						 ipr_dev->gen_name);
+						 dev->gen_name);
 				return false;
 			} else {
 				if (!silent)
-					scsi_err(ipr_dev, "Disk %s needs updated microcode "
+					scsi_err(dev, "Disk %s needs updated microcode "
 					       "before transitioning to 522 bytes/sector "
-					       "format.", ipr_dev->gen_name);
+					       "format.", dev->gen_name);
 				return true;
 			}
 		}
 	} else {/* disk is not supported at all */
 		if (!silent)
 			syslog(LOG_ERR,"Disk %s canot be formatted to "
-			       "522 bytes/sector.", ipr_dev->gen_name);
+			       "522 bytes/sector.", dev->gen_name);
 		return true;
 	}
 

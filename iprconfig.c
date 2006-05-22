@@ -636,25 +636,24 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 					mvaddstr(stdscr_max_y-footer_lines,stdscr_max_x-8,"       ");
 
 				for (i = 0; i < num_fields; i++) {
-					if (fields[i] != NULL) {
-						/* height, width, top, left, offscreen rows, buffer */
-						field_info(fields[i],&h,&w,&t,&l,&o,&b); 
+					if (!fields[i])
+						continue;
+					/* height, width, top, left, offscreen rows, buffer */
+					field_info(fields[i],&h,&w,&t,&l,&o,&b); 
 
-						/* turn all offscreen fields off */
-						if ((t >= (header_lines + pad_t)) &&
-						    (t <= (viewable_body_lines + pad_t))) {
+					/* turn all offscreen fields off */
+					if ((t >= (header_lines + pad_t)) &&
+					    (t <= (viewable_body_lines + pad_t))) {
 
-							field_opts_on(fields[i],O_ACTIVE);
-							if (form_adjust) {
-								if (!(f_flags & TOGGLE_FLAG) || !toggle_field)
-									set_current_field(form,fields[i]);
-								form_adjust = false;
-							}
-						} else {
-							if (field_opts_off(fields[i],O_ACTIVE) == E_CURRENT &&
-							    toggle_field && i == (toggle_field - 1))
-								pagedn = true;
-						}
+						field_opts_on(fields[i],O_ACTIVE);
+						if (!form_adjust)
+							continue;
+						if (!(f_flags & TOGGLE_FLAG) || !toggle_field)
+							set_current_field(form,fields[i]);
+						form_adjust = false;
+					} else if (field_opts_off(fields[i],O_ACTIVE) == E_CURRENT &&
+						   toggle_field && i == (toggle_field - 1)) {
+						pagedn = true;
 					}
 				}
 			}  
@@ -1258,10 +1257,10 @@ static int time_screen_driver(s_node *n_screen, unsigned long seconds, int allow
 	return rc;
 }
 
-static void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa,
+static void evaluate_device(struct ipr_dev *dev, struct ipr_ioa *ioa,
 			    int new_block_size)
 {
-	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
+	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
 	struct ipr_res_addr res_addr;
 	struct ipr_dev_record *dev_record;
 	int device_converted;
@@ -1273,8 +1272,8 @@ static void evaluate_device(struct ipr_dev *ipr_dev, struct ipr_ioa *ioa,
 		res_addr.bus = scsi_dev_data->channel;
 		res_addr.target = scsi_dev_data->id;
 		res_addr.lun = scsi_dev_data->lun;
-	} else if (ipr_is_af_dasd_device(ipr_dev)) {
-		dev_record = ipr_dev->dev_rcd;
+	} else if (ipr_is_af_dasd_device(dev)) {
+		dev_record = dev->dev_rcd;
 		if (dev_record->no_cfgte_dev) 
 			return;
 
@@ -1386,28 +1385,15 @@ int main_menu(i_container *i_con)
 }
 
 static int print_standalone_disks(struct ipr_ioa *ioa,
-				  i_container **i_con, char **buffer)
+				  i_container **i_con, char **buffer, int type)
 {
-	struct scsi_dev_data *scsi_dev_data;
-	int j, k;
+	struct ipr_dev *dev;
+	int k;
 	int num_lines = 0;
 
-	/* print JBOD and non-member AF devices*/
-	for (j = 0; j < ioa->num_devices; j++) {
-		scsi_dev_data = ioa->dev[j].scsi_dev_data;
-		if (!scsi_dev_data ||
-		    (scsi_dev_data->type != TYPE_DISK &&
-		     scsi_dev_data->type != IPR_TYPE_AF_DISK) ||
-		    ipr_is_hot_spare(&ioa->dev[j]) ||
-		    ipr_is_volume_set(&ioa->dev[j]) ||
-		    ipr_is_array_member(&ioa->dev[j]))
-			continue;
-
-		/* check if evaluate_device is needed for this device */
-		verify_device(&ioa->dev[j]);
-		print_dev (k, &ioa->dev[j], buffer, "%1", 2+k);
-
-		*i_con = add_i_con(*i_con,"\0",&ioa->dev[j]);  
+	__for_each_standalone_disk(ioa, dev) {
+		print_dev (k, dev, buffer, "%1", type+k);
+		*i_con = add_i_con(*i_con, "\0", dev);  
 		num_lines++;
 	}
 
@@ -1415,17 +1401,33 @@ static int print_standalone_disks(struct ipr_ioa *ioa,
 }
 
 static int print_hotspare_disks(struct ipr_ioa *ioa,
-				i_container **i_con, char **buffer)
+				i_container **i_con, char **buffer, int type)
 {
 	struct ipr_dev *dev;
 	int k;
 	int num_lines = 0;
 
 	for_each_hot_spare(ioa, dev) {
-		if (!dev->scsi_dev_data)
-			continue;
+		print_dev(k, dev, buffer, "%1", type+k);
+		*i_con = add_i_con(*i_con, "\0", dev);  
+		num_lines++;
+	}
 
-		print_dev(k, dev, buffer, "%1", 2+k);
+	return num_lines;
+}
+
+static int print_ses_devices(struct ipr_ioa *ioa,
+			     i_container **i_con, char **buffer, int type)
+{
+	struct ipr_dev *dev;
+	int k;
+	int num_lines = 0;
+
+	/* xxx */
+	return 0;
+
+	for_each_ses(ioa, dev) {
+		print_dev(k, dev, buffer, "%1", type+k);
 		*i_con = add_i_con(*i_con, "\0", dev);  
 		num_lines++;
 	}
@@ -1434,7 +1436,7 @@ static int print_hotspare_disks(struct ipr_ioa *ioa,
 }
 
 static int print_vsets(struct ipr_ioa *ioa,
-		       i_container **i_con, char **buffer)
+		       i_container **i_con, char **buffer, int type)
 {
 	int k;
 	int num_lines = 0;
@@ -1442,12 +1444,12 @@ static int print_vsets(struct ipr_ioa *ioa,
 
 	/* print volume set and associated devices*/
 	for_each_vset(ioa, vset) {
-		print_dev(k, vset, buffer, "%1", 2+k);
+		print_dev(k, vset, buffer, "%1", type+k);
 		*i_con = add_i_con(*i_con, "\0", vset);
 		num_lines++;
 
 		for_each_dev_in_vset(vset, dev) {
-			print_dev(k, dev, buffer, "%1", 2+k);
+			print_dev(k, dev, buffer, "%1", type+k);
 			*i_con = add_i_con(*i_con, "\0", dev);
 			num_lines++;
 		}
@@ -1462,6 +1464,7 @@ int disk_status(i_container *i_con)
 	int len = 0;
 	int num_lines = 0;
 	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
 	struct screen_output *s_out;
 	int header_lines;
 	char *buffer[2];
@@ -1484,9 +1487,13 @@ int disk_status(i_container *i_con)
 
 		num_lines++;
 
-		num_lines += print_standalone_disks(ioa, &i_con, buffer);
-		num_lines += print_hotspare_disks(ioa, &i_con, buffer);
-		num_lines += print_vsets(ioa, &i_con, buffer);
+		/* xxxx remove? */
+		__for_each_standalone_disk(ioa, dev)
+			verify_device(dev);
+		num_lines += print_standalone_disks(ioa, &i_con, buffer, 2);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 2);
+		num_lines += print_vsets(ioa, &i_con, buffer, 2);
+		num_lines += print_ses_devices(ioa, &i_con, buffer, 2);
 	}
 
 
@@ -1923,6 +1930,60 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	return body;
 }
 
+static char *ses_details(char *body, struct ipr_dev *dev)
+{
+	int rc;
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	char product_id[IPR_PROD_ID_LEN+1];
+	char vendor_id[IPR_VENDOR_ID_LEN+1];
+	char buffer[100];
+	int len;
+
+	ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
+	ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+
+	body = add_line_to_body(body,"", NULL);
+	body = add_line_to_body(body,_("Manufacturer"), vendor_id);
+	body = add_line_to_body(body,_("Product ID"), product_id);
+
+	rc = ipr_inquiry(dev, 0x03, &page3_inq, sizeof(page3_inq));
+
+	if (!rc) {
+		len = sprintf(buffer, "%X%X%X%X", page3_inq.release_level[0],
+			      page3_inq.release_level[1], page3_inq.release_level[2],
+			      page3_inq.release_level[3]);
+
+		if (isalnum(page3_inq.release_level[0]) && isalnum(page3_inq.release_level[1]) &&
+		    isalnum(page3_inq.release_level[2]) && isalnum(page3_inq.release_level[3])) {
+			sprintf(buffer + len, " (%c%c%c%c)", page3_inq.release_level[0],
+				page3_inq.release_level[1], page3_inq.release_level[2],
+				page3_inq.release_level[3]);
+		}
+
+		body = add_line_to_body(body, _("Firmware Version"), buffer);
+	}
+
+	if (strlen(dev->gen_name) > 0)
+		body = add_line_to_body(body,_("Resource Name"), dev->gen_name);
+
+	body = add_line_to_body(body, "", NULL);
+	body = add_line_to_body(body, _("Physical location"), NULL);
+	body = add_line_to_body(body ,_("PCI Address"), dev->ioa->pci_address);
+
+	sprintf(buffer, "%d", dev->ioa->host_num);
+	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
+
+	sprintf(buffer, "%d", dev->scsi_dev_data->channel);
+	body = add_line_to_body(body, _("SCSI Channel"), buffer);
+
+	sprintf(buffer, "%d", dev->scsi_dev_data->id);
+	body = add_line_to_body(body, _("SCSI Id"), buffer);
+
+	sprintf(buffer, "%d", dev->scsi_dev_data->lun);
+	body = add_line_to_body(body, _("SCSI Lun"), buffer);
+	return body;
+}
+
 int device_details(i_container *i_con)
 {
 	char *body = NULL;
@@ -1942,6 +2003,9 @@ int device_details(i_container *i_con)
 	} else if (ipr_is_volume_set(dev)) {
 		n_screen = &n_vset_details;
 		body = vset_details(body, dev);
+	} else if (ipr_is_ses(dev)) {
+		n_screen = &n_ses_details;
+		body = ses_details(body, dev);
 	} else {
 		n_screen = &n_device_details;
 		body = disk_details(body, dev);
@@ -1991,7 +2055,6 @@ int raid_status(i_container *i_con)
 	int len = 0;
 	int num_lines = 0;
 	struct ipr_ioa *ioa;
-	struct ipr_dev *dev;
 	struct screen_output *s_out;
 	int header_lines;
 	char *buffer[2];
@@ -2009,14 +2072,8 @@ int raid_status(i_container *i_con)
 		if (!ioa->ioa.scsi_dev_data)
 			continue;
 
-		/* print Hot Spare devices*/
-		for_each_hot_spare(ioa, dev) {
-			print_dev(k, dev, buffer, "%1", 2+k);
-			i_con = add_i_con(i_con, "\0", dev);  
-			num_lines++;
-		}
-
-		num_lines += print_vsets(ioa, &i_con, buffer);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 2);
+		num_lines += print_vsets(ioa, &i_con, buffer, 2);
 	}
 
 	if (num_lines == 0) {
@@ -3005,7 +3062,7 @@ int raid_start_complete()
 	int exit_now = 0;
 	struct ipr_ioa *ioa;
 	struct array_cmd_data *cur_raid_cmd;
-	struct ipr_dev *ipr_dev;
+	struct ipr_dev *dev;
 	struct ipr_disk_attr attr;
 
 	while (1) {
@@ -3043,15 +3100,15 @@ int raid_start_complete()
 				    (status_record->resource_handle != IPR_IOA_RESOURCE_HANDLE)) {
 
 					check_current_config(false);
-					ipr_dev = get_dev_from_handle(status_record->resource_handle);
-					if ((ipr_dev)  &&  (ipr_dev->scsi_dev_data)) {
+					dev = get_dev_from_handle(status_record->resource_handle);
+					if (dev && dev->scsi_dev_data) {
 						device_available = 1;
-						ipr_init_new_dev(ipr_dev);
-						if (ipr_get_dev_attr(ipr_dev, &attr)) {
+						ipr_init_new_dev(dev);
+						if (ipr_get_dev_attr(dev, &attr)) {
 							syslog(LOG_ERR, _("Unable to read queue_depth"));
 						} else {
 							attr.queue_depth = cur_raid_cmd->qdepth;
-							if (ipr_set_dev_attr(ipr_dev, &attr, 1))
+							if (ipr_set_dev_attr(dev, &attr, 1))
 								syslog(LOG_ERR, _("Unable to set queue_depth"));
 						}
 					}
@@ -4821,6 +4878,7 @@ static int get_res_addrs(struct ipr_dev *dev)
 	struct ipr_res_addr *ra;
 	struct ipr_res_addr_aliases aliases;
 	int i = 0;
+	u32 *data;
 
 	ipr_query_res_addr_aliases(dev->ioa, &(dev->res_addr[0]), &aliases);
 
@@ -4830,6 +4888,10 @@ static int get_res_addrs(struct ipr_dev *dev)
 			break;
 	}
 
+	/* xxx remove */
+	data (u32 *)&aliases;
+	scsi_dbg(dev, "Res addr aliases: %X %X %X\n", ntohl(data[0]),
+		 ntohl(data[1]), ntohl(data[2]));
 	return 0;
 }
 
@@ -7208,12 +7270,10 @@ int disk_config(i_container * i_con)
 	int len = 0;
 	int num_lines = 0;
 	struct ipr_ioa *ioa;
-	struct scsi_dev_data *scsi_dev_data;
 	struct screen_output *s_out;
 	int header_lines;
 	char *buffer[2];
 	int toggle = 1;
-	struct ipr_dev *dev, *vset;
 
 	processing();
 	rc = RC_SUCCESS;
@@ -7226,45 +7286,9 @@ int disk_config(i_container * i_con)
 		if (ioa->is_secondary || ioa->ioa_dead || !ioa->ioa.scsi_dev_data)
 			continue;
 
-		/* print JBOD and non-member AF devices*/
-		for_each_dev(ioa, dev) {
-			scsi_dev_data = dev->scsi_dev_data;
-			if (!scsi_dev_data ||
-			    ((scsi_dev_data->type != TYPE_DISK) &&
-			     (scsi_dev_data->type != IPR_TYPE_AF_DISK)) ||
-			    ipr_is_hot_spare(dev) || ipr_is_volume_set(dev) ||
-			    ipr_is_array_member(dev))
-				continue;
-
-			print_dev(k, dev, buffer, "%1", k);
-			i_con = add_i_con(i_con, "\0", dev);  
-
-			num_lines++;
-		}
-
-		/* print Hot Spare devices*/
-		for_each_hot_spare(ioa, dev) {
-			if (!dev->scsi_dev_data)
-				continue;
-
-			print_dev(k, dev, buffer, "%1", k);
-			i_con = add_i_con(i_con, "\0", dev);  
-
-			num_lines++;
-		}
-
-		/* print volume set and associated devices*/
-		for_each_vset(ioa, vset) {
-			print_dev(k, vset, buffer, "%1", k);
-			i_con = add_i_con(i_con, "\0", vset);
-			num_lines++;
-
-			for_each_dev_in_vset(vset, dev) {
-				print_dev(k, dev, buffer, "%1", k);
-				i_con = add_i_con(i_con, "\0", dev);
-				num_lines++;
-			}
-		}
+		num_lines += print_standalone_disks(ioa, &i_con, buffer, 0);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 0);
+		num_lines += print_vsets(ioa, &i_con, buffer, 0);
 	}
 
 
@@ -7301,7 +7325,7 @@ struct disk_config_attr {
 	int tcq_enabled;
 };
 
-static int disk_config_menu(struct ipr_dev *ipr_dev, struct disk_config_attr *disk_config_attr,
+static int disk_config_menu(struct disk_config_attr *disk_config_attr,
 			    int start_row, int header_lines)
 {
 	int i;
@@ -7525,7 +7549,7 @@ int change_disk_config(i_container * i_con)
 		for_each_icon(temp_i_con) {
 			if (!temp_i_con->field_data[0]) {
 				config_attr = (struct disk_config_attr *)temp_i_con->data;
-				rc = disk_config_menu(dev, config_attr, temp_i_con->y, header_lines);
+				rc = disk_config_menu(config_attr, temp_i_con->y, header_lines);
 
 				if (rc == CANCEL_FLAG)
 					rc = RC_SUCCESS;
@@ -7629,7 +7653,7 @@ struct ioa_config_attr {
 	int preferred_primary;
 };
 
-int ioa_config_menu(struct ipr_dev *ipr_dev, struct ioa_config_attr *ioa_config_attr,
+int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 		    int start_row, int header_lines)
 {
 	int i;
@@ -7746,7 +7770,7 @@ int change_ioa_config(i_container * i_con)
 		for_each_icon(temp_i_con) {
 			if (!temp_i_con->field_data[0]) {
 				config_attr = (struct ioa_config_attr *)temp_i_con->data;
-				rc = ioa_config_menu(dev, config_attr, temp_i_con->y, header_lines);
+				rc = ioa_config_menu(config_attr, temp_i_con->y, header_lines);
 
 				if (rc == CANCEL_FLAG)
 					rc = RC_SUCCESS;
@@ -7789,7 +7813,6 @@ int download_ucode(i_container * i_con)
 	int num_lines = 0;
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev, *vset;
-	struct scsi_dev_data *scsi_dev_data;
 	struct screen_output *s_out;
 	int header_lines;
 	char *buffer[2];
@@ -7812,30 +7835,8 @@ int download_ucode(i_container * i_con)
 
 		num_lines++;
 
-		/* print JBOD and non-member AF devices*/
-		for_each_dev(ioa, dev) {
-			scsi_dev_data = dev->scsi_dev_data;
-			if ((scsi_dev_data == NULL) ||
-			    ((scsi_dev_data->type != TYPE_DISK) &&
-			     (scsi_dev_data->type != IPR_TYPE_AF_DISK) /* &&
-									(scsi_dev_data->type != TYPE_ENCLOSURE) &&
-									(scsi_dev_data->type != TYPE_PROCESSOR) */) ||
-			    ipr_is_hot_spare(dev) || ipr_is_volume_set(dev) ||
-			    ipr_is_array_member(dev))
-				continue;
-
-			print_dev(k, dev, buffer, "%1", k);
-			i_con = add_i_con(i_con, "\0", dev);  
-
-			num_lines++;
-		}
-
-		/* print Hot Spare devices*/
-		for_each_hot_spare(ioa, dev) {
-			print_dev(k, dev, buffer, "%1", k);
-			i_con = add_i_con(i_con, "\0", dev);  
-			num_lines++;
-		}
+		num_lines += print_standalone_disks(ioa, &i_con, buffer, 0);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 0);
 
 		/* print volume set associated devices*/
 		for_each_vset(ioa, vset) {
@@ -8094,15 +8095,13 @@ int choose_ucode(i_container * i_con)
 		return 1;
 
 	for_each_icon(temp_i_con) {
+		if (!temp_i_con->data)
+			continue;
+		if (!temp_i_con->field_data)
+			continue;
+
 		dev =(struct ipr_dev *)(temp_i_con->data);
-
-		if (!dev)
-			continue;
-
 		input = temp_i_con->field_data;
-
-		if (input == NULL)
-			continue;
 
 		if (strcmp(input, "1") == 0) {
 			rc = process_choose_ucode(dev);
@@ -8614,19 +8613,16 @@ int ibm_boot_log(i_container *i_con)
 		return 1; /* return with no status */
 }
 
-static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
+static void get_status(struct ipr_dev *dev, char *buf, int percent)
 {
-	struct scsi_dev_data *scsi_dev_data = ipr_dev->scsi_dev_data;
-	struct ipr_ioa *ioa = ipr_dev->ioa;
-	int rc;
+	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
+	struct ipr_ioa *ioa = dev->ioa;
 	struct ipr_query_res_state res_state;
-	u8 ioctl_buffer[255];
-	int status;
+	int status, rc;
 	int format_req = 0;
-	struct ipr_mode_parm_hdr *mode_parm_hdr;
+	struct ipr_mode_pages mode_pages;
 	struct ipr_block_desc *block_desc;
 	struct sense_data_t sense_data;
-	struct ipr_array_record *array_record;
 	struct ipr_cmd_status cmd_status;
 	struct ipr_cmd_status_record *status_record;
 	int percent_cmplt = 0;
@@ -8645,36 +8641,34 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 		sprintf(buf, "Empty");
 	} else {
-		if (ipr_is_volume_set(ipr_dev)) {
+		if (ipr_is_volume_set(dev)) {
 			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
 
 			if (!rc) {
-				array_record = ipr_dev->array_rcd;
-
 				for_each_cmd_status(status_record, &cmd_status) {
-					if (array_record->array_id == status_record->array_id) {
-						if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS) {
-							if (status_record->command_code == IPR_RESYNC_ARRAY_PROTECTION)
-								resync_in_progress = 1;
-							percent_cmplt = status_record->percent_complete;
-						}
-					}
+					if (dev->array_rcd->array_id != status_record->array_id)
+						continue;
+					if (status_record->status != IPR_CMD_STATUS_IN_PROGRESS)
+						continue;
+					if (status_record->command_code == IPR_RESYNC_ARRAY_PROTECTION)
+						resync_in_progress = 1;
+					percent_cmplt = status_record->percent_complete;
 				}
 			}
-		} else if (ipr_is_af_dasd_device(ipr_dev)) {
-			rc = ipr_query_command_status(ipr_dev, &cmd_status);
+		} else if (ipr_is_af_dasd_device(dev)) {
+			rc = ipr_query_command_status(dev, &cmd_status);
 
 			if ((rc == 0) && (cmd_status.num_records != 0)) {
 				status_record = cmd_status.record;
-				if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
-				    (status_record->status != IPR_CMD_STATUS_FAILED)) {
+				if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL &&
+				    status_record->status != IPR_CMD_STATUS_FAILED) {
 					percent_cmplt = status_record->percent_complete;
 					format_in_progress++;
 				}
 			}
-		} else if (ipr_is_gscsi(ipr_dev)) {
+		} else if (ipr_is_gscsi(dev)) {
 			/* Send Test Unit Ready to find percent complete in sense data. */
-			rc = ipr_test_unit_ready(ipr_dev, &sense_data);
+			rc = ipr_test_unit_ready(dev, &sense_data);
 
 			if ((rc == CHECK_CONDITION) &&
 			    ((sense_data.error_code & 0x7F) == 0x70) &&
@@ -8687,21 +8681,18 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 			}
 		}
 
-		if (ipr_is_af(ipr_dev)) {
-			memset(&res_state, 0, sizeof(res_state));
+		memset(&res_state, 0, sizeof(res_state));
 
-			/* Do a query resource state */
-			rc = ipr_query_resource_state(ipr_dev, &res_state);
+		if (ipr_is_af(dev)) {
+			rc = ipr_query_resource_state(dev, &res_state);
 
 			if (rc != 0)
 				res_state.not_oper = 1;
-		} else { /* JBOD */
-			memset(&res_state, 0, sizeof(res_state));
-
+		} else if (ipr_is_gscsi(dev)) {
 			format_req = 0;
 
 			/* Issue mode sense/mode select to determine if device needs to be formatted */
-			status = ipr_mode_sense(ipr_dev, 0x0a, &ioctl_buffer);
+			status = ipr_mode_sense(dev, 0x0a, &mode_pages);
 
 			if (status == CHECK_CONDITION &&
 			    sense_data.add_sense_code == 0x31 &&
@@ -8709,10 +8700,8 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 				format_req = 1;
 			} else {
 				if (!status) {
-					mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
-
-					if (mode_parm_hdr->block_desc_len > 0) {
-						block_desc = (struct ipr_block_desc *)(mode_parm_hdr+1);
+					if (mode_pages.hdr.block_desc_len > 0) {
+						block_desc = (struct ipr_block_desc *)(mode_pages.data);
 
 						if ((block_desc->block_length[1] != 0x02) ||
 						    (block_desc->block_length[2] != 0x00))
@@ -8721,7 +8710,7 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 				}
 
 				/* check device with test unit ready */
-				rc = ipr_test_unit_ready(ipr_dev, &sense_data);
+				rc = ipr_test_unit_ready(dev, &sense_data);
 
 				if (rc == CHECK_CONDITION &&
 				    sense_data.add_sense_code == 0x31 &&
@@ -8736,7 +8725,7 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 			sprintf(buf, "Unknown");
 		else if (format_in_progress)
 			sprintf(buf, "%d%% Formatted", percent_cmplt);
-		else if (!scsi_dev_data && ipr_dev->ioa->is_secondary)
+		else if (!scsi_dev_data && dev->ioa->is_secondary)
 			sprintf(buf, "Remote");
 		else if (!scsi_dev_data)
 			sprintf(buf, "Missing");
@@ -8748,7 +8737,7 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 			sprintf(buf, "R/W Protected");
 		else if (res_state.prot_dev_failed)
 			sprintf(buf, "Failed");
-		else if (ipr_is_volume_set(ipr_dev)) {
+		else if (ipr_is_volume_set(dev)) {
 			if (res_state.prot_resuming) {
 				if (!percent || (percent_cmplt == 0))
 					sprintf(buf, "Rebuilding");
@@ -8767,7 +8756,7 @@ static void get_status(struct ipr_dev *ipr_dev, char *buf, int percent)
 				sprintf(buf, "Active");
 		} else if (format_req)
 			sprintf(buf, "Format Required");
-		else if (ipr_device_is_zeroed(ipr_dev))
+		else if (ipr_device_is_zeroed(dev))
 			sprintf(buf, "Zeroed");
 		else
 			sprintf(buf, "Active");
@@ -8780,17 +8769,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
 	int i;
-	char ioctl_buffer[255];
-	char raid_str[48];
 	char *dev_name = dev->dev_name;
 	char *gen_name = dev->gen_name;
-	char node_name[7], buf[100];
+	char node_name[7], buf[100], raid_str[48];
 	int tab_stop = 0;
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
-	struct ipr_common_record *common_record;
-	struct ipr_dev_record *device_record;
-	struct ipr_array_record *array_record;
 	struct ipr_ioa *ioa = dev->ioa;
 
 	if (body)
@@ -8819,8 +8803,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			len += sprintf(body + len,"            %-8s %-16s ",
 				       scsi_dev_data->vendor_id,
 				       scsi_dev_data->product_id);
-	} else if ((scsi_dev_data) &&
-		   (scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT)) {
+	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 
 		tab_stop  = sprintf(body + len,"%d:%d: ",
 				    dev->res_addr[ra].bus,
@@ -8840,17 +8823,13 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		if (scsi_dev_data) {
 			ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 			ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
-		}
-		else if (dev->qac_entry) {
-			common_record = dev->qac_entry;
-			if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
-				device_record = (struct ipr_dev_record *)common_record;
-				ipr_strncpy_0(vendor_id, (char *)device_record->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , (char *)device_record->product_id, IPR_PROD_ID_LEN);
-			} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
-				array_record = (struct ipr_array_record *)common_record;
-				ipr_strncpy_0(vendor_id, (char *)array_record->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , (char *)array_record->product_id,
+		} else if (dev->qac_entry) {
+			if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
+				ipr_strncpy_0(vendor_id, (char *)dev->dev_rcd->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , (char *)dev->dev_rcd->product_id, IPR_PROD_ID_LEN);
+			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+				ipr_strncpy_0(vendor_id, (char *)dev->array_rcd->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id , (char *)dev->array_rcd->product_id,
 					      IPR_PROD_ID_LEN);
 			}
 		}
@@ -8869,9 +8848,9 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			if (ipr_is_hot_spare(dev))
 				len += sprintf(body + len, "%-25s ", "Hot Spare");
 			else if (ipr_is_volume_set(dev)) {
-				sprintf(ioctl_buffer, "RAID %s Disk Array",
+				sprintf(buf, "RAID %s Disk Array",
 					dev->prot_level_str);
-				len += sprintf(body + len, "%-25s ", ioctl_buffer);
+				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
 					sprintf(raid_str,"  RAID %s Array Member",
@@ -9334,6 +9313,17 @@ static void printf_standlone_disks(struct ipr_ioa *ioa, int type)
 		printf_device(dev, type);
 }
 
+static void printf_ses_devices(struct ipr_ioa *ioa, int type)
+{
+	struct ipr_dev *dev;
+
+	/* xxx */
+	return;
+
+	for_each_ses(ioa, dev)
+		printf_device(dev, type);
+}
+
 static void printf_ioa(struct ipr_ioa *ioa, int type)
 {
 	if (!ioa->ioa.scsi_dev_data)
@@ -9343,6 +9333,7 @@ static void printf_ioa(struct ipr_ioa *ioa, int type)
 	printf_standlone_disks(ioa, type);
 	printf_hot_spare_disks(ioa, type);
 	printf_vsets(ioa, type);
+	printf_ses_devices(ioa, type);
 }
 
 static int query_raid_create(char **args, int num_args)

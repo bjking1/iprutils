@@ -242,6 +242,12 @@ s_node n_vset_details = {
 	.title    = __("Disk Array Information Details")
 };
 
+s_node n_ses_details = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG | FWD_FLAG),
+	.title    = __("Disk Enclosure Information Details")
+};
+
 struct screen_opts raid_screen_opt[] = {
 	{raid_status,      "1", __("Display disk array status")},
 	{raid_start,       "2", __("Create a disk array")},
