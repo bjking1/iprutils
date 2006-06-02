@@ -4889,7 +4889,7 @@ static int get_res_addrs(struct ipr_dev *dev)
 	}
 
 	/* xxx remove */
-	data (u32 *)&aliases;
+	data = (u32 *)&aliases;
 	scsi_dbg(dev, "Res addr aliases: %X %X %X\n", ntohl(data[0]),
 		 ntohl(data[1]), ntohl(data[2]));
 	return 0;
