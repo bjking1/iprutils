@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.0
+Version: 2.1.5
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,27 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-* Mon May 8 2006 Brian King <brking@us.ibm.com>
-- Use IOA's default format timeout for AF DASD instead
-  of using a hard coded default.
+* Thu Jul 13 2006 Brian King <brking@us.ibm.com> 2.1.5
+- Fix to allow for compiling with libsysfs 2.0.0
 - Remove RAID support for some older drives that should never
   have been supported.
-* Mon May 1 2006 Brian King <brking@us.ibm.com>
-- Add support to iprinit for it to handle disks going
-  from JBOD <-> AF format across an adapter reset. When this
-  is detected, iprinit will now attempt to delete the disk
-  and then rescan that slot.
-- Fixed an ncurses screen drawing bug which resulted in the
-  screen getting paged down if the cursor was on the last item
-  on the screen and 't' was pressed to toggle the display.
-- Added disk concurrent maintenance support for handling
-  dual pathed SAS disks.
-* Fri Mar 17 2006 Brian King <brking@us.ibm.com>
-- Improve iprdbg's logging
-* Thu Mar 16 2006 Brian King <brking@us.ibm.com>
-- Print better status for devices when IOA is offline/dead.
-* Tue Mar 14 2006 Brian King <brking@us.ibm.com>
-- Fix to allow for compiling with libsysfs 2.0.0
 * Tue Mar 14 2006 Brian King <brking@us.ibm.com> 2.1.4
 - Concurrent maintenance fix for certain iSeries
   enclosures which would result in non existent
