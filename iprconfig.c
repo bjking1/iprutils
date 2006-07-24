@@ -1423,9 +1423,6 @@ static int print_ses_devices(struct ipr_ioa *ioa,
 	int k;
 	int num_lines = 0;
 
-	/* xxx */
-	return 0;
-
 	for_each_ses(ioa, dev) {
 		print_dev(k, dev, buffer, "%1", type+k);
 		*i_con = add_i_con(*i_con, "\0", dev);  
@@ -1495,7 +1492,6 @@ int disk_status(i_container *i_con)
 		num_lines += print_vsets(ioa, &i_con, buffer, 2);
 		num_lines += print_ses_devices(ioa, &i_con, buffer, 2);
 	}
-
 
 	if (num_lines == 0) {
 		for (k = 0; k < 2; k++) {
@@ -4878,7 +4874,6 @@ static int get_res_addrs(struct ipr_dev *dev)
 	struct ipr_res_addr *ra;
 	struct ipr_res_addr_aliases aliases;
 	int i = 0;
-	u32 *data;
 
 	ipr_query_res_addr_aliases(dev->ioa, &(dev->res_addr[0]), &aliases);
 
@@ -4888,10 +4883,6 @@ static int get_res_addrs(struct ipr_dev *dev)
 			break;
 	}
 
-	/* xxx remove */
-	data = (u32 *)&aliases;
-	scsi_dbg(dev, "Res addr aliases: %X %X %X\n", ntohl(data[0]),
-		 ntohl(data[1]), ntohl(data[2]));
 	return 0;
 }
 
@@ -4907,6 +4898,7 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	scsi_dev_data = calloc(1, sizeof(*scsi_dev_data));
 	scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
 	scsi_dev_data->host = ioa->host_num;
+	scsi_dev_data->lun = 0;
 
 	if (is_vses) {
 		scsi_dev_data->channel = slot;
@@ -7836,6 +7828,9 @@ int download_ucode(i_container * i_con)
 		num_lines++;
 
 		num_lines += print_standalone_disks(ioa, &i_con, buffer, 0);
+/* xxx
+		num_lines += print_ses_devices(ioa, &i_con, buffer, 0);
+*/
 		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 0);
 
 		/* print volume set associated devices*/
@@ -7944,7 +7939,7 @@ int process_choose_ucode(struct ipr_dev *dev)
 		return 67 | EXIT_FLAG;
 	if (dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
 		rc = get_ioa_firmware_image_list(dev->ioa, &list);
-/*
+/* xxx
 	else if (dev->scsi_dev_data->type == TYPE_ENCLOSURE || dev->scsi_dev_data->type == TYPE_PROCESSOR)
 		rc = get_ses_firmware_image_list(dev, &list);
 */

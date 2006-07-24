@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.95 2006/05/22 22:41:21 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.96 2006/07/24 19:56:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1213,7 +1213,7 @@ void tool_init(int save_state)
 
 	if (ipr_devs != NULL) {
 		dlist_for_each_data(ipr_devs, pci_address, char) {
-			if (!strcmp(pci_address, "ipr"))
+			if (!strncmp(pci_address, "ipr", 3))
 				continue;
 
 			ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
@@ -2301,6 +2301,16 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 	return rc;
 }
 
+static void ipr_init_res_addr_aliases(struct ipr_res_addr_aliases *aliases,
+				      struct ipr_res_addr *res_addr)
+{
+	struct ipr_res_addr *ra;
+
+	aliases->length = htonl(sizeof(*res_addr) * IPR_DEV_MAX_PATHS);
+	for_each_ra_alias(ra, aliases)
+		memcpy(ra, res_addr, sizeof(*ra));
+}
+
 int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr,
 			       struct ipr_res_addr_aliases *aliases)
 {
@@ -2308,11 +2318,9 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	char *name = ioa->ioa.gen_name;
-	struct ipr_res_addr *ra;
 
-	aliases->length = htonl(sizeof(*res_addr) * IPR_DEV_MAX_PATHS);
-	for_each_ra_alias(ra, aliases)
-		memcpy(ra, res_addr, sizeof(*ra));
+
+	ipr_init_res_addr_aliases(aliases, res_addr);
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -2340,6 +2348,8 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 		      sizeof(*aliases), SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
+	if (rc || (ntohl(aliases->length) <= 4))
+		ipr_init_res_addr_aliases(aliases, res_addr);
 	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
 		ioa_cmd_err(ioa, &sense_data, "Query Resource Address Aliases", rc);
 	if (rc && sense_data.sense_key != ILLEGAL_REQUEST)
