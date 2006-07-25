@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.16 2005/05/18 21:44:00 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.17 2006/07/25 17:48:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -19,12 +19,13 @@
 
 #include <sys/mman.h>
 
-char *tool_name = "iprdump";
-
 #define IPRDUMP_SIZE (8 * 1024 * 1024)
 #define IPRDUMP_DIR "/var/log/"
 #define MAX_DUMP_FILES 4
-#define DUMP_PREFIX "iprdump."
+#define TOOL_NAME "iprdump"
+#define DUMP_PREFIX TOOL_NAME"."
+
+char *tool_name = TOOL_NAME;
 
 struct dump_header {
 	u32 eye_catcher;
@@ -163,7 +164,7 @@ static int read_dump(struct ipr_ioa *ioa)
 
 static int select_dump_file(const struct dirent *dirent)
 {
-	if (strstr(dirent->d_name, "ipr"))
+	if (strstr(dirent->d_name, DUMP_PREFIX))
 		return 1;
 	return 0;
 }
@@ -174,8 +175,8 @@ static int dump_sort(const void *a, const void *b)
 	const struct dirent **dumpb = (const struct dirent **)b;
 	int numa, numb;
 
-	sscanf((*dumpa)->d_name, "iprdump.%d", &numa);
-	sscanf((*dumpb)->d_name, "iprdump.%d", &numb);
+	sscanf((*dumpa)->d_name, DUMP_PREFIX"%d", &numa);
+	sscanf((*dumpb)->d_name, DUMP_PREFIX"%d", &numb);
 
 	if (numa < MAX_DUMP_FILES && numb >= (100 - MAX_DUMP_FILES))
 		return 1;
@@ -317,7 +318,7 @@ int main(int argc, char *argv[])
 	struct ipr_ioa *ioa;
 	int len, i;
 
-	openlog("iprdump", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
+	openlog(TOOL_NAME, LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
 	strcpy(usr_dir, IPRDUMP_DIR);
 
 	for (i = 1; i < argc; i++) {
@@ -331,7 +332,7 @@ int main(int argc, char *argv[])
 				usr_dir[len + 2] = '\0';
 			}
 		} else {
-			printf("Usage: iprdump [options]\n");
+			printf("Usage: "TOOL_NAME" [options]\n");
 			printf("  Options: --version    Print iprdump version\n");
 			printf("           --debug      Print extra debugging information\n");
 			printf("           -d <usr_dir>\n");

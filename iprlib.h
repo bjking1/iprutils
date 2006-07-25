@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.80 2006/05/22 22:41:21 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.81 2006/07/25 17:48:44 brking Exp $
  */
 
 #include <stdarg.h>
@@ -94,7 +94,7 @@
 #define IPR_INTERNAL_TIMEOUT                 (30)         /* 30 seconds */
 #define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)         /* 35 seconds */
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
-#define IPR_WRITE_BUFFER_TIMEOUT             (2 * 60)     /* 2 minutes */
+#define IPR_WRITE_BUFFER_TIMEOUT             (8 * 60)     /* 8 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
 #define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.96 2006/07/24 19:56:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.97 2006/07/25 17:48:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2459,7 +2459,10 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	if (rc != 0) {
 		scsi_cmd_err(dev, &sense_data, "Write buffer", rc);
 	} else {
-		sleep(5);
+		if (ipr_is_ses(dev))
+			sleep(120);
+		else
+			sleep(5);
 
 		/* Wait for the device to come back to life */
 		for (i = 0, rc = -1; rc && (i < 60); i ++)
@@ -4959,7 +4962,7 @@ int ipr_update_disk_fw(struct ipr_dev *dev,
 	level = htonl(image->version);
 
 	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
-		scsi_info(dev, "Updating disk microcode using %s "
+		scsi_info(dev, "Updating device microcode using %s "
 			  "from %02X%02X%02X%02X (%c%c%c%c) to %08X (%c%c%c%c)\n", image->file,
 			  page3_inq.release_level[0], page3_inq.release_level[1],
 			  page3_inq.release_level[2], page3_inq.release_level[3],
