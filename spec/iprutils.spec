@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Jul 25 2006 Brian King <brking@us.ibm.com> 2.2.0
+- Fix for command line SES microcode update.
 * Mon May 8 2006 Brian King <brking@us.ibm.com>
 - Use IOA's default format timeout for AF DASD instead
   of using a hard coded default.
