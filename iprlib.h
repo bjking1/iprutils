@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.81 2006/07/25 17:48:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.82 2006/09/08 16:26:01 brking Exp $
  */
 
 #include <stdarg.h>
@@ -140,6 +140,7 @@
 #define IPR_SUSPEND_DEV_BUS                  0xC8
 #define IPR_IOA_SERVICE_ACTION               0xD2
 #define  IPR_QUERY_RES_ADDR_ALIASES          0x10
+#define  IPR_DISRUPT_DEVICE                  0x11
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ					0xE8
 #define SKIP_WRITE				0xEA
@@ -1738,6 +1739,7 @@ int ipr_format_unit(struct ipr_dev *);
 int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
+int ipr_disrupt_device(struct ipr_dev *);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 int ipr_query_res_addr_aliases(struct ipr_ioa *, struct ipr_res_addr *,
 			       struct ipr_res_addr_aliases *);

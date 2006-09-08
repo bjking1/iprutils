@@ -56,6 +56,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Fri Sep 8 2006 Brian King <brking@us.ibm.com>
+- Reduce default JBOD queue depth to 3.
+* Wed Aug 23 2006 Brian King <brking@us.ibm.com>
+- Fix a race condition with hotplug events which could
+  cause the ipr daemons to run before newly added devices
+  are completed added to the system.
+* Wed Aug 9 2006 Brian King <brking@us.ibm.com>
+- Fix a segfault in iprdbg when using the macro function
 * Tue Jul 25 2006 Brian King <brking@us.ibm.com> 2.2.0
 - Fix for command line SES microcode update.
 * Mon May 8 2006 Brian King <brking@us.ibm.com>

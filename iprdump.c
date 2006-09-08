@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.17 2006/07/25 17:48:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.18 2006/09/08 16:26:01 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -293,16 +293,20 @@ static void poll_for_dump()
 static void kevent_handler(char *buf)
 {
 	struct ipr_ioa *ioa;
-	int host;
+	int host, i;
 
 	if (strncmp(buf, "change@/class/scsi_host", 23))
 		return;
 
 	host = strtoul(&buf[28], NULL, 10);
 
-	tool_init(0);
-
-	ioa = find_ioa(host);
+	for (i = 0; i < 10; i++) {
+		tool_init(0);
+		ioa = find_ioa(host);
+		if (ioa)
+			break;
+		sleep(2);
+	}
 
 	if (!ioa) {
 		syslog(LOG_ERR, "Failed to find ipr ioa %d for iprdump\n", host);

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.97 2006/07/25 17:48:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.98 2006/09/08 16:26:01 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2261,6 +2261,51 @@ int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 	return rc;
 }
 
+int ipr_disrupt_device(struct ipr_dev *dev)
+{
+	int fd, rc;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	u32 res_handle;
+	char *name = dev->ioa->ioa.gen_name;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	if (!dev->dev_rcd)
+		return -EINVAL;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	res_handle = ntohl(dev->dev_rcd->resource_handle);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_DISRUPT_DEVICE;
+	cdb[6] = (u8)(res_handle >> 24);
+	cdb[7] = (u8)(res_handle >> 16);
+	cdb[8] = (u8)(res_handle >> 8);
+	cdb[9] = (u8)(res_handle);
+
+	scsi_info(dev, "Attempting to force device failure "
+		  "with disrupt device command\n");
+	rc = sg_ioctl(fd, cdb, NULL,
+		      0, SG_DXFER_NONE,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		scsi_cmd_err(dev, &sense_data, "Disrupt Device", rc);
+
+	close(fd);
+	return rc;
+}
+
 int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 {
 	int fd, rc;
@@ -3672,11 +3717,14 @@ static int ipr_get_saved_ioa_attr(struct ipr_ioa *ioa,
 	return ipr_get_saved_attr(ioa, category, field, value);
 }
 
+#define GSCSI_TCQ_DEPTH	3
 #define AS400_TCQ_DEPTH 16
 #define DEFAULT_TCQ_DEPTH 64
 
 static int get_tcq_depth(struct ipr_dev *dev)
 {
+	if (ipr_is_gscsi(dev))
+		return GSCSI_TCQ_DEPTH;
 	if (!dev->scsi_dev_data)
 		return AS400_TCQ_DEPTH;
 	if (!strncmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8))
@@ -3861,10 +3909,10 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 	if (attr->format_timeout != old_attr.format_timeout) {
 		if (ipr_is_af_dasd_device(dev)) {
 			sprintf(temp, "%d", attr->format_timeout);
-			if (ipr_set_dasd_timeouts(dev))
-				return -EIO;
 			if (save)
 				ipr_save_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp, 1);
+			if (ipr_set_dasd_timeouts(dev))
+				return -EIO;
 		}
 	}
 
@@ -5404,7 +5452,7 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 {
 	struct ipr_dev *dev;
 	char *name;
-	int i, rc = -EAGAIN;
+	int i, j, rc = -EAGAIN;
 
 	name = strrchr(buf, '/');
 	if (!name) {
@@ -5414,9 +5462,14 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 
 	name++;
 	for (i = 0; i < 2 && rc == -EAGAIN; i++) {
-		tool_init(1);
-		check_current_config(false);
-		dev = find_device(name);
+		for (j = 0; j < 10; j++) {
+			tool_init(1);
+			check_current_config(false);
+			dev = find_device(name);
+			if (dev)
+				break;
+			sleep(2);
+		}
 
 		if (!dev) {
 			syslog_dbg("Failed to find ipr dev %s\n", name);
@@ -5432,7 +5485,7 @@ void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 	struct ipr_ioa *ioa;
 	char *c;
 	int host;
-	int i, rc = -EAGAIN;
+	int i, j, rc = -EAGAIN;
 
 	c = strrchr(buf, '/');
 	if (!c) {
@@ -5444,9 +5497,14 @@ void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 
 	host = strtoul(c, NULL, 10);
 	for (i = 0; i < 2 && rc == -EAGAIN; i++) {
-		tool_init(1);
-		check_current_config(false);
-		ioa = find_ioa(host);
+		for (j = 0; j < 10; j++) {
+			tool_init(1);
+			check_current_config(false);
+			ioa = find_ioa(host);
+			if (ioa)
+				break;
+			sleep(2);
+		}
 
 		if (!ioa) {
 			syslog_dbg("Failed to find ipr ioa %d\n", host);

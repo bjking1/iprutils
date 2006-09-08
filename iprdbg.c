@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.25 2006/03/21 14:53:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdbg.c,v 1.26 2006/09/08 16:26:01 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -676,7 +676,7 @@ static int exec_macro(struct ipr_ioa *ioa, char *cmd)
 
 	strcpy(copy, cmd);
 
-	if (!cmd_to_args(cmd, &argc, &argv))
+	if (!cmd_to_args(copy, &argc, &argv))
 		goto out_free_argv;
 
 	rc = parse_cmd(ioa, argc - 1, &argv[1]);

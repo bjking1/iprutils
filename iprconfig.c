@@ -1324,8 +1324,9 @@ static void verify_device(struct ipr_dev *dev)
 	} else if (dev->scsi_dev_data->type == TYPE_DISK) {
 		rc = ipr_test_unit_ready(dev, &sense_data);
 
-		if (rc != CHECK_CONDITION) {
-			if (ipr_get_blk_size(dev) != 512 && dev->ioa->qac_data->num_records != 0) {
+		if (!rc) {
+			if (ipr_get_blk_size(dev) == dev->ioa->af_block_size &&
+			    dev->ioa->qac_data->num_records != 0) {
 				enable_af(dev);
 				evaluate_device(dev, dev->ioa, dev->ioa->af_block_size);
 			}
@@ -10084,6 +10085,23 @@ static int update_ucode_cmd(char **args, int num_args)
 		return update_dev_ucode(dev, args[1]);
 }
 
+static int disrupt_device_cmd(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_af_dasd_device(dev)) {
+		fprintf(stderr, "%s is not an Advanced Function disk\n", args[0]);
+		return -EINVAL;
+	}
+
+	return ipr_disrupt_device(dev);
+}
+
 static int raid_rebuild_cmd(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -11028,6 +11046,7 @@ static const struct {
 	{ "start-ioa-cache",			1, 0, 1, start_ioa_cache, "sg5" },
 	{ "raid-consistency-check",		1, 0, 1, raid_consistency_check, "sg5" },
 	{ "raid-rebuild",				1, 0, 1, raid_rebuild_cmd, "sg6" },
+	{ "disrupt-device",			1, 0, 1, disrupt_device_cmd, "sg6" },
 	{ "update-ucode",				2, 0, 2, update_ucode_cmd, "sg5 /root/ucode.bin" },
 	{ "set-format-timeout",			2, 0, 2, set_format_timeout, "sg6 4" },
 	{ "set-qdepth",				2, 0, 2, set_qdepth, "sda 16" },
