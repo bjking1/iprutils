@@ -9571,7 +9571,7 @@ static int set_bus_width(char **args, int num_args)
 
 static int set_bus_speed(char **args, int num_args)
 {
-	int rc, max_xfer_rate, new_xfer_rate;
+	int rc, max_speed, new_xfer_rate;
 	struct ipr_scsi_buses page_28_cur;
 	struct ipr_scsi_buses page_28_chg;
 	struct ipr_ioa *ioa;
@@ -9603,14 +9603,12 @@ static int set_bus_speed(char **args, int num_args)
 
 	get_changeable_bus_attr(ioa, &page_28_chg, page_28_cur.num_buses);
 
-	max_xfer_rate = get_max_bus_speed(ioa, bus);
+	max_speed = get_max_bus_speed(ioa, bus);
 	new_xfer_rate = IPR_BUS_THRUPUT_TO_XFER_RATE(speed,
 						     page_28_cur.bus[bus].bus_width);
 
-	if (new_xfer_rate > max_xfer_rate) {
-		fprintf(stderr, "Max speed allowed: %d MB/sec\n",
-			IPR_BUS_XFER_RATE_TO_THRUPUT(max_xfer_rate,
-						     page_28_cur.bus[bus].bus_width));
+	if (speed > max_speed) {
+		fprintf(stderr, "Max speed allowed: %d MB/sec\n", max_speed);
 		return -EINVAL;
 	}
 

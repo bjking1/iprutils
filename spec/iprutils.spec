@@ -58,6 +58,7 @@ rm -rf $RPM_BUILD_ROOT
 %changelog
 * Fri Sep 8 2006 Brian King <brking@us.ibm.com>
 - Reduce default JBOD queue depth to 3.
+- Fix iprconfig -c set-bus-speed.
 * Wed Aug 23 2006 Brian King <brking@us.ibm.com>
 - Fix a race condition with hotplug events which could
   cause the ipr daemons to run before newly added devices
