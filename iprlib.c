@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.99 2006/09/12 14:22:27 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.100 2006/09/12 20:42:14 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -693,6 +693,21 @@ static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 
 	close(fd);
 	return rc;
+}
+
+static enum ipr_tcq_mode ioa_get_tcq_mode(struct ipr_ioa *ioa)
+{
+	struct ipr_mode_pages mode_pages;
+	struct sense_data_t sense_data;
+	int rc;
+
+	rc = mode_sense(&ioa->ioa, 0x28, &mode_pages, &sense_data);
+
+	if (rc && sense_data.sense_key == ILLEGAL_REQUEST)
+		return IPR_TCQ_NACA;
+	if (rc)
+		return IPR_TCQ_DISABLE;
+	return IPR_TCQ_FROZEN;
 }
 
 int ioa_is_spi(struct ipr_ioa *ioa)
@@ -3232,6 +3247,7 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 	struct ipr_mode_pages mode_pages;
 
 	ioa->af_block_size = IPR_DEFAULT_AF_BLOCK_SIZE;
+	ioa->tcq_mode = ioa_get_tcq_mode(ioa);
 
 	rc = ipr_inquiry(&ioa->ioa, 0, &page0_inq, sizeof(page0_inq));
 
@@ -5164,6 +5180,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	struct ipr_mode_pages mode_pages, ch_mode_pages;
 	struct ipr_control_mode_page *page, *ch_page;
 	int len;
+	int rc = 0;
 
 	memset(&mode_pages, 0, sizeof(mode_pages));
 	memset(&ch_mode_pages, 0, sizeof(ch_mode_pages));
@@ -5183,24 +5200,36 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	IPR_SET_MODE(ch_page->queue_algorithm_modifier,
 		     page->queue_algorithm_modifier, 1);
 	IPR_SET_MODE(ch_page->tst, page->tst, 1);
-	IPR_SET_MODE(ch_page->qerr, page->qerr, 3);
+
+	switch(dev->ioa->tcq_mode) {
+	case IPR_TCQ_FROZEN:
+		IPR_SET_MODE(ch_page->qerr, page->qerr, 3);
+		if (page->tst != 1 || page->qerr != 3) {
+			scsi_dbg(dev, "Cannot set QERR/TST for multi-initiator. "
+				 "TST=%d, QERR=%d\n", page->tst, page->qerr);
+
+			IPR_SET_MODE(ch_page->tst, page->tst, 0);
+			IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
+
+			if (page->tst != 0 || page->qerr != 1)
+				scsi_dbg(dev, "Cannot set QERR/TST for single-initiator. "
+					 "TST=%d, QERR=%d\n", page->tst, page->qerr);
+		}
+		break;
+	case IPR_TCQ_NACA:
+		IPR_SET_MODE(ch_page->qerr, page->qerr, 0);
+		break;
+	case IPR_TCQ_DISABLE:
+	default:
+		rc = -EIO;
+		break;
+	};
+
 	IPR_SET_MODE(ch_page->dque, page->dque, 0);
 
 	if (page->dque != 0) {
 		scsi_dbg(dev, "Cannot set dque=0\n");
 		return -EIO;
-	}
-
-	if (page->tst != 1 || page->qerr != 3) {
-		scsi_dbg(dev, "Cannot set QERR/TST for multi-initiator. "
-			 "TST=%d, QERR=%d\n", page->tst, page->qerr);
-
-		IPR_SET_MODE(ch_page->tst, page->tst, 0);
-		IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
-
-		if (page->tst != 0 || page->qerr != 1)
-			scsi_dbg(dev, "Cannot set QERR/TST for single-initiator. "
-				 "TST=%d, QERR=%d\n", page->tst, page->qerr);
 	}
 
 	if (page->queue_algorithm_modifier != 1)
@@ -5216,7 +5245,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 		scsi_err(dev, "Failed to setup mode page 0x0A\n");
 		return -EIO;
 	}
-	return 0;
+	return rc;
 }
 
 /*

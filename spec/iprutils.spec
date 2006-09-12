@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Sep 12 2006 Brian King <brking@us.ibm.com>
+- Change default QERR setting for SAS to 0.
 * Tue Sep 12 2006 Brian King <brking@us.ibm.com> 2.2.2
 - Fix iprconfig set-format-timeout.
 * Mon Sep 11 2006 Brian King <brking@us.ibm.com> 2.2.1

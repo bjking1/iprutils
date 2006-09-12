@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.83 2006/09/12 14:22:28 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.84 2006/09/12 20:42:14 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1086,6 +1086,12 @@ struct ipr_dev {
            for(ra = (dev)->res_addr; \
                 (ra - ((dev)->res_addr)) < IPR_DEV_MAX_PATHS; ra++)
 
+enum ipr_tcq_mode {
+	IPR_TCQ_DISABLE = 0,
+	IPR_TCQ_FROZEN = 1,
+	IPR_TCQ_NACA = 2
+};
+
 #define IPR_MAX_IOA_DEVICES        (IPR_MAX_NUM_BUSES * 15 * 2 + 1)
 struct ipr_ioa {
 	struct ipr_dev ioa;
@@ -1104,6 +1110,7 @@ struct ipr_ioa {
 	u8 should_init:1;
 	u8 is_aux_cache:1;
 	u8 protect_last_bus:1;
+	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
 	u16 subsystem_vendor;
