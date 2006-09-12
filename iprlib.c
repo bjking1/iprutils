@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.98 2006/09/08 16:26:01 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.99 2006/09/12 14:22:27 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3801,6 +3801,75 @@ static int get_format_timeout(struct ipr_dev *dev)
 	return timeout;
 }
 
+static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
+	{READ_10, 0, __constant_cpu_to_be16(30)},
+	{WRITE_10, 0, __constant_cpu_to_be16(30)},
+	{WRITE_VERIFY, 0, __constant_cpu_to_be16(30)},
+	{SKIP_READ, 0, __constant_cpu_to_be16(30)},
+	{SKIP_WRITE, 0, __constant_cpu_to_be16(30)}
+};
+
+struct ipr_dasd_timeouts {
+	u32 length;
+	struct ipr_dasd_timeout_record record[ARRAY_SIZE(ipr_dasd_timeouts) + 1];
+};
+
+static int ipr_set_dasd_timeouts(struct ipr_dev *dev, int format_timeout)
+{
+	int fd, rc, len;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	struct ipr_dasd_timeouts timeouts;
+	struct ipr_disk_attr attr;
+	char *name = dev->gen_name;
+
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+
+	fd = open(name, O_RDWR);
+
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memcpy(timeouts.record, ipr_dasd_timeouts, sizeof(ipr_dasd_timeouts));
+	len = sizeof(timeouts) - sizeof(timeouts.record[0]);
+
+	if (!ipr_get_dev_attr(dev, &attr)) {
+		len = sizeof(timeouts);
+
+		if (!format_timeout)
+			format_timeout = attr.format_timeout;
+
+		timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].op_code = FORMAT_UNIT;
+		if (format_timeout >= IPR_TIMEOUT_MASK) {
+			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
+				(format_timeout / 60) | IPR_TIMEOUT_MINUTE_RADIX;
+		} else {
+			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
+				format_timeout;
+		}
+	}
+
+	timeouts.length = htonl(len);
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+	cdb[0] = SET_DASD_TIMEOUTS;
+	cdb[7] = (len >> 8) & 0xff;
+	cdb[8] = len & 0xff;
+
+	rc = sg_ioctl(fd, cdb, &timeouts,
+		      len, SG_DXFER_TO_DEV,
+		      &sense_data, SET_DASD_TIMEOUTS_TIMEOUT);
+
+	if (rc != 0)
+		scsi_cmd_err(dev, &sense_data, "Set DASD timeouts", rc);
+
+	close(fd);
+	return rc;
+}
+
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
 	char temp[100];
@@ -3909,10 +3978,10 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 	if (attr->format_timeout != old_attr.format_timeout) {
 		if (ipr_is_af_dasd_device(dev)) {
 			sprintf(temp, "%d", attr->format_timeout);
+			if (ipr_set_dasd_timeouts(dev, attr->format_timeout))
+				return -EIO;
 			if (save)
 				ipr_save_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp, 1);
-			if (ipr_set_dasd_timeouts(dev))
-				return -EIO;
 		}
 	}
 
@@ -3981,71 +4050,6 @@ int ipr_query_dasd_timeouts(struct ipr_dev *dev,
 
 	if (rc != 0)
 		scsi_cmd_err(dev, &sense_data, "Query DASD timeouts", rc);
-
-	close(fd);
-	return rc;
-}
-
-static const struct ipr_dasd_timeout_record ipr_dasd_timeouts[] = {
-	{READ_10, 0, __constant_cpu_to_be16(30)},
-	{WRITE_10, 0, __constant_cpu_to_be16(30)},
-	{WRITE_VERIFY, 0, __constant_cpu_to_be16(30)},
-	{SKIP_READ, 0, __constant_cpu_to_be16(30)},
-	{SKIP_WRITE, 0, __constant_cpu_to_be16(30)}
-};
-
-struct ipr_dasd_timeouts {
-	u32 length;
-	struct ipr_dasd_timeout_record record[ARRAY_SIZE(ipr_dasd_timeouts) + 1];
-};
-
-int ipr_set_dasd_timeouts(struct ipr_dev *dev)
-{
-	int fd, rc, len;
-	u8 cdb[IPR_CCB_CDB_LEN];
-	struct sense_data_t sense_data;
-	struct ipr_dasd_timeouts timeouts;
-	struct ipr_disk_attr attr;
-	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
-	fd = open(name, O_RDWR);
-
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s. %m\n", name);
-		return errno;
-	}
-
-	memcpy(timeouts.record, ipr_dasd_timeouts, sizeof(ipr_dasd_timeouts));
-	len = sizeof(timeouts) - sizeof(timeouts.record[0]);
-
-	if (!ipr_get_dev_attr(dev, &attr)) {
-		len = sizeof(timeouts);
-
-		if (attr.format_timeout >= IPR_TIMEOUT_MASK) {
-			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
-				(attr.format_timeout / 60) | IPR_TIMEOUT_MINUTE_RADIX;
-		} else {
-			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
-				attr.format_timeout;
-		}
-	}
-
-	timeouts.length = htonl(len);
-	memset(cdb, 0, IPR_CCB_CDB_LEN);
-	cdb[0] = SET_DASD_TIMEOUTS;
-	cdb[7] = (len >> 8) & 0xff;
-	cdb[8] = len & 0xff;
-
-	rc = sg_ioctl(fd, cdb, &timeouts,
-		      len, SG_DXFER_TO_DEV,
-		      &sense_data, SET_DASD_TIMEOUTS_TIMEOUT);
-
-	if (rc != 0)
-		scsi_cmd_err(dev, &sense_data, "Set DASD timeouts", rc);
 
 	close(fd);
 	return rc;
@@ -5302,7 +5306,7 @@ static void init_af_dev(struct ipr_dev *dev)
 	struct ipr_disk_attr attr;
 	int rc;
 
-	if (ipr_set_dasd_timeouts(dev))
+	if (ipr_set_dasd_timeouts(dev, 0))
 		return;
 	if (polling_mode && (!dev->should_init && !memcmp(&attr, &dev->attr, sizeof(attr))))
 	    return;
@@ -5316,7 +5320,6 @@ static void init_af_dev(struct ipr_dev *dev)
 		return;
 	if (ipr_get_dev_attr(dev, &attr))
 		return;
-	attr.format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
 
 	if ((rc = setup_page0x0a(dev))) {
 		if (rc != -EINVAL) {

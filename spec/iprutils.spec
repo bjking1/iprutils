@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.0
+Version: 2.2.2
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Sep 12 2006 Brian King <brking@us.ibm.com> 2.2.2
+- Fix iprconfig set-format-timeout.
+* Mon Sep 11 2006 Brian King <brking@us.ibm.com> 2.2.1
 * Fri Sep 8 2006 Brian King <brking@us.ibm.com>
 - Reduce default JBOD queue depth to 3.
 - Fix iprconfig -c set-bus-speed.
