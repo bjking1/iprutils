@@ -5047,7 +5047,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	for_each_primary_ioa(ioa) {
 		is_spi = ioa_is_spi(ioa);
 
-		for_each_dev(ioa, dev)
+		for_each_hotplug_dev(ioa, dev)
 			get_res_addrs(dev);
 
 		for_each_ses(ioa, ses) {

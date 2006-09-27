@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.2
+Version: 2.2.3
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Sep 27 2006 Brian King <brking@us.ibm.com> 2.2.3
+- Fix SAS disk hotplug dual path bug.
 * Tue Sep 12 2006 Brian King <brking@us.ibm.com>
 - Change default QERR setting for SAS to 0.
 * Tue Sep 12 2006 Brian King <brking@us.ibm.com> 2.2.2

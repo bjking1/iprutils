@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.84 2006/09/12 20:42:14 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.85 2006/09/27 16:22:31 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1137,6 +1137,10 @@ struct ipr_ioa {
            if (!ioa->is_secondary)
 
 #define for_each_dev(i, d) for (d = (i)->dev; (d - (i)->dev) < (i)->num_devices; d++)
+
+#define for_each_hotplug_dev(i, d) \
+      for_each_dev(i, d) \
+           if (ipr_is_af_dasd_device(d) || ipr_is_gscsi(d))
 
 #define for_each_af_dasd(i, d) \
       for_each_dev(i, d) \

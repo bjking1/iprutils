@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.100 2006/09/12 20:42:14 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.101 2006/09/27 16:22:31 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -5030,14 +5030,17 @@ int ipr_update_disk_fw(struct ipr_dev *dev,
 	level = htonl(image->version);
 
 	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
-		scsi_info(dev, "Updating device microcode using %s "
-			  "from %02X%02X%02X%02X (%c%c%c%c) to %08X (%c%c%c%c)\n", image->file,
-			  page3_inq.release_level[0], page3_inq.release_level[1],
-			  page3_inq.release_level[2], page3_inq.release_level[3],
-			  page3_inq.release_level[0], page3_inq.release_level[1],
-			  page3_inq.release_level[2], page3_inq.release_level[3],
-			  image->version, image->version >> 24, (image->version >> 16) & 0xff,
-			  (image->version >> 8) & 0xff, image->version & 0xff);
+		if (!ipr_is_ses(dev)) {
+			scsi_info(dev, "Updating device microcode using %s "
+				  "from %02X%02X%02X%02X (%c%c%c%c) to %08X (%c%c%c%c)\n", image->file,
+				  page3_inq.release_level[0], page3_inq.release_level[1],
+				  page3_inq.release_level[2], page3_inq.release_level[3],
+				  page3_inq.release_level[0], page3_inq.release_level[1],
+				  page3_inq.release_level[2], page3_inq.release_level[3],
+				  image->version, image->version >> 24, (image->version >> 16) & 0xff,
+				  (image->version >> 8) & 0xff, image->version & 0xff);
+		} else
+                scsi_info(dev, "Updating device microcode using %s.\n", image->file);
 
 		rc = ipr_write_buffer(dev, img_hdr, ucode_stats.st_size);
 		ipr_init_dev(dev);
