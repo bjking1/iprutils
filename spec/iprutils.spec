@@ -56,6 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Tue Oct 10 2006 Brian King <brking@us.ibm.com>
+- Add a couple utility functions for SAS
+	ipr_query_sas_expander_info
+	ipr_query_res_redundancy_info
 * Wed Sep 27 2006 Brian King <brking@us.ibm.com> 2.2.3
 - Fix SAS disk hotplug dual path bug.
 * Tue Sep 12 2006 Brian King <brking@us.ibm.com>

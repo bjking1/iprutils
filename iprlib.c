@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.101 2006/09/27 16:22:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.102 2006/10/10 17:39:04 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2379,7 +2379,6 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	struct sense_data_t sense_data;
 	char *name = ioa->ioa.gen_name;
 
-
 	ipr_init_res_addr_aliases(aliases, res_addr);
 
 	if (strlen(name) == 0)
@@ -2414,6 +2413,98 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 		ioa_cmd_err(ioa, &sense_data, "Query Resource Address Aliases", rc);
 	if (rc && sense_data.sense_key != ILLEGAL_REQUEST)
 		rc = 0;
+
+	close(fd);
+	return rc;
+}
+
+int ipr_query_sas_expander_info(struct ipr_ioa *ioa,
+				struct ipr_query_sas_expander_info *info)
+{
+	char *name = ioa->ioa.gen_name;
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	int fd, rc;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_QUERY_SAS_EXPANDER_INFO;
+	cdb[10] = sizeof(*info) >> 24;
+	cdb[11] = (sizeof(*info) >> 16) & 0xff;
+	cdb[12] = (sizeof(*info) >> 8) & 0xff;
+	cdb[13] = sizeof(*info) & 0xff;
+
+	rc = sg_ioctl(fd, cdb, info, sizeof(*info), SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		ioa_cmd_err(ioa, &sense_data, "Query SAS Expander Info", rc);
+
+	close(fd);
+	return rc;	
+}
+
+int ipr_query_res_redundancy_info(struct ipr_dev *dev,
+				  struct ipr_res_redundancy_info *info)
+{
+	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
+	char *name = dev->ioa->ioa.gen_name;
+	struct ipr_dev_record *dev_record;
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	u32 res_handle;
+	int fd, rc;
+
+	if (scsi_dev_data)
+		res_handle = scsi_dev_data->handle;
+	else if (ipr_is_af_dasd_device(dev)) {
+		dev_record = dev->dev_rcd;
+		if (dev_record->no_cfgte_dev) 
+			return -EINVAL;
+
+		res_handle = ntohl(dev_record->resource_handle);
+	} else
+		return -EINVAL;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_QUERY_RES_REDUNDANCY_INFO;
+	cdb[2] = (u8)(res_handle >> 24);
+	cdb[3] = (u8)(res_handle >> 16);
+	cdb[4] = (u8)(res_handle >> 8);
+	cdb[5] = (u8)(res_handle);
+	cdb[10] = sizeof(*info) >> 24;
+	cdb[11] = (sizeof(*info) >> 16) & 0xff;
+	cdb[12] = (sizeof(*info) >> 8) & 0xff;
+	cdb[13] = sizeof(*info) & 0xff;
+
+	rc = sg_ioctl(fd, cdb, info, sizeof(*info), SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		ioa_cmd_err(dev->ioa, &sense_data, "Query Resource Redundancy Info", rc);
 
 	close(fd);
 	return rc;

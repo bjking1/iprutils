@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.85 2006/09/27 16:22:31 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.86 2006/10/10 17:39:04 brking Exp $
  */
 
 #include <stdarg.h>
@@ -141,6 +141,8 @@
 #define IPR_IOA_SERVICE_ACTION               0xD2
 #define  IPR_QUERY_RES_ADDR_ALIASES          0x10
 #define  IPR_DISRUPT_DEVICE                  0x11
+#define  IPR_QUERY_SAS_EXPANDER_INFO         0x12
+#define  IPR_QUERY_RES_REDUNDANCY_INFO       0x13
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ					0xE8
 #define SKIP_WRITE				0xEA
@@ -1577,6 +1579,80 @@ struct ipr_sas_port_log_desc {
 	struct ipr_sas_phy_log_desc phy[IPR_IOA_MAX_PHYS];
 };
 
+#define IPR_SAS_LINK_RATE_NOT_PROGRAMMABLE	0
+#define IPR_SAS_LINK_RATE_1_5_Gbps			8
+#define IPR_SAS_LINK_RATE_3_0_Gbps			9
+
+#define IPR_SAS_ROUTING_DIRECT		0
+#define IPR_SAS_ROUTING_SUB_OR_DIRECT	1
+#define IPR_SAS_ROUTING_TABLE_OR_DIRECT	2
+
+struct ipr_sas_phy_info {
+	u32 len;
+	u8 bus;
+	u8 cascade;
+	u8 phy_num;
+	u8 reserved;
+	struct ipr_sas_phy_log_desc phy_log;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 prog_min_link_rate:4;
+	u8 hw_min_link_rate:4;
+
+	u8 prog_max_link_rate:4;
+	u8 hw_max_link_rate:4;
+
+	u8 virtual_phy:1;
+	u8 reserved2:7;
+
+	u8 reserved3:4;
+	u8 routing_attr:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 hw_min_link_rate:4;
+	u8 prog_min_link_rate:4;
+
+	u8 hw_max_link_rate:4;
+	u8 prog_max_link_rate:4;
+
+	u8 reserved2:7;
+	u8 virtual_phy:1;
+
+	u8 routing_attr:4;
+	u8 reserved3:4;
+#endif
+};
+
+struct ipr_sas_expander_info {
+	u32 len;
+	u8 bus;
+	u8 cascade;
+	u8 reserved;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved2:7;
+	u8 sas_1_1_fmt:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 sas_1_1_fmt:1;
+	u8 reserved2:7;
+#endif
+	struct ipr_std_inq_vpids vpids;
+	u8 prod_rev_level[4];
+	u8 component_vendor_id[8];
+	u8 component_id[2];
+	u8 component_rev_id;
+	u8 reserved3;
+	u8 vendor_spec[8];
+	u8 enclosure_logical_id[8];
+	u8 reserved4[3];
+	u8 num_phys;
+	struct ipr_sas_phy_info phy[1];
+};
+
+struct ipr_query_sas_expander_info {
+	u32 len;
+	u8 reserved[3];
+	u8 num_expanders;
+	struct ipr_sas_expander_info exp[1];
+};
+
 struct ipr_log_page18 {
 	u8 page_code;
 	u8 reserved;
@@ -1594,6 +1670,69 @@ struct ipr_log_page18 {
         for (phy = (port)->phy; \
              (phy < ((port)->phy + (port)->num_phys)) && \
              (phy < ((port)->phy + IPR_IOA_MAX_PORTS)); phy++)
+
+struct ipr_fabric_config_element {
+	u8 type_status;
+#define IPR_PATH_CFG_TYPE_MASK	0xF0
+#define IPR_PATH_CFG_NOT_EXIST	0x00
+#define IPR_PATH_CFG_IOA_PORT		0x10
+#define IPR_PATH_CFG_EXP_PORT		0x20
+#define IPR_PATH_CFG_DEVICE_PORT	0x30
+#define IPR_PATH_CFG_DEVICE_LUN	0x40
+
+#define IPR_PATH_CFG_STATUS_MASK	0x0F
+#define IPR_PATH_CFG_NO_PROB		0x00
+#define IPR_PATH_CFG_DEGRADED		0x01
+#define IPR_PATH_CFG_FAILED		0x02
+#define IPR_PATH_CFG_SUSPECT		0x03
+#define IPR_PATH_NOT_DETECTED		0x04
+#define IPR_PATH_INCORRECT_CONN	0x05
+
+	u8 cascaded_expander;
+	u8 phy;
+	u8 link_rate;
+#define IPR_PHY_LINK_RATE_MASK	0x0F
+
+	u32 wwid[2];
+};
+
+struct ipr_fabric_descriptor {
+	u16 length;
+	u8 ioa_port;
+	u8 cascaded_expander;
+	u8 phy;
+	u8 path_state;
+#define IPR_PATH_ACTIVE_MASK		0xC0
+#define IPR_PATH_NO_INFO		0x00
+#define IPR_PATH_ACTIVE			0x40
+#define IPR_PATH_NOT_ACTIVE		0x80
+
+#define IPR_PATH_STATE_MASK		0x0F
+#define IPR_PATH_STATE_NO_INFO	0x00
+#define IPR_PATH_HEALTHY		0x01
+#define IPR_PATH_DEGRADED		0x02
+#define IPR_PATH_FAILED			0x03
+
+	u16 num_entries;
+	struct ipr_fabric_config_element elem[1];
+};
+
+#define for_each_fabric_cfg(fabric, cfg) \
+		for (cfg = (fabric)->elem; \
+			cfg < ((fabric)->elem + ntohs((fabric)->num_entries)); \
+			cfg++)
+
+struct ipr_res_redundancy_info {
+	u32 len;
+	u8 possibly_redundant_paths;
+	u8 healthy_paths;
+	u8 degraded_paths;
+	u8 failed_paths;
+	u8 active_paths;
+	u8 reserved[2];
+	u8 fabric_descriptors;
+	struct ipr_fabric_descriptor fabric[1];
+};
 
 struct ipr_ses_type_desc {
 	u8 elem_type;
@@ -1750,6 +1889,10 @@ int ipr_format_unit(struct ipr_dev *);
 int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);
+int ipr_query_res_redundancy_info(struct ipr_dev *,
+				  struct ipr_res_redundancy_info *);
+int ipr_query_sas_expander_info(struct ipr_ioa *,
+				struct ipr_query_sas_expander_info *);
 int ipr_disrupt_device(struct ipr_dev *);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 int ipr_query_res_addr_aliases(struct ipr_ioa *, struct ipr_res_addr *,
