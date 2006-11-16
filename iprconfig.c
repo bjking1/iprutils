@@ -4884,6 +4884,10 @@ static int get_res_addrs(struct ipr_dev *dev)
 			break;
 	}
 
+	scsi_dbg(dev, "Resource address aliases: %08X %08X\n",
+		 IPR_GET_PHYSICAL_LOCATOR(&(dev->res_addr[0])),
+		 IPR_GET_PHYSICAL_LOCATOR(&(dev->res_addr[1])));
+
 	return 0;
 }
 
@@ -4916,6 +4920,7 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	dev->scsi_dev_data = scsi_dev_data;
 	dev->ses[0] = ses;
 	dev->ioa = ioa;
+	scsi_dbg(dev, "Found empty slot\n");
 	get_res_addrs(dev);
 	return dev;
 }
@@ -5064,6 +5069,8 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 				is_vses = 1;
 			else
 				is_vses = 0;
+
+			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
 
 			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
@@ -7820,13 +7827,16 @@ int download_ucode(i_container * i_con)
 	body_init_status(buffer, n_download_ucode.header, &header_lines);
 
 	for_each_ioa(ioa) {
-		if (!ioa->ioa.scsi_dev_data || ioa->ioa_dead || ioa->is_secondary)
+		if (!ioa->ioa.scsi_dev_data || ioa->ioa_dead)
 			continue;
 
 		print_dev(k, &ioa->ioa, buffer, "%1", k);
 		i_con = add_i_con(i_con, "\0", &ioa->ioa);
 
 		num_lines++;
+
+		if (ioa->is_secondary)
+			continue;
 
 		num_lines += print_standalone_disks(ioa, &i_con, buffer, 0);
 /* xxx
@@ -8245,6 +8255,11 @@ int ibm_storage_log(i_container *i_con)
 	def_prog_mode();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
+	if (num_dir_entries < 0) {
+		s_status.num = 75;
+		return 75;
+	}
+
 	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
 	if (num_dir_entries)
 		dirent = log_files;
@@ -8288,8 +8303,11 @@ int ibm_storage_log(i_container *i_con)
 
 	rc = system(cmnd);
 
-	if (num_dir_entries)
+	if (num_dir_entries) {
+		while (num_dir_entries--)
+			free(log_files[num_dir_entries]);
 		free(*log_files);
+	}
 
 	if ((rc != 0) && (rc != 127)) {
 		/* "Editor returned %d. Try setting the default editor" */
@@ -8312,6 +8330,11 @@ int kernel_log(i_container *i_con)
 	def_prog_mode();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
+	if (num_dir_entries < 0) {
+		s_status.num = 75;
+		return 75;
+	}
+
 	if (num_dir_entries)
 		dirent = log_files;
 
@@ -8348,8 +8371,11 @@ int kernel_log(i_container *i_con)
 	}
 
 	rc = system(cmnd);
-	if (num_dir_entries)
+	if (num_dir_entries > 0) {
+		while (num_dir_entries--)
+			free(log_files[num_dir_entries]);
 		free(*log_files);
+	}
 
 	if ((rc != 0) && (rc != 127))	{
 		/* "Editor returned %d. Try setting the default editor" */
@@ -8373,6 +8399,11 @@ int iprconfig_log(i_container *i_con)
 	def_prog_mode();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
+	if (num_dir_entries < 0) {
+		s_status.num = 75;
+		return 75;
+	}
+
 	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
 	if (num_dir_entries)
 		dirent = log_files;
@@ -8406,8 +8437,11 @@ int iprconfig_log(i_container *i_con)
 	}
 
 	rc = system(cmnd);
-	if (num_dir_entries)
+	if (num_dir_entries) {
+		while (num_dir_entries--)
+			free(log_files[num_dir_entries]);
 		free(*log_files);
+	}
 
 	if ((rc != 0) && (rc != 127))	{
 		/* "Editor returned %d. Try setting the default editor" */

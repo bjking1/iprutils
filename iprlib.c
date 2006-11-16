@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.102 2006/10/10 17:39:04 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.103 2006/11/16 20:31:25 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2182,7 +2182,8 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 {
 	int rc = __ipr_test_unit_ready(dev, sense_data);
 
-	if (rc != 0 && sense_data->sense_key != NOT_READY)
+	if (rc != 0 && sense_data->sense_key != NOT_READY &&
+	    (!strcmp(tool_name, "iprconfig") || ipr_debug))
 		scsi_cmd_err(dev, sense_data, "Test Unit Ready", rc);
 
 	return rc;

@@ -1407,6 +1407,7 @@ const char *screen_status[] = {
 	/* 72 */ __("Selected battery packs successfully forced into an error state."),
 	/* 73 */ __("Force RAID Consistency check failed"),
 	/* 74 */ __("RAID Consistency check successful"),
+	/* 75 */ __("Failed to read error log. Try setting root kernel message log directory."),
       /* NOTE:  127 maximum limit */
 };
 

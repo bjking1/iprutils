@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.86 2006/10/10 17:39:04 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.87 2006/11/16 20:31:25 brking Exp $
  */
 
 #include <stdarg.h>
@@ -233,7 +233,7 @@ struct ipr_res_addr {
 	};
 	u8 lun;
 #define IPR_GET_PHYSICAL_LOCATOR(res_addr) \
-	(((res_addr)->channel << 16) | ((res_addr)->id << 8) | (res_addr)->lun)
+	(((res_addr)->bus << 16) | ((res_addr)->target << 8) | (res_addr)->lun)
 };
 
 struct ipr_std_inq_vpids {

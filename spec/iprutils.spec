@@ -56,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Nov 16 2006 Brian King <brking@us.ibm.com>
+- Fix segfault in iprconfig if /var/log does not exist.
+- Allow IOA microcode download to a secondary IOA.
 * Tue Oct 10 2006 Brian King <brking@us.ibm.com>
 - Add a couple utility functions for SAS
 	ipr_query_sas_expander_info
