@@ -56,9 +56,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Nov 29 2006 Brian King <brking@us.ibm.com>
+- Fixes for SES microcode download on SAS.
+* Mon Nov 20 2006 Brian King <brking@us.ibm.com>
+- Change to handle UA responses in the JBOD iprinit sequence.
 * Thu Nov 16 2006 Brian King <brking@us.ibm.com>
 - Fix segfault in iprconfig if /var/log does not exist.
 - Allow IOA microcode download to a secondary IOA.
+- Fix to prevent errors during SAS SES microcode download.
 * Tue Oct 10 2006 Brian King <brking@us.ibm.com>
 - Add a couple utility functions for SAS
 	ipr_query_sas_expander_info

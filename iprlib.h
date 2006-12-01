@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.87 2006/11/16 20:31:25 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.88 2006/12/01 22:21:18 brking Exp $
  */
 
 #include <stdarg.h>
@@ -82,6 +82,8 @@
 #define IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER    256
 #define  IPR_SDB_CHECK_AND_QUIESCE           0x00
 #define  IPR_SDB_CHECK_ONLY                  0x40
+#define  IPR_SDB_CHECK_AND_QUIESCE_ENC       0x0e
+#define  IPR_RDB_UNQUIESCE_AND_REBALANCE     0x20
 #define IPR_MAX_NUM_SUPP_INQ_PAGES           36
 #define IPR_DUMP_TRACE_ENTRY_SIZE            8192
 #define IPR_MODE_SENSE_LENGTH                255
@@ -138,6 +140,7 @@
 #define IPR_QUERY_RESOURCE_STATE             0xC2
 #define IPR_QUERY_COMMAND_STATUS             0xCB
 #define IPR_SUSPEND_DEV_BUS                  0xC8
+#define IPR_RESUME_DEV_BUS                   0xC9
 #define IPR_IOA_SERVICE_ACTION               0xD2
 #define  IPR_QUERY_RES_ADDR_ALIASES          0x10
 #define  IPR_DISRUPT_DEVICE                  0x11
@@ -1947,6 +1950,7 @@ void ipr_log_ucode_error(struct ipr_ioa *);
 u32 get_dasd_ucode_version(char *, int);
 const char *get_ioa_desc(struct ipr_ioa *);
 int ioa_is_spi(struct ipr_ioa *);
+int __ioa_is_spi(struct ipr_ioa *);
 int page0x0a_setup(struct ipr_dev *);
 int handle_events(void (*) (void), int, void (*) (char *));
 struct ipr_ioa *find_ioa(int);
@@ -1966,6 +1970,7 @@ struct ipr_array_cap_entry *get_cap_entry(struct ipr_supported_arrays *, char *)
 int ipr_get_blk_size(struct ipr_dev *);
 u32 get_ioa_ucode_version(char *);
 int ipr_improper_device_type(struct ipr_dev *);
+int ipr_get_fw_version(struct ipr_dev *, u8 release_level[4]);
 
 static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {

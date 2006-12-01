@@ -1433,6 +1433,25 @@ static int print_ses_devices(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+static int print_sas_ses_devices(struct ipr_ioa *ioa,
+				 i_container **i_con, char **buffer, int type)
+{
+	struct ipr_dev *dev;
+	int k;
+	int num_lines = 0;
+
+	if (__ioa_is_spi(ioa))
+		return 0;
+
+	for_each_ses(ioa, dev) {
+		print_dev(k, dev, buffer, "%1", type+k);
+		*i_con = add_i_con(*i_con, "\0", dev);  
+		num_lines++;
+	}
+
+	return num_lines;
+}
+
 static int print_vsets(struct ipr_ioa *ioa,
 		       i_container **i_con, char **buffer, int type)
 {
@@ -1930,7 +1949,7 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 static char *ses_details(char *body, struct ipr_dev *dev)
 {
 	int rc;
-	struct ipr_dasd_inquiry_page3 page3_inq;
+	u8 release_level[4];
 	char product_id[IPR_PROD_ID_LEN+1];
 	char vendor_id[IPR_VENDOR_ID_LEN+1];
 	char buffer[100];
@@ -1943,18 +1962,16 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body,_("Manufacturer"), vendor_id);
 	body = add_line_to_body(body,_("Product ID"), product_id);
 
-	rc = ipr_inquiry(dev, 0x03, &page3_inq, sizeof(page3_inq));
+	rc = ipr_get_fw_version(dev, release_level);
 
 	if (!rc) {
-		len = sprintf(buffer, "%X%X%X%X", page3_inq.release_level[0],
-			      page3_inq.release_level[1], page3_inq.release_level[2],
-			      page3_inq.release_level[3]);
+		len = sprintf(buffer, "%X%X%X%X", release_level[0], release_level[1],
+			      release_level[2], release_level[3]);
 
-		if (isalnum(page3_inq.release_level[0]) && isalnum(page3_inq.release_level[1]) &&
-		    isalnum(page3_inq.release_level[2]) && isalnum(page3_inq.release_level[3])) {
-			sprintf(buffer + len, " (%c%c%c%c)", page3_inq.release_level[0],
-				page3_inq.release_level[1], page3_inq.release_level[2],
-				page3_inq.release_level[3]);
+		if (isalnum(release_level[0]) && isalnum(release_level[1]) &&
+		    isalnum(release_level[2]) && isalnum(release_level[3])) {
+			sprintf(buffer + len, " (%c%c%c%c)", release_level[0],
+				release_level[1], release_level[2], release_level[3]);
 		}
 
 		body = add_line_to_body(body, _("Firmware Version"), buffer);
@@ -7839,9 +7856,7 @@ int download_ucode(i_container * i_con)
 			continue;
 
 		num_lines += print_standalone_disks(ioa, &i_con, buffer, 0);
-/* xxx
-		num_lines += print_ses_devices(ioa, &i_con, buffer, 0);
-*/
+		num_lines += print_sas_ses_devices(ioa, &i_con, buffer, 0);
 		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 0);
 
 		/* print volume set associated devices*/
@@ -7887,7 +7902,7 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 	char *body;
 	int header_lines, status, time = 0;
 	pid_t pid, done;
-	struct ipr_dasd_inquiry_page3 page3_inq;
+	u8 release_level[5];
 	u32 fw_version;
 	int rc = 0;
 
@@ -7912,13 +7927,15 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 		exit(0);
 	}
 
-	memset(&page3_inq, 0, sizeof(page3_inq));
-	ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+	ipr_get_fw_version(dev, release_level);
 
-	fw_version = page3_inq.release_level[0] << 24 |
-		page3_inq.release_level[1] << 16 |
-		page3_inq.release_level[2] << 8 |
-		page3_inq.release_level[3];
+	if (ipr_is_ses(dev)) {
+		release_level[4] = '\0';
+		fw_version = strtoul((char *)release_level, NULL, 16);
+	} else {
+		fw_version = release_level[0] << 24 | release_level[1] << 16 |
+			release_level[2] << 8 | release_level[3];
+	}
 
 	if (fw_version != fw_image->version)
 		rc = 67 | EXIT_FLAG;
@@ -7944,16 +7961,14 @@ int process_choose_ucode(struct ipr_dev *dev)
 	int version_swp;
 	char *version;
 	struct screen_output *s_out;
-	struct ipr_dasd_inquiry_page3 page3_inq;
+	u8 release_level[4];
 
 	if (!dev->scsi_dev_data)
 		return 67 | EXIT_FLAG;
 	if (dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
 		rc = get_ioa_firmware_image_list(dev->ioa, &list);
-/* xxx
 	else if (dev->scsi_dev_data->type == TYPE_ENCLOSURE || dev->scsi_dev_data->type == TYPE_PROCESSOR)
 		rc = get_ses_firmware_image_list(dev, &list);
-*/
 	else
 		rc = get_dasd_firmware_image_list(dev, &list);
 
@@ -7962,8 +7977,7 @@ int process_choose_ucode(struct ipr_dev *dev)
 	else
 		list_count = rc;
 
-	memset(&page3_inq, 0, sizeof(page3_inq));
-	ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+	ipr_get_fw_version(dev, release_level);
 
 	if (dev->scsi_dev_data &&
 	    dev->scsi_dev_data->type == IPR_TYPE_ADAPTER) {
@@ -7985,27 +7999,21 @@ int process_choose_ucode(struct ipr_dev *dev)
 
 	body = add_string_to_body(body, buffer, "", &header_lines);
 
-	if (isprint(page3_inq.release_level[0]) &&
-	    isprint(page3_inq.release_level[1]) &&
-	    isprint(page3_inq.release_level[2]) &&
-	    isprint(page3_inq.release_level[3]))
+	if (isprint(release_level[0]) &&
+	    isprint(release_level[1]) &&
+	    isprint(release_level[2]) &&
+	    isprint(release_level[3]))
 		sprintf(buffer, "%s%02X%02X%02X%02X (%c%c%c%c)\n\n",
 			_("The current microcode for this device is: "),
-			page3_inq.release_level[0],
-			page3_inq.release_level[1],
-			page3_inq.release_level[2],
-			page3_inq.release_level[3],
-			page3_inq.release_level[0],
-			page3_inq.release_level[1],
-			page3_inq.release_level[2],
-			page3_inq.release_level[3]);
+			release_level[0], release_level[1],
+			release_level[2], release_level[3],
+			release_level[0], release_level[1],
+			release_level[2], release_level[3]);
 	else
 		sprintf(buffer, "%s%02X%02X%02X%02X\n\n",
 			_("The current microcode for this device is: "),
-			page3_inq.release_level[0],
-			page3_inq.release_level[1],
-			page3_inq.release_level[2],
-			page3_inq.release_level[3]);
+			release_level[0], release_level[1],
+			release_level[2], release_level[3]);
 
 	body = add_string_to_body(body, buffer, "", &header_lines);
 	body = __body_init(body, n_choose_ucode.header, &header_lines);
@@ -8057,7 +8065,7 @@ int process_choose_ucode(struct ipr_dev *dev)
 
 	if (!found)
 		goto leave;
-		
+
 	body = body_init(n_confirm_download_ucode.header, &header_lines);
 	version_swp = htonl(fw_image->version);
 	version = (char *)&version_swp;

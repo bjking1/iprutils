@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.103 2006/11/16 20:31:25 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.104 2006/12/01 22:21:18 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -32,6 +32,7 @@ int ipr_force = 0;
 int ipr_sg_required = 0;
 int polling_mode = 0;
 int ipr_fast = 0;
+static int ipr_mode5_write_buffer = 0;
 
 struct sysfs_dev *head_zdev = NULL;
 struct sysfs_dev *tail_zdev = NULL;
@@ -710,21 +711,26 @@ static enum ipr_tcq_mode ioa_get_tcq_mode(struct ipr_ioa *ioa)
 	return IPR_TCQ_FROZEN;
 }
 
-int ioa_is_spi(struct ipr_ioa *ioa)
+int __ioa_is_spi(struct ipr_ioa *ioa)
 {
 	struct ipr_mode_pages mode_pages;
 	struct sense_data_t sense_data;
-	const struct ioa_details *details = get_ioa_details(ioa);
 	int rc;
-
-	if (details)
-		return details->is_spi;
 
 	rc = mode_sense(&ioa->ioa, 0x28, &mode_pages, &sense_data);
 
 	if (rc && sense_data.sense_key == ILLEGAL_REQUEST)
 		return 0;
 	return 1;
+}
+
+int ioa_is_spi(struct ipr_ioa *ioa)
+{
+	const struct ioa_details *details = get_ioa_details(ioa);
+
+	if (details)
+		return details->is_spi;
+	return __ioa_is_spi(ioa);
 }
 
 static const char *raid_desc = "PCI-X SCSI RAID Adapter";
@@ -988,6 +994,8 @@ int parse_option(char *opt)
 		ipr_force_uevents = 1;
 	else if (strcmp(opt, "--fast") == 0)
 		ipr_fast = 1;
+	else if (strcmp(opt, "--mode5-write-buffer") == 0)
+		ipr_mode5_write_buffer = 1;
 	else
 		return 0;
 
@@ -2174,7 +2182,6 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 
 	close(fd);
 	return rc;
-
 }
 
 int ipr_test_unit_ready(struct ipr_dev *dev,
@@ -2183,6 +2190,7 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 	int rc = __ipr_test_unit_ready(dev, sense_data);
 
 	if (rc != 0 && sense_data->sense_key != NOT_READY &&
+	    sense_data->sense_key != UNIT_ATTENTION &&
 	    (!strcmp(tool_name, "iprconfig") || ipr_debug))
 		scsi_cmd_err(dev, sense_data, "Test Unit Ready", rc);
 
@@ -2360,6 +2368,25 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 
 	close(fd);
 	return rc;
+}
+
+int ipr_get_fw_version(struct ipr_dev *dev, u8 release_level[4])
+{
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	int rc;
+
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+
+	if (rc)
+		return rc;
+
+	if (ipr_is_ses(dev) && !__ioa_is_spi(dev->ioa))
+		memcpy(release_level, page3_inq.load_id, 4);
+	else
+		memcpy(release_level, page3_inq.release_level, 4);
+
+	return 0;
 }
 
 static void ipr_init_res_addr_aliases(struct ipr_res_addr_aliases *aliases,
@@ -2561,22 +2588,95 @@ fail:
 	return dev->gen_name;
 }
 
-int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
+static int ipr_resume_device_bus(struct ipr_ioa *ioa,
+				 struct ipr_res_addr *res_addr)
 {
-	int fd, rc, i;
+	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
-	struct ipr_disk_attr attr;
-	int old_qdepth;
+	int length = 0;
+
+	if (strlen(ioa->ioa.gen_name) == 0)
+		return -ENOENT;
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_RESUME_DEV_BUS;
+	cdb[1] = IPR_RDB_UNQUIESCE_AND_REBALANCE;
+	cdb[3] = res_addr->bus;
+	cdb[4] = res_addr->target;
+	cdb[5] = res_addr->lun;
+
+	rc = sg_ioctl(fd, cdb, NULL,
+		      length, SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_SUSPEND_DEV_BUS_TIMEOUT);
+
+	close(fd);
+	return rc;
+}
+
+static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int length,
+			      struct sense_data_t *sense_data)
+{
 	char *name = get_write_buffer_dev(dev);
+	u32 direction = length ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	int fd, rc;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s.\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = WRITE_BUFFER;
+	cdb[1] = mode;
+	cdb[6] = (length & 0xff0000) >> 16;
+	cdb[7] = (length & 0x00ff00) >> 8;
+	cdb[8] = length & 0x0000ff;
+
+	rc = sg_ioctl(fd, cdb, buff,
+		      length, direction,
+		      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
+
+	if (rc != 0)
+		scsi_cmd_err(dev, sense_data, "Write buffer", rc);
+
+	close(fd);
+	return rc;
+}
+
+int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
+{
+	int rc, i;
+	struct sense_data_t sense_data;
+	struct ipr_disk_attr attr;
+	int old_qdepth;
+	int sas_ses = 0;
+	int mode5 = 1;
 
 	if ((rc = ipr_get_dev_attr(dev, &attr))) {
 		scsi_dbg(dev, "Failed to get device attributes. rc=%d\n", rc);
 		return rc;
 	}
+
+	if (ipr_is_ses(dev) && !__ioa_is_spi(dev->ioa))
+		sas_ses = 1;
+	if (sas_ses && !ipr_mode5_write_buffer)
+		mode5 = 0;
 
 	/*
 	 * Set the queue depth to 1 for the duration of the code download.
@@ -2589,53 +2689,59 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 		return rc;
 	}
 
-	fd = open(name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s.\n",name);
-		return errno;
-	}
+	if (sas_ses) {
+		if (!mode5) {
+			rc = __ipr_write_buffer(dev, 0x0e, buff, length, &sense_data);
+			if (rc && sense_data.sense_key == ILLEGAL_REQUEST)
+				mode5 = 1;
+			else if (rc)
+				goto out;
+		}
 
-	memset(cdb, 0, IPR_CCB_CDB_LEN);
+		rc = ipr_suspend_device_bus(dev->ioa, &dev->res_addr[0], 
+					    IPR_SDB_CHECK_AND_QUIESCE_ENC);
 
-	cdb[0] = WRITE_BUFFER;
-	cdb[1] = 5;
-	cdb[6] = (length & 0xff0000) >> 16;
-	cdb[7] = (length & 0x00ff00) >> 8;
-	cdb[8] = length & 0x0000ff;
+		if (rc) {
+			scsi_dbg(dev, "Failed to quiesce the SAS port.\n");
+			goto out;
+		}
 
-	rc = sg_ioctl(fd, cdb, buff,
-		      length, SG_DXFER_TO_DEV,
-		      &sense_data, IPR_WRITE_BUFFER_TIMEOUT);
-
-	if (rc != 0) {
-		scsi_cmd_err(dev, &sense_data, "Write buffer", rc);
-	} else {
-		if (ipr_is_ses(dev))
-			sleep(120);
+		if (mode5)
+			rc = __ipr_write_buffer(dev, 5, buff, length, &sense_data);
 		else
-			sleep(5);
+			rc = __ipr_write_buffer(dev, 0x0f, NULL, 0, &sense_data);
 
-		/* Wait for the device to come back to life */
-		for (i = 0, rc = -1; rc && (i < 60); i ++)
-			rc = __ipr_test_unit_ready(dev, &sense_data);
+		if (rc) {
+			scsi_dbg(dev, "Write buffer %sfailed.\n", mode5 ? "" : "activate ");
+			goto out_resume;
+		}
+	} else {
+		if ((rc = __ipr_write_buffer(dev, 5, buff, length, &sense_data)))
+			goto out;
 	}
 
-	close(fd);
+	scsi_dbg(dev, "Waiting for device to come ready after download\n");
+	sleep(sas_ses ? 120 : 5);
 
+	for (i = 0, rc = -1; rc && (i < 60); i++, sleep(1))
+		rc = __ipr_test_unit_ready(dev, &sense_data);
+
+out_resume:
+	if (sas_ses)
+		ipr_resume_device_bus(dev->ioa, &dev->res_addr[0]);
+
+out:
 	attr.queue_depth = old_qdepth;
 	ipr_set_dev_attr(dev, &attr, 0);
-
 	return rc;
 }
 
 int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 			   struct ipr_res_addr *res_addr, u8 option)
 {
-	int fd;
+	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
-	int rc;
 	int length = 0;
 
 	if (strlen(ioa->ioa.gen_name) == 0)
@@ -2660,7 +2766,6 @@ int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_SUSPEND_DEV_BUS_TIMEOUT);
 
-	/* FIXME will rc != 0 if sense data */
 	close(fd);
 	return rc;
 }
@@ -3529,7 +3634,7 @@ void check_current_config(bool allow_rebuild_refresh)
 				/* Send Test Unit Ready to start device if its a volume set */
 				/* xxx try to remove this */
 				if (!ipr_fast && ipr_is_volume_set(&ioa->dev[device_count]))
-					ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
+					__ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
 				device_count++;
 			} else if (scsi_dev_data->type == IPR_TYPE_ADAPTER) {
@@ -4694,19 +4799,18 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 
 u32 get_dev_fw_version(struct ipr_dev *dev)
 {
-	struct ipr_dasd_inquiry_page3 page3_inq;
+	u8 release_level[4];
 	int rc;
 
-	memset(&page3_inq, 0, sizeof(page3_inq));
-	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+	rc = ipr_get_fw_version(dev, release_level);
 
 	if (rc != 0) {
 		scsi_dbg(dev, "Inquiry failed\n");
 		return 0;
 	}
 
-	rc = page3_inq.release_level[0] << 24 | page3_inq.release_level[1] << 16 |
-		page3_inq.release_level[2] << 8 | page3_inq.release_level[3];
+	rc = release_level[0] << 24 | release_level[1] << 16 |
+		release_level[2] << 8 | release_level[3];
 	return rc;
 }
 
@@ -4875,38 +4979,51 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 	return len;
 }
 
+static int get_ses_load_id(struct ipr_dev *dev, u8 load_id[4])
+{
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	int rc;
+
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+
+	if (rc)
+		return rc;
+
+	if (ipr_is_ses(dev) && !__ioa_is_spi(dev->ioa))
+		memcpy(load_id, page3_inq.release_level, 4);
+	else
+		memcpy(load_id, page3_inq.load_id, 4);
+
+	return 0;
+}
+
 int get_ses_firmware_image_list(struct ipr_dev *dev,
 				struct ipr_fw_images **list)
 {
 	char buf[100];
 	struct ipr_fw_images *ret = NULL;
-	struct ipr_dasd_inquiry_page3 page3_inq;
+	u8 load_id[4];
 	int rc;
 	int len = 0;
 
-	/* xxx */
-	return 0;
-
 	*list = NULL;
 
-	memset(&page3_inq, 0, sizeof(page3_inq));
-	rc = ipr_inquiry(dev, 3, &page3_inq, sizeof(page3_inq));
+	rc = get_ses_load_id(dev, load_id);
 
 	if (rc != 0) {
 		scsi_dbg(dev, "Inquiry failed\n");
 		return -EIO;
 	}
 
-	sprintf(buf, "%02X%02X%02X%02X",
-		page3_inq.load_id[0], page3_inq.load_id[1],
-		page3_inq.load_id[2], page3_inq.load_id[3]);
+	sprintf(buf, "%02X%02X%02X%02X", load_id[0], load_id[1],
+		load_id[2], load_id[3]);
 
 	len = scan_fw_dir(UCODE_BASE_DIR, buf, &ret, len,
 			  init_disk_ucode_entry_nohdr);
 
-	sprintf(buf, "IBM-%02X%02X%02X%02X",
-		page3_inq.load_id[0], page3_inq.load_id[1],
-		page3_inq.load_id[2], page3_inq.load_id[3]);
+	sprintf(buf, "IBM-%02X%02X%02X%02X", load_id[0], load_id[1],
+		load_id[2], load_id[3]);
 
 	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len,
 			  init_disk_ucode_entry_nohdr);
@@ -5395,8 +5512,11 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 
 	if (polling_mode && !dev->should_init)
 		return;
-	if (ipr_test_unit_ready(dev, &sense_data))
-		return;
+	if (ipr_test_unit_ready(dev, &sense_data)) {
+		if ((sense_data.sense_key != UNIT_ATTENTION) ||
+		    ipr_test_unit_ready(dev, &sense_data))
+			return;
+	}
 	if (enable_af(dev))
 		return;
 	if (ipr_get_dev_attr(dev, &attr))
