@@ -7929,13 +7929,8 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 
 	ipr_get_fw_version(dev, release_level);
 
-	if (ipr_is_ses(dev)) {
-		release_level[4] = '\0';
-		fw_version = strtoul((char *)release_level, NULL, 16);
-	} else {
-		fw_version = release_level[0] << 24 | release_level[1] << 16 |
-			release_level[2] << 8 | release_level[3];
-	}
+	fw_version = release_level[0] << 24 | release_level[1] << 16 |
+		release_level[2] << 8 | release_level[3];
 
 	if (fw_version != fw_image->version)
 		rc = 67 | EXIT_FLAG;

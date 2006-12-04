@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.104 2006/12/01 22:21:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.105 2006/12/04 21:24:32 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2370,6 +2370,15 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 	return rc;
 }
 
+static void __ipr_get_fw_version(struct ipr_dev *dev,
+				 struct ipr_dasd_inquiry_page3 *page3_inq, u8 release_level[4])
+{
+	if (ipr_is_ses(dev) && !__ioa_is_spi(dev->ioa))
+		memcpy(release_level, page3_inq->load_id, 4);
+	else
+		memcpy(release_level, page3_inq->release_level, 4);
+}
+
 int ipr_get_fw_version(struct ipr_dev *dev, u8 release_level[4])
 {
 	struct ipr_dasd_inquiry_page3 page3_inq;
@@ -2381,11 +2390,7 @@ int ipr_get_fw_version(struct ipr_dev *dev, u8 release_level[4])
 	if (rc)
 		return rc;
 
-	if (ipr_is_ses(dev) && !__ioa_is_spi(dev->ioa))
-		memcpy(release_level, page3_inq.load_id, 4);
-	else
-		memcpy(release_level, page3_inq.release_level, 4);
-
+	__ipr_get_fw_version(dev, &page3_inq, release_level);
 	return 0;
 }
 
@@ -4797,6 +4802,18 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 	return rc;
 }
 
+static u32 get_ses_ucode_version(char *ucode_file)
+{
+	char *tmp = strrchr(ucode_file, '.');
+
+	if (!tmp)
+		return 0;
+	if (strlen(tmp+1) < 4)
+		return 0;
+
+	return (tmp[1] << 24) | (tmp[2] << 16) | (tmp[3] << 8) | tmp[4];
+}
+
 u32 get_dev_fw_version(struct ipr_dev *dev)
 {
 	u8 release_level[4];
@@ -4865,6 +4882,12 @@ static void init_disk_ucode_entry(struct ipr_fw_images *img)
 static void init_disk_ucode_entry_nohdr(struct ipr_fw_images *img)
 {
 	img->version = get_dasd_ucode_version(img->file, 0);
+	img->has_header = 0;
+}
+
+static void init_ses_ucode_entry_nohdr(struct ipr_fw_images *img)
+{
+	img->version = get_ses_ucode_version(img->file);
 	img->has_header = 0;
 }
 
@@ -5020,13 +5043,13 @@ int get_ses_firmware_image_list(struct ipr_dev *dev,
 		load_id[2], load_id[3]);
 
 	len = scan_fw_dir(UCODE_BASE_DIR, buf, &ret, len,
-			  init_disk_ucode_entry_nohdr);
+			  init_ses_ucode_entry_nohdr);
 
 	sprintf(buf, "IBM-%02X%02X%02X%02X", load_id[0], load_id[1],
 		load_id[2], load_id[3]);
 
 	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len,
-			  init_disk_ucode_entry_nohdr);
+			  init_ses_ucode_entry_nohdr);
 
 	if (len)
 		qsort(ret, len, sizeof(*ret), fw_compare);
@@ -5188,6 +5211,7 @@ int ipr_update_disk_fw(struct ipr_dev *dev,
 	struct ipr_std_inq_data std_inq_data;
 	struct unsupported_af_dasd *unsupp_af;
 	u32 level;
+	u8 release_level[4];
 
 	memset(&std_inq_data, 0, sizeof(std_inq_data));
 	rc = ipr_inquiry(dev, IPR_STD_INQUIRY,
@@ -5237,19 +5261,15 @@ int ipr_update_disk_fw(struct ipr_dev *dev,
 	}
 
 	level = htonl(image->version);
+	__ipr_get_fw_version(dev, &page3_inq, release_level);
 
 	if (memcmp(&level, page3_inq.release_level, 4) > 0 || force) {
-		if (!ipr_is_ses(dev)) {
-			scsi_info(dev, "Updating device microcode using %s "
-				  "from %02X%02X%02X%02X (%c%c%c%c) to %08X (%c%c%c%c)\n", image->file,
-				  page3_inq.release_level[0], page3_inq.release_level[1],
-				  page3_inq.release_level[2], page3_inq.release_level[3],
-				  page3_inq.release_level[0], page3_inq.release_level[1],
-				  page3_inq.release_level[2], page3_inq.release_level[3],
-				  image->version, image->version >> 24, (image->version >> 16) & 0xff,
-				  (image->version >> 8) & 0xff, image->version & 0xff);
-		} else
-                scsi_info(dev, "Updating device microcode using %s.\n", image->file);
+		scsi_info(dev, "Updating device microcode using %s "
+			  "from %02X%02X%02X%02X (%c%c%c%c) to %08X (%c%c%c%c)\n", image->file,
+			  release_level[0], release_level[1], release_level[2], release_level[3],
+			  release_level[0], release_level[1], release_level[2], release_level[3],
+			  image->version, image->version >> 24, (image->version >> 16) & 0xff,
+			  (image->version >> 8) & 0xff, image->version & 0xff);
 
 		rc = ipr_write_buffer(dev, img_hdr, ucode_stats.st_size);
 		ipr_init_dev(dev);
