@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.105 2006/12/04 21:24:32 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.106 2007/01/04 19:11:36 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -2312,6 +2312,8 @@ int ipr_disrupt_device(struct ipr_dev *dev)
 
 	cdb[0] = IPR_IOA_SERVICE_ACTION;
 	cdb[1] = IPR_DISRUPT_DEVICE;
+	if (!ipr_force)
+		cdb[2] = 0x40;
 	cdb[6] = (u8)(res_handle >> 24);
 	cdb[7] = (u8)(res_handle >> 16);
 	cdb[8] = (u8)(res_handle >> 8);

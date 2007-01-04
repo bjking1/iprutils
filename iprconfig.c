@@ -744,12 +744,12 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 				for (i = 0; i < screen->num_opts; i++) {
 					temp = &(screen->options[i]);
 
-					if ((temp->key == "\n") ||
+					if ((temp->key[0] == '\n') ||
 					    ((num_fields > 0)?(strcasecmp(input,temp->key) == 0):0)) {
 
 						invalid = false;
 
-						if ((temp->key == "\n") && (num_fields > 0)) {
+						if ((temp->key[0] == '\n') && (num_fields > 0)) {
 
 							/* store field data to existing i_con (which should already
 							 contain pointers) */
@@ -9097,6 +9097,7 @@ static int raid_create(char **args, int num_args)
 	next_stripe_size = 0;
 	next_qdepth = 0;
 	stripe_size = 0;
+	qdepth = 0;
 
 	for (i = 0; i < num_args; i++) {
 		if (strcmp(args[i], "-r") == 0)

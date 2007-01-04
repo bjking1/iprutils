@@ -56,6 +56,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Thu Jan 4 2007 Brian King <brking@us.ibm.com>
+- Sourceforge patch 1627672: iprutils fix to buffer overflow
+- Fix a bug in which the iprconfig command "raid-create"
+  may create an illegal queue depth value to the ipr
+  config file.
 * Wed Nov 29 2006 Brian King <brking@us.ibm.com>
 - Fixes for SES microcode download on SAS.
 * Mon Nov 20 2006 Brian King <brking@us.ibm.com>
