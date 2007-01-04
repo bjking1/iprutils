@@ -10045,6 +10045,11 @@ static int set_qdepth(char **args, int num_args)
 
 	attr.queue_depth = strtoul(args[1], NULL, 10);
 
+	if (attr.queue_depth > 255) {
+		fprintf(stderr, "Invalid queue depth %s\n", args[1]);
+		return -EINVAL;
+	}
+
 	return ipr_set_dev_attr(dev, &attr, 1);
 }
 

@@ -57,6 +57,13 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Thu Jan 4 2007 Brian King <brking@us.ibm.com>
+- Sourceforge patch 1627673: iprutils fix to buffer overflow
+- Add checking to iprconfig command "set-qdepth" input queue
+  depth value. If the given value is larger than 255, fail the command.
+- Fix a bug in which the iprconfig command "raid-create"
+  may create an illegal queue depth value to the ipr
+  config file.
+* Thu Jan 4 2007 Brian King <brking@us.ibm.com>
 - Sourceforge patch 1627672: iprutils fix to buffer overflow
 - Fix a bug in which the iprconfig command "raid-create"
   may create an illegal queue depth value to the ipr
