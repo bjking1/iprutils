@@ -4669,6 +4669,30 @@ get_elem_status(struct ipr_dev *dev, struct ipr_dev *ses,
 	return NULL;
 }
 
+static void wait_for_new_dev(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr)
+{
+	int time = 12;
+	struct ipr_dev *dev;
+	struct ipr_res_addr_aliases aliases;
+	struct ipr_res_addr *ra;
+
+	ipr_query_res_addr_aliases(ioa, res_addr, &aliases);
+
+	for_each_ra_alias(ra, &aliases)
+		ipr_scan(ioa, ra->bus, ra->target, ra->lun);
+
+	while (time--) {
+		check_current_config(false);
+		for_each_ra_alias(ra, &aliases) {
+			if ((dev = get_dev_from_addr(ra))) {
+				ipr_init_new_dev(dev);
+				return;
+			}
+		}
+		sleep(5);
+	}
+}
+
 int process_conc_maint(i_container *i_con, int action)
 {
 	i_container *temp_i_con;
@@ -4686,7 +4710,6 @@ int process_conc_maint(i_container *i_con, int action)
 	s_node *n_screen;
 	struct screen_output *s_out;
 	struct ipr_res_addr res_addr;
-	int time = 12;
 	int max_y, max_x;
 	struct ipr_ses_config_pg ses_cfg;
 
@@ -4729,19 +4752,21 @@ int process_conc_maint(i_container *i_con, int action)
 	} else if (action == IPR_WAIT_CONC_REMOVE) {
 		elem_status->select = 1;
 		elem_status->remove = 1;
+		elem_status->identify = 1;
 	} else if (action == IPR_WAIT_CONC_ADD) {
 		elem_status->select = 1;
 		elem_status->insert = 1;
+		elem_status->identify = 1;
 	}
 
-	if (action == IPR_WAIT_CONC_REMOVE || action == IPR_WAIT_CONC_ADD) {
-		overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
-		overall->select = 1;
+	overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
+	overall->select = 1;
+	overall->insert = 0;
+	overall->remove = 0;
+	overall->identify = 0;
+
+	if (action == IPR_WAIT_CONC_REMOVE || action == IPR_WAIT_CONC_ADD)
 		overall->disable_resets = 1;
-		overall->insert = 0;
-		overall->remove = 0;
-		overall->identify = 0;
-	}
 
 	if (action == IPR_VERIFY_CONC_REMOVE)
 		n_screen = &n_verify_conc_remove;
@@ -4758,7 +4783,7 @@ int process_conc_maint(i_container *i_con, int action)
 		buffer[k] = print_device(dev, buffer[k], "1", k);
 	}
 
-	rc = ipr_send_diagnostics(ses, &ses_data, sizeof(ses_data));
+	rc = ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
 	if (rc) {
 		for (k = 0; k < 2; k++) {
@@ -4783,6 +4808,10 @@ int process_conc_maint(i_container *i_con, int action)
 
 	n_screen->body = NULL;
 
+	elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
+	if (!elem_status)
+		return 30 | EXIT_FLAG;;
+
 	/* turn light off flashing light */
 	overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
 	overall->select = 1;
@@ -4795,7 +4824,7 @@ int process_conc_maint(i_container *i_con, int action)
 	elem_status->remove = 0;
 	elem_status->identify = 0;
 
-	ipr_send_diagnostics(ses, &ses_data, sizeof(ses_data));
+	ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
 	/* call function to complete conc maint */
 	if (!rc) {
@@ -4819,16 +4848,7 @@ int process_conc_maint(i_container *i_con, int action)
 				move(max_y-1,0);
 				printw(_("Operation in progress - please wait"));
 				refresh();
-				ipr_scan(ioa, res_addr.bus, res_addr.target, res_addr.lun);
-
-				while (time--) {
-					check_current_config(false);
-					if ((dev = get_dev_from_addr(&res_addr))) {
-						ipr_init_new_dev(dev);
-						break;
-					}
-					sleep(5);
-				}
+				wait_for_new_dev(ioa, &res_addr);
 			}
 		}
 	}
@@ -4998,6 +5018,9 @@ static int dev_is_dup(struct ipr_dev *first, struct ipr_dev *second)
 {
 	struct ipr_res_addr *first_ra;
 	struct ipr_res_addr *second_ra;
+
+	if (first->ioa != second->ioa)
+		return 0;
 
 	for_each_ra(first_ra, first) {
 		for_each_ra(second_ra, second) {
@@ -9729,30 +9752,6 @@ static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot
 	return NULL;
 }
 
-static void wait_for_new_dev(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr)
-{
-	int time = 12;
-	struct ipr_dev *dev;
-	struct ipr_res_addr_aliases aliases;
-	struct ipr_res_addr *ra;
-
-	ipr_query_res_addr_aliases(ioa, res_addr, &aliases);
-
-	for_each_ra_alias(ra, &aliases)
-		ipr_scan(ioa, ra->bus, ra->target, ra->lun);
-
-	while (time--) {
-		check_current_config(false);
-		for_each_ra_alias(ra, &aliases) {
-			if ((dev = get_dev_from_addr(ra))) {
-				ipr_init_new_dev(dev);
-				return;
-			}
-		}
-		sleep(5);
-	}
-}
-
 static int __add_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses = dev->ses[0];
@@ -9775,13 +9774,13 @@ static int __add_device(struct ipr_dev *dev, int on)
 	elem_status->select = 1;
 	elem_status->remove = 0;
 	elem_status->insert = on;
-	elem_status->identify = 0;
+	elem_status->identify = on;
 
 	overall = ipr_get_overall_elem(&ses_data, &ses_cfg); 
 	overall->select = 1;
 	overall->disable_resets = on;
 
-	rc = ipr_send_diagnostics(ses, &ses_data, sizeof(ses_data));
+	rc = ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
 	if (!on)
 		wait_for_new_dev(dev->ioa, &(dev->res_addr[0]));
@@ -9817,13 +9816,13 @@ static int __remove_device(struct ipr_dev *dev, int on)
 	elem_status->select = 1;
 	elem_status->remove = on;
 	elem_status->insert = 0;
-	elem_status->identify = 0;
+	elem_status->identify = on;
 
 	overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
 	overall->select = 1;
 	overall->disable_resets = on;
 
-	rc = ipr_send_diagnostics(ses, &ses_data, sizeof(ses_data));
+	rc = ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
 	if (!on) {
 		ipr_write_dev_attr(dev, "delete", "1");
@@ -9923,7 +9922,7 @@ static int __identify_device(struct ipr_dev *dev, int on)
 	elem_status->insert = 0;
 	elem_status->remove = 0;
 
-	return ipr_send_diagnostics(ses, &ses_data, sizeof(ses_data));
+	return ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 }
 
 static int identify_slot(char **args, int num_args)

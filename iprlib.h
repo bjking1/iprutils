@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.88 2006/12/01 22:21:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.89 2007/02/02 21:38:21 brking Exp $
  */
 
 #include <stdarg.h>
@@ -98,7 +98,7 @@
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (8 * 60)     /* 8 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
-#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    16
+#define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    50
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
 #define IPR_DRIVE_ELEM_STATUS_POPULATED      1
 #define IPR_DRIVE_ELEM_STATUS_UNSUPP         0
@@ -1740,6 +1740,8 @@ struct ipr_res_redundancy_info {
 struct ipr_ses_type_desc {
 	u8 elem_type;
 #define IPR_SES_DEVICE_ELEM	0x01
+#define IPR_SES_ESM_ELEM	0x07
+#define IPR_SES_ENCLOSURE_ELEM	0x0E
 	u8 num_elems;
 	u8 subenclosure_id;
 	u8 text_len;
@@ -1805,7 +1807,7 @@ struct ipr_ses_config_pg {
 	u8 buf[2048];
 };
 
-static inline int ipr_dev_elem_offset(struct ipr_ses_config_pg *ses_cfg)
+static inline int ipr_elem_offset(struct ipr_ses_config_pg *ses_cfg, u8 type)
 {
 	int i, off;
 	struct ipr_ses_type_desc *desc;
@@ -1814,10 +1816,25 @@ static inline int ipr_dev_elem_offset(struct ipr_ses_config_pg *ses_cfg)
 	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
 
 	for (i = 0, off = 1; i < diag[10]; off += (desc->num_elems + 1), i++, desc++)
-		if (desc->elem_type == IPR_SES_DEVICE_ELEM)
+		if (desc->elem_type == type)
 			return off;
 
 	return 1;
+}
+
+static inline int ipr_dev_elem_offset(struct ipr_ses_config_pg *ses_cfg)
+{
+	return ipr_elem_offset(ses_cfg, IPR_SES_DEVICE_ELEM);
+}
+
+static inline int ipr_ses_elem_offset(struct ipr_ses_config_pg *ses_cfg)
+{
+	return ipr_elem_offset(ses_cfg, IPR_SES_ENCLOSURE_ELEM);
+}
+
+static inline int ipr_esm_elem_offset(struct ipr_ses_config_pg *ses_cfg)
+{
+	return ipr_elem_offset(ses_cfg, IPR_SES_ESM_ELEM);
 }
 
 static inline struct ipr_drive_elem_status *
@@ -1827,7 +1844,7 @@ ipr_get_overall_elem(struct ipr_encl_status_ctl_pg *ses_data,
 	return &(ses_data->elem_status[ipr_dev_elem_offset(ses_cfg) - 1]);
 }
 
-static inline struct ipr_ses_type_desc *ipr_get_dev_elem(struct ipr_ses_config_pg *ses_cfg)
+static inline struct ipr_ses_type_desc *ipr_get_elem(struct ipr_ses_config_pg *ses_cfg, u8 type)
 {
 	int i;
 	struct ipr_ses_type_desc *desc;
@@ -1836,10 +1853,29 @@ static inline struct ipr_ses_type_desc *ipr_get_dev_elem(struct ipr_ses_config_p
 	desc = (struct ipr_ses_type_desc *)&diag[12+diag[11]];
 
 	for (i = 0; i < diag[10]; i++, desc++)
-		if (desc->elem_type == IPR_SES_DEVICE_ELEM)
+		if (desc->elem_type == type)
 			return desc;
 
 	return NULL;
+}
+
+static inline struct ipr_ses_type_desc *ipr_get_dev_elem(struct ipr_ses_config_pg *ses_cfg)
+{
+	return ipr_get_elem(ses_cfg, IPR_SES_DEVICE_ELEM);
+}
+
+static inline struct ipr_drive_elem_status *
+ipr_get_enclosure_elem(struct ipr_encl_status_ctl_pg *ses_data,
+		       struct ipr_ses_config_pg *ses_cfg)
+{
+	return &(ses_data->elem_status[ipr_ses_elem_offset(ses_cfg) - 1]);
+}
+
+static inline struct ipr_drive_elem_status *
+ipr_get_esm_elem(struct ipr_encl_status_ctl_pg *ses_data,
+		 struct ipr_ses_config_pg *ses_cfg)
+{
+	return &(ses_data->elem_status[ipr_esm_elem_offset(ses_cfg) - 1]);
 }
 
 static inline int ipr_max_dev_elems(struct ipr_ses_config_pg *ses_cfg)

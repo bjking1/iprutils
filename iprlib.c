@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.106 2007/01/04 19:11:36 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.107 2007/02/02 21:38:21 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -32,7 +32,7 @@ int ipr_force = 0;
 int ipr_sg_required = 0;
 int polling_mode = 0;
 int ipr_fast = 0;
-static int ipr_mode5_write_buffer = 0;
+static int ipr_mode5_write_buffer = 1;
 
 struct sysfs_dev *head_zdev = NULL;
 struct sysfs_dev *tail_zdev = NULL;
@@ -994,6 +994,8 @@ int parse_option(char *opt)
 		ipr_force_uevents = 1;
 	else if (strcmp(opt, "--fast") == 0)
 		ipr_fast = 1;
+	else if (strcmp(opt, "--deferred-write-buffer") == 0)
+		ipr_mode5_write_buffer = 0;
 	else if (strcmp(opt, "--mode5-write-buffer") == 0)
 		ipr_mode5_write_buffer = 1;
 	else
@@ -2413,8 +2415,11 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	char *name = ioa->ioa.gen_name;
+	struct ipr_res_addr *ra;
 
 	ipr_init_res_addr_aliases(aliases, res_addr);
+	for_each_ra_alias(ra, aliases)
+		ra->host = ioa->host_num;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -2448,6 +2453,9 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 		ioa_cmd_err(ioa, &sense_data, "Query Resource Address Aliases", rc);
 	if (rc && sense_data.sense_key != ILLEGAL_REQUEST)
 		rc = 0;
+
+	for_each_ra_alias(ra, aliases)
+		ra->host = ioa->host_num;
 
 	close(fd);
 	return rc;
@@ -5490,7 +5498,7 @@ static int setup_page0x0a(struct ipr_dev *dev)
 static void init_vset_dev(struct ipr_dev *dev)
 {
 	struct ipr_query_res_state res_state;
-	char q_depth[10];
+	char q_depth[100];
 	char cur_depth[100], saved_depth[100];
 	int depth, rc;
 
@@ -5509,7 +5517,9 @@ static void init_vset_dev(struct ipr_dev *dev)
 		if (rc == RC_SUCCESS) {
 			if (!strcmp(saved_depth, q_depth))
 				return;
-			strcpy(q_depth, saved_depth);
+			depth = strtoul(saved_depth, NULL, 10);
+			if (depth && depth <= 255)
+				strcpy(q_depth, saved_depth);
 		}
 
 		if (!strcmp(cur_depth, q_depth))

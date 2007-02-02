@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.3
+Version: 2.2.4
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Jan 10 2007 Brian King <brking@us.ibm.com>
+- Fix send diagnostics buffer transfer length to be only what was
+  received in the receive diagnostics. Fixes disk hotplug on
+  some SAS disk enclosures.
 * Thu Jan 4 2007 Brian King <brking@us.ibm.com>
 - Sourceforge patch 1627673: iprutils fix to buffer overflow
 - Add checking to iprconfig command "set-qdepth" input queue
