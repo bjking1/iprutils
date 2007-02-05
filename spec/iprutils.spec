@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.4
+Version: 2.2.4.cvs
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -56,6 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Mon Feb 5 2007 Brian King <brking@us.ibm.com>
+- Fix incorrect memory free in analyze log menus.
 * Wed Jan 10 2007 Brian King <brking@us.ibm.com>
 - Fix send diagnostics buffer transfer length to be only what was
   received in the receive diagnostics. Fixes disk hotplug on

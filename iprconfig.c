@@ -8332,7 +8332,7 @@ int ibm_storage_log(i_container *i_con)
 	if (num_dir_entries) {
 		while (num_dir_entries--)
 			free(log_files[num_dir_entries]);
-		free(*log_files);
+		free(log_files);
 	}
 
 	if ((rc != 0) && (rc != 127)) {
@@ -8400,7 +8400,7 @@ int kernel_log(i_container *i_con)
 	if (num_dir_entries > 0) {
 		while (num_dir_entries--)
 			free(log_files[num_dir_entries]);
-		free(*log_files);
+		free(log_files);
 	}
 
 	if ((rc != 0) && (rc != 127))	{
@@ -8466,7 +8466,7 @@ int iprconfig_log(i_container *i_con)
 	if (num_dir_entries) {
 		while (num_dir_entries--)
 			free(log_files[num_dir_entries]);
-		free(*log_files);
+		free(log_files);
 	}
 
 	if ((rc != 0) && (rc != 127))	{
