@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.90 2007/02/09 16:15:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.91 2007/02/09 17:23:44 brking Exp $
  */
 
 #include <stdarg.h>
@@ -174,6 +174,7 @@
 #define REPORT_LUNS				0xA0
 #endif
 
+#define IPR_XLATE_DEV_FMT_RC(rc)	((((rc) & 127) == 51) ? -EIO : 0)
 #define IPR_TYPE_AF_DISK             0xC
 #define IPR_TYPE_ADAPTER             0x1f
 #define IPR_TYPE_EMPTY_SLOT          0xff

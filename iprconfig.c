@@ -9047,7 +9047,7 @@ static void curses_init()
 
 static int format_devices(char **args, int num_args, int blksz)
 {
-	int i;
+	int i, rc;
 	struct ipr_dev *dev;
 
 	for (i = 0; i < num_args; i++) {
@@ -9074,9 +9074,9 @@ static int format_devices(char **args, int num_args, int blksz)
 		dev_init_tail->do_init = 1;
 	}
 
-	send_dev_inits(NULL);
+	rc = send_dev_inits(NULL);
 	free_devs_to_init();
-	return 0;
+	return IPR_XLATE_DEV_FMT_RC(rc);
 }
 
 static int recovery_format(char **args, int num_args)
@@ -9091,7 +9091,7 @@ static int format_for_jbod(char **args, int num_args)
 
 static int format_for_raid(char **args, int num_args)
 {
-	int i;
+	int i, rc;
 	struct ipr_dev *dev;
 
 	for (i = 0; i < num_args; i++) {
@@ -9105,9 +9105,9 @@ static int format_for_raid(char **args, int num_args)
 		dev_init_tail->do_init = 1;
 	}
 
-	send_dev_inits(NULL);
+	rc = send_dev_inits(NULL);
 	free_devs_to_init();
-	return 0;
+	return IPR_XLATE_DEV_FMT_RC(rc);
 }
 
 static int raid_create(char **args, int num_args)
@@ -9187,8 +9187,10 @@ static int raid_create(char **args, int num_args)
 		qdepth = num_devs * 4;
 
 	if (dev_init_head) {
-		send_dev_inits(NULL);
+		rc = send_dev_inits(NULL);
 		free_devs_to_init();
+		if (IPR_XLATE_DEV_FMT_RC(rc))
+			return rc;
 	}
 
 	check_current_config(false);
@@ -9251,7 +9253,7 @@ static int hot_spare_create(char **args, int num_args)
 
 static int raid_include_cmd(char **args, int num_args)
 {
-	int i, zeroed = 0;
+	int i, rc, zeroed = 0;
 	struct ipr_dev *dev, *vset = NULL;
 	struct ipr_ioa *ioa;
 
@@ -9304,8 +9306,10 @@ static int raid_include_cmd(char **args, int num_args)
 	}
 
 	if (!zeroed) {
-		send_dev_inits(NULL);
+		rc = send_dev_inits(NULL);
 		free_devs_to_init();
+		if (IPR_XLATE_DEV_FMT_RC(rc))
+			return rc;
 	}
 
 	return do_array_include(vset->ioa, vset->array_rcd->array_id,

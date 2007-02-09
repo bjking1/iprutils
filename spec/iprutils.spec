@@ -56,9 +56,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+=======
 * Fri Feb 9 2007 Brian King <brking@us.ibm.com>
 - Add filename date to microcode download screen. (Ryan Hong)
 - Fix to prevent unnecessarily writing sysfs attributes. (Ryan Hong)
+* Tue Feb 6 2007 Brian King <brking@us.ibm.com>
+- Return standard error code according to send_dev_init() return code.
 * Mon Feb 5 2007 Brian King <brking@us.ibm.com>
 - Fix incorrect memory free in analyze log menus.
 * Wed Jan 10 2007 Brian King <brking@us.ibm.com>
