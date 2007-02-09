@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.107 2007/02/02 21:38:21 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.108 2007/02/09 16:15:18 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1204,6 +1204,152 @@ static void resolve_old_config()
 	free_old_config();
 }
 
+struct ipr_pci_slot {
+	char slot_name[SYSFS_PATH_MAX];
+	char physical_name[SYSFS_PATH_MAX];
+	char pci_device[SYSFS_PATH_MAX];
+};
+
+static struct ipr_pci_slot *pci_slot;
+static unsigned int num_pci_slots;
+
+static int ipr_true(const struct dirent *dirent)
+{
+	return 1;
+}
+
+static int ipr_select_phy_location(const struct dirent *dirent)
+{
+	if (strstr(dirent->d_name, "phy_location"))
+		return 1;
+	return 0;
+}
+
+static int read_slot_attr(char *path, char out[SYSFS_PATH_MAX])
+{
+	int fd, len;
+
+	if ((fd = open(path, O_RDONLY)) < 0) {
+		syslog_dbg("Failed to open %s\n", path);
+		return -EIO;
+	}
+
+	len = read(fd, out, SYSFS_PATH_MAX);
+	if (len < 0) {
+		syslog_dbg("Failed to read %s\n", path);
+		close(fd);
+		return -EIO;
+	}
+
+	if (out[strlen(out) - 1] == '\n')
+		out[strlen(out) - 1] = '\0';
+
+	close(fd);
+	return 0;
+}
+
+static int ipr_add_slot(char *path, char *name)
+{
+	struct ipr_pci_slot *slot;
+	char fpath[SYSFS_PATH_MAX];
+	int rc;
+
+	sprintf(fpath, "%s%s/phy_location", path, name);
+
+	pci_slot = realloc(pci_slot, sizeof(*pci_slot) * (num_pci_slots + 1));
+	slot = &pci_slot[num_pci_slots];
+	memset(slot, 0, sizeof(*slot));
+
+	strcpy(slot->slot_name, name);
+	rc = read_slot_attr(fpath, slot->physical_name);
+
+	if (rc) {
+		pci_slot = realloc(pci_slot, sizeof(*pci_slot) * num_pci_slots);
+		return rc;
+	}
+
+	num_pci_slots++;
+	return 0;
+}
+
+static void ipr_get_pci_slots()
+{
+	char rootslot[SYSFS_PATH_MAX], slot[SYSFS_PATH_MAX];
+	char slotpath[SYSFS_PATH_MAX], attr[SYSFS_PATH_MAX];
+	int num_slots, i, j, rc, num_attrs;
+	struct dirent **slotdir, **dirent;
+	struct stat statbuf;
+	struct ipr_ioa *ioa;
+	struct sysfs_bus *sysfs_bus = sysfs_open_bus("pci");
+
+	if (!sysfs_bus)
+		return;
+
+	sprintf(rootslot, "%s/slots/", sysfs_bus->path);
+
+	num_slots = scandir(rootslot, &slotdir, ipr_true, alphasort);
+	if (num_slots <= 0) {
+		sysfs_close_bus(sysfs_bus);
+		return;
+	}
+
+	for (i = 0; i < num_slots; i++) {
+		sprintf(slot, "%s%s", rootslot, slotdir[i]->d_name);
+		rc = scandir(slot, &dirent, ipr_select_phy_location, alphasort);
+		if (rc <= 0)
+			continue;
+
+		ipr_add_slot(rootslot, slotdir[i]->d_name);
+		while (rc--)
+			free(dirent[rc]);
+		free(dirent);
+	}
+
+	while (num_slots--)
+		free(slotdir[num_slots]);
+	free(slotdir);
+
+	for (i = 0; i < num_pci_slots; i++) {
+		sprintf(slotpath, "%s/"SYSFS_DEVICES_NAME"/%s/",
+			sysfs_bus->path, pci_slot[i].slot_name);
+
+		num_attrs = scandir(slotpath, &slotdir, ipr_true, alphasort);
+		if (num_attrs <= 0)
+			continue;
+
+		for (j = 0; j < num_attrs; j++) {
+			sprintf(attr, "%s/%s", slotpath, slotdir[j]->d_name);
+			rc = stat(attr, &statbuf);
+			if (rc || !S_ISDIR(statbuf.st_mode))
+				continue;
+			if (!strcmp(slotdir[j]->d_name, "."))
+				continue;
+			if (!strcmp(slotdir[j]->d_name, ".."))
+				continue;
+			strcpy(pci_slot[i].pci_device, slotdir[j]->d_name);
+			break;
+		}
+
+		while (num_attrs--)
+			free(slotdir[num_attrs]);
+		free(slotdir);
+	}
+
+	sysfs_close_bus(sysfs_bus);
+
+	for_each_ioa(ioa)
+		ioa->physical_location[0] = '\0';
+
+	for_each_ioa(ioa) {
+		for (i = 0; i < num_pci_slots; i++) {
+			if (strcmp(pci_slot[i].pci_device, ioa->pci_address))
+				continue;
+			strcpy(ioa->physical_location, pci_slot[i].physical_name);
+			break;
+		}
+	}
+}
+
 void tool_init(int save_state)
 {
 	int temp;
@@ -1219,7 +1365,6 @@ void tool_init(int save_state)
 	struct sysfs_device *sysfs_device_device;
 	struct sysfs_device *sysfs_host_device;
 	struct sysfs_device *sysfs_pci_device;
-
 	struct sysfs_attribute *sysfs_attr;
 
 	save_old_config();
@@ -1300,6 +1445,9 @@ void tool_init(int save_state)
 	sysfs_close_driver(sysfs_ipr_driver);
 	if (!save_state)
 		free_old_config();
+/*
+	ipr_get_pci_slots();
+*/
 	return;
 }
 
@@ -3903,7 +4051,7 @@ static int ipr_get_saved_attr(struct ipr_ioa *ioa, char *category,
 					str_ptr += strlen(field);
 					while (str_ptr[0] == ' ')
 						str_ptr++;
-					sprintf(value,"%s\n",str_ptr);
+					sscanf(str_ptr, "%s\n", value);
 					fclose(fd);
 					return RC_SUCCESS;
 				}
@@ -4655,6 +4803,22 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	return 0;
 }
 
+void get_ucode_date(char *ucode_file, char *ucode_date, int max_size)
+{
+	struct stat st;
+	struct tm *file_tm;
+
+	ucode_date[0] = '\0';
+	if (stat(ucode_file, &st))
+		return;
+
+	file_tm = localtime(&st.st_mtime);
+	if (!file_tm)
+		return;
+
+	strftime(ucode_date, max_size, "%D", file_tm);
+}
+
 u32 get_ioa_ucode_version(char *ucode_file)
 {
 	int fd, rc;
@@ -4881,24 +5045,28 @@ static void init_ioa_ucode_entry(struct ipr_fw_images *img)
 {
 	img->version = get_ioa_ucode_version(img->file);
 	img->has_header = 0;
+	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
 static void init_disk_ucode_entry(struct ipr_fw_images *img)
 {
 	img->version = get_dasd_ucode_version(img->file, 1);
 	img->has_header = 1;
+	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
 static void init_disk_ucode_entry_nohdr(struct ipr_fw_images *img)
 {
 	img->version = get_dasd_ucode_version(img->file, 0);
 	img->has_header = 0;
+	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
 static void init_ses_ucode_entry_nohdr(struct ipr_fw_images *img)
 {
 	img->version = get_ses_ucode_version(img->file);
 	img->has_header = 0;
+	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
 static int scan_fw_dir(char *path, char *name, struct ipr_fw_images **list, int len,

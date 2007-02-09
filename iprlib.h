@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.89 2007/02/02 21:38:21 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.90 2007/02/09 16:15:18 brking Exp $
  */
 
 #include <stdarg.h>
@@ -49,6 +49,7 @@
 #include <paths.h>
 #include <bits/sockaddr.h>
 #include <linux/netlink.h>
+#include <time.h>
 
 #define IPR_DASD_UCODE_USRLIB 0
 #define IPR_DASD_UCODE_ETC 1
@@ -1125,6 +1126,7 @@ struct ipr_ioa {
 	int host_num;
 	char pci_address[16];
 	char host_name[16];
+	char physical_location[1024];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
 	struct ipr_multi_ioa_status ioa_status;
 	struct ipr_array_query_data *qac_data;
@@ -1452,6 +1454,7 @@ struct ipr_fw_images {
 	char file[100];
 	u32 version;
 	int has_header;
+	char date[20];
 };
 
 struct ipr_ioa_vpd {

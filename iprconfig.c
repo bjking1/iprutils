@@ -1657,6 +1657,11 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body,_("PCI Address"), dev->ioa->pci_address);
 	sprintf(buffer,"%d", dev->ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
+/* xxx
+	if (strlen(dev->ioa->physical_location))
+		body = add_line_to_body(body,_("Physical Location"),
+					dev->ioa->physical_location);
+*/
 	if (dev->ioa->dual_raid_support) {
 		ioa_entry = (struct ipr_dual_ioa_entry *)
 			(((unsigned long)&dev->ioa->ioa_status.cap) +
@@ -8045,11 +8050,11 @@ int process_choose_ucode(struct ipr_dev *dev)
 			version = (char *)&version_swp;
 			if (isprint(version[0]) && isprint(version[1]) &&
 			    isprint(version[2]) && isprint(version[3]))
-				sprintf(buffer," %%1   %.8X (%c%c%c%c) %s",list[i].version,
+				sprintf(buffer," %%1   %.8X (%c%c%c%c) %s %s",list[i].version,
 					version[0], version[1], version[2],	version[3],
-					list[i].file);
+					list[i].date, list[i].file);
 			else
-				sprintf(buffer," %%1   %.8X        %s",list[i].version,list[i].file);
+				sprintf(buffer," %%1   %.8X        %s %s",list[i].version, list[i].date, list[i].file);
 
 			body = add_line_to_body(body, buffer, NULL);
 			i_con = add_i_con(i_con, "\0", &list[i]);
@@ -8089,11 +8094,11 @@ int process_choose_ucode(struct ipr_dev *dev)
 	version = (char *)&version_swp;
 	if (isprint(version[0]) && isprint(version[1]) &&
 	    isprint(version[2]) && isprint(version[3]))
-		sprintf(buffer," 1   %.8X (%c%c%c%c) %s\n",fw_image->version,
+		sprintf(buffer," 1   %.8X (%c%c%c%c) %s %s\n",fw_image->version,
 			version[0], version[1], version[2],	version[3],
-			fw_image->file);
+			fw_image->date, fw_image->file);
 	else
-		sprintf(buffer," 1   %.8X        %s\n",fw_image->version,fw_image->file);
+		sprintf(buffer," 1   %.8X        %s %s\n",fw_image->version,fw_image->date, fw_image->file);
 
 	body = add_line_to_body(body, buffer, NULL);
 
