@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.91 2007/02/09 17:23:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.92 2007/03/14 21:25:44 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1081,6 +1081,7 @@ struct ipr_dev {
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
 	struct ipr_disk_attr attr;
+	char physical_location[1024];
 	union {
 		struct ipr_common_record *qac_entry;
 		struct ipr_dev_record *dev_rcd;

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.108 2007/02/09 16:15:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.109 2007/03/14 21:25:43 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3420,7 +3420,7 @@ static int wait_for_dev(char *name)
 {
 	int fd, delay;
 
-	for (delay = 3, fd = 0; delay; delay--) {
+	for (delay = 20, fd = 0; delay; delay--) {
 		fd = open(name, O_RDWR);
 		if (fd != -1) {
 			close(fd);
@@ -5712,9 +5712,9 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 
 	if (polling_mode && !dev->should_init)
 		return;
-	if (ipr_test_unit_ready(dev, &sense_data)) {
+	if (__ipr_test_unit_ready(dev, &sense_data)) {
 		if ((sense_data.sense_key != UNIT_ATTENTION) ||
-		    ipr_test_unit_ready(dev, &sense_data))
+		    __ipr_test_unit_ready(dev, &sense_data))
 			return;
 	}
 	if (enable_af(dev))

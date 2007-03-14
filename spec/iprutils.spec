@@ -57,6 +57,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 =======
+* Mon Mar 12 2007 Brian King <brking@us.ibm.com>
+- Increase time waiting for new devices to show up in
+  iprconfig when doing concurrent add.
 * Fri Feb 9 2007 Brian King <brking@us.ibm.com>
 - Add filename date to microcode download screen. (Ryan Hong)
 - Fix to prevent unnecessarily writing sysfs attributes. (Ryan Hong)
