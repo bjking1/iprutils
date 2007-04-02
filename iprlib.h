@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.92 2007/03/14 21:25:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.93 2007/04/02 19:09:48 brking Exp $
  */
 
 #include <stdarg.h>
@@ -441,6 +441,10 @@ struct ipr_control_mode_page {
 	u8 raerp:1;
 	u8 uaaerp:1;
 	u8 eaerp:1;
+	u8 ato:1;
+	u8 tas:1;
+	u8 reserved5:3;
+	u8 autoload_mode:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 rlec:1;
 	u8 gltsd:1;
@@ -457,8 +461,11 @@ struct ipr_control_mode_page {
 	u8 reserved4:2;
 	u8 rac:1;
 	u8 reserved3:1;
+	u8 autoload_mode:3;
+	u8 reserved5:3;
+	u8 tas:1;
+	u8 ato:1;
 #endif
-	u8 reserved5;
 	u16 ready_aen_holdoff_period;
 	u16 busy_timeout_period;
 	u16 reserved6;
@@ -1145,6 +1152,10 @@ struct ipr_ioa {
         __for_each_ioa(ioa, ipr_ioa_head) \
            if (!ioa->is_secondary)
 
+#define for_each_sas_ioa(ioa) \
+        __for_each_ioa(ioa, ipr_ioa_head) \
+           if (!__ioa_is_spi(ioa))
+
 #define for_each_dev(i, d) for (d = (i)->dev; (d - (i)->dev) < (i)->num_devices; d++)
 
 #define for_each_hotplug_dev(i, d) \
@@ -1730,6 +1741,11 @@ struct ipr_fabric_descriptor {
 			cfg < ((fabric)->elem + ntohs((fabric)->num_entries)); \
 			cfg++)
 
+#define for_each_fabric_desc(fabric, info) \
+	for (fabric = (info)->fabric; \
+	     ((unsigned long)fabric) < (((unsigned long)(info)) + ntohl((info)->len) + sizeof((info)->len)); \
+	     fabric = (struct ipr_fabric_descriptor *)(((unsigned long)fabric) + ntohs(fabric->length)))
+
 struct ipr_res_redundancy_info {
 	u32 len;
 	u8 possibly_redundant_paths;
@@ -1740,6 +1756,7 @@ struct ipr_res_redundancy_info {
 	u8 reserved[2];
 	u8 fabric_descriptors;
 	struct ipr_fabric_descriptor fabric[1];
+	u8 data[16384];
 };
 
 struct ipr_ses_type_desc {

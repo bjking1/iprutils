@@ -123,7 +123,8 @@ struct special_status {
 
 char *print_device(struct ipr_dev *, char *, char *, int);
 int display_menu(ITEM **, int, int, int **);
-char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int);
+char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int);
+static char *print_path_details(struct ipr_dev *, char *);
 
 #define print_dev(i, dev, buf, fmt, type) \
         for (i = 0; i < 2; i++) \
@@ -975,19 +976,27 @@ static char *status_hdr[] = {
 		"OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
 		"OPT Name   PCI/SCSI Location          Description               Status",
 		"Name   PCI/SCSI Location          Vendor   Product ID       Status",
-		"Name   PCI/SCSI Location          Description               Status"};
+		"Name   PCI/SCSI Location          Description               Status",
+		"OPT SAS Port/SAS Address   Description        Active Status            Info",
+		"OPT SAS Port/SAS Address   Description        Active Status            Info",
+		"SAS Port/SAS Address   Description        Active Status            Info",
+		"SAS Port/SAS Address   Description        Active Status            Info"};
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
 		"--- ------ -------------------------- ------------------------- -----------------",
 		"------ -------------------------- -------- ---------------- -----------------",
-		"------ -------------------------- ------------------------- -----------------"};
+		"------ -------------------------- ------------------------- -----------------",
+		"--- ---------------------- ------------------ ------ ----------------- ----------",
+		"--- ---------------------- ------------------ ------ ----------------- ----------",
+		"---------------------- ------------------ ------ ----------------- ----------",
+		"---------------------- ------------------ ------ ----------------- ----------"
+};
+
 static char *status_header(char *buffer, int *num_lines, int type)
 {
 	int cur_len = strlen(buffer);
 	int header_lines = 0;
 
-	if (type > 1)
-		type = 0;
 	buffer = realloc(buffer, cur_len + strlen(status_hdr[type]) + strlen(status_sep[type]) + 8);
 	cur_len += sprintf(buffer + cur_len, "%s\n", status_hdr[type]);
 	cur_len += sprintf(buffer + cur_len, "%s\n", status_sep[type]);
@@ -1657,11 +1666,11 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body,_("PCI Address"), dev->ioa->pci_address);
 	sprintf(buffer,"%d", dev->ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
-/* xxx
+
 	if (strlen(dev->ioa->physical_location))
-		body = add_line_to_body(body,_("Physical Location"),
+		body = add_line_to_body(body,_("Platform Location"),
 					dev->ioa->physical_location);
-*/
+
 	if (dev->ioa->dual_raid_support) {
 		ioa_entry = (struct ipr_dual_ioa_entry *)
 			(((unsigned long)&dev->ioa->ioa_status.cap) +
@@ -5231,6 +5240,99 @@ int concurrent_remove_device(i_container *i_con)
 	return start_conc_maint(i_con, IPR_CONC_REMOVE);
 }
 
+int path_details(i_container *i_con)
+{
+	int rc, header_lines = 2;
+	char *body = NULL;
+	struct ipr_dev *dev;
+	struct screen_output *s_out;
+	char location[512];
+	char *name;
+
+	rc = RC_SUCCESS;
+
+	processing();
+
+	if ((rc = device_details_get_device(i_con, &dev)))
+		return rc;
+
+	if (strlen(dev->dev_name))
+		name = dev->dev_name;
+	else
+		name = dev->gen_name;
+
+	sprintf(location, "%s/%d:%d:%d:%d", dev->ioa->pci_address, dev->ioa->host_num,
+		dev->res_addr[0].bus, dev->res_addr[0].target, dev->res_addr[0].lun);
+	body = add_line_to_body(body, _("Device"), name);
+	body = add_line_to_body(body, _("Location"), location);
+	body = __body_init(body, n_path_details.header, &header_lines);
+	body = status_header(body, &header_lines, 6);
+
+	body = print_path_details(dev, body);
+
+	n_path_details.body = body;
+	s_out = screen_driver(&n_path_details, header_lines, i_con);
+	free(n_path_details.body);
+	n_path_details.body = NULL;
+	rc = s_out->rc;
+	free(s_out);
+	return rc;
+}
+
+int path_status(i_container * i_con)
+{
+	int rc, k, header_lines;
+	char *buffer[2];
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	struct screen_output *s_out;
+	int toggle = 1, num_devs = 0;
+
+	rc = RC_SUCCESS;
+
+	processing();
+
+	i_con = free_i_con(i_con);
+
+	check_current_config(false);
+
+	for (k = 0; k < 2; k++)
+		buffer[k] = __body_init_status(n_path_status.header, &header_lines, k);
+
+	for_each_sas_ioa(ioa) {
+		if (ioa->ioa_dead)
+			continue;
+
+		for_each_disk(ioa, dev) {
+			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 0, 1);
+			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 1);
+			i_con = add_i_con(i_con, "\0", dev);
+			num_devs++;
+		}
+	}
+
+	if (!num_devs)
+		/* "No SAS disks available" */
+		return 76; 
+
+	do {
+		n_path_status.body = buffer[toggle&1];
+		s_out = screen_driver(&n_path_status, header_lines, i_con);
+		toggle++;
+	} while (s_out->rc == TOGGLE_SCREEN);
+
+	rc = s_out->rc;
+	free(s_out);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_path_status.body = NULL;
+	return rc;
+}
+
 int init_device(i_container *i_con)
 {
 	int rc, k;
@@ -7839,6 +7941,7 @@ int change_ioa_config(i_container * i_con)
 			break;
 	}
 
+	processing();
 	ipr_set_ioa_attr(dev->ioa, &ioa_attr, 1);
 
 	leave:
@@ -8674,7 +8777,7 @@ int ibm_boot_log(i_container *i_con)
 		return 1; /* return with no status */
 }
 
-static void get_status(struct ipr_dev *dev, char *buf, int percent)
+static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_status)
 {
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
 	struct ipr_ioa *ioa = dev->ioa;
@@ -8689,6 +8792,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent)
 	int percent_cmplt = 0;
 	int format_in_progress = 0;
 	int resync_in_progress = 0;
+	struct ipr_res_redundancy_info info;
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
 		if (!scsi_dev_data->online)
@@ -8782,9 +8886,19 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent)
 			}
 		}
 
+		if (path_status)
+			rc = ipr_query_res_redundancy_info(dev, &info);
+
 		if (ioa->ioa_dead)
 			sprintf(buf, "Unknown");
-		else if (format_in_progress)
+		else if (path_status && !rc) {
+			if (info.healthy_paths > 1)
+				sprintf(buf, "Redundant Paths");
+			else if (info.healthy_paths)
+				sprintf(buf, "Single Path");
+			else
+				sprintf(buf, "No Paths");
+		} else if (format_in_progress)
 			sprintf(buf, "%d%% Formatted", percent_cmplt);
 		else if (!scsi_dev_data && dev->ioa->is_secondary)
 			sprintf(buf, "Remote");
@@ -8824,8 +8938,163 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent)
 	}
 }
 
+static const struct {
+	u8 status;
+	char *desc;
+} path_status_desc[] = {
+	{ IPR_PATH_CFG_NO_PROB, "Functional" },
+	{ IPR_PATH_CFG_DEGRADED, "Degraded" },
+	{ IPR_PATH_CFG_FAILED, "Failed" },
+	{ IPR_PATH_CFG_SUSPECT, "Suspect" },
+	{ IPR_PATH_NOT_DETECTED, "Missing" },
+	{ IPR_PATH_INCORRECT_CONN, "Incorrect connect" }
+};
+
+static const char *get_phy_state(u8 state)
+{
+	int i;
+	u8 mstate = state & IPR_PATH_CFG_STATUS_MASK;
+
+	for (i = 0; i < ARRAY_SIZE(path_status_desc); i++) {
+		if (path_status_desc[i].status == mstate)
+			return path_status_desc[i].desc;
+	}
+
+	return "Unknown";
+}
+
+static const struct {
+	u8 type;
+	char *desc;
+} path_type_desc[] = {
+	{ IPR_PATH_CFG_IOA_PORT, "IOA port" },
+	{ IPR_PATH_CFG_EXP_PORT, "Expander port" },
+	{ IPR_PATH_CFG_DEVICE_PORT, "Device port" },
+	{ IPR_PATH_CFG_DEVICE_LUN, "Device LUN" }
+};
+
+static const char *get_phy_type(u8 type)
+{
+	int i;
+	u8 mtype = type & IPR_PATH_CFG_TYPE_MASK;
+
+	for (i = 0; i < ARRAY_SIZE(path_type_desc); i++) {
+		if (path_type_desc[i].type == mtype)
+			return path_type_desc[i].desc;
+	}
+
+	return "Unknown";
+}
+
+static const char *link_rate[] = {
+	"Enabled",
+	"Disabled",
+	"Reset Prob",
+	"SpinupHold",
+	"Port Selec",
+	"Resetting",
+	"Unknown",
+	"Unknown",
+	"1.5Gbps",
+	"3.0Gbps",
+	"6.0Gbps",
+	"Enabled",
+	"Enabled",
+	"Enabled",
+	"Enabled",
+	"Enabled"
+};
+
+static const struct {
+	u8 state;
+	char *desc;
+} path_state_desc[] = {
+	{ IPR_PATH_STATE_NO_INFO, "Unknown" },
+	{ IPR_PATH_HEALTHY, "Healthy" },
+	{ IPR_PATH_DEGRADED, "Degraded" },
+	{ IPR_PATH_FAILED, "Failed" }
+};
+
+static const char *get_path_state(u8 path_state)
+{
+	int i;
+	u8 state = path_state & IPR_PATH_STATE_MASK;
+
+	for (i = 0; i < ARRAY_SIZE(path_state_desc); i++) {
+		if (path_state_desc[i].state == state)
+			return path_state_desc[i].desc;
+	}
+
+	return "Unknown";
+}
+
+static char *print_phy(struct ipr_fabric_config_element *cfg, char *body)
+{
+	int len = strlen(body);
+
+	body = realloc(body, len + 256);
+	body[len] = '\0';
+
+	len += sprintf(body + len, "%2X/%08X%08X    ", cfg->phy,
+		       ntohl(cfg->wwid[0]), ntohl(cfg->wwid[1]));
+
+	len += sprintf(body + len, " %-17s       ", get_phy_type(cfg->type_status));
+	len += sprintf(body + len, " %-17s", get_phy_state(cfg->type_status));
+	len += sprintf(body + len, " %s \n",
+		       link_rate[cfg->link_rate & IPR_PHY_LINK_RATE_MASK]);
+	return body;
+}
+
+static char *print_path(struct ipr_fabric_descriptor *fabric, char *body)
+{
+	int len = strlen(body);
+	struct ipr_fabric_config_element *cfg;
+
+	body = realloc(body, len + 256);
+	body[len] = '\0';
+
+	len += sprintf(body + len, "%2X/                    "
+		       "Physical Path      ", fabric->ioa_port);
+
+	if (fabric->path_state & IPR_PATH_ACTIVE)
+		len += sprintf(body + len, " Yes   ");
+	else if (fabric->path_state & IPR_PATH_NOT_ACTIVE)
+		len += sprintf(body + len, " No    ");
+	else 
+		len += sprintf(body + len, " ???   ");
+
+	len += sprintf(body + len, "%-17s \n", get_path_state(fabric->path_state));
+
+	for_each_fabric_cfg(fabric, cfg)
+		body = print_phy(cfg, body);
+
+	return body;
+}
+
+static char *print_path_details(struct ipr_dev *dev, char *body)
+{
+	int rc, len = 0;
+	struct ipr_res_redundancy_info info;
+	struct ipr_fabric_descriptor *fabric;
+
+	rc = ipr_query_res_redundancy_info(dev, &info);
+
+	if (rc)
+		return body;
+
+	if (body)
+		len = strlen(body);
+	body = realloc(body, len + 256);
+	body[len] = '\0';
+
+	for_each_fabric_desc(fabric, &info)
+		body = print_path(fabric, body);
+
+	return body;
+}
+
 char *__print_device(struct ipr_dev *dev, char *body, char *option,
-		     int sd, int sg, int vpd, int percent, int indent, int ra)
+		     int sd, int sg, int vpd, int percent, int indent, int ra, int path_status)
 {
 	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -8934,10 +9203,9 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		}
 	}
 
-	get_status(dev, buf, percent);
+	get_status(dev, buf, percent, path_status);
 	sprintf(body + len, "%s\n", buf);
 	return body;
-
 }
 
 /*
@@ -8969,7 +9237,7 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 	if (type == 3)
 		indent = 1;
 
-	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, type&1);
+	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, type&1, 0);
 }
 
 static void usage()
@@ -9347,7 +9615,7 @@ static void printf_device(struct ipr_dev *dev, int type)
 static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 			    int percent, int indent)
 {
-	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, 0);
+	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, 0, 0);
 	printf("%s", buf);
 	free(buf);
 }
@@ -10206,6 +10474,79 @@ static int reclaim_unknown(char **args, int num_args)
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
+
+static int query_path_details(char **args, int num_args)
+{
+	char *buf;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Invalid device %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	buf = print_path_details(dev, NULL);
+	if (buf) {
+		printf("%s\n%s\n", status_hdr[6], status_sep[6]);
+		printf("%s", buf);
+		free(buf);
+	}
+
+	return 0;
+}
+
+static void printf_path_status(struct ipr_dev *dev)
+{
+	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 1);
+	printf("%s", buf);
+	free(buf);
+}
+
+static int printf_ioa_path_status(struct ipr_ioa *ioa)
+{
+	struct ipr_dev *dev;
+
+	if (__ioa_is_spi(ioa))
+		return 0;
+
+	for_each_disk(ioa, dev)
+		printf_path_status(dev);
+
+	return 0;
+}
+
+static int query_path_status(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev = NULL;
+	int hdr = 1;
+
+	if (!num_args) {
+		for_each_sas_ioa(ioa) {
+			if (hdr) {
+				printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+				hdr = 0;
+			}
+
+			printf_ioa_path_status(ioa);
+		}
+		return 0;
+	}
+
+	dev = find_dev(args[0]);
+	if (!dev)
+		return -ENXIO;
+
+	printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+
+	if (&dev->ioa->ioa == dev)
+		printf_ioa_path_status(dev->ioa);
+	else
+		printf_path_status(dev);
+
+	return 0;
+}
+
 static int query_recommended_stripe_size(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10925,7 +11266,7 @@ static int __print_status(char **args, int num_args, int percent)
 		return -EINVAL;
 	}
 
-	get_status(dev, buf, percent);
+	get_status(dev, buf, percent, 0);
 	printf("%s\n", buf);
 	return 0;
 }
@@ -11079,6 +11420,8 @@ static const struct {
 	{ "query-min-mult-in-array",		2, 0, 2, query_min_mult_in_array, "sg5 5" },
 	{ "query-supp-stripe-sizes",		2, 0, 2, query_supp_stripe_sizes, "sg5 5" },
 	{ "query-recommended-stripe-size",	2, 0, 2, query_recommended_stripe_size, "sg5 5" },
+	{ "query-path-status",			0, 0, 1, query_path_status, "sg5" },
+	{ "query-path-details",			1, 0, 1, query_path_details, "sda" },
 	{ "primary",				1, 0, 1, set_primary, "sg5" },
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
 	{ "raid-create",				1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
@@ -11126,11 +11469,15 @@ static int non_interactive_cmd(char *cmd, char **args, int num_args)
 
 		if (num_args < command[i].min_args) {
 			fprintf(stderr, "Not enough arguments specified.\n");
+			fprintf(stderr, "Usage: iprconfig -c %s %s\n",
+				cmd, command[i].usage);
 			return -EINVAL;
 		}
 
 		if (!command[i].unlimited_max && num_args > command[i].max_args) {
 			fprintf(stderr, "Too many arguments specified.\n");
+			fprintf(stderr, "Usage: iprconfig -c %s %s\n",
+				cmd, command[i].usage);
 			return -EINVAL;
 		}
 

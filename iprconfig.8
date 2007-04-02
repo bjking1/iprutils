@@ -353,6 +353,14 @@ Show the current maximum SCSI bus speed allowed on the specified SCSI bus.
 .br
 Show the current SCSI bus width in units of bits for the specified SCSI bus.
 .TP
+.B query-path-status [IOA]
+.br
+Show the current dual path state for the SAS devices attached specified IOA.
+.TP
+.B query-path-details [device]
+.br
+Show the current dual path details for the specified SAS device.
+.TP
 .B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
@@ -404,6 +412,10 @@ Create a hot spare using the specified Advanced Function disk.
 .B hot-spare-delete [disk]
 .br
 Delete the specified hot spare.
+.TP
+.B disrupt-device [disk]
+.br
+Force the specified Advanced Function device failed.
 .TP
 .B reclaim-cache [IOA]
 .br

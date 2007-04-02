@@ -67,6 +67,7 @@ int main_menu(i_container * i_con);
 
 int disk_status(i_container * i_con);
 int device_details(i_container * i_con);
+int path_details(i_container * i_con);
 int raid_screen(i_container * i_con);
 int raid_status(i_container * i_con);
 int raid_stop(i_container * i_con);
@@ -88,6 +89,7 @@ int concurrent_add_device(i_container *i_con);
 int concurrent_remove_device(i_container *i_con);
 int verify_conc_maint(i_container * i_con);
 
+int path_status(i_container * i_con);
 int init_device(i_container * i_con);
 int confirm_init_device(i_container * i_con);
 int send_dev_inits(i_container * i_con);
@@ -179,9 +181,9 @@ struct screen_opts main_menu_opt[] = {
 	{bus_config,         "4", __("Work with SCSI bus configuration")},
 	{driver_config,      "5", __("Work with driver configuration")},
 	{disk_config,        "6", __("Work with disk configuration")},
-	/* {ioa_config,         "7", __("Work with adapter configuration")}, */
 	{download_ucode,     "7", __("Download microcode")},
-	{log_menu,           "8", __("Analyze log")}
+	{log_menu,           "8", __("Analyze log")},
+/*	{ioa_config,         "9", __("Work with adapter configuration")} */
 };
 
 s_node n_main_menu = {
@@ -640,7 +642,8 @@ struct screen_opts disk_unit_recovery_opt[] = {
 	{reclaim_cache,            "4", __("Reclaim IOA cache storage")},
 	{raid_rebuild,             "5", __("Rebuild disk unit data")},
 	{raid_resync,              "6", __("Force RAID Consistency Check")},
-	{battery_maint,            "7", __("Work with resources containing cache battery packs")}
+	{battery_maint,            "7", __("Work with resources containing cache battery packs")},
+	{path_status,              "8", __("Display SAS path status")}
 };
 
 s_node n_disk_unit_recovery = {
@@ -1016,6 +1019,29 @@ s_node n_confirm_start_cache = {
 s_node n_show_battery_info = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
 	.title    = __("Battery Information")
+};
+
+struct screen_opts path_status_opt[] = {
+	{path_details, "\n"}
+};
+
+s_node n_path_status = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(path_status_opt),
+	.options  = &path_status_opt[0],
+	.title    = __("Display SAS Path Status"),
+	.header   = {
+		__("Type option, press Enter.\n"),
+		__("  1=Display SAS Path routing details\n\n"),
+		"" }
+};
+
+s_node n_path_details = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | FWD_FLAG),
+	.title    = __("Display SAS Path Details"),
+	.header   = {__("\n\n"), ""}
 };
 
 struct screen_opts bus_config_opt[] = {
@@ -1408,6 +1434,7 @@ const char *screen_status[] = {
 	/* 73 */ __("Force RAID Consistency check failed"),
 	/* 74 */ __("RAID Consistency check successful"),
 	/* 75 */ __("Failed to read error log. Try setting root kernel message log directory."),
+	/* 76 */ __("No SAS disks available"),
       /* NOTE:  127 maximum limit */
 };
 

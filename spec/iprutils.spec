@@ -56,7 +56,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
-=======
+* Mon Mar 19 2007 Brian King <brking@us.ibm.com>
+- Add iprconfig option to display SAS dual pathing information.
 * Mon Mar 12 2007 Brian King <brking@us.ibm.com>
 - Increase time waiting for new devices to show up in
   iprconfig when doing concurrent add.

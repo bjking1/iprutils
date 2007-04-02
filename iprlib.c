@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.109 2007/03/14 21:25:43 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.110 2007/04/02 19:09:48 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1445,9 +1445,8 @@ void tool_init(int save_state)
 	sysfs_close_driver(sysfs_ipr_driver);
 	if (!save_state)
 		free_old_config();
-/*
+
 	ipr_get_pci_slots();
-*/
 	return;
 }
 
@@ -5610,21 +5609,19 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	IPR_SET_MODE(ch_page->queue_algorithm_modifier,
 		     page->queue_algorithm_modifier, 1);
 	IPR_SET_MODE(ch_page->tst, page->tst, 1);
+	IPR_SET_MODE(ch_page->tas, page->tas, 1);
 
 	switch(dev->ioa->tcq_mode) {
 	case IPR_TCQ_FROZEN:
 		IPR_SET_MODE(ch_page->qerr, page->qerr, 3);
-		if (page->tst != 1 || page->qerr != 3) {
-			scsi_dbg(dev, "Cannot set QERR/TST for multi-initiator. "
-				 "TST=%d, QERR=%d\n", page->tst, page->qerr);
-
-			IPR_SET_MODE(ch_page->tst, page->tst, 0);
+		if (page->qerr != 3) {
 			IPR_SET_MODE(ch_page->qerr, page->qerr, 1);
-
-			if (page->tst != 0 || page->qerr != 1)
-				scsi_dbg(dev, "Cannot set QERR/TST for single-initiator. "
-					 "TST=%d, QERR=%d\n", page->tst, page->qerr);
+			if (page->tst != 1)
+				IPR_SET_MODE(ch_page->tst, page->tst, 0);
 		}
+
+		scsi_dbg(dev, "Using control mode settings: "
+			 "TST=%d, QERR=%d, TAS=%d\n", page->tst, page->qerr, page->tas);
 		break;
 	case IPR_TCQ_NACA:
 		IPR_SET_MODE(ch_page->qerr, page->qerr, 0);
