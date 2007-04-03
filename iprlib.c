@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.110 2007/04/02 19:09:48 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.111 2007/04/03 20:03:44 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -1213,11 +1213,6 @@ struct ipr_pci_slot {
 static struct ipr_pci_slot *pci_slot;
 static unsigned int num_pci_slots;
 
-static int ipr_true(const struct dirent *dirent)
-{
-	return 1;
-}
-
 static int ipr_select_phy_location(const struct dirent *dirent)
 {
 	if (strstr(dirent->d_name, "phy_location"))
@@ -1287,7 +1282,7 @@ static void ipr_get_pci_slots()
 
 	sprintf(rootslot, "%s/slots/", sysfs_bus->path);
 
-	num_slots = scandir(rootslot, &slotdir, ipr_true, alphasort);
+	num_slots = scandir(rootslot, &slotdir, NULL, alphasort);
 	if (num_slots <= 0) {
 		sysfs_close_bus(sysfs_bus);
 		return;
@@ -1313,7 +1308,7 @@ static void ipr_get_pci_slots()
 		sprintf(slotpath, "%s/"SYSFS_DEVICES_NAME"/%s/",
 			sysfs_bus->path, pci_slot[i].slot_name);
 
-		num_attrs = scandir(slotpath, &slotdir, ipr_true, alphasort);
+		num_attrs = scandir(slotpath, &slotdir, NULL, alphasort);
 		if (num_attrs <= 0)
 			continue;
 
@@ -1348,6 +1343,10 @@ static void ipr_get_pci_slots()
 			break;
 		}
 	}
+
+	free(pci_slot);
+	pci_slot = NULL;
+	num_pci_slots = 0;
 }
 
 void tool_init(int save_state)

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.93 2007/04/02 19:09:48 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.94 2007/04/03 20:03:44 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1016,6 +1016,11 @@ struct ipr_path_entry {
 	u8 remote_connection_id[8];
 };
 
+struct ipr_path_entries {
+	u32 num_path_entries;
+	struct ipr_path_entry path[0]; /* variable length */
+};
+
 struct ipr_dual_ioa_entry {
 	u32 length;
 	u8 link_state;
@@ -1025,14 +1030,27 @@ struct ipr_dual_ioa_entry {
 #define IPR_IOA_STATE_PRIMARY		2
 #define IPR_IOA_STATE_SECONDARY	3
 #define IPR_IOA_STATE_NO_PREFERENCE	4
-	u8 reserved;
-	u8 token;
-	u8 reserved2[4];
-	u8 remote_vendor_id[IPR_VENDOR_ID_LEN];
-	u8 remote_prod_id[IPR_PROD_ID_LEN];
-	u8 remote_sn[IPR_SERIAL_NUM_LEN];
-	u32 num_path_entries;
-	struct ipr_path_entry path[0]; /* variable length */
+	u8 fmt;
+	u8 multi_adapter_type;
+#define IPR_IOA_MA_TYPE_UNDEFINED	0
+#define IPR_IOA_MA_TYPE_DUAL_IOA	1
+#define IPR_IOA_MA_TYPE_AUX_CACHE	2
+	u8 reserved[2];
+	u16 add_len;
+	union {
+		struct {
+			u8 remote_vendor_id[IPR_VENDOR_ID_LEN];
+			u8 remote_prod_id[IPR_PROD_ID_LEN];
+			u8 remote_sn[IPR_SERIAL_NUM_LEN];
+		} fmt0;
+
+		struct {
+			u8 remote_vendor_id[IPR_VENDOR_ID_LEN];
+			u8 remote_prod_id[IPR_PROD_ID_LEN];
+			u8 remote_sn[IPR_SERIAL_NUM_LEN];
+			u8 wwid[8];
+		} fmt1;
+	};
 };
 
 struct ipr_phys_bus_entry {
