@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.94 2007/04/03 20:03:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.95 2007/04/06 15:13:46 brking Exp $
  */
 
 #include <stdarg.h>
@@ -2024,6 +2024,7 @@ u32 get_ioa_fw_version(struct ipr_ioa *);
 int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
 u32 get_dasd_ucode_version(char *, int);
+const char *get_bus_desc(struct ipr_ioa *);
 const char *get_ioa_desc(struct ipr_ioa *);
 int ioa_is_spi(struct ipr_ioa *);
 int __ioa_is_spi(struct ipr_ioa *);

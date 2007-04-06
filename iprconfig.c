@@ -1681,12 +1681,12 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 		body = add_line_to_body(body,_("Preferred Dual Adapter State"),
 					dev->ioa->preferred_dual_state);
 		if (ntohl(dev->ioa->ioa_status.num_entries)) {
-			ipr_strncpy_0(buffer, (char *)ioa_entry->remote_vendor_id, IPR_VENDOR_ID_LEN);
+			ipr_strncpy_0(buffer, (char *)ioa_entry->fmt0.remote_vendor_id, IPR_VENDOR_ID_LEN);
 			body = add_line_to_body(body,_("Remote Adapter Manufacturer"), buffer);
-			ipr_strncpy_0(buffer, (char *)ioa_entry->remote_prod_id, IPR_PROD_ID_LEN);
+			ipr_strncpy_0(buffer, (char *)ioa_entry->fmt0.remote_prod_id, IPR_PROD_ID_LEN);
 			body = add_line_to_body(body,_("Remote Adapter Machine Type And Model"),
 						buffer);
-			ipr_strncpy_0(buffer, (char *)ioa_entry->remote_sn, IPR_SERIAL_NUM_LEN);
+			ipr_strncpy_0(buffer, (char *)ioa_entry->fmt0.remote_sn, IPR_SERIAL_NUM_LEN);
 			body = add_line_to_body(body,_("Remote Adapter Serial Number"), buffer);
 		}
 	}
@@ -9128,7 +9128,8 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
 		if (!vpd) {
-			len += sprintf(body + len,"            %-25s ", get_ioa_desc(dev->ioa));
+			len += sprintf(body + len,"            %s %-19s ", get_bus_desc(ioa),
+				       get_ioa_desc(dev->ioa));
 		} else
 			len += sprintf(body + len,"            %-8s %-16s ",
 				       scsi_dev_data->vendor_id,

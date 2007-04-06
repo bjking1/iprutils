@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.111 2007/04/03 20:03:44 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.112 2007/04/06 15:13:46 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -621,6 +621,35 @@ static const struct ioa_parms ioa_parms [] = {
 	.msl = 0x030E0040, .fw_name = "5349530E" },
 };
 
+struct chip_details {
+	u16 vendor;
+	u16 device;
+	const char *desc;
+};
+
+static const struct chip_details chip_details []= {
+	{ .vendor = 0x1069, .device = 0xB166, "PCI-X" }, /* Gemstone */
+	{ .vendor = 0x1014, .device = 0x028C, "PCI-X" }, /* Citrine */
+	{ .vendor = 0x1014, .device = 0x0180, "PCI-X" }, /* Snipe */
+	{ .vendor = 0x1014, .device = 0x02BD, "PCI-X" }, /* Obsidian */
+	{ .vendor = 0x1014, .device = 0x0339, "PCI-E" }, /* Obsidian-E */
+	{ .vendor = 0x9005, .device = 0x0503, "PCI-X" }, /* Scamp */
+	{ .vendor = 0x1014, .device = 0x034A, "PCI-E" }, /* Scamp-E */
+};
+
+static const struct chip_details *get_chip_details(struct ipr_ioa *ioa)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chip_details); i++) {
+		if (ioa->pci_vendor == chip_details[i].vendor &&
+		    ioa->pci_device == chip_details[i].device)
+			return &chip_details[i];
+	}
+
+	return NULL;
+}
+
 struct ioa_details {
 	u16 subsystem_vendor;
 	u16 subsystem_device;
@@ -733,11 +762,21 @@ int ioa_is_spi(struct ipr_ioa *ioa)
 	return __ioa_is_spi(ioa);
 }
 
-static const char *raid_desc = "PCI-X SCSI RAID Adapter";
-static const char *jbod_desc = "PCI-X SCSI Adapter";
-static const char *sas_raid_desc = "PCI-X SAS RAID Adapter";
-static const char *sas_jbod_desc = "PCI-X SAS Adapter";
-static const char *aux_cache_desc = "PCI-X Aux Cache Adapter";
+static const char *raid_desc = "SCSI RAID Adapter";
+static const char *jbod_desc = "SCSI Adapter";
+static const char *sas_raid_desc = "SAS RAID Adapter";
+static const char *sas_jbod_desc = "SAS Adapter";
+static const char *aux_cache_desc = "Aux Cache Adapter";
+static const char *def_chip_desc = "PCI";
+
+const char *get_bus_desc(struct ipr_ioa *ioa)
+{
+	const struct chip_details *chip = get_chip_details(ioa);
+
+	if (!chip)
+		return def_chip_desc;
+	return chip->desc;
+}
 
 const char *get_ioa_desc(struct ipr_ioa *ioa)
 {
