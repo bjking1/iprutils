@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.112 2007/04/06 15:13:46 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.113 2007/04/25 16:07:15 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3351,13 +3351,19 @@ int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 	return rc;
 }
 
+static void ipr_save_ioa_attr(struct ipr_ioa *ioa, char *field,
+			      char *value, int update);
+
 int set_preferred_primary(char *sg_name, int preferred_primary)
 {
-	struct ipr_ioa *ioa;
+	char temp[100];
+	struct ipr_dev *dev = find_gen_dev(sg_name);
 
-	for_each_ioa(ioa) {
-		if (!strcmp(ioa->ioa.gen_name, sg_name))
-			return ipr_set_preferred_primary(ioa, preferred_primary);
+	if (dev) {
+		sprintf(temp, "%d", preferred_primary);
+		if (ipr_set_preferred_primary(dev->ioa, preferred_primary))
+			return -EIO;
+		ipr_save_ioa_attr(dev->ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
 	}
 
 	return -ENXIO;
@@ -3732,6 +3738,50 @@ static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 	return 0;
 }
 
+static struct ipr_dev *find_multipath_vset(struct ipr_dev *vset1)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset2;
+
+	for_each_ioa(ioa) {
+		if (ioa == vset1->ioa)
+			continue;
+		for_each_vset(ioa, vset2) {
+			if (memcmp(vset1->array_rcd->vendor_id,
+				   vset2->array_rcd->vendor_id,
+				   IPR_VENDOR_ID_LEN))
+				continue;
+			if (memcmp(vset1->array_rcd->product_id,
+				   vset2->array_rcd->product_id,
+				   IPR_PROD_ID_LEN))
+				continue;
+			if (memcmp(vset1->array_rcd->serial_number,
+				   vset2->array_rcd->serial_number,
+				   ARRAY_SIZE(vset2->array_rcd->serial_number)))
+				continue;
+			return vset2;
+		}
+	}
+
+	return NULL;
+}
+
+static void link_multipath_vsets()
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset1, *vset2;
+
+	for_each_ioa(ioa) {
+		for_each_vset(ioa, vset1) {
+			vset2 = find_multipath_vset(vset1);
+			if (!vset2)
+				continue;
+			vset1->alt_path = vset2;
+			vset2->alt_path = vset1;
+		}
+	}
+}
+
 void check_current_config(bool allow_rebuild_refresh)
 {
 	struct scsi_dev_data *scsi_dev_data;
@@ -3887,6 +3937,7 @@ void check_current_config(bool allow_rebuild_refresh)
 		}
 	}
 
+	link_multipath_vsets();
 	ipr_cleanup_zeroed_devs();
 	resolve_old_config();
 }

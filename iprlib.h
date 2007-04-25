@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.95 2007/04/06 15:13:46 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.96 2007/04/25 16:07:15 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1112,6 +1112,7 @@ struct ipr_dev {
 		struct ipr_dev_record *dev_rcd;
 		struct ipr_array_record *array_rcd;
 	};
+	struct ipr_dev *alt_path;
 	struct ipr_ioa *ioa;
 };
 
@@ -1169,6 +1170,10 @@ struct ipr_ioa {
 #define for_each_primary_ioa(ioa) \
         __for_each_ioa(ioa, ipr_ioa_head) \
            if (!ioa->is_secondary)
+
+#define for_each_secondary_ioa(ioa) \
+        __for_each_ioa(ioa, ipr_ioa_head) \
+           if (ioa->is_secondary)
 
 #define for_each_sas_ioa(ioa) \
         __for_each_ioa(ioa, ipr_ioa_head) \

@@ -2382,6 +2382,8 @@ int do_confirm_raid_stop(i_container *i_con)
 
 		if (vset->scsi_dev_data)
 			rc = ipr_start_stop_stop(vset);
+		if (vset->alt_path && vset->alt_path->scsi_dev_data)
+			rc = ipr_start_stop_stop(vset->alt_path);
 
 		if (rc != 0)
 			return (20 | EXIT_FLAG);
@@ -9600,6 +9602,8 @@ static int raid_delete(char **args, int num_args)
 	dev->array_rcd->issue_cmd = 1;
 	if (dev->scsi_dev_data)
 		rc = ipr_start_stop_stop(dev);
+	if (dev->alt_path && dev->alt_path->scsi_dev_data)
+		rc = ipr_start_stop_stop(dev->alt_path);
 	if ((rc = ipr_stop_array_protection(dev->ioa)))
 		return rc;
 
