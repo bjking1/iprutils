@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.113 2007/04/25 16:07:15 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.114 2007/04/26 13:32:30 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -678,6 +678,14 @@ static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
 
 int ipr_improper_device_type(struct ipr_dev *dev)
 {
+	struct ipr_ioa *ioa = dev->ioa;
+
+	if (ioa->is_secondary && !ioa->was_secondary &&
+	    ipr_is_af_dasd_device(dev) && dev->scsi_dev_data)
+		return 1;
+	if (!ioa->is_secondary && ioa->was_secondary &&
+	    ipr_is_af_dasd_device(dev) && !dev->scsi_dev_data)
+		return 1;
 	if (!dev->scsi_dev_data)
 		return 0;
 	if (!dev->ioa->qac_data || !dev->ioa->qac_data->num_records)
@@ -1084,8 +1092,33 @@ static int old_num_ioas;
 static struct scsi_dev_data *old_scsi_dev_table;
 struct ipr_array_query_data *old_qac_data;
 
+static void free_current_config()
+{
+	struct ipr_ioa *ioa;
+
+	for (ioa = ipr_ioa_head; ioa;) {
+		ioa = ioa->next;
+		free(ipr_ioa_head);
+		ipr_ioa_head = ioa;
+	}
+
+	free(ipr_qac_data);
+	free(scsi_dev_table);
+
+	ipr_ioa_head = NULL;
+	ipr_ioa_tail = NULL;
+	num_ioas = 0;
+	scsi_dev_table = NULL;
+	ipr_qac_data = NULL;
+}
+
 static void save_old_config()
 {
+	if (old_ioa_head) {
+		free_current_config();
+		return;
+	}
+
 	old_ioa_head = ipr_ioa_head;
 	old_ioa_tail = ipr_ioa_tail;
 	old_num_ioas = num_ioas;
@@ -1208,6 +1241,7 @@ static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 	struct ipr_dev *dev, *old_dev;
 
 	ioa->should_init = 0;
+	ioa->was_secondary = old_ioa->is_secondary;
 
 	for_each_dev(ioa, dev) {
 		for_each_dev(old_ioa, old_dev) {
@@ -1227,6 +1261,7 @@ static void resolve_old_config()
 
 	for_each_ioa(ioa) {
 		ioa->should_init = 1;
+		ioa->was_secondary = 0;
 		for_each_dev(ioa, dev)
 			dev->should_init = 1;
 	}
@@ -3354,19 +3389,16 @@ int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 static void ipr_save_ioa_attr(struct ipr_ioa *ioa, char *field,
 			      char *value, int update);
 
-int set_preferred_primary(char *sg_name, int preferred_primary)
+int set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 {
 	char temp[100];
-	struct ipr_dev *dev = find_gen_dev(sg_name);
 
-	if (dev) {
-		sprintf(temp, "%d", preferred_primary);
-		if (ipr_set_preferred_primary(dev->ioa, preferred_primary))
-			return -EIO;
-		ipr_save_ioa_attr(dev->ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
-	}
+	sprintf(temp, "%d", preferred_primary);
+	if (ipr_set_preferred_primary(ioa, preferred_primary))
+		return -EIO;
+	ipr_save_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
 
-	return -ENXIO;
+	return 0;
 }
 
 int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
@@ -5933,6 +5965,33 @@ void ipr_init_new_dev(struct ipr_dev *dev)
 	ipr_init_dev(dev);
 }
 
+static void ipr_scan_ra(struct ipr_ioa *ioa, struct ipr_res_addr *ra)
+{
+	ra_dbg(ra, "Scanning for new device\n");
+	ipr_scan(ioa, ra->bus, ra->target, ra->lun);
+}
+
+static void ipr_for_each_unique_ra(struct ipr_dev *dev,
+				   void (*func) (struct ipr_ioa *, struct ipr_res_addr *))
+{
+	signed int i, j;
+	int dup;
+
+	for (i = 0; i < ARRAY_SIZE(dev->res_addr); i++) {
+		dup = 0;
+		for (j = i - 1; j >= 0; j--) {
+			if (!memcmp(&dev->res_addr[i], &dev->res_addr[j],
+				    sizeof(struct ipr_res_addr))) {
+				dup = 1;
+				break;
+			}
+		}
+
+		if (!dup)
+			func(dev->ioa, &dev->res_addr[i]);
+	}
+}
+
 static int fixup_improper_devs(struct ipr_ioa *ioa)
 {
 	struct ipr_dev *dev;
@@ -5956,9 +6015,7 @@ static int fixup_improper_devs(struct ipr_ioa *ioa)
 		if (!dev->local_flag)
 			continue;
 		dev->local_flag = 0;
-		scsi_dbg(dev, "Scanning for new device\n");
-		ipr_scan(ioa, dev->scsi_dev_data->channel,
-			 dev->scsi_dev_data->id, dev->scsi_dev_data->lun);
+		ipr_for_each_unique_ra(dev, ipr_scan_ra);
 	}
 
 	return improper;

@@ -25,6 +25,7 @@ install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
 install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
 install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
 install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
+install -m 755 init.d/iprha $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprha
 
 %ifarch ppc ppc64
 %post
@@ -56,6 +57,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/init.d/*
 
 %changelog
+* Wed Apr 25 2007 Brian King <brking@us.ibm.com>
+- Add iprha init.d script to enable/disable primary adapter mode
+  for dual initiator configs.
 * Fri Apr 13 2007 Brian King <brking@us.ibm.com>
 - Add adapter config option in iprconfig for setting primary/secondary
   adapter in dual adapter environment.

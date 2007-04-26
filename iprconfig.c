@@ -11366,14 +11366,43 @@ static int battery_info(char **args, int num_args)
 	return 0;
 }
 
+static int __set_preferred_primary(char *sg_name, int preferred_primary)
+{
+	struct ipr_dev *dev = find_gen_dev(sg_name);
+
+	if (dev)
+		return set_preferred_primary(dev->ioa, preferred_primary);
+	return -ENXIO;
+}
+
 static int set_primary(char **args, int num_args)
 {
-	return set_preferred_primary(args[0], 1);
+	return __set_preferred_primary(args[0], 1);
 }
 
 static int set_secondary(char **args, int num_args)
 {
-	return set_preferred_primary(args[0], 0);
+	return __set_preferred_primary(args[0], 0);
+}
+
+static int set_all_primary(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa)
+		set_preferred_primary(ioa, 1);
+
+	return 0;
+}
+
+static int set_all_secondary(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa)
+		set_preferred_primary(ioa, 0);
+
+	return 0;
 }
 
 static const struct {
@@ -11429,6 +11458,8 @@ static const struct {
 	{ "query-path-details",			1, 0, 1, query_path_details, "sda" },
 	{ "primary",				1, 0, 1, set_primary, "sg5" },
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
+	{ "set-all-primary",			0, 0, 0, set_all_primary, "" },
+	{ "set-all-secondary",			0, 0, 0, set_all_secondary, "" },
 	{ "raid-create",				1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
 	{ "raid-delete",				1, 0, 1, raid_delete, "sdb" },
 	{ "raid-include",				2, 0, 17, raid_include_cmd, "sda sg6 sg7" },

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.96 2007/04/25 16:07:15 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.97 2007/04/26 13:32:30 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1141,6 +1141,7 @@ struct ipr_ioa {
 	u8 scsi_id_changeable:1;
 	u8 dual_raid_support:1;
 	u8 is_secondary:1;
+	u8 was_secondary:1;
 	u8 should_init:1;
 	u8 is_aux_cache:1;
 	u8 protect_last_bus:1;
@@ -1942,7 +1943,7 @@ static inline int ipr_max_dev_elems(struct ipr_ses_config_pg *ses_cfg)
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int ipr_set_preferred_primary(struct ipr_ioa *, int);
-int set_preferred_primary(char *, int);
+int set_preferred_primary(struct ipr_ioa *, int);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
 void tool_init(int);
@@ -2160,6 +2161,10 @@ do { \
 if (ipr_debug) \
 syslog(LOG_ERR, __VA_ARGS__);\
 } while(0)
+
+#define ra_dbg(ra, fmt, ...) \
+      syslog_dbg("%d:%d:%d:%d: " fmt, (ra)->host, (ra)->bus, \
+             (ra)->target, (ra)->lun, ##__VA_ARGS__); \
 
 #define scsi_log(level, dev, fmt, ...) \
 do { \
