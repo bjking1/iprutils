@@ -530,8 +530,52 @@ Set the maximum SCSI bus speed allowed on the specified SCSI bus.
 Set the SCSI bus width to use for the specified SCSI bus. Example:
 .br
 .B iprconfig -c set-bus-width sg5 0 16
+.TP
+.B primary [IOA]
+.br
+Set the adapter as the 
+.B preferred primary 
+adapter. This is used in dual initiator RAID configurations to indicate
+which adapter should be the 
+.B primary
+adapter. The 
+.B primary 
+adapter should be the adapter receiving the majority of the I/O. Example:
+.br
+.B iprconfig -c primary sg5
+.TP
+.B secondary [IOA]
+.br
+Set the adapter to indicate it is not the  
+.B preferred primary 
+adapter. See the notes for the 
+.B preferred primary
+for additional information. Example:
+.br
+.B iprconfig -c secondary sg5
+.TP
+.B set-all-primary
+.br
+Set all attached ipr adapters as the 
+.B preferred primary 
+adapter. This can be used when running a dual initiator RAID HA configuration.
+This command can be run on the 
+.B primary 
+system to quickly enable the 
+.B preferred primary 
+mode for all attached adapters. Refer to /etc/ha.d/resource.d/iprha for
+an example of how this might be used. Example:
+.br
+.B iprconfig -c set-all-primary
+.TP
+.B set-all-secondary
+.br
+Set all attached ipr adapters to indicate they are not the 
+.B preferred primary 
+adapter. Example:
+.br
+.B iprconfig -c set-all-secondary 
 .RE
-
 .TP
 .B \-\-version
 Print version number of 
