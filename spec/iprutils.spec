@@ -25,7 +25,9 @@ install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
 install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
 install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
 install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
-install -m 755 init.d/iprha $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprha
+install -d $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d
+install -d $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d
+install -m 755 init.d/iprha $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d/iprha
 
 %ifarch ppc ppc64
 %post
@@ -55,6 +57,7 @@ rm -rf $RPM_BUILD_ROOT
 /sbin/*
 %{_mandir}/man*/*
 %{_sysconfdir}/init.d/*
+%{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
 * Wed Apr 25 2007 Brian King <brking@us.ibm.com>
