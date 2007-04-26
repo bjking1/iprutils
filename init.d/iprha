@@ -1,0 +1,67 @@
+#!/bin/sh
+# Copyright (C) 2007 International Business Machines Corporation and others.
+# All Rights Reserved. This program and the accompanying
+# materials are made available under the terms of the
+# Common Public License v1.0 which accompanies this distribution.
+#
+# Author: Brian King <brking@us.ibm.com>
+#
+# iprha
+#
+# System startup script for the ipr HA facility
+#
+### BEGIN INIT INFO
+# Provides: iprha
+# Required-Start:    $local_fs $syslog
+# Should-Start:      $remote_fs $netfs
+# Required-Stop:     $local_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Set all ipr adapters to be preferred primary adapter
+# Description:       Set all ipr adapters to be preferred primary adapter.
+#       This script should be started on the "primary" system in a high
+#       availability configuration for improved ipr disk performance.
+### END INIT INFO
+
+IPRCONFIG=/sbin/iprconfig
+test -x $IPRCONFIG || exit 5
+. /lib/lsb/init-functions
+
+start() {
+    echo -n "Enabling ipr primary adapter mode"
+    $IPRCONFIG -c set-all-primary
+
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
+    return $RETVAL
+}
+
+stop() {
+    echo -n "Disabling ipr primary adapter mode"
+    $IPRCONFIG -c set-all-secondary
+    
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
+    return $RETVAL
+}
+
+case "$1" in
+    start)
+	start
+	;;
+    stop)
+	stop
+	;;
+    *)
+	echo "Usage: $0 {start|stop}"
+	exit 1
+	;;
+esac
