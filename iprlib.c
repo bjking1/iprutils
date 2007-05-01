@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.114 2007/04/26 13:32:30 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.115 2007/05/01 21:56:18 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -678,13 +678,7 @@ static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
 
 int ipr_improper_device_type(struct ipr_dev *dev)
 {
-	struct ipr_ioa *ioa = dev->ioa;
-
-	if (ioa->is_secondary && !ioa->was_secondary &&
-	    ipr_is_af_dasd_device(dev) && dev->scsi_dev_data)
-		return 1;
-	if (!ioa->is_secondary && ioa->was_secondary &&
-	    ipr_is_af_dasd_device(dev) && !dev->scsi_dev_data)
+	if (dev->rescan)
 		return 1;
 	if (!dev->scsi_dev_data)
 		return 0;
@@ -1176,6 +1170,8 @@ static int same_ioa(struct ipr_ioa *first, struct ipr_ioa *second)
 
 static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *second)
 {
+	if (!first || !second)
+		return 0;
 	if (first->host != second->host)
 		return 0;
 	if (first->channel != second->channel)
@@ -1187,8 +1183,6 @@ static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *seco
 	if (first->type != second->type)
 		return 0;
 	if (first->online != second->online)
-		return 0;
-	if (first->handle != second->handle)
 		return 0;
 	if (strcmp(first->vendor_id, second->vendor_id))
 		return 0;
@@ -1203,15 +1197,32 @@ static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *seco
 	return 1;
 }
 
+static int same_dev_rcd(struct ipr_dev_record *first, struct ipr_dev_record *second)
+{
+	if (memcmp(&first->resource_addr, &second->resource_addr,
+		   sizeof(first->resource_addr)))
+		return 0;
+	if (memcmp(first->vendor_id, second->vendor_id, IPR_VENDOR_ID_LEN))
+		return 0;
+	if (memcmp(first->product_id, second->product_id, IPR_PROD_ID_LEN))
+		return 0;
+	if (memcmp(first->serial_num, second->serial_num, IPR_SERIAL_NUM_LEN))
+		return 0;
+	return 1;
+}
+
 static int same_dev(struct ipr_dev *first, struct ipr_dev *second)
 {
 	if (strcmp(first->dev_name, second->dev_name))
 		return 0;
 	if (strcmp(first->gen_name, second->gen_name))
 		return 0;
-	if (!first->scsi_dev_data || !second->scsi_dev_data)
-		return 0;
-	if (!same_scsi_dev(first->scsi_dev_data, second->scsi_dev_data))
+	if (!first->scsi_dev_data && !second->scsi_dev_data) {
+		if (!ipr_is_af_dasd_device(first) || !ipr_is_af_dasd_device(second))
+			return 0;
+		if (!same_dev_rcd(first->dev_rcd, second->dev_rcd))
+			return 0;
+	} else if (!same_scsi_dev(first->scsi_dev_data, second->scsi_dev_data))
 		return 0;
 	return 1;
 }
@@ -1234,6 +1245,12 @@ static void resolve_dev(struct ipr_dev *new, struct ipr_dev *old)
 	new->init_not_allowed = !dev_init_allowed(new);
 	if (!old->init_not_allowed || new->init_not_allowed)
 		new->should_init = 0;
+	if (new->ioa->is_secondary && !old->ioa->is_secondary &&
+	    ipr_is_af_dasd_device(new) && new->scsi_dev_data)
+		new->rescan = 1;
+	if (!new->ioa->is_secondary && old->ioa->is_secondary &&
+	    ipr_is_af_dasd_device(new) && !new->scsi_dev_data)
+		new->rescan = 1;
 }
 
 static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
@@ -1241,13 +1258,13 @@ static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 	struct ipr_dev *dev, *old_dev;
 
 	ioa->should_init = 0;
-	ioa->was_secondary = old_ioa->is_secondary;
 
 	for_each_dev(ioa, dev) {
 		for_each_dev(old_ioa, old_dev) {
 			if (!same_dev(dev, old_dev))
 				continue;
 			memcpy(&dev->attr, &old_dev->attr, sizeof(dev->attr));
+			dev->rescan = old_dev->rescan;
 			resolve_dev(dev, old_dev);
 			break;
 		}
@@ -1261,7 +1278,6 @@ static void resolve_old_config()
 
 	for_each_ioa(ioa) {
 		ioa->should_init = 1;
-		ioa->was_secondary = 0;
 		for_each_dev(ioa, dev)
 			dev->should_init = 1;
 	}
@@ -6015,6 +6031,7 @@ static int fixup_improper_devs(struct ipr_ioa *ioa)
 		if (!dev->local_flag)
 			continue;
 		dev->local_flag = 0;
+		dev->rescan = 0;
 		ipr_for_each_unique_ra(dev, ipr_scan_ra);
 	}
 

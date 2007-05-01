@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.97 2007/04/26 13:32:30 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.98 2007/05/01 21:56:18 brking Exp $
  */
 
 #include <stdarg.h>
@@ -1102,6 +1102,7 @@ struct ipr_dev {
 	u32 should_init:1;
 	u32 init_not_allowed:1;
 	u32 local_flag:1;
+	u32 rescan:1;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
@@ -1141,7 +1142,6 @@ struct ipr_ioa {
 	u8 scsi_id_changeable:1;
 	u8 dual_raid_support:1;
 	u8 is_secondary:1;
-	u8 was_secondary:1;
 	u8 should_init:1;
 	u8 is_aux_cache:1;
 	u8 protect_last_bus:1;
