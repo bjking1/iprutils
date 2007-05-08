@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.5.cvs
+Version: 2.2.6
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -60,7 +60,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
-* Tue May 1 2007 Brian King <brking@us.ibm.com>
+* Tue May 1 2007 Brian King <brking@us.ibm.com> 2.2.6
 - Fix iprinit dual initiator failover device rescanning code.
 * Wed Apr 25 2007 Brian King <brking@us.ibm.com>
 - Add iprha init.d script to enable/disable primary adapter mode
