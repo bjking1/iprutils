@@ -12,8 +12,8 @@
 #
 ### BEGIN INIT INFO
 # Provides: iprdump
-# Required-Start:    $local_fs $syslog iprinit
-# Should-Start:      $remote_fs $netfs
+# Required-Start:    $local_fs iprinit
+# Should-Start:      $remote_fs $syslog
 # Required-Stop:     $local_fs $syslog iprinit
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6

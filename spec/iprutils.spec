@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.6
+Version: 2.2.7
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -31,9 +31,23 @@ install -m 755 init.d/iprha $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d/iprha
 
 %ifarch ppc ppc64
 %post
-/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
-/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
-/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
+if [ $1 = 2 ]; then
+	echo "Restarting iprutils services"
+	%{_sysconfdir}/init.d/iprdump restart  > /dev/null 2>&1
+	%{_sysconfdir}/init.d/iprupdate restart  > /dev/null 2>&1
+	%{_sysconfdir}/init.d/iprinit restart  > /dev/null 2>&1
+elif [ -f /usr/lib/lsb/install_initd ]; then
+	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
+	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
+	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
+else
+	chkconfig --add iprinit > /dev/null 2>&1
+	chkconfig --add iprdump > /dev/null 2>&1
+	chkconfig --add iprupdate > /dev/null 2>&1
+	chkconfig iprinit on > /dev/null 2>&1
+	chkconfig iprdump on > /dev/null 2>&1
+	chkconfig iprupdate on > /dev/null 2>&1
+fi
 %endif
 
 %ifarch ppc ppc64
@@ -42,9 +56,16 @@ if [ $1 = 0 ]; then
 	%{_sysconfdir}/init.d/iprdump stop  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprupdate stop  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprinit stop  > /dev/null 2>&1
-	/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
-	/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
-	/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
+
+	if [ -f /usr/lib/lsb/remove_initd ]; then
+		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
+		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
+		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
+	else
+		chkconfig --del iprinit > /dev/null 2>&1
+		chkconfig --del iprdump > /dev/null 2>&1
+		chkconfig --del iprupdate > /dev/null 2>&1
+	fi
 fi
 %endif
 
@@ -60,6 +81,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Thu Jun 21 2007 Brian King <brking@us.ibm.com> 2.2.7
+- Fixes for init.d scripts to fix problems installing them on
+  some systems.
+* Wed Jun 13 2007 Brian King <brking@us.ibm.com>
+- rpm spec file updates
 * Tue May 1 2007 Brian King <brking@us.ibm.com> 2.2.6
 - Fix iprinit dual initiator failover device rescanning code.
 * Wed Apr 25 2007 Brian King <brking@us.ibm.com>
