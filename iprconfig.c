@@ -7763,7 +7763,7 @@ int ioa_config(i_container * i_con)
 	for_each_ioa(ioa) {
 		if (ioa->ioa.scsi_dev_data == NULL)
 			continue;
-		if (!ioa->dual_raid_support)
+		if (!ioa->dual_raid_support && !ioa->gscsi_only_ha)
 			continue;
 
 		print_dev(k, &ioa->ioa, buffer, "%1", k);
@@ -7800,6 +7800,7 @@ int ioa_config(i_container * i_con)
 struct ioa_config_attr {
 	int option;
 	int preferred_primary;
+	int gscsi_only_ha;
 };
 
 int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
@@ -7818,20 +7819,28 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 	 same line as the field in which the menu is opened for*/
 	start_row += 2; /* for title */  /* FIXME */
 
-	if (ioa_config_attr->option == 1) {
+	if (ioa_config_attr->option == 1 || ioa_config_attr->option == 2) {
 		num_menu_items = 2;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
 
 		menu_index = 0;
-		menu_item[menu_index] = new_item("None","");
+		if (ioa_config_attr->option == 1)
+			menu_item[menu_index] = new_item("None","");
+		else
+			menu_item[menu_index] = new_item("RAID","");
+
 		userptr[menu_index] = 0;
 		set_item_userptr(menu_item[menu_index],
 				 (char *)&userptr[menu_index]);
 
 		menu_index++;
 
-		menu_item[menu_index] = new_item("Primary","");
+		if (ioa_config_attr->option == 1)
+			menu_item[menu_index] = new_item("Primary","");
+		else
+			menu_item[menu_index] = new_item("JBOD","");
+
 		userptr[menu_index] = 1;
 		set_item_userptr(menu_item[menu_index],
 				 (char *)&userptr[menu_index]);
@@ -7839,8 +7848,12 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 
 		menu_item[menu_index] = (ITEM *)NULL;
 		rc = display_menu(menu_item, start_row, menu_index, &retptr);
-		if (rc == RC_SUCCESS)
-			ioa_config_attr->preferred_primary = *retptr;
+		if (rc == RC_SUCCESS) {
+			if (ioa_config_attr->option == 1)
+				ioa_config_attr->preferred_primary = *retptr;
+			else
+				ioa_config_attr->gscsi_only_ha = *retptr;
+		}
 
 		i = 0;
 		while (menu_item[i] != NULL)
@@ -7866,7 +7879,7 @@ int change_ioa_config(i_container * i_con)
 	struct ioa_config_attr ioa_config_attr[3];
 	struct ioa_config_attr *config_attr = NULL;
 	struct ipr_ioa_attr ioa_attr;
-	int header_lines = 0;
+	int header_lines = 0, index = 0;
 	char *body = NULL;
 	struct screen_output *s_out;
 
@@ -7901,14 +7914,27 @@ int change_ioa_config(i_container * i_con)
 	body = add_line_to_body(body, buffer, NULL);
 	header_lines += 2;
 
-	body = add_line_to_body(body,_("Preferred Dual Adapter State"), "%13");
-	ioa_config_attr[0].option = 1;
-	ioa_config_attr[0].preferred_primary = ioa_attr.preferred_primary;
-	if (ioa_attr.preferred_primary)
-		sprintf(pref_str, "Primary");
-	else
-		sprintf(pref_str, "None");
-	i_con = add_i_con(i_con, pref_str, &ioa_config_attr[0]);
+	if (dev->ioa->dual_raid_support) {
+		body = add_line_to_body(body,_("Preferred Dual Adapter State"), "%13");
+		ioa_config_attr[index].option = 1;
+		ioa_config_attr[index].preferred_primary = ioa_attr.preferred_primary;
+		if (ioa_attr.preferred_primary)
+			sprintf(pref_str, "Primary");
+		else
+			sprintf(pref_str, "None");
+		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
+	}
+
+	if (dev->ioa->gscsi_only_ha) {
+		body = add_line_to_body(body,_("High-Availability Mode"), "%13");
+		ioa_config_attr[index].option = 2;
+		ioa_config_attr[index].gscsi_only_ha = ioa_attr.gscsi_only_ha;
+		if (ioa_attr.gscsi_only_ha)
+			sprintf(pref_str, "JBOD");
+		else
+			sprintf(pref_str, "Normal");
+		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
+	}
 
 	n_change_ioa_config.body = body;
 	while (1) {
@@ -7930,6 +7956,12 @@ int change_ioa_config(i_container * i_con)
 					else
 						sprintf(temp_i_con->field_data, "None");
 					ioa_attr.preferred_primary = config_attr->preferred_primary;
+				} else if (config_attr->option == 2) {
+					if (config_attr->gscsi_only_ha)
+						sprintf(temp_i_con->field_data, "JBOD");
+					else
+						sprintf(temp_i_con->field_data, "Normal");
+					ioa_attr.gscsi_only_ha = config_attr->gscsi_only_ha;
 				}
 				found++;
 				break;
@@ -11366,6 +11398,35 @@ static int battery_info(char **args, int num_args)
 	return 0;
 }
 
+static int get_ha_mode(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_gen_dev(args[0]);
+
+	if (!dev)
+		return -ENXIO;
+
+	if (dev->ioa->in_gscsi_only_ha)
+		printf("JBOD\n");
+	else
+		printf("Normal\n");
+	return 0;
+}
+
+static int __set_ha_mode(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_gen_dev(args[0]);
+
+	if (!dev)
+		return -ENXIO;
+
+	if (!strncasecmp(args[1], "Normal", 4))
+		return set_ha_mode(dev->ioa, 0);
+	else if (!strncasecmp(args[1], "JBOD", 4))
+		return set_ha_mode(dev->ioa, 1);
+
+	return -EINVAL; 
+}
+
 static int __set_preferred_primary(char *sg_name, int preferred_primary)
 {
 	struct ipr_dev *dev = find_gen_dev(sg_name);
@@ -11460,6 +11521,8 @@ static const struct {
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
 	{ "set-all-primary",			0, 0, 0, set_all_primary, "" },
 	{ "set-all-secondary",			0, 0, 0, set_all_secondary, "" },
+	{ "query-ha-mode",			1, 0, 1, get_ha_mode, "sg5" },
+	{ "set-ha-mode",				2, 0, 2, __set_ha_mode, "sg5 [Normal | JBOD]" },
 	{ "raid-create",				1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
 	{ "raid-delete",				1, 0, 1, raid_delete, "sdb" },
 	{ "raid-include",				2, 0, 17, raid_include_cmd, "sda sg6 sg7" },

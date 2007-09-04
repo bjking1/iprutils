@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.115 2007/05/01 21:56:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.116 2007/09/04 21:05:10 brking Exp $
  */
 
 #ifndef iprlib_h
@@ -3366,6 +3366,42 @@ int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 			 sense_data, timeout_in_sec, 0);
 };
 
+int ipr_set_ha_mode(struct ipr_ioa *ioa, int gscsi_only_ha)
+{
+	int rc, len;
+	struct sense_data_t sense_data;
+	struct ipr_config_term_hdr *hdr;
+	struct ipr_subsys_config_term *term;
+	struct ipr_mode_pages pages;
+	struct ipr_mode_page25 *page;
+
+	memset(&sense_data, 0, sizeof(sense_data));
+	rc = mode_sense(&ioa->ioa, 0x25, &pages, &sense_data);
+
+	if (!rc) {
+		page = (struct ipr_mode_page25 *)(pages.data + pages.hdr.block_desc_len);
+
+		for_each_page25_term(hdr, page) {
+			if (hdr->term_id != IPR_SUBSYS_CONFIG_TERM_ID)
+				continue;
+
+			term = (struct ipr_subsys_config_term *)hdr;
+			if (gscsi_only_ha)
+				term->config = IPR_GSCSI_ONLY_HA_SUBSYS;
+			else
+				term->config = IPR_AFDASD_SUBSYS;
+
+			len = pages.hdr.length + 1;
+			pages.hdr.length = 0;
+
+			return ipr_mode_select(&ioa->ioa, &pages, len);
+		}
+
+	}	
+
+	return rc;
+}
+
 int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 {
 	int fd, rc;
@@ -3413,6 +3449,22 @@ int set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 	if (ipr_set_preferred_primary(ioa, preferred_primary))
 		return -EIO;
 	ipr_save_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
+
+	return 0;
+}
+
+int set_ha_mode(struct ipr_ioa *ioa, int gscsi_only)
+{
+	char temp[100];
+	int reset_needed = (gscsi_only != ioa->in_gscsi_only_ha);
+
+	sprintf(temp, "%d", gscsi_only);
+	if (ipr_set_ha_mode(ioa, gscsi_only))
+		return -EIO;
+	ipr_save_ioa_attr(ioa, IPR_GSCSI_HA_ONLY, temp, 1);
+
+	if (reset_needed)
+		ipr_reset_adapter(ioa);
 
 	return 0;
 }
@@ -3652,6 +3704,39 @@ static void print_ioa_state(char *buf, u8 state)
 	sprintf(buf, "Unknown (%d)", state);
 }
 
+static void get_subsys_config(struct ipr_ioa *ioa)
+{
+	int rc;
+	struct ipr_mode_pages pages;
+	struct ipr_mode_page25 *page;
+	struct ipr_config_term_hdr *hdr;
+	struct ipr_subsys_config_term *term;
+	struct sense_data_t sense_data;
+
+	ioa->in_gscsi_only_ha = 0;
+
+	if (!ioa->gscsi_only_ha)
+		return;
+
+	memset(&sense_data, 0, sizeof(sense_data));
+	rc = mode_sense(&ioa->ioa, 0x25, &pages, &sense_data);
+
+	if (!rc) {
+		page = (struct ipr_mode_page25 *)(pages.data + pages.hdr.block_desc_len);
+
+		for_each_page25_term(hdr, page) {
+			if (hdr->term_id != IPR_SUBSYS_CONFIG_TERM_ID)
+				continue;
+
+			term = (struct ipr_subsys_config_term *)hdr;
+			if (term->config == IPR_GSCSI_ONLY_HA_SUBSYS)
+				ioa->in_gscsi_only_ha = 1;
+			return;
+		} 
+	}
+
+}
+
 static void get_dual_ioa_state(struct ipr_ioa *ioa)
 {
 	int rc;
@@ -3726,6 +3811,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 				ioa->is_aux_cache = 1;
 			if (ioa_cap.can_attach_to_aux_cache && ioa_cap.is_dual_wide)
 				ioa->protect_last_bus = 1;
+			if (ioa_cap.gscsi_only_ha)
+				ioa->gscsi_only_ha = 1;
 		}
 	} else
 		ioa->ioa_dead = 1;
@@ -3870,6 +3957,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 		get_ioa_cap(ioa);
 		get_dual_ioa_state(ioa);
+		get_subsys_config(ioa);
 
 		/* Get Query Array Config Data */
 		rc = ipr_query_array_config(ioa, allow_rebuild_refresh, 0, 0, qac_data);
@@ -4423,6 +4511,7 @@ int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	struct ipr_dual_ioa_entry *ioa_entry;
 
 	attr->preferred_primary = 0;
+	attr->gscsi_only_ha = ioa->in_gscsi_only_ha;
 
 	if (!ioa->dual_raid_support)
 		return 0;
@@ -4463,6 +4552,9 @@ int ipr_modify_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	rc = ipr_get_saved_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp);
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &attr->preferred_primary);
+	rc = ipr_get_saved_ioa_attr(ioa, IPR_GSCSI_HA_ONLY, temp);
+	if (rc == RC_SUCCESS)
+		sscanf(temp, "%d", &attr->gscsi_only_ha);
 	return 0;
 }
 
@@ -4526,7 +4618,18 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 			ipr_save_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
 	}
 
+	if (attr->gscsi_only_ha != old_attr.gscsi_only_ha) {
+		sprintf(temp, "%d", attr->gscsi_only_ha);
+
+		if (ipr_set_ha_mode(ioa, attr->gscsi_only_ha))
+			return -EIO;
+		if (save)
+			ipr_save_ioa_attr(ioa, IPR_GSCSI_HA_ONLY, temp, 1);
+		ipr_reset_adapter(ioa);
+	}
+
 	get_dual_ioa_state(ioa);
+	get_subsys_config(ioa);
 	return 0;
 }
 
@@ -5921,10 +6024,16 @@ static void init_af_dev(struct ipr_dev *dev)
 static void init_ioa_dev(struct ipr_dev *dev)
 {
 	struct ipr_scsi_buses buses;
+	struct ipr_ioa_attr attr;
 
 	if (!dev->ioa)
 		return;
 	if (polling_mode && !dev->ioa->should_init)
+		return;
+	if (ipr_get_ioa_attr(dev->ioa, &attr))
+		return;
+	ipr_modify_ioa_attr(dev->ioa, &attr);
+	if (ipr_set_ioa_attr(dev->ioa, &attr, 1))
 		return;
 	if (ipr_get_bus_attr(dev->ioa, &buses))
 		return;

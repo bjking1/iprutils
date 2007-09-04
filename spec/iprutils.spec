@@ -81,6 +81,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Mon Aug 27 2007 Brian King <brking@us.ibm.com>
+- Add support for setting dual adapter HA mode.
 * Thu Jun 21 2007 Brian King <brking@us.ibm.com> 2.2.7
 - Fixes for init.d scripts to fix problems installing them on
   some systems.

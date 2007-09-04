@@ -122,10 +122,15 @@ is used to change driver configurable attributes, such as log_level.
 .B 6. Work with disk configuration
 is used to change configurable disk attributes, such as queue depth.
 .PP
-.B 7. Download microcode
+.B 7. Work with adapter configuration
+is used to change configurable adapter attributes, such as dual adapter settings.
+Refer to the following command line options: primary, secondary, query-ha-mode, 
+and set-ha-mode for more information regarding these settings.
+.PP
+.B 8. Download microcode
 is used to download microcode to ipr adapters and attached SCSI disks.
 .PP
-.B 8. Analyze Log
+.B 9. Analyze Log
 is an option available to analyze /var/log/messages* files. By default
 it will use vi as the editor to open the concatenated error log files.
 This can be changed by using option 6 on the
@@ -574,7 +579,34 @@ Set all attached ipr adapters to indicate they are not the
 .B preferred primary 
 adapter. Example:
 .br
-.B iprconfig -c set-all-secondary 
+.B iprconfig -c set-all-secondary
+.TP
+.B query-ha-mode [IOA]
+.br
+When an adapter is configured in a highly available dual adapter configuration,
+it may be able to be configured in one of two ways. The default mode is
+.B Normal. 
+This mode is used for all SCSI adapters and many SAS adapters. 
+Some SAS adapters also support a
+.B JBOD 
+dual adapter configuration. This mode is to be used when the dual adapter
+configuration is to consist of JBOD disks rather than RAID arrays. If the adapter
+is
+.B NOT 
+going to be used in a dual adapter configuration, this mode 
+.B MUST 
+be set to 
+.B Normal.
+Example:
+.br
+.B iprconfig -c query-ha-mode sg5
+.TP
+.B set-ha-mode [IOA] [Normal | RAID]
+Used to set the high-availability mode of the adapter. Refer to the
+.B query-ha-mode 
+command for more information regarding these settings. Example:
+.br
+.B iprconfig -c set-ha-mode sg5 Normal
 .RE
 .TP
 .B \-\-version

@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.98 2007/05/01 21:56:18 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.99 2007/09/04 21:05:11 brking Exp $
  */
 
 #include <stdarg.h>
@@ -958,6 +958,7 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 
 #define IPR_CATEGORY_IOA "Adapter"
 #define IPR_DA_PREFERRED_PRIMARY "PREFERRED_PRIMARY"
+#define IPR_GSCSI_HA_ONLY "JBOD_ONLY_HA"
 
 #define IPR_CATEGORY_BUS "Bus"
 #define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
@@ -1091,6 +1092,7 @@ struct ipr_vset_attr {
 
 struct ipr_ioa_attr {
 	int preferred_primary;
+	int gscsi_only_ha;
 };
 
 #define IPR_DEV_MAX_PATHS	2
@@ -1145,6 +1147,8 @@ struct ipr_ioa {
 	u8 should_init:1;
 	u8 is_aux_cache:1;
 	u8 protect_last_bus:1;
+	u8 gscsi_only_ha:1;
+	u8 in_gscsi_only_ha:1;
 	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
@@ -1301,6 +1305,32 @@ struct ipr_mode_page24 {
 #endif
 };
 
+struct ipr_config_term_hdr {
+	u8 term_id;
+	u8 len;
+};
+
+struct ipr_subsys_config_term {
+	struct ipr_config_term_hdr hdr;
+#define IPR_SUBSYS_CONFIG_TERM_ID	0x02
+	u8 config;
+#define IPR_AFDASD_SUBSYS		0x00
+#define IPR_GSCSI_ONLY_HA_SUBSYS	0x01
+	u8 reserved;
+};
+
+struct ipr_mode_page25 {
+	struct ipr_mode_page_hdr hdr;
+	u8 reserved[2];
+	struct ipr_config_term_hdr term;
+	u8 data[256];
+};
+
+#define for_each_page25_term(hdr, page) \
+for (hdr = &(page)->term;	\
+	(char *)hdr < ((char *)(page) + (page)->hdr.page_length + sizeof((page)->hdr));	\
+	hdr = (struct ipr_config_term_hdr *)((char *)hdr + (hdr)->len + sizeof(*hdr)))
+
 struct ipr_mode_page_28_header {
 	struct ipr_mode_page_hdr header;
 	u8 num_dev_entries;
@@ -1439,7 +1469,8 @@ struct ipr_inquiry_ioa_cap {
 	u8 reserved1;
 	u8 page_length;
 	u8 ascii_len;
-	u8 reserved2[3];
+	u8 reserved2;
+	u8 sis_version[2];
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 dual_ioa_raid:1;
 	u8 dual_ioa_wcache:1;
@@ -1448,7 +1479,8 @@ struct ipr_inquiry_ioa_cap {
 	u8 can_attach_to_aux_cache:1;
 	u8 is_aux_cache:1;
 	u8 is_dual_wide:1;
-	u8 reserved3:5;
+	u8 gscsi_only_ha:1;
+	u8 reserved3:4;
 
 	u8 reserved4[2];
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
@@ -1456,7 +1488,8 @@ struct ipr_inquiry_ioa_cap {
 	u8 dual_ioa_wcache:1;
 	u8 dual_ioa_raid:1;
 
-	u8 reserved3:5;
+	u8 reserved3:4;
+	u8 gscsi_only_ha:1;
 	u8 is_dual_wide:1;
 	u8 is_aux_cache:1;
 	u8 can_attach_to_aux_cache:1;
@@ -1943,6 +1976,7 @@ static inline int ipr_max_dev_elems(struct ipr_ses_config_pg *ses_cfg)
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int ipr_set_preferred_primary(struct ipr_ioa *, int);
+int set_ha_mode(struct ipr_ioa *, int);
 int set_preferred_primary(struct ipr_ioa *, int);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
