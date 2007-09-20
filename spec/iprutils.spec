@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.7
+Version: 2.2.8
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Thu Sep 20 2007 Brian King <brking@us.ibm.com> 2.2.8
+- Release 2.2.8
 * Mon Aug 27 2007 Brian King <brking@us.ibm.com>
 - Add support for setting dual adapter HA mode.
 * Thu Jun 21 2007 Brian King <brking@us.ibm.com> 2.2.7
