@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.99 2007/09/04 21:05:11 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.100 2008/04/09 19:34:17 tsenglin Exp $
  */
 
 #include <stdarg.h>
@@ -957,7 +957,6 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_CONFIG_DIR "/etc/ipr/"
 
 #define IPR_CATEGORY_IOA "Adapter"
-#define IPR_DA_PREFERRED_PRIMARY "PREFERRED_PRIMARY"
 #define IPR_GSCSI_HA_ONLY "JBOD_ONLY_HA"
 
 #define IPR_CATEGORY_BUS "Bus"

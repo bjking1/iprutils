@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.116 2007/09/04 21:05:10 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.117 2008/04/09 19:34:51 tsenglin Exp $
  */
 
 #ifndef iprlib_h
@@ -3448,7 +3448,6 @@ int set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 	sprintf(temp, "%d", preferred_primary);
 	if (ipr_set_preferred_primary(ioa, preferred_primary))
 		return -EIO;
-	ipr_save_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
 
 	return 0;
 }
@@ -4549,9 +4548,6 @@ int ipr_modify_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	char temp[100];
 	int rc;
 
-	rc = ipr_get_saved_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp);
-	if (rc == RC_SUCCESS)
-		sscanf(temp, "%d", &attr->preferred_primary);
 	rc = ipr_get_saved_ioa_attr(ioa, IPR_GSCSI_HA_ONLY, temp);
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &attr->gscsi_only_ha);
@@ -4614,8 +4610,6 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 		sprintf(temp, "%d", attr->preferred_primary);
 		if (ipr_set_preferred_primary(ioa, attr->preferred_primary))
 			return -EIO;
-		if (save)
-			ipr_save_ioa_attr(ioa, IPR_DA_PREFERRED_PRIMARY, temp, 1);
 	}
 
 	if (attr->gscsi_only_ha != old_attr.gscsi_only_ha) {
