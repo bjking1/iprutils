@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.8
+Version: 2.2.9
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Thu Apr 09 2008 Tseng-Hui Lin <tsenglin@us.ibm.com> 2.2.9
+- Release 2.2.9
+- Do not save preferred primary attribute to fix an infinite failover
+  problem in HA two system RAID configuration.
 * Thu Sep 20 2007 Brian King <brking@us.ibm.com> 2.2.8
 - Release 2.2.8
 * Mon Aug 27 2007 Brian King <brking@us.ibm.com>
