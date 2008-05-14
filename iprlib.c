@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.117 2008/04/09 19:34:51 tsenglin Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.118 2008/05/14 20:17:08 tsenglin Exp $
  */
 
 #ifndef iprlib_h
@@ -345,6 +345,14 @@ static const struct ses_table_entry ses_table[] = {
 	{"HSBPD4M  PU3SCSI", "XXXXXXX*XXXXXXXX", 160, 0},
 	{"VSBPD1H   U3SCSI", "XXXXXXX*XXXXXXXX", 160, 0}
 };
+
+
+/*---------- static subroutine/function declearation starts here --------*/
+
+static int sg_ioctl_by_name(char *, u8 *, void *, u32, u32,
+			    struct sense_data_t *, u32);
+
+/*---------- subroutine/function code starts here ---------*/
 
 static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 {
@@ -2873,23 +2881,24 @@ static int ipr_resume_device_bus(struct ipr_ioa *ioa,
 	return rc;
 }
 
+/*
+ * Issue WRITE_BUFFER command.
+ * In older kernels, max_sectors_kb is not big enough and would return
+ * -EIO when using dev_name to issue SG_IO ioctl(). In that case, we have
+ * to use gen_name. Also, in case dev_name does not exist, we need to use
+ * gen_name. Hence, we try dev_name first and switch to gen_name if we get
+ * -ENOENT or -EIO.
+ */
+
 static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int length,
 			      struct sense_data_t *sense_data)
 {
-	char *name = get_write_buffer_dev(dev);
 	u32 direction = length ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
 	u8 cdb[IPR_CCB_CDB_LEN];
-	int fd, rc;
+	int rc;
 
-	if (strlen(name) == 0)
+	if ((strlen(dev->dev_name) == 0) && (strlen(dev->gen_name) == 0))
 		return -ENOENT;
-
-	fd = open(name, O_RDWR);
-	if (fd <= 1) {
-		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
-			syslog(LOG_ERR, "Could not open %s.\n", name);
-		return errno;
-	}
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -2899,14 +2908,31 @@ static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int leng
 	cdb[7] = (length & 0x00ff00) >> 8;
 	cdb[8] = length & 0x0000ff;
 
-	rc = sg_ioctl(fd, cdb, buff,
-		      length, direction,
-		      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
+	rc = sg_ioctl_by_name(dev->dev_name, cdb, buff,
+			      length, direction,
+			      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
+	if (rc != 0) {
+		if ((rc == -ENOENT) || (rc == -EIO)) {
+			syslog_dbg("Write buffer failed on sd device %s. %m\n", dev->dev_name);
+			rc = sg_ioctl_by_name(dev->gen_name, cdb, buff,
+					      length, direction,
+					      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
+			if (rc != 0) {
+				scsi_cmd_err(dev, sense_data,
+					     "Write buffer using sg device", rc);
+				if (rc == -ENOMEM)
+					syslog(LOG_ERR,
+					       "Cannot get enough memory to "
+					       "perform microcode download "
+					       "through %s. Reduce system "
+					       "memory usage and try again.\n",
+					       dev->gen_name);
+			}
+		} else
+			scsi_cmd_err(dev, sense_data,
+				     "Write buffer using sd device", rc);
+	}
 
-	if (rc != 0)
-		scsi_cmd_err(dev, sense_data, "Write buffer", rc);
-
-	close(fd);
 	return rc;
 }
 
@@ -3261,7 +3287,14 @@ int format_req(struct ipr_dev *dev)
 	return 0;
 }
 
+/*
+ * Scatter/gather list buffers are checked against the value returned
+ * by queue_dma_alignment(), which defaults to 511 in Linux 2.6,
+ * for alignment if a SG_IO ioctl request is sent through a /dev/sdX device.
+ */
+#define IPR_S_G_BUFF_ALIGNMENT 512
 #define IPR_MAX_XFER 0x8000
+
 
 const int cdb_size[] ={6, 10, 10, 0, 16, 12, 16, 16};
 static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
@@ -3287,7 +3320,7 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		segment_size = IPR_MAX_XFER;
 
 		for (i = 0; (i < iovec_count) && (buff_len != 0); i++) {
-			iovec[i].iov_base = malloc(segment_size);
+			posix_memalign(&(iovec[i].iov_base), IPR_S_G_BUFF_ALIGNMENT, segment_size);
 			if (data_direction == SG_DXFER_TO_DEV)
 				memcpy(iovec[i].iov_base, data + (IPR_MAX_XFER * i), segment_size);
 			iovec[i].iov_len = segment_size;
@@ -3365,6 +3398,31 @@ int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 			 data, xfer_len, data_direction,
 			 sense_data, timeout_in_sec, 0);
 };
+
+static int sg_ioctl_by_name(char *name, u8 cdb[IPR_CCB_CDB_LEN],
+			    void *data, u32 xfer_len, u32 data_direction,
+			    struct sense_data_t *sense_data,
+			    u32 timeout_in_sec)
+{
+	int fd, rc;
+
+	if (strlen(name) <= 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s.\n", name);
+		return errno;
+	}
+
+	rc = sg_ioctl(fd, cdb, data,
+		      xfer_len, data_direction,
+		      sense_data, timeout_in_sec);
+	close(fd);
+
+	return rc;
+}
 
 int ipr_set_ha_mode(struct ipr_ioa *ioa, int gscsi_only_ha)
 {
