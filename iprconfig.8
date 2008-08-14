@@ -366,6 +366,31 @@ Show the current dual path state for the SAS devices attached specified IOA.
 .br
 Show the current dual path details for the specified SAS device.
 .TP
+.B query-arrays-raid-migrate
+.br
+Show the arrays that can be migrated to a different protection level.
+.TP
+.B query-devices-raid-migrate [array]
+.br
+Show the AF disks that are candidates to be used in a migration for a given
+array.
+.TP
+.B query-raid-levels-raid-migrate [array]
+.br
+Show the protection levels to which the given array can be migrated.
+.TP
+.B query-stripe-sizes-raid-migrate [array] [raid level]
+.br
+Given an array and a protection level, show the valid stripe sizes to which
+the array can be migrated.
+.TP
+.B query-devices-min-max-raid-migrate [array] [raid level]
+.br
+Show the number of devices that will be removed for a migration to a protection
+level that requires fewer devices.  Or, show the minmum number of devices
+required, the maximum number of devices allowed and the multiple of the number
+of devices required for a migration that requires more devices.
+.TP
 .B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
@@ -394,6 +419,15 @@ Add the specified devices to the specified disk array to increase its capacity.
 Example:
 .br
 .B iprconfig -c raid-include sda sg6 sg7
+.TP
+.B raid-migrate -r raid_level [-s stripe_size_in_kb] array [disk] ... [disk]
+.br
+Migrate an existing RAID array to a new RAID protection level.  Optionally,
+a new stripe size can be given.  In some cases one or more new disks must be
+added for the migration to succeed.
+Example:
+.br
+.B iprconfig -c raid-migrate -r 10 -s 64 sda sg5 sg6
 .TP
 .B format-for-raid [disk] ... [disk]
 .br

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.118 2008/05/14 20:17:08 tsenglin Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.119 2008/08/14 01:12:54 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -354,6 +354,14 @@ static int sg_ioctl_by_name(char *, u8 *, void *, u32, u32,
 
 /*---------- subroutine/function code starts here ---------*/
 
+/**
+ * ses_table_entry - 
+ * @ioa:	ipr ioa struct
+ * @bus:	
+ *
+ * Returns:
+ *   ses_table_entry pointer if success / NULL on failure
+ **/
 static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 {
 	int i, j, matches;
@@ -391,6 +399,15 @@ static const struct ses_table_entry *get_ses_entry(struct ipr_ioa *ioa, int bus)
 	return NULL;
 }
 
+/**
+ * get_cap_entry - Returns a pointer to a capability entry that corresponds to
+ * 		   the given raid level.
+ * @supported_arrays:	ipr_supported_arrays struct
+ * @raid_level:		character string representation of the raid level
+ *
+ * Returns:
+ *   ipr_array_cap_entry pointer if success / NULL on failure
+ **/
 struct ipr_array_cap_entry *
 get_cap_entry(struct ipr_supported_arrays *supported_arrays, char *raid_level)
 {
@@ -404,6 +421,15 @@ get_cap_entry(struct ipr_supported_arrays *supported_arrays, char *raid_level)
 	return NULL;
 }
 
+/**
+ * get_raid_cap_entry - Returns a pointer to a capability entry that corresponds
+ * 			to the given protection level.
+ * @supported_arrays:	ipr_supported_arrays struct
+ * @prot_level:		protection level
+ *
+ * Returns:
+ *   ipr_array_cap_entry pointer if success / NULL on failure
+ **/
 struct ipr_array_cap_entry *
 get_raid_cap_entry(struct ipr_supported_arrays *supported_arrays, u8 prot_level)
 {
@@ -420,6 +446,15 @@ get_raid_cap_entry(struct ipr_supported_arrays *supported_arrays, u8 prot_level)
 	return NULL;
 }
 
+/**
+ * get_prot_level_str - Returns the string representation of the protection
+ * 			level the given the numeric protection level.
+ * @supported_arrays:	ipr_supported_arrays struct
+ * @prot_level:		protection level
+ *
+ * Returns:
+ *   protection level string if success / NULL on failure
+ **/
 char *get_prot_level_str(struct ipr_supported_arrays *supported_arrays,
 			 int prot_level)
 {
@@ -433,6 +468,14 @@ char *get_prot_level_str(struct ipr_supported_arrays *supported_arrays,
 	return NULL;
 }
 
+/**
+ * ipr_find_sysfs_dev - 
+ * @dev:		ipr dev struct
+ * @head:		sysfs dev struct
+ *
+ * Returns:
+ *    sysfs_dev pointer if success / NULL on failure
+ **/
 struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev *head)
 {
 	struct sysfs_dev *sdev;
@@ -449,6 +492,13 @@ struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev *hea
 	return sdev;
 }
 
+/**
+ * ipr_sysfs_dev_to_dev - 
+ * @sdev:		sysfs dev struct
+ *
+ * Returns:
+ *    ipr_dev pointer if success / NULL on failure
+ **/
 struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *sdev)
 {
 	struct ipr_dev *dev;
@@ -467,11 +517,25 @@ struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *sdev)
 	return NULL;
 }
 
+/**
+ * ipr_find_zeroed_dev -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *    results of call to ipr_find_sysfs_dev
+ **/
 struct sysfs_dev * ipr_find_zeroed_dev(struct ipr_dev *dev)
 {
 	return ipr_find_sysfs_dev(dev, head_zdev);
 }
 
+/**
+ * ipr_device_is_zeroed -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *    1 if the given devices is zeroed / 0 if the device is not zeroed
+ **/
 int ipr_device_is_zeroed(struct ipr_dev *dev)
 {
 	if (ipr_find_zeroed_dev(dev))
@@ -479,6 +543,15 @@ int ipr_device_is_zeroed(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * ipr_add_sysfs_dev - 
+ * @dev:		ipr dev struct
+ * @head:		sysfs dev struct
+ * @tail:		sysfs dev struct
+ *
+ * Returns:
+ *    nothing
+ **/
 void ipr_add_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
 		       struct sysfs_dev **tail)
 {
@@ -502,11 +575,27 @@ void ipr_add_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
 	}
 }
 
+/**
+ * ipr_add_zeroed_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *    nothing
+ **/
 void ipr_add_zeroed_dev(struct ipr_dev *dev)
 {
 	ipr_add_sysfs_dev(dev, &head_zdev, &tail_zdev);
 }
 
+/**
+ * ipr_del_sysfs_dev - 
+ * @dev:		ipr dev struct
+ * @head:		sysfs dev struct
+ * @tail:		sysfs dev struct
+ *
+ * Returns:
+ *    nothing
+ **/
 void ipr_del_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
 		       struct sysfs_dev **tail)
 {
@@ -531,11 +620,25 @@ void ipr_del_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
 	}
 }
 
+/**
+ * ipr_del_zeroed_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *    nothing
+ **/
 void ipr_del_zeroed_dev(struct ipr_dev *dev)
 {
 	ipr_del_sysfs_dev(dev, &head_zdev, &tail_zdev);
 }
 
+/**
+ * ipr_update_qac_with_zeroed_devs
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *    nothing
+ **/
 void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *ioa)
 {
 	struct sysfs_dev *zdev;
@@ -554,6 +657,12 @@ void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *ioa)
 	}
 }
 
+/**
+ * ipr_cleanup_zeroed_devs -
+ *
+ * Returns:
+ *    nothing
+ **/
 void ipr_cleanup_zeroed_devs()
 {
 	struct ipr_ioa *ioa;
@@ -576,6 +685,14 @@ void ipr_cleanup_zeroed_devs()
 	}
 }
 
+/**
+ * get_max_bus_speed - 
+ * @ioa:		ipr ioa struct
+ * @bus:		bus number
+ *
+ * Returns:
+ *   maximum bus speed value
+ **/
 int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 {
 	struct sysfs_class_device *class_device;
@@ -645,6 +762,13 @@ static const struct chip_details chip_details []= {
 	{ .vendor = 0x1014, .device = 0x034A, "PCI-E" }, /* Scamp-E */
 };
 
+/**
+ * get_chip_details - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   chip_details struct pointer if success / NULL on failure
+ **/
 static const struct chip_details *get_chip_details(struct ipr_ioa *ioa)
 {
 	int i;
@@ -671,6 +795,13 @@ static const struct ioa_details ioa_details [] = {
 	"PCI-X SAS RAID Adapter", .is_spi = 0}
 };
 
+/**
+ * get_ioa_details - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   ioa_details struct pointer if success / NULL on failure
+ **/
 static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
 {
 	int i;
@@ -684,6 +815,13 @@ static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
 	return NULL;
 }
 
+/**
+ * ipr_improper_device_type -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   1 if the device is improper / 0 if the device is not improper
+ **/
 int ipr_improper_device_type(struct ipr_dev *dev)
 {
 	if (dev->rescan)
@@ -701,6 +839,16 @@ int ipr_improper_device_type(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * mode_sense - 
+ * @dev:		ipr dev struct
+ * @page:		page number
+ * @buff:		buffer
+ * @sense_data		sense_data_t struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 		      struct sense_data_t *sense_data)
 {
@@ -735,6 +883,13 @@ static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 	return rc;
 }
 
+/**
+ * ipr_tcq_mode -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   the tcq mode type
+ **/
 static enum ipr_tcq_mode ioa_get_tcq_mode(struct ipr_ioa *ioa)
 {
 	struct ipr_mode_pages mode_pages;
@@ -750,6 +905,13 @@ static enum ipr_tcq_mode ioa_get_tcq_mode(struct ipr_ioa *ioa)
 	return IPR_TCQ_FROZEN;
 }
 
+/**
+ * __ioa_is_spi -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   1 if success / 0 on failure
+ **/
 int __ioa_is_spi(struct ipr_ioa *ioa)
 {
 	struct ipr_mode_pages mode_pages;
@@ -763,6 +925,13 @@ int __ioa_is_spi(struct ipr_ioa *ioa)
 	return 1;
 }
 
+/**
+ * ioa_is_spi -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   FIXME
+ **/
 int ioa_is_spi(struct ipr_ioa *ioa)
 {
 	const struct ioa_details *details = get_ioa_details(ioa);
@@ -779,6 +948,13 @@ static const char *sas_jbod_desc = "SAS Adapter";
 static const char *aux_cache_desc = "Aux Cache Adapter";
 static const char *def_chip_desc = "PCI";
 
+/**
+ * get_bus_desc -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   FIXME
+ **/
 const char *get_bus_desc(struct ipr_ioa *ioa)
 {
 	const struct chip_details *chip = get_chip_details(ioa);
@@ -788,6 +964,13 @@ const char *get_bus_desc(struct ipr_ioa *ioa)
 	return chip->desc;
 }
 
+/**
+ * iget_ioa_desc
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   FIXME
+ **/
 const char *get_ioa_desc(struct ipr_ioa *ioa)
 {
 	const struct ioa_details *details = get_ioa_details(ioa);
@@ -806,6 +989,13 @@ const char *get_ioa_desc(struct ipr_ioa *ioa)
 	return jbod_desc;
 }
 
+/**
+ * get_ioa_fw - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   pointer to ioa_parms entry / NULL on failure
+ **/
 static const struct ioa_parms *get_ioa_fw(struct ipr_ioa *ioa)
 {
 	int i;
@@ -818,6 +1008,13 @@ static const struct ioa_parms *get_ioa_fw(struct ipr_ioa *ioa)
 	return NULL;
 }
 
+/**
+ * setup_ioa_parms
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void setup_ioa_parms(struct ipr_ioa *ioa)
 {
 	const struct ioa_parms *ioa_parms = get_ioa_fw(ioa);
@@ -830,6 +1027,13 @@ static void setup_ioa_parms(struct ipr_ioa *ioa)
 	}
 }
 
+/**
+ * find_ioa - 
+ * @host_no:		host number int
+ *
+ * Returns:
+ *   pointer to ipr_ioa /  NULL on failure
+ **/
 struct ipr_ioa *find_ioa(int host_no)
 {
 	struct ipr_ioa *ioa;
@@ -840,6 +1044,14 @@ struct ipr_ioa *find_ioa(int host_no)
 	return NULL;
 }
 
+/**
+ * _find_dev - 
+ * @blk:		ipr ioa struct
+ * @compare:	        pointer to a comparison function
+ *
+ * Returns:
+ *   ipr_dev pointer if success / NULL on failure
+ **/
 static struct ipr_dev *_find_dev(char *blk, int (*compare) (struct ipr_dev *, char *))
 {
 	struct ipr_ioa *ioa;
@@ -872,26 +1084,63 @@ static struct ipr_dev *_find_dev(char *blk, int (*compare) (struct ipr_dev *, ch
 	return NULL;
 }
 
+/**
+ * blk_compare - 
+ * @dev:		ipr ioa struct
+ * @name:		character string to compare
+ *
+ * Returns:
+ *   integer result of the strcmp()
+ **/
 static int blk_compare(struct ipr_dev *dev, char *name)
 {
 	return strcmp(dev->dev_name, name);
 }
 
+/**
+ * find_blk_dev -
+ * @blk:		block device name
+ *
+ * Returns:
+ *   result of _find_dev()
+ **/
 struct ipr_dev *find_blk_dev(char *blk)
 {
 	return _find_dev(blk, blk_compare);
 }
 
+/**
+ * gen_compare - 
+ * @dev:		ipr dev struct
+ * @name:		character string to compare
+ *
+ * Returns:
+ *   integer result of the strcmp()
+ **/
 static int gen_compare(struct ipr_dev *dev, char *name)
 {
 	return strcmp(dev->gen_name, name);
 }
 
+/**
+ * find_gen_dev - 
+ * @gen:		generic device name
+ *
+ * Returns:
+ *   result of _find_dev()
+ **/
 struct ipr_dev *find_gen_dev(char *gen)
 {
 	return _find_dev(gen, gen_compare);
 }
 
+/**
+ * find_dev - 
+ * @name:		device name to find
+ *
+ * Returns:
+ *   ipr_dev pointer
+ **/
 struct ipr_dev *find_dev(char *name)
 {
 	struct ipr_dev *dev = find_blk_dev(name);
@@ -901,6 +1150,12 @@ struct ipr_dev *find_dev(char *name)
 	return dev;
 }
 
+/**
+ * ipr_uevents_supported - indicate if uevents are supported
+ *
+ * Returns:
+ *   1 if success / 0 on failure
+ **/
 static int ipr_uevents_supported()
 {
 	struct sysfs_class_device *class_device;
@@ -929,6 +1184,14 @@ static int ipr_uevents_supported()
 
 #define NETLINK_KOBJECT_UEVENT        15
 
+/**
+ * poll_forever -
+ * @poll_func:		pointer to polling function
+ * @poll_delay:         integer sleep delay value
+ *
+ * Returns:
+ *   nothing
+ **/
 static void poll_forever(void (*poll_func) (void), int poll_delay)
 {
 	while (1) {
@@ -937,6 +1200,15 @@ static void poll_forever(void (*poll_func) (void), int poll_delay)
 	}
 }
 
+/**
+ * handle_events - 
+ * @poll_func:		pointer to polling function
+ * @poll_delay:         integer sleep delay value
+ * @prot_level:		pointer to event handler function
+ *
+ * Returns:
+ *   0 if poll_forever() ever returns
+ **/
 int handle_events(void (*poll_func) (void), int poll_delay,
 		  void (*kevent_handler) (char *))
 {
@@ -1024,6 +1296,13 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 	return 0;
 }
 
+/**
+ * parse_option - parse options from the command line
+ * @opt:		character string option value
+ *
+ * Returns:
+ *   1 if success / 0 if the option isn't recognized
+ **/
 int parse_option(char *opt)
 {
 	if (strcmp(opt, "--version") == 0) {
@@ -1053,6 +1332,14 @@ int parse_option(char *opt)
 	return 1;
 }
 
+/**
+ * get_pci_attr - 
+ * @sysfs_pci_device:	sysfs_device struct
+ * @attr:		attribute string
+ *
+ * Returns:
+ *    pci attribute value if success / 0 on failure
+ **/
 static int get_pci_attr(struct sysfs_device *sysfs_pci_device,
 			char *attr)
 {
@@ -1079,6 +1366,14 @@ static int get_pci_attr(struct sysfs_device *sysfs_pci_device,
 	return temp;
 }
 
+/**
+ * get_pci_attrs - sets vendor and device information
+ * @ioa:		ipr ioa struct
+ * @sysfs_pci_device:	sysfs_device struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_pci_attrs(struct ipr_ioa *ioa,
 			  struct sysfs_device *sysfs_pci_device)
 {
@@ -1094,6 +1389,12 @@ static int old_num_ioas;
 static struct scsi_dev_data *old_scsi_dev_table;
 struct ipr_array_query_data *old_qac_data;
 
+/**
+ * free_current_config - frees current configuration data structures
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_current_config()
 {
 	struct ipr_ioa *ioa;
@@ -1114,6 +1415,12 @@ static void free_current_config()
 	ipr_qac_data = NULL;
 }
 
+/**
+ * save_old_config - saves current configuration data structures
+ *
+ * Returns:
+ *   nothing
+ **/
 static void save_old_config()
 {
 	if (old_ioa_head) {
@@ -1134,6 +1441,12 @@ static void save_old_config()
 	num_ioas = 0;
 }
 
+/**
+ * free_old_config - frees old configuration data structures
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_old_config()
 {
 	struct ipr_ioa *ioa;
@@ -1155,6 +1468,14 @@ static void free_old_config()
 	old_qac_data = NULL;
 }
 
+/**
+ * same_ioa - compares two ioas to determine if they are the same
+ * @first:		ipr ioa struct
+ * @second:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if ioas are not the same / 1 if ioas are the same
+ **/
 static int same_ioa(struct ipr_ioa *first, struct ipr_ioa *second)
 {
 	if (strcmp(first->pci_address, second->pci_address))
@@ -1176,6 +1497,14 @@ static int same_ioa(struct ipr_ioa *first, struct ipr_ioa *second)
 	return 1;
 }
 
+/**
+ * same_scsi_dev - compares two scsi devices to determin if they are the same
+ * @first:		scsi_dev_data struct
+ * @second:		scsi_dev_data struct
+ *
+ * Returns:
+ *   0 if scsi devs are not the same / 1 if scsi devs are the same
+ **/
 static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *second)
 {
 	if (!first || !second)
@@ -1205,6 +1534,14 @@ static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *seco
 	return 1;
 }
 
+/**
+ * same_dev_rcd - compares two devices to determin if they are the same
+ * @first:		ipr_dev_record struct
+ * @second:		ipr_dev_record struct
+ *
+ * Returns:
+ *   0 if devices are not the same / 1 if devices are the same
+ **/
 static int same_dev_rcd(struct ipr_dev_record *first, struct ipr_dev_record *second)
 {
 	if (memcmp(&first->resource_addr, &second->resource_addr,
@@ -1219,6 +1556,14 @@ static int same_dev_rcd(struct ipr_dev_record *first, struct ipr_dev_record *sec
 	return 1;
 }
 
+/**
+ * same_dev_rcd - compares two devices to determin if they are the same
+ * @first:		ipr_dev struct
+ * @second:		ipr_dev struct
+ *
+ * Returns:
+ *   0 if devices are not the same / 1 if devices are the same
+ **/
 static int same_dev(struct ipr_dev *first, struct ipr_dev *second)
 {
 	if (strcmp(first->dev_name, second->dev_name))
@@ -1235,6 +1580,13 @@ static int same_dev(struct ipr_dev *first, struct ipr_dev *second)
 	return 1;
 }
 
+/**
+ * dev_init_allowed - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   1 if initialization is allowed / 0 if initialization is not allowed
+ **/
 static int dev_init_allowed(struct ipr_dev *dev)
 {
 	struct ipr_query_res_state res_state;
@@ -1248,6 +1600,14 @@ static int dev_init_allowed(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * resolve_dev - 
+ * @new:		ipr dev struct
+ * @old:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void resolve_dev(struct ipr_dev *new, struct ipr_dev *old)
 {
 	new->init_not_allowed = !dev_init_allowed(new);
@@ -1261,6 +1621,14 @@ static void resolve_dev(struct ipr_dev *new, struct ipr_dev *old)
 		new->rescan = 1;
 }
 
+/**
+ * resolve_ioa - 
+ * @ioa:		ipr ioa struct
+ * @old_ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 {
 	struct ipr_dev *dev, *old_dev;
@@ -1279,6 +1647,12 @@ static void resolve_ioa(struct ipr_ioa *ioa, struct ipr_ioa *old_ioa)
 	}
 }
 
+/**
+ * resolve_old_config - 
+ *
+ * Returns:
+ *   nothing
+ **/
 static void resolve_old_config()
 {
 	struct ipr_ioa *ioa, *old_ioa;
@@ -1311,6 +1685,13 @@ struct ipr_pci_slot {
 static struct ipr_pci_slot *pci_slot;
 static unsigned int num_pci_slots;
 
+/**
+ * ipr_select_phy_location - 
+ * @dirent:		dirent struct
+ *
+ * Returns:
+ *   1 if d_name == "phy_location"/ 0 otherwise
+ **/
 static int ipr_select_phy_location(const struct dirent *dirent)
 {
 	if (strstr(dirent->d_name, "phy_location"))
@@ -1318,6 +1699,14 @@ static int ipr_select_phy_location(const struct dirent *dirent)
 	return 0;
 }
 
+/**
+ * read_slot_attr -
+ * @path:       	path name of device/file to open
+ * @out:		character array
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int read_slot_attr(char *path, char out[SYSFS_PATH_MAX])
 {
 	int fd, len;
@@ -1341,6 +1730,14 @@ static int read_slot_attr(char *path, char out[SYSFS_PATH_MAX])
 	return 0;
 }
 
+/**
+ * ipr_add_slot -
+ * @path:		path of device/file to open
+ * @name:       	name of device/file to open
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_add_slot(char *path, char *name)
 {
 	struct ipr_pci_slot *slot;
@@ -1365,6 +1762,12 @@ static int ipr_add_slot(char *path, char *name)
 	return 0;
 }
 
+/**
+ * ipr_get_pci_slots -
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_get_pci_slots()
 {
 	char rootslot[SYSFS_PATH_MAX], slot[SYSFS_PATH_MAX];
@@ -1447,6 +1850,13 @@ static void ipr_get_pci_slots()
 	num_pci_slots = 0;
 }
 
+/**
+ * tool_init -
+ * @save_state:		integer flag - whether or not to save the old config
+ *
+ * Returns:
+ *   nothing
+ **/
 void tool_init(int save_state)
 {
 	int temp;
@@ -1547,6 +1957,13 @@ void tool_init(int save_state)
 	return;
 }
 
+/**
+ * ipr_reset_adapter -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 void ipr_reset_adapter(struct ipr_ioa *ioa)
 {
 	struct sysfs_class_device *class_device;
@@ -1560,6 +1977,15 @@ void ipr_reset_adapter(struct ipr_ioa *ioa)
 	sysfs_close_class_device(class_device);
 }
 
+/**
+ * ipr_read_host_attr -
+ * @ioa:		ipr ioa struct
+ * @name:       	stripe size for new array
+ * @value:		protection (RAID) level for new array
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_read_host_attr(struct ipr_ioa *ioa, char *name, char *value)
 {
 	struct sysfs_class_device *class_device;
@@ -1582,6 +2008,13 @@ static int ipr_read_host_attr(struct ipr_ioa *ioa, char *name, char *value)
 	return 0;
 }
 
+/**
+ * ipr_cmds_per_lun -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   number of commands per lun if success / 6 on failure
+ **/
 int ipr_cmds_per_lun(struct ipr_ioa *ioa)
 {
 	char value[100];
@@ -1595,6 +2028,16 @@ int ipr_cmds_per_lun(struct ipr_ioa *ioa)
 	return strtoul(value, NULL, 10);
 }
 
+/**
+ * ipr_scan - 
+ * @ioa:		ipr ioa struct
+ * @bus:	        bus number
+ * @id:		        id number
+ * @lun:		lun number (RAID) level for new array
+ *
+ * Returns:
+ *   nothing
+ **/
 void ipr_scan(struct ipr_ioa *ioa, int bus, int id, int lun)
 {
 	struct sysfs_class_device *class_device;
@@ -1609,9 +2052,21 @@ void ipr_scan(struct ipr_ioa *ioa, int bus, int id, int lun)
 	sysfs_close_class_device(class_device);
 }
 
+/**
+ * __ipr_query_array_config - perform a query array configuration ioctl
+ * @ioa:		ipr ioa struct
+ * @fd:                 file descriptor
+ * @allow_rebuld_refresh:	allow rebuild refresh flag
+ * @set_array_id:		set array id flag
+ * @array_id:		array id number
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 			     bool allow_rebuild_refresh, bool set_array_id,
-			     int array_id, void *buff)
+			     bool vset_migrate_query, int array_id, void *buff)
 {
 	int length = sizeof(struct ipr_array_query_data);
 	u8 cdb[IPR_CCB_CDB_LEN];
@@ -1624,7 +2079,10 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 
 	cdb[0] = IPR_QUERY_ARRAY_CONFIG;
 
-	if (set_array_id) {
+	if (vset_migrate_query) {
+		cdb[1] = 0x08;
+		cdb[2] = array_id;
+	} else if (set_array_id) {
 		cdb[1] = 0x01;
 		cdb[2] = array_id;
 	} else if (allow_rebuild_refresh)
@@ -1651,9 +2109,20 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 	return rc;
 }
 
+/**
+ * ipr_query_array_config - entry point to query array configuration ioctl call
+ * @ioa:		ipr ioa struct
+ * @allow_rebuld_refresh:	allow rebuild refresh flag
+ * @set_array_id:		set array id flag
+ * @array_id:		array id number
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_array_config(struct ipr_ioa *ioa,
 			   bool allow_rebuild_refresh, bool set_array_id,
-			   int array_id, void *buff)
+			   bool vset_migrate_query, int array_id, void *buff)
 {
 	int fd, rc;
 
@@ -1680,12 +2149,22 @@ int ipr_query_array_config(struct ipr_ioa *ioa,
 	}
 
 	rc = __ipr_query_array_config(ioa, fd, allow_rebuild_refresh,
-				      set_array_id, array_id, buff);
+				      set_array_id, vset_migrate_query,
+				      array_id, buff);
 
 	close(fd);
 	return rc;
 }
 
+/**
+ * ipr_query_multi_ioa_status -
+ * @ioa:		ipr ioa struct
+ * @buff:       	data buffer
+ * @len:		length
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_multi_ioa_status(struct ipr_ioa *ioa, void *buff, u32 len)
 {
 	int fd, rc;
@@ -1727,6 +2206,17 @@ int ipr_query_multi_ioa_status(struct ipr_ioa *ioa, void *buff, u32 len)
 	return rc;
 }
 
+/**
+ * ipr_start_array - Start array protection for an array
+ * @ioa:		ipr ioa struct
+ * @cmd:                char pointer
+ * @stripe_size:	stripe size for new array
+ * @prot_level:		protection (RAID) level for new array
+ * @hot_spare:          flag to indicate hot spare usage
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_start_array(struct ipr_ioa *ioa, char *cmd,
 			   int stripe_size, int prot_level, int hot_spare)
 {
@@ -1755,7 +2245,7 @@ static int ipr_start_array(struct ipr_ioa *ioa, char *cmd,
 		cdb[1] = 0x01;
 
 	cdb[4] = (u8)(stripe_size >> 8);
-	cdb[5] = (u8)(stripe_size);
+	cdb[5] = (u8)(stripe_size & 0xff);
 	cdb[6] = prot_level;
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
@@ -1771,6 +2261,15 @@ static int ipr_start_array(struct ipr_ioa *ioa, char *cmd,
 	return rc;
 }
 
+/**
+ * ipr_start_array_protection - Start array protection for an array
+ * @ioa:		ipr ioa struct
+ * @stripe_size:	stripe size for new array
+ * @prot_level:		protection (RAID) level for new array
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_start_array_protection(struct ipr_ioa *ioa,
 			       int stripe_size, int prot_level)
 {
@@ -1778,11 +2277,68 @@ int ipr_start_array_protection(struct ipr_ioa *ioa,
 			       stripe_size, prot_level, 0);
 }
 
+/**
+ * ipr_migrate_array_protection - Migrate array protection for an array
+ * @ioa:		ipr ioa struct
+ * @qac_data:		struct ipr_array_query_data
+ * @fd:			file descriptor
+ * @stripe_size:	new or existing stripe size for array
+ * @prot_level:		new protection (RAID) level for array
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_migrate_array_protection(struct ipr_ioa *ioa,
+				 struct ipr_array_query_data *qac_data,
+				 int fd, int stripe_size, int prot_level)
+{
+	u8 cdb[IPR_CCB_CDB_LEN];
+	char *cmd = "migrate array protection";
+	struct sense_data_t sense_data;
+	int rc;
+	int length = ntohs(qac_data->resp_len);
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_MIGRATE_ARRAY_PROTECTION;
+
+	cdb[4] = (u8)(stripe_size >> 8);
+	cdb[5] = (u8)(stripe_size & 0xff);
+	cdb[6] = prot_level;
+	cdb[7] = (length & 0xff00) >> 8;
+	cdb[8] = length & 0xff;
+
+	rc = sg_ioctl(fd, cdb, qac_data,
+		      length, SG_DXFER_TO_DEV,
+		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
+
+	if (rc != 0)
+		ioa_cmd_err(ioa, &sense_data, cmd, rc);
+
+	return rc;
+}
+
+/**
+ * ipr_add_hot_spare - Adds a hot spare to an array
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_add_hot_spare(struct ipr_ioa *ioa)
 {
 	return ipr_start_array(ioa, "Create hot spare", 0, 0, 1);
 }
 
+/**
+ * ipr_stop_array - Stop array protection for an array
+ * @ioa:		ipr ioa struct
+ * @cmd:        	command string
+ * @hot_spare:		flag to indicate hot spare usage
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
 {
 	int fd;
@@ -1821,16 +2377,37 @@ static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
 	return rc;
 }
 
+/**
+ * ipr_stop_array_protection - Stop array protection for an array
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_stop_array_protection(struct ipr_ioa *ioa)
 {
 	return ipr_stop_array(ioa, "Stop Array Protection", 0);
 }
 
+/**
+ * ipr_remove_hot_spare - remove a hot spare from an array
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_remove_hot_spare(struct ipr_ioa *ioa)
 {
 	return ipr_stop_array(ioa, "Delete hot spare", 1);
 }
 
+/**
+ * ipr_rebuild_device_data - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 {
 	int fd;
@@ -1865,6 +2442,13 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 	return rc;
 }
 
+/**
+ * ipr_resync_array - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_resync_array(struct ipr_ioa *ioa)
 {
 	int fd;
@@ -1899,6 +2483,15 @@ int ipr_resync_array(struct ipr_ioa *ioa)
 	return rc;
 }
 
+/**
+ * ipr_add_array_device - 
+ * @ioa:		ipr ioa struct
+ * @fd:                 device/file descriptor
+ * @qac_data:		query array configuration info
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_add_array_device(struct ipr_ioa *ioa, int fd,
 			 struct ipr_array_query_data *qac_data)
 {
@@ -1925,6 +2518,14 @@ int ipr_add_array_device(struct ipr_ioa *ioa, int fd,
 	return rc;
 }
 
+/**
+ * ipr_query_command_status - 
+ * @dev:		ipr dev struct
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_command_status(struct ipr_dev *dev, void *buff)
 {
 	int fd, rc;
@@ -1963,6 +2564,14 @@ int ipr_query_command_status(struct ipr_dev *dev, void *buff)
 	return rc;
 }
 
+/**
+ * ipr_query_resource_state
+ * @dev:		ipr dev struct
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_resource_state(struct ipr_dev *dev, void *buff)
 {
 	int fd, rc;
@@ -2001,6 +2610,15 @@ int ipr_query_resource_state(struct ipr_dev *dev, void *buff)
 	return rc;
 }
 
+/**
+ * ipr_mod_sense - issue a mode sense command
+ * @dev:		ipr dev struct
+ * @page:       	mode page
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 {
 	struct sense_data_t sense_data;
@@ -2020,6 +2638,16 @@ int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 	return rc;
 }
 
+/**
+ * ipr_log-sense - issue a log sense command
+ * @dev:		ipr dev struct
+ * @page:       	mode page
+ * @buff:		data buffer
+ * @length:             buffer length
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_log_sense(struct ipr_dev *dev, u8 page, void *buff, u16 length)
 {
 	struct sense_data_t sense_data;
@@ -2057,6 +2685,14 @@ int ipr_log_sense(struct ipr_dev *dev, u8 page, void *buff, u16 length)
 	return rc;
 }
 
+/**
+ * ipr_is_log_page_supported - is the give page supported?
+ * @dev:		ipr dev struct
+ * @page:       	mode page
+ *
+ * Returns:
+ *   1 if supported / 0 if not supported
+ **/
 int ipr_is_log_page_supported(struct ipr_dev *dev, u8 page)
 {
 	struct ipr_supp_log_pages pages;
@@ -2076,6 +2712,13 @@ int ipr_is_log_page_supported(struct ipr_dev *dev, u8 page)
 	return 0;
 }
 
+/**
+ * ipr_get_blk_size - return the block size for the given device
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   block size if success / non-zero on failure
+ **/
 int ipr_get_blk_size(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages;
@@ -2095,6 +2738,15 @@ int ipr_get_blk_size(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * ipr_mode_select - issue a mode select command
+ * @dev:		ipr dev struct
+ * @buff:	        data buffer
+ * @length:		length of buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_mode_select(struct ipr_dev *dev, void *buff, int length)
 {
 	int fd;
@@ -2133,6 +2785,13 @@ int ipr_mode_select(struct ipr_dev *dev, void *buff, int length)
 	return rc;
 }
 
+/**
+ * page0x0a_setup - Start array protection for an array
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   1 if success / 0 on failure
+ **/
 int page0x0a_setup(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages;
@@ -2159,6 +2818,14 @@ int page0x0a_setup(struct ipr_dev *dev)
 	return 1;
 }
 
+/**
+ * ipr_setup_af_qdepth - 
+ * @dev:		ipr dev struct
+ * @qdepth:		queue depth
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_setup_af_qdepth(struct ipr_dev *dev, int qdepth)
 {
 	struct ipr_mode_pages mode_pages;
@@ -2189,6 +2856,13 @@ static int ipr_setup_af_qdepth(struct ipr_dev *dev, int qdepth)
 
 }
 
+/**
+ * ipr_reset_device - issue a SG_SCSI_RESET to a device
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_reset_device(struct ipr_dev *dev)
 {
 	int fd, rc, arg;
@@ -2213,6 +2887,13 @@ int ipr_reset_device(struct ipr_dev *dev)
 	return rc;
 }
 
+/**
+ * ipr_re_read_partition - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_re_read_partition(struct ipr_dev *dev)
 {
 	int fd, rc;
@@ -2236,6 +2917,14 @@ int ipr_re_read_partition(struct ipr_dev *dev)
 	return rc;
 }
 
+/**
+ * ipr_read_capacity - issue a read capacity command to a device
+ * @dev:		ipr dev struct
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_read_capacity(struct ipr_dev *dev, void *buff)
 {
 	int fd;
@@ -2273,6 +2962,14 @@ int ipr_read_capacity(struct ipr_dev *dev, void *buff)
 	return rc;
 }
 
+/**
+ * ipr_read_capacity_16 - issue a read capacity 16 to a device
+ * @dev:		ipr dev struct
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_read_capacity_16(struct ipr_dev *dev, void *buff)
 {
 	int fd, rc;
@@ -2310,6 +3007,15 @@ int ipr_read_capacity_16(struct ipr_dev *dev, void *buff)
 	return rc;
 }
 
+/**
+ * ipr_reclaim_cache_store - 
+ * @ioa:		ipr ioa struct
+ * @action:	        action value
+ * @buff:		data buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 {
 	char *file = ioa->ioa.gen_name;
@@ -2351,6 +3057,15 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 	return rc;
 }
 
+/**
+ * ipr_start_stop - 
+ * @dev:		ipr dev struct
+ * @start:      	start or stop flag
+ * @cmd:		command buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_start_stop(struct ipr_dev *dev, u8 start, char *cmd)
 {
 	int fd, rc;
@@ -2387,16 +3102,38 @@ static int ipr_start_stop(struct ipr_dev *dev, u8 start, char *cmd)
 	return rc;
 }
 
+/**
+ * ipr_start_stop_start - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_start_stop_start(struct ipr_dev *dev)
 {
 	return ipr_start_stop(dev, IPR_START_STOP_START, "Start Unit");
 }
 
+/**
+ * ipr_start_stop_stop - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_start_stop_stop(struct ipr_dev *dev)
 {
 	return ipr_start_stop(dev, IPR_START_STOP_STOP, "Stop Unit");
 }
 
+/**
+ * __ipr_test_unit_ready - issue a test unit ready command
+ * @dev:		ipr dev struct
+ * @sense_data:		sense data struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int __ipr_test_unit_ready(struct ipr_dev *dev,
 			  struct sense_data_t *sense_data)
 {
@@ -2430,6 +3167,14 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * ipr_test_unit_ready - issue a test unit ready command
+ * @dev:		ipr dev struct
+ * @sense_data:		sense data struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_test_unit_ready(struct ipr_dev *dev,
 			struct sense_data_t *sense_data)
 {
@@ -2443,6 +3188,13 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * ipr_format_unit - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_format_unit(struct ipr_dev *dev)
 {
 	int fd, rc;
@@ -2488,6 +3240,14 @@ int ipr_format_unit(struct ipr_dev *dev)
 	return rc;
 }
 
+/**
+ * ipr_evaluate_device - 
+ * @dev:		ipr dev struct
+ * @res_handle:         resource handle
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 {
 	int fd, rc;
@@ -2531,6 +3291,13 @@ int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 	return rc;
 }
 
+/**
+ * ipr_disrupt_device - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_disrupt_device(struct ipr_dev *dev)
 {
 	int fd, rc;
@@ -2578,6 +3345,16 @@ int ipr_disrupt_device(struct ipr_dev *dev)
 	return rc;
 }
 
+/**
+ * ipr_inquiry - issue an inquiry command
+ * @dev:		ipr dev struct
+ * @page:               mode page
+ * @buff:		data buffer
+ * @length              buffer length
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 {
 	int fd, rc;
@@ -2618,6 +3395,15 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 	return rc;
 }
 
+/**
+ * __ipr_get_fw_version - get the firmware version
+ * @dev:		ipr dev struct
+ * @pag3_ing:           page 3 inquiry data
+ * @release_level:	location to copy version info into
+ *
+ * Returns:
+ *   nothing
+ **/
 static void __ipr_get_fw_version(struct ipr_dev *dev,
 				 struct ipr_dasd_inquiry_page3 *page3_inq, u8 release_level[4])
 {
@@ -2627,6 +3413,14 @@ static void __ipr_get_fw_version(struct ipr_dev *dev,
 		memcpy(release_level, page3_inq->release_level, 4);
 }
 
+/**
+ * ipr_get_fw_version - get the firmware version entry point
+ * @dev:		ipr dev struct
+ * @release_level:	location to copy version info into
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_get_fw_version(struct ipr_dev *dev, u8 release_level[4])
 {
 	struct ipr_dasd_inquiry_page3 page3_inq;
@@ -2642,6 +3436,14 @@ int ipr_get_fw_version(struct ipr_dev *dev, u8 release_level[4])
 	return 0;
 }
 
+/**
+ * ipr_init_res_addr_aliases - 
+ * @aliases:		ipr_res_addr_aliases struct
+ * @res_addr:		ipr_res_addr struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_init_res_addr_aliases(struct ipr_res_addr_aliases *aliases,
 				      struct ipr_res_addr *res_addr)
 {
@@ -2652,6 +3454,15 @@ static void ipr_init_res_addr_aliases(struct ipr_res_addr_aliases *aliases,
 		memcpy(ra, res_addr, sizeof(*ra));
 }
 
+/**
+ * ipr_query_res_addr_aliases - 
+ * @ioa:		ipr ioa struct
+ * @res_addr:		ipr_res_addr struct
+ * @aliases:		ipr_res_addr_aliases struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr,
 			       struct ipr_res_addr_aliases *aliases)
 {
@@ -2705,6 +3516,14 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 	return rc;
 }
 
+/**
+ * ipr_query_sas_expander_info - 
+ * @ioa:		ipr ioa struct
+ * @info:		ipr_query_sas_expander_info struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_sas_expander_info(struct ipr_ioa *ioa,
 				struct ipr_query_sas_expander_info *info)
 {
@@ -2742,6 +3561,14 @@ int ipr_query_sas_expander_info(struct ipr_ioa *ioa,
 	return rc;	
 }
 
+/**
+ * ipr_query_res_redundancy_info - 
+ * @dev:		ipr dev struct
+ * @info:		ipr_res_redundancy_info struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 				  struct ipr_res_redundancy_info *info)
 {
@@ -2797,6 +3624,13 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * get_write_buffer_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   device generic name for now - see FIXME below
+ **/
 static char *get_write_buffer_dev(struct ipr_dev *dev)
 {
 	struct sysfs_class_device *class_device;
@@ -2847,6 +3681,14 @@ fail:
 	return dev->gen_name;
 }
 
+/**
+ * ipr_resume_device_bus - 
+ * @ioa:		ipr ioa struct
+ * @res_addr:		ipr_res_addr struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_resume_device_bus(struct ipr_ioa *ioa,
 				 struct ipr_res_addr *res_addr)
 {
@@ -2881,15 +3723,23 @@ static int ipr_resume_device_bus(struct ipr_ioa *ioa,
 	return rc;
 }
 
-/*
- * Issue WRITE_BUFFER command.
- * In older kernels, max_sectors_kb is not big enough and would return
- * -EIO when using dev_name to issue SG_IO ioctl(). In that case, we have
- * to use gen_name. Also, in case dev_name does not exist, we need to use
- * gen_name. Hence, we try dev_name first and switch to gen_name if we get
- * -ENOENT or -EIO.
- */
-
+/**
+ * __ipr_write_buffer - Issue WRITE_BUFFER command.
+ * 			In older kernels, max_sectors_kb is not big enough and
+ * 			would return -EIO when using dev_name to issue
+ * 			SG_IO ioctl(). In that case, we have to use gen_name.
+ * 			Also, in case dev_name does not exist, we need to use
+ * 			gen_name. Hence, we try dev_name first and switch to
+ * 			gen_name if we get -ENOENT or -EIO.
+ * @dev:		ipr dev struct
+ * @mode:       	mode value
+ * @buff:		data buffer
+ * @length:             buffer length
+ * @sense_data:         sense data struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int length,
 			      struct sense_data_t *sense_data)
 {
@@ -2909,8 +3759,9 @@ static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int leng
 	cdb[8] = length & 0x0000ff;
 
 	rc = sg_ioctl_by_name(dev->dev_name, cdb, buff,
-			      length, direction,
-			      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
+		      length, direction,
+		      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
+
 	if (rc != 0) {
 		if ((rc == -ENOENT) || (rc == -EIO)) {
 			syslog_dbg("Write buffer failed on sd device %s. %m\n", dev->dev_name);
@@ -2936,6 +3787,15 @@ static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int leng
 	return rc;
 }
 
+/**
+ * ipr_write_buffer - 
+ * @dev:		ipr dev struct
+ * @buff:	        data buffer
+ * @length:		buffer length
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 {
 	int rc, i;
@@ -3013,6 +3873,15 @@ out:
 	return rc;
 }
 
+/**
+ * ipr_suspend_device_bus - 
+ * @ioa:		ipr ioa struct
+ * @res_addr:	        ipr_res_addr struct
+ * @option:		option value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 			   struct ipr_res_addr *res_addr, u8 option)
 {
@@ -3047,6 +3916,13 @@ int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 	return rc;
 }
 
+/**
+ * ipr_can_remove_device - indicate whether or not a device can be removed
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   1 if device can be removed / 0 if device can not be removed
+ **/
 int ipr_can_remove_device(struct ipr_dev *dev)
 {
 	struct ipr_res_addr *ra;
@@ -3059,6 +3935,16 @@ int ipr_can_remove_device(struct ipr_dev *dev)
 	return 1;
 }
 
+/**
+ * ipr_receive_diagnostics - 
+ * @dev:		ipr dev struct
+ * @page:	        page number
+ * @buff:		data buffer
+ * @length:             buffer length
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_receive_diagnostics(struct ipr_dev *dev,
 			    u8 page, void *buff, int length)
 {
@@ -3100,6 +3986,15 @@ int ipr_receive_diagnostics(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * ipr_send_diagnostics - 
+ * @dev:		ipr dev struct
+ * @buff:		data buffer
+ * @length:             buffer length
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_send_diagnostics(struct ipr_dev *dev, void *buff, int length)
 {
 	int fd;
@@ -3139,6 +4034,14 @@ int ipr_send_diagnostics(struct ipr_dev *dev, void *buff, int length)
 	return rc;
 }
 
+/**
+ * set_supported_devs - 
+ * @dev:		ipr dev struct
+ * @std_inq:		ipr_std_inq_data struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_supported_devs(struct ipr_dev *dev,
 		       struct ipr_std_inq_data *std_inq)
 {
@@ -3178,6 +4081,14 @@ static int set_supported_devs(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * __device_supported - 
+ * @dev:		ipr dev struct
+ * @inq:		ipr_std_inq_data
+ *
+ * Returns:
+ *   0 if device is supported / 1 if device is not supported
+ **/
 static int __device_supported(struct ipr_dev *dev, struct ipr_std_inq_data *inq)
 {
 	int i, j;
@@ -3217,6 +4128,13 @@ static int __device_supported(struct ipr_dev *dev, struct ipr_std_inq_data *inq)
 	return 1;
 }
 
+/**
+ * device_supported - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if device is supported / 1 if device is not supported
+ **/
 int device_supported(struct ipr_dev *dev)
 {
 	struct ipr_std_inq_data std_inq;
@@ -3227,6 +4145,13 @@ int device_supported(struct ipr_dev *dev)
 	return __device_supported(dev, &std_inq);
 }
 
+/**
+ * enable_af - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int enable_af(struct ipr_dev *dev)
 {
 	struct ipr_std_inq_data std_inq;
@@ -3244,6 +4169,13 @@ int enable_af(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * get_blk_size - return the block size of the device
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   block size / non-zero on failure
+ **/
 static int get_blk_size(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages modes;
@@ -3264,6 +4196,13 @@ static int get_blk_size(struct ipr_dev *dev)
 	return -EIO;
 }
 
+/**
+ * format_req - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int format_req(struct ipr_dev *dev)
 {
 	struct sense_data_t sense_data;
@@ -3295,8 +4234,21 @@ int format_req(struct ipr_dev *dev)
 #define IPR_S_G_BUFF_ALIGNMENT 512
 #define IPR_MAX_XFER 0x8000
 
-
 const int cdb_size[] ={6, 10, 10, 0, 16, 12, 16, 16};
+/**
+ * _sg_ioctl - 
+ * @fd: 		file descriptor
+ * @cdb:        	cdb
+ * @data:		data pointer
+ * @xfer_len            transfer length
+ * @data_direction      transfer to dev or from dev
+ * @sense_data          sense data pointer
+ * @timeout_in_sec      timeout value
+ * @retries             number of retries
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		     void *data, u32 xfer_len, u32 data_direction,
 		     struct sense_data_t *sense_data,
@@ -3379,6 +4331,19 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 	return rc;
 };
 
+/**
+ * sg_ioctl - 
+ * @fd: 		file descriptor
+ * @cdb:        	cdb
+ * @data:		data pointer
+ * @xfer_len            transfer length
+ * @data_direction      transfer to dev or from dev
+ * @sense_data          sense data pointer
+ * @timeout_in_sec      timeout value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 	     void *data, u32 xfer_len, u32 data_direction,
 	     struct sense_data_t *sense_data,
@@ -3389,6 +4354,19 @@ int sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 			 sense_data, timeout_in_sec, 1);
 };
 
+/**
+ * sg_ioctl_noretry - 
+ * @fd: 		file descriptor
+ * @cdb:        	cdb
+ * @data:		data pointer
+ * @xfer_len            transfer length
+ * @data_direction      transfer to dev or from dev
+ * @sense_data          sense data pointer
+ * @timeout_in_sec      timeout value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		     void *data, u32 xfer_len, u32 data_direction,
 		     struct sense_data_t *sense_data,
@@ -3399,6 +4377,19 @@ int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 			 sense_data, timeout_in_sec, 0);
 };
 
+/**
+ * sg_ioctl_noretry - 
+ * @name: 		file name
+ * @cdb:        	cdb
+ * @data:		data pointer
+ * @xfer_len            transfer length
+ * @data_direction      transfer to dev or from dev
+ * @sense_data          sense data pointer
+ * @timeout_in_sec      timeout value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int sg_ioctl_by_name(char *name, u8 cdb[IPR_CCB_CDB_LEN],
 			    void *data, u32 xfer_len, u32 data_direction,
 			    struct sense_data_t *sense_data,
@@ -3424,6 +4415,14 @@ static int sg_ioctl_by_name(char *name, u8 cdb[IPR_CCB_CDB_LEN],
 	return rc;
 }
 
+/**
+ * ipr_set_ha_mode - 
+ * @ioa:		ipr ioa struct
+ * @gscsi_only_ha:	process gscsi only flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_set_ha_mode(struct ipr_ioa *ioa, int gscsi_only_ha)
 {
 	int rc, len;
@@ -3460,6 +4459,14 @@ int ipr_set_ha_mode(struct ipr_ioa *ioa, int gscsi_only_ha)
 	return rc;
 }
 
+/**
+ * ipr_set_preferred_primary - set the preferred primary state
+ * @ioa:		ipr ioa struct
+ * @preferred_primary:	set preferred primary flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 {
 	int fd, rc;
@@ -3499,6 +4506,14 @@ int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 static void ipr_save_ioa_attr(struct ipr_ioa *ioa, char *field,
 			      char *value, int update);
 
+/**
+ * set_preferred_primary - set the preferred primary state
+ * @ioa:		ipr ioa struct
+ * @preferred_primary:	set preferred primary flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 {
 	char temp[100];
@@ -3510,6 +4525,14 @@ int set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 	return 0;
 }
 
+/**
+ * set_ha_mode - 
+ * @ioa:		ipr ioa struct
+ * @gscsi_only:		gscsi only flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int set_ha_mode(struct ipr_ioa *ioa, int gscsi_only)
 {
 	char temp[100];
@@ -3526,6 +4549,13 @@ int set_ha_mode(struct ipr_ioa *ioa, int gscsi_only)
 	return 0;
 }
 
+/**
+ * get_scsi_dev_data - get scsi device data
+ * @scsi_dev_ref:	scsi_dev_data struct
+ *
+ * Returns:
+ *   number of devices if success / 0 or -1 on failure
+ **/
 int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 {
 	int num_devs = 0;
@@ -3616,6 +4646,13 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 	return num_devs;
 }
 
+/**
+ * wait_for_dev - wait 20 seconds for the device to become available
+ * @name:		device name
+ *
+ * Returns:
+ *   -ETIMEDOUT
+ **/
 static int wait_for_dev(char *name)
 {
 	int fd, delay;
@@ -3637,6 +4674,13 @@ static int wait_for_dev(char *name)
 	return -ETIMEDOUT;
 }
 
+/**
+ * get_sg_names - waits for sg devices to become available
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_sg_names(int num_devs)
 {
 	int i;
@@ -3677,6 +4721,13 @@ static void get_sg_names(int num_devs)
 	sysfs_close_class(sysfs_device_class);
 }
 
+/**
+ * get_sd_names - populate the scsi_dev_table dev_name entries
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_sd_names(int num_devs)
 {
 	int i;
@@ -3714,6 +4765,14 @@ static void get_sd_names(int num_devs)
 	sysfs_close_class(sysfs_device_class);
 }
 
+/**
+ * get_ioa_name - populate adapter information in the scsi_dev_table
+ * @ioa:		ipr ioa struct
+ * @num_sg_devices:	number of sg devices
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_ioa_name(struct ipr_ioa *ioa,
 			 int num_sg_devices)
 {
@@ -3747,6 +4806,14 @@ static struct ipr_dual_ioa_state dual_ioa_states [] = {
 	{IPR_IOA_STATE_NO_PREFERENCE, "No Preference"}
 };
 
+/**
+ * print_ioa_state - copy the ioa state into buf
+ * @buf:		data buffer
+ * @state:	        state
+ *
+ * Returns:
+ *   nothing
+ **/
 static void print_ioa_state(char *buf, u8 state)
 {
 	int i;
@@ -3761,6 +4828,13 @@ static void print_ioa_state(char *buf, u8 state)
 	sprintf(buf, "Unknown (%d)", state);
 }
 
+/**
+ * get_subsys_config - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_subsys_config(struct ipr_ioa *ioa)
 {
 	int rc;
@@ -3794,6 +4868,13 @@ static void get_subsys_config(struct ipr_ioa *ioa)
 
 }
 
+/**
+ * get_dual_ioa_state - set ioa->is_secondary to indicate the dual ioa state
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_dual_ioa_state(struct ipr_ioa *ioa)
 {
 	int rc;
@@ -3821,6 +4902,13 @@ static void get_dual_ioa_state(struct ipr_ioa *ioa)
 		ioa->is_secondary = 0;
 }
 
+/**
+ * get_af_block_size - return the af block size
+ * @ioa_cap:		ipr_inquiry_ioa_cap struct
+ *
+ * Returns:
+ *   the actual af_block_size or IPR_DEFAULT_AF_BLOCK_SIZE
+ **/
 static u16 get_af_block_size(struct ipr_inquiry_ioa_cap *ioa_cap)
 {
 	int sz_off = offsetof(struct ipr_inquiry_ioa_cap, af_block_size);
@@ -3831,6 +4919,13 @@ static u16 get_af_block_size(struct ipr_inquiry_ioa_cap *ioa_cap)
 	return IPR_DEFAULT_AF_BLOCK_SIZE;
 }
 
+/**
+ * get_ioa_cap - get the capability information for the ioa
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_ioa_cap(struct ipr_ioa *ioa)
 {
 	int rc, j;
@@ -3875,6 +4970,14 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 		ioa->ioa_dead = 1;
 }
 
+/**
+ * get_prot_levels - populate the prot_level_str field for each vset and each
+ *                   device in the vset
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_prot_levels(struct ipr_ioa *ioa)
 {
 	struct ipr_dev *vset, *dev;
@@ -3889,6 +4992,14 @@ static void get_prot_levels(struct ipr_ioa *ioa)
 	}
 }
 
+/**
+ * get_res_addr - 
+ * @dev:		ipr dev struct
+ * @res_addr:		ipr_res_addr struct
+ *
+ * Returns:
+ *   0 if success / -1 on failure
+ **/
 static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 {
 	struct ipr_dev_record *dev_record = dev->dev_rcd;
@@ -3930,6 +5041,13 @@ static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 	return 0;
 }
 
+/**
+ * find_multipath_vset - return the other vset of a given multipath vset
+ * @vset1:		ipr dev struct
+ *
+ * Returns:
+ *   ipr_dev if success / NULL on failure
+ **/
 static struct ipr_dev *find_multipath_vset(struct ipr_dev *vset1)
 {
 	struct ipr_ioa *ioa;
@@ -3958,6 +5076,12 @@ static struct ipr_dev *find_multipath_vset(struct ipr_dev *vset1)
 	return NULL;
 }
 
+/**
+ * link_multipath_vsets - set the alt_path entries for multipath vsets
+ *
+ * Returns:
+ *   nothing
+ **/
 static void link_multipath_vsets()
 {
 	struct ipr_ioa *ioa;
@@ -3974,6 +5098,13 @@ static void link_multipath_vsets()
 	}
 }
 
+/**
+ * check_current_config - populates the ioa configuration data
+ * @allow_rebuild_refresh:	allow_rebuild_refresh flag
+ *
+ * Returns:
+ *   nothing
+ **/
 void check_current_config(bool allow_rebuild_refresh)
 {
 	struct scsi_dev_data *scsi_dev_data;
@@ -4017,7 +5148,7 @@ void check_current_config(bool allow_rebuild_refresh)
 		get_subsys_config(ioa);
 
 		/* Get Query Array Config Data */
-		rc = ipr_query_array_config(ioa, allow_rebuild_refresh, 0, 0, qac_data);
+		rc = ipr_query_array_config(ioa, allow_rebuild_refresh, 0, 0, 0, qac_data);
 
 		if (rc != 0) {
 			qac_data->num_records = 0;
@@ -4075,7 +5206,7 @@ void check_current_config(bool allow_rebuild_refresh)
 				}
 
 				/* Send Test Unit Ready to start device if its a volume set */
-				/* xxx try to remove this */
+				/* xxx TODO try to remove this */
 				if (!ipr_fast && ipr_is_volume_set(&ioa->dev[device_count]))
 					__ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
@@ -4135,7 +5266,17 @@ void check_current_config(bool allow_rebuild_refresh)
 	resolve_old_config();
 }
 
-/* xxx delete */
+/**
+ * num_devices_opens - return usage count (number of opens) for a given device
+ * @host_num:		host number
+ * @channel:    	channel number
+ * @id: 		id number
+ * @lun:		lun number
+ *
+ * Returns:
+ *   usage count (number of opens) for a given device
+ **/
+/* xxx TODO delete */
 int num_device_opens(int host_num, int channel, int id, int lun)
 {
 	struct scsi_dev_data *scsi_dev_base = NULL;
@@ -4162,6 +5303,44 @@ int num_device_opens(int host_num, int channel, int id, int lun)
 	return opens;
 }
 
+/**
+ * open_and_lock - Open and device file and lock it.
+ * @file_name:		the name of the device to open
+ *
+ * Returns:
+ *   file descriptor if success / -1 on failure
+ **/
+int open_and_lock(char *file_name)
+{
+	int fd;
+	int rc;
+
+	fd = open(file_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", file_name);
+		return fd;
+	}
+
+	rc = flock(fd, LOCK_EX);
+	if (rc) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not lock %s. %m\n", file_name);
+		close(fd);
+		return rc;
+	}
+
+	return fd;
+}
+
+/**
+ * exit_on_error - exits program or error after cleaning up
+ * @s:			string
+ * @...:		arguments
+ *
+ * Returns:
+ *   nothing - exits program on error
+ **/
 void exit_on_error(char *s, ...)
 {
 	va_list args;
@@ -4181,6 +5360,13 @@ void exit_on_error(char *s, ...)
 	exit(1);
 }
 
+/**
+ * ipr_config_file_hdr - prints the header to the ipr config file
+ * @file_name:		file name
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_config_file_hdr(char *file_name)
 {
 	FILE *fd;
@@ -4214,6 +5400,17 @@ static void ipr_config_file_hdr(char *file_name)
 	fclose(fd);
 }
 
+/**
+ * ipr_save_attr - Start array protection for an array
+ * @ioa:		ipr ioa struct
+ * @category:		
+ * @field:		
+ * @value:		
+ * @update:		
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_save_attr(struct ipr_ioa *ioa, char *category,
 			  char *field, char *value, int update)
 {
@@ -4281,6 +5478,17 @@ static void ipr_save_attr(struct ipr_ioa *ioa, char *category,
 
 }
 
+/**
+ * ipr_save_bus_attr - 
+ * @ioa:		ipr ioa struct
+ * @bus:		bus
+ * @field:		
+ * @value:		
+ * @update:		
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_save_bus_attr(struct ipr_ioa *ioa, int bus,
 			      char *field, char *value, int update)
 {
@@ -4289,6 +5497,16 @@ static void ipr_save_bus_attr(struct ipr_ioa *ioa, int bus,
 	ipr_save_attr(ioa, category, field, value, update);
 }
 
+/**
+ * ipr_save_dev_attr - 
+ * @dev:		ipr dev struct
+ * @field:		
+ * @value:		
+ * @update:		
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_save_dev_attr(struct ipr_dev *dev, char *field,
 			     char *value, int update)
 {
@@ -4299,6 +5517,16 @@ static void ipr_save_dev_attr(struct ipr_dev *dev, char *field,
 	ipr_save_attr(dev->ioa, category, field, value, update);
 }
 
+/**
+ * ipr_save_ioa_attr - 
+ * @ioa:		ipr ioa struct
+ * @field:		
+ * @value:		
+ * @update:		
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_save_ioa_attr(struct ipr_ioa *ioa, char *field,
 			     char *value, int update)
 {
@@ -4307,6 +5535,16 @@ static void ipr_save_ioa_attr(struct ipr_ioa *ioa, char *field,
 	ipr_save_attr(ioa, category, field, value, update);
 }
 
+/**
+ * ipr_get_saved_attr - 
+ * @ioa:		ipr ioa struct
+ * @category:		
+ * @field:		
+ * @value:		
+ *
+ * Returns:
+ *   0 if success / RC_FAILED on failure
+ **/
 static int ipr_get_saved_attr(struct ipr_ioa *ioa, char *category,
 				  char *field, char *value)
 {
@@ -4344,6 +5582,16 @@ static int ipr_get_saved_attr(struct ipr_ioa *ioa, char *category,
 	return RC_FAILED;
 }
 
+/**
+ * ipr_get_saved_bus_attr - 
+ * @ioa:		ipr ioa struct
+ * @bus:		
+ * @field:		
+ * @value:		
+ *
+ * Returns:
+ *   0 if success / RC_FAILED on failure
+ **/
 static int ipr_get_saved_bus_attr(struct ipr_ioa *ioa, int bus,
 				  char *field, char *value)
 {
@@ -4352,6 +5600,15 @@ static int ipr_get_saved_bus_attr(struct ipr_ioa *ioa, int bus,
 	return ipr_get_saved_attr(ioa, category, field, value);
 }
 
+/**
+ * ipr_get_saved_dev_attr - 
+ * @dev:		ipr dev struct
+ * @field:		
+ * @value:		
+ *
+ * Returns:
+ *   0 if success / RC_FAILED on failure
+ **/
 static int ipr_get_saved_dev_attr(struct ipr_dev *dev,
 				  char *field, char *value)
 {
@@ -4366,6 +5623,15 @@ static int ipr_get_saved_dev_attr(struct ipr_dev *dev,
 	return ipr_get_saved_attr(dev->ioa, category, field, value);
 }
 
+/**
+ * ipr_get_saved_ioa_attr - 
+ * @ioa:		ipr ioa struct
+ * @field:	
+ * @value:		
+ *
+ * Returns:
+ *   0 if success / RC_FAILED on failure
+ **/
 static int ipr_get_saved_ioa_attr(struct ipr_ioa *ioa,
 				  char *field, char *value)
 {
@@ -4378,6 +5644,13 @@ static int ipr_get_saved_ioa_attr(struct ipr_ioa *ioa,
 #define AS400_TCQ_DEPTH 16
 #define DEFAULT_TCQ_DEPTH 64
 
+/**
+ * get_tcq_depth - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   GSCSI_TCQ_DEPTH, AS400_TCQ_DEPTH or DEFAULT_TCQ_DEPTH
+ **/
 static int get_tcq_depth(struct ipr_dev *dev)
 {
 	if (ipr_is_gscsi(dev))
@@ -4390,6 +5663,13 @@ static int get_tcq_depth(struct ipr_dev *dev)
 	return DEFAULT_TCQ_DEPTH;
 }
 
+/**
+ * is_tagged - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   
+ **/
 static int is_tagged(struct ipr_dev *dev)
 {
 	char temp[100];
@@ -4402,6 +5682,14 @@ static int is_tagged(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * set_tagged - 
+ * @dev:		ipr dev struct
+ * @tcq_enabled:	
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
 {
 	char temp[100];
@@ -4424,6 +5712,13 @@ static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
 	return -EIO;
 }
 
+/**
+ * get_format_timeout - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   timeout value
+ **/
 static int get_format_timeout(struct ipr_dev *dev)
 {
 	struct ipr_query_dasd_timeouts tos;
@@ -4471,6 +5766,14 @@ struct ipr_dasd_timeouts {
 	struct ipr_dasd_timeout_record record[ARRAY_SIZE(ipr_dasd_timeouts) + 1];
 };
 
+/**
+ * ipr_set_dasd_timeouts - 
+ * @dev:		ipr dev struct
+ * @format_timeout:	
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_set_dasd_timeouts(struct ipr_dev *dev, int format_timeout)
 {
 	int fd, rc, len;
@@ -4527,6 +5830,14 @@ static int ipr_set_dasd_timeouts(struct ipr_dev *dev, int format_timeout)
 	return rc;
 }
 
+/**
+ * ipr_get_dev_attr - 
+ * @ioa:		ipr ioa struct
+ * @attr:		ipr_disk_attr struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
 	char temp[100];
@@ -4563,6 +5874,14 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	return 0;
 }
 
+/**
+ * ipr_get_ioa_attr - 
+ * @ioa:		ipr ioa struct
+ * @attr:		ipr_ioa_attr struct
+ *
+ * Returns:
+ *   0
+ **/
 int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 {
 	struct ipr_dual_ioa_entry *ioa_entry;
@@ -4581,6 +5900,14 @@ int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	return 0;
 }
 
+/**
+ * ipr_modify_dev_attr - 
+ * @dev:		ipr dev struct
+ * @attr:		ipr_disk_attr struct
+ *
+ * Returns:
+ *   0
+ **/
 int ipr_modify_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 {
 	char temp[100];
@@ -4601,6 +5928,14 @@ int ipr_modify_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	return 0;
 }
 
+/**
+ * ipr_modify_ioa_attr - 
+ * @ioa:		ipr ioa struct
+ * @attr:		ipr_ioa_attr struct
+ *
+ * Returns:
+ *   0
+ **/
 int ipr_modify_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 {
 	char temp[100];
@@ -4612,6 +5947,15 @@ int ipr_modify_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	return 0;
 }
 
+/**
+ * ipr_set_dev_attr - 
+ * @dev:		ipr dev struct
+ * @attr:		ipr_disk_attr struct
+ * @save:		save flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 {
 	struct ipr_disk_attr old_attr;
@@ -4656,6 +6000,15 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 	return 0;
 }
 
+/**
+ * ipr_set_ioa_attr - 
+ * @ioa:		ipr ioa struct
+ * @attr:		ipr_ioa_attr struct
+ * @save:		save flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 {
 	struct ipr_ioa_attr old_attr;
@@ -4685,6 +6038,14 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	return 0;
 }
 
+/**
+ * ipr_query_dasd_timeouts - 
+ * @dev:		ipr dev struct
+ * @timeouts:		ipr_query_dasd_timesouts struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_query_dasd_timeouts(struct ipr_dev *dev,
 			    struct ipr_query_dasd_timeouts *timeouts)
 {
@@ -4722,6 +6083,14 @@ int ipr_query_dasd_timeouts(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * ipr_get_bus_attr - 
+ * @ioa:		ipr ioa struct
+ * @sbus:		ipr_scsi_buses struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_get_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 {
 	struct ipr_mode_pages mode_pages;
@@ -4753,6 +6122,15 @@ int ipr_get_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 	return 0;
 }
 
+/**
+ * ipr_set_bus_attr - 
+ * @ioa:		ipr ioa struct
+ * @sbus:		ipr_scsi_buses struct
+ * @save:		save flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_set_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus, int save)
 {
 	struct ipr_mode_pages mode_pages;
@@ -4829,6 +6207,14 @@ int ipr_set_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus, int save)
 	return rc;
 }
 
+/**
+ * ipr_modify_bus_attr - 
+ * @ioa:		ipr ioa struct
+ * @sbus:		ipr_scsi_buses struct
+ *
+ * Returns:
+ *   nothing
+ **/
 void ipr_modify_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 {
 	int i, rc, saved_value, max_xfer_rate;
@@ -4886,6 +6272,14 @@ void ipr_modify_bus_attr(struct ipr_ioa *ioa, struct ipr_scsi_buses *sbus)
 	}
 }
 
+/**
+ * get_unsupp_af - 
+ * @ing:		ipr_std_ing_data struct
+ * @page3:		ipr_dasd_inquiry_page3 struct
+ *
+ * Returns:
+ *   unsupported_af_dasd struct
+ **/
 struct unsupported_af_dasd *
 get_unsupp_af(struct ipr_std_inq_data *inq,
 	      struct ipr_dasd_inquiry_page3 *page3)
@@ -4925,6 +6319,14 @@ get_unsupp_af(struct ipr_std_inq_data *inq,
 	return NULL;
 }
 
+/**
+ * disk_needs_msl - 
+ * @unsupp_af:		unsupported_af_dasd struct
+ * @inq:		ipr_std_inq_data struct
+ *
+ * Returns:
+ *   true if needs msl / false otherwise
+ **/
 bool disk_needs_msl(struct unsupported_af_dasd *unsupp_af,
 		    struct ipr_std_inq_data *inq)
 {
@@ -4951,6 +6353,14 @@ bool disk_needs_msl(struct unsupported_af_dasd *unsupp_af,
 	return false;
 }
 
+/**
+ * is_af_blocked - 
+ * @dev:		ipr dev struct
+ * @silent:		
+ *
+ * Returns:
+ *   true if blocked / false otherwise
+ **/
 bool is_af_blocked(struct ipr_dev *dev, int silent)
 {
 	int rc;
@@ -5009,6 +6419,15 @@ bool is_af_blocked(struct ipr_dev *dev, int silent)
 	return false;
 }
 
+/**
+ * ipr_read_dev_attr - 
+ * @dev:		ipr dev struct
+ * @attr:		
+ * @value:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 {
 	struct sysfs_class_device *class_device;
@@ -5059,6 +6478,15 @@ int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	return 0;
 }
 
+/**
+ * ipr_write_dev_attr - 
+ * @dev:		ipr dev struct
+ * @attr:		
+ * @value:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 {
 	struct sysfs_class_device *class_device;
@@ -5094,6 +6522,15 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	return 0;
 }
 
+/**
+ * get_ucode_date - 
+ * @ucode_file:		microcode file name
+ * @ucode_date:		microcode date string pointer
+ * @max_size:		max size for the date field
+ *
+ * Returns:
+ *   nothing
+ **/
 void get_ucode_date(char *ucode_file, char *ucode_date, int max_size)
 {
 	struct stat st;
@@ -5110,6 +6547,13 @@ void get_ucode_date(char *ucode_file, char *ucode_date, int max_size)
 	strftime(ucode_date, max_size, "%D", file_tm);
 }
 
+/**
+ * get_ioa_ucode_version - 
+ * @ucode_file:		microcode file name
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 u32 get_ioa_ucode_version(char *ucode_file)
 {
 	int fd, rc;
@@ -5143,6 +6587,14 @@ u32 get_ioa_ucode_version(char *ucode_file)
 	return rc;
 }
 
+/**
+ * fw_compare - compare two firmware images
+ * @parm1:		pointer to firmware image
+ * @parm2:		pointer to firmware image
+ *
+ * Returns:
+ *   0 if the images are the same / non-zero otherwise
+ **/
 /* Sort in decending order */
 static int fw_compare(const void *parm1,
 		      const void *parm2)
@@ -5154,6 +6606,12 @@ static int fw_compare(const void *parm1,
 		      sizeof(second->version));
 }
 
+/**
+ * ipr_get_hotplug_dir - 
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int ipr_get_hotplug_dir()
 {
 	FILE *file;
@@ -5211,6 +6669,14 @@ static int ipr_get_hotplug_dir()
 	return 0;
 }
 
+/**
+ * get_dasd_ucode_version - 
+ * @ucode_file:		file name of microcode file
+ * @has_hdr:		has header flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 {
 	int fd;
@@ -5267,6 +6733,13 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 	return rc;
 }
 
+/**
+ * get_ses_ucode_version - 
+ * @ucode_file:		
+ *
+ * Returns:
+ *   ses microcode version / 0 if failure
+ **/
 static u32 get_ses_ucode_version(char *ucode_file)
 {
 	char *tmp = strrchr(ucode_file, '.');
@@ -5279,6 +6752,13 @@ static u32 get_ses_ucode_version(char *ucode_file)
 	return (tmp[1] << 24) | (tmp[2] << 16) | (tmp[3] << 8) | tmp[4];
 }
 
+/**
+ * get_dev_fw_version - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   device firmware version / 0 if failure
+ **/
 u32 get_dev_fw_version(struct ipr_dev *dev)
 {
 	u8 release_level[4];
@@ -5296,6 +6776,13 @@ u32 get_dev_fw_version(struct ipr_dev *dev)
 	return rc;
 }
 
+/**
+ * get_ioa_fw_version -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   ioa firmware version
+ **/
 u32 get_ioa_fw_version(struct ipr_ioa *ioa)
 {
 	struct sysfs_class_device *class_device;
@@ -5310,12 +6797,27 @@ u32 get_ioa_fw_version(struct ipr_ioa *ioa)
 	return fw_version;
 }
 
+/**
+ * get_ioa_image_type -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   ioa image type
+ **/
 static u8 get_ioa_image_type(struct ipr_ioa *ioa)
 {
 	u32 fw_version = get_ioa_fw_version(ioa);
 	return ((fw_version & 0x00ff0000) >> 16);
 }
 
+/**
+ * get_ioa_fw_name -
+ * @ioa:		ipr ioa struct
+ * @buf:		data buffer
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
 {
 	const struct ioa_parms *ioa_parms = get_ioa_fw(ioa);
@@ -5326,12 +6828,27 @@ static void get_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
 		sprintf(buf, "534953%02X", get_ioa_image_type(ioa));
 }
 
+/**
+ * get_linux_ioa_fw_name -
+ * @ioa:		ipr ioa struct
+ * @buf:		data buffer
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_linux_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
 {
 	sprintf(buf, "pci.%04X%04X.%02X", ioa->pci_vendor, ioa->pci_device,
 		get_ioa_image_type(ioa));
 }
 
+/**
+ * init_ioa_ucode_entry - 
+ * @img:		ipr_fw_images struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void init_ioa_ucode_entry(struct ipr_fw_images *img)
 {
 	img->version = get_ioa_ucode_version(img->file);
@@ -5339,6 +6856,13 @@ static void init_ioa_ucode_entry(struct ipr_fw_images *img)
 	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
+/**
+ * init_disk_ucode_entry - 
+ * @img:		ipr_fw_images
+ *
+ * Returns:
+ *   nothing
+ **/
 static void init_disk_ucode_entry(struct ipr_fw_images *img)
 {
 	img->version = get_dasd_ucode_version(img->file, 1);
@@ -5346,6 +6870,13 @@ static void init_disk_ucode_entry(struct ipr_fw_images *img)
 	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
+/**
+ * init_disk_ucode_entry_nohdr -
+ * @img:		ipr_fw_images struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void init_disk_ucode_entry_nohdr(struct ipr_fw_images *img)
 {
 	img->version = get_dasd_ucode_version(img->file, 0);
@@ -5353,6 +6884,13 @@ static void init_disk_ucode_entry_nohdr(struct ipr_fw_images *img)
 	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
+/**
+ * init_ses_ucode_entry_nohdr - 
+ * @img:		ipr_fw_images struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void init_ses_ucode_entry_nohdr(struct ipr_fw_images *img)
 {
 	img->version = get_ses_ucode_version(img->file);
@@ -5360,6 +6898,17 @@ static void init_ses_ucode_entry_nohdr(struct ipr_fw_images *img)
 	get_ucode_date(img->file, img->date, sizeof(img->date));
 }
 
+/**
+ * scan_fw_dir - 
+ * @path:		
+ * @name:		
+ * @list:		
+ * @len:		
+ * @init		function pointer to initialization function
+ *
+ * Returns:
+ *   int len
+ **/
 static int scan_fw_dir(char *path, char *name, struct ipr_fw_images **list, int len,
 		       void (*init)(struct ipr_fw_images *))
 {
@@ -5387,6 +6936,14 @@ static int scan_fw_dir(char *path, char *name, struct ipr_fw_images **list, int 
 	return len;
 }
 
+/**
+ * get_ioa_firmware_image_list -
+ * @ioa:		ipr ioa struct
+ * @list:		ipr_fw_images struct
+ *
+ * Returns:
+ *   length of list
+ **/
 int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 				struct ipr_fw_images **list)
 {
@@ -5419,6 +6976,14 @@ int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 	return len;
 }
 
+/**
+ * get_dasd_firmware_image_list- 
+ * @dev:		ipr dev struct
+ * @list:		irp_fw_images struct
+ *
+ * Returns:
+ *   length value if success / non-zero on failure
+ **/
 int get_dasd_firmware_image_list(struct ipr_dev *dev,
 				 struct ipr_fw_images **list)
 {
@@ -5471,6 +7036,14 @@ int get_dasd_firmware_image_list(struct ipr_dev *dev,
 	return len;
 }
 
+/**
+ * get_ses_load_id- 
+ * @dev:		ipr dev struct
+ * @load_id:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int get_ses_load_id(struct ipr_dev *dev, u8 load_id[4])
 {
 	struct ipr_dasd_inquiry_page3 page3_inq;
@@ -5490,6 +7063,14 @@ static int get_ses_load_id(struct ipr_dev *dev, u8 load_id[4])
 	return 0;
 }
 
+/**
+ * get_ses_firmware_image_list- 
+ * @dev:		ipr dev struct
+ * @list:		
+ *
+ * Returns:
+ *   length value if success / non-zero on failure
+ **/
 int get_ses_firmware_image_list(struct ipr_dev *dev,
 				struct ipr_fw_images **list)
 {
@@ -5546,6 +7127,13 @@ struct ipr_ioa_desc ioa_desc [] = {
 	{0x570B, "PCI-X Dual Channel SCSI Integrated Controller (Adapter bus) [570B]"}
 };
 
+/**
+ * get_long_ioa_desc- 
+ * @type:		
+ *
+ * Returns:
+ *   IOA description if success / NULL on failure
+ **/
 static const char *get_long_ioa_desc(u16 type)
 {
 	int i;
@@ -5558,6 +7146,13 @@ static const char *get_long_ioa_desc(u16 type)
 	return NULL;
 }
 
+/**
+ * ipr_log_ucode_error - log a microcode error
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 void ipr_log_ucode_error(struct ipr_ioa *ioa)
 {
 	const char *desc = get_long_ioa_desc(ioa->ccin);
@@ -5577,6 +7172,15 @@ void ipr_log_ucode_error(struct ipr_ioa *ioa)
 	}
 }
 
+/**
+ * ipr_update_ioa_fw -
+ * @ioa:		ipr ioa struct
+ * @image:		pointer to fw image
+ * @force:		force flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		      struct ipr_fw_images *image, int force)
 {
@@ -5667,7 +7271,16 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	return rc;
 }
 
-/* xxx make a general routine to do write buffer that takes a
+/**
+ * ipr_update_disk_fw - update disk fw
+ * @dev:		ipr dev struct
+ * @image:		pointer to fw image
+ * @force:		force flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+/* xxx TODO make a general routine to do write buffer that takes a
  struct ipr_fw_images as input */
 int ipr_update_disk_fw(struct ipr_dev *dev,
 		       struct ipr_fw_images *image, int force)
@@ -5751,6 +7364,15 @@ int ipr_update_disk_fw(struct ipr_dev *dev,
 	return rc;
 }
 
+/**
+ * mode_select - issue a mode select command
+ * @dev:		ipr dev struct
+ * @buff:		data buffer
+ * @length:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int mode_select(struct ipr_dev *dev, void *buff, int length)
 {
 	int fd;
@@ -5786,6 +7408,13 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 	return rc;
 }
 
+/**
+ * setup_page0x00 - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int setup_page0x00(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages, ch_mode_pages;
@@ -5833,6 +7462,13 @@ static int setup_page0x00(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * setup_page0x01 - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int setup_page0x01(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages, ch_mode_pages;
@@ -5876,6 +7512,13 @@ error:
 	return 0;
 }
 
+/**
+ * setup_page0x0a - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int setup_page0x0a(struct ipr_dev *dev)
 {
 	struct ipr_mode_pages mode_pages, ch_mode_pages;
@@ -5947,6 +7590,13 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	return rc;
 }
 
+/**
+ * init_vset_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 /*
  * VSETs:
  * 1. Adjust queue depth based on number of devices
@@ -5986,6 +7636,13 @@ static void init_vset_dev(struct ipr_dev *dev)
 	}
 }
 
+/**
+ * init_gpdd_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 /*
  * GPDD DASD:
  * 1. Setup Mode Page 0x0A for TCQing.
@@ -6028,6 +7685,13 @@ static void init_gpdd_dev(struct ipr_dev *dev)
 		return;
 }
 
+/**
+ * init_af_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 /*
  * AF DASD:
  * 1. Setup mode pages (pages 0x01, 0x0A, 0x20)
@@ -6069,6 +7733,13 @@ static void init_af_dev(struct ipr_dev *dev)
 		return;
 }
 
+/**
+ * init_ioa_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 /*
  * IOA:
  * 1. Load saved adapter configuration
@@ -6094,6 +7765,13 @@ static void init_ioa_dev(struct ipr_dev *dev)
 		return;
 }
 
+/**
+ * ipr_init_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0
+ **/
 int ipr_init_dev(struct ipr_dev *dev)
 {
 	if (!dev->scsi_dev_data)
@@ -6120,6 +7798,13 @@ int ipr_init_dev(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * ipr_init_new_dev - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 void ipr_init_new_dev(struct ipr_dev *dev)
 {
 	if (!dev->scsi_dev_data)
@@ -6142,12 +7827,28 @@ void ipr_init_new_dev(struct ipr_dev *dev)
 	ipr_init_dev(dev);
 }
 
+/**
+ * ipr_scan_ra - 
+ * @ioa:		ipr ioa struct
+ * @ra:			ipr_res_addr struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_scan_ra(struct ipr_ioa *ioa, struct ipr_res_addr *ra)
 {
 	ra_dbg(ra, "Scanning for new device\n");
 	ipr_scan(ioa, ra->bus, ra->target, ra->lun);
 }
 
+/**
+ * ipr_for_each_unique_ra - 
+ * @dev:		ipr dev struct
+ * @func:		function pointer
+ *
+ * Returns:
+ *   nothing
+ **/
 static void ipr_for_each_unique_ra(struct ipr_dev *dev,
 				   void (*func) (struct ipr_ioa *, struct ipr_res_addr *))
 {
@@ -6169,6 +7870,13 @@ static void ipr_for_each_unique_ra(struct ipr_dev *dev,
 	}
 }
 
+/**
+ * fixup_improper_devs - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if no improper devs / number of improper devs otherwise
+ **/
 static int fixup_improper_devs(struct ipr_ioa *ioa)
 {
 	struct ipr_dev *dev;
@@ -6199,6 +7907,13 @@ static int fixup_improper_devs(struct ipr_ioa *ioa)
 	return improper;
 }
 
+/**
+ * ipr_init_ioa - 
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_init_ioa(struct ipr_ioa *ioa)
 {
 	struct ipr_dev *dev;
@@ -6215,6 +7930,15 @@ int ipr_init_ioa(struct ipr_ioa *ioa)
 	return 0;
 }
 
+/**
+ * scsi_dev_kevent - 
+ * @buf:		data buffer
+ * @find_device:	function pointer
+ * @func:		function pointer
+ *
+ * Returns:
+ *   nothing
+ **/
 void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 		     int (*func)(struct ipr_dev *))
 {
@@ -6248,6 +7972,14 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 	}
 }
 
+/**
+ * scsi_host_kevent - Start array protection for an array
+ * @buf:		data buffer
+ * @func:		funtion pointer
+ *
+ * Returns:
+ *   nothing
+ **/
 void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 {
 	struct ipr_ioa *ioa;
@@ -6283,6 +8015,13 @@ void scsi_host_kevent(char *buf, int (*func)(struct ipr_ioa *))
 	}
 }
 
+/**
+ * get_dev_from_addr - 
+ * @res_addr:		ipr_res_addr struct
+ *
+ * Returns:
+ *   ipr_dev struct if success / NULL otherwise
+ **/
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 {
 	struct ipr_ioa *ioa;
@@ -6307,6 +8046,13 @@ struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 	return NULL;
 }
 
+/**
+ * get_dev_from_handle - 
+ * @res_handle:		
+ *
+ * Returns:
+ *   ipr_dev struct if success / NULL otherwise
+ **/
 struct ipr_dev *get_dev_from_handle(u32 res_handle)
 {
 	struct ipr_ioa *ioa;
@@ -6330,6 +8076,12 @@ struct ipr_dev *get_dev_from_handle(u32 res_handle)
 	return NULL;
 }
 
+/**
+ * ipr_daemonize - 
+ *
+ * Returns:
+ *   nothing
+ **/
 void ipr_daemonize()
 {
 	int rc = fork();
@@ -6350,6 +8102,13 @@ void ipr_daemonize()
 	setsid();
 }
 
+/**
+ * ipr_disable_qerr - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ipr_disable_qerr(struct ipr_dev *dev)
 {
 	u8 ioctl_buffer[IOCTL_BUFFER_SIZE];

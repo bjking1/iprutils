@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.100 2008/04/09 19:34:17 tsenglin Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.101 2008/08/14 01:12:54 wboyer Exp $
  */
 
 #include <stdarg.h>
@@ -51,19 +51,19 @@
 #include <linux/netlink.h>
 #include <time.h>
 
-#define IPR_DASD_UCODE_USRLIB 0
-#define IPR_DASD_UCODE_ETC 1
+#define IPR_DASD_UCODE_USRLIB                0
+#define IPR_DASD_UCODE_ETC                   1
 
-#define IPR_DASD_UCODE_NOT_FOUND -1
-#define IPR_DASD_UCODE_NO_HDR 1
-#define IPR_DASD_UCODE_HDR 2
+#define IPR_DASD_UCODE_NOT_FOUND             -1
+#define IPR_DASD_UCODE_NO_HDR                1
+#define IPR_DASD_UCODE_HDR                   2
 
-#define UCODE_BASE_DIR "/usr/lib/microcode"
-#define LINUX_UCODE_BASE_DIR "/lib/firmware"
+#define UCODE_BASE_DIR                       "/usr/lib/microcode"
+#define LINUX_UCODE_BASE_DIR                 "/lib/firmware"
 
-#define FIRMWARE_HOTPLUG_DIR_TAG "FIRMWARE_DIR"
-#define FIRMWARE_HOTPLUG_CONFIG_FILE "/etc/hotplug/firmware.agent"
-#define FIRMWARE_HOTPLUG_DEFAULT_DIR LINUX_UCODE_BASE_DIR
+#define FIRMWARE_HOTPLUG_DIR_TAG             "FIRMWARE_DIR"
+#define FIRMWARE_HOTPLUG_CONFIG_FILE         "/etc/hotplug/firmware.agent"
+#define FIRMWARE_HOTPLUG_DEFAULT_DIR         LINUX_UCODE_BASE_DIR
 
 #define IPR_JBOD_BLOCK_SIZE                  512
 #define IPR_DEFAULT_AF_BLOCK_SIZE            522
@@ -81,36 +81,36 @@
 #define IPR_INVALID_ARRAY_ID                 0xFF
 #define IPR_IOA_RESOURCE_HANDLE              0xffffffff
 #define IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER    256
-#define  IPR_SDB_CHECK_AND_QUIESCE           0x00
-#define  IPR_SDB_CHECK_ONLY                  0x40
-#define  IPR_SDB_CHECK_AND_QUIESCE_ENC       0x0e
-#define  IPR_RDB_UNQUIESCE_AND_REBALANCE     0x20
+#define IPR_SDB_CHECK_AND_QUIESCE            0x00
+#define IPR_SDB_CHECK_ONLY                   0x40
+#define IPR_SDB_CHECK_AND_QUIESCE_ENC        0x0e
+#define IPR_RDB_UNQUIESCE_AND_REBALANCE      0x20
 #define IPR_MAX_NUM_SUPP_INQ_PAGES           36
 #define IPR_DUMP_TRACE_ENTRY_SIZE            8192
 #define IPR_MODE_SENSE_LENGTH                255
 #define IPR_DEFECT_LIST_HDR_LEN              4
 #define IPR_FORMAT_DATA                      0x10
 #define IPR_FORMAT_IMMED                     2
-#define IPR_ARRAY_CMD_TIMEOUT                (2 * 60)     /* 2 minutes */
-#define IPR_INTERNAL_DEV_TIMEOUT             (2 * 60)     /* 2 minutes */
+#define IPR_ARRAY_CMD_TIMEOUT                (2 * 60)      /* 2 minutes */
+#define IPR_INTERNAL_DEV_TIMEOUT             (2 * 60)      /* 2 minutes */
 #define IPR_FORMAT_UNIT_TIMEOUT              (3 * 60 * 60) /* 3 hours */
-#define IPR_INTERNAL_TIMEOUT                 (30)         /* 30 seconds */
-#define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)         /* 35 seconds */
-#define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)     /* 2 minutes */
-#define IPR_WRITE_BUFFER_TIMEOUT             (8 * 60)     /* 8 minutes */
-#define SET_DASD_TIMEOUTS_TIMEOUT		   (2 * 60)
+#define IPR_INTERNAL_TIMEOUT                 (30)          /* 30 seconds */
+#define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)          /* 35 seconds */
+#define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)      /* 2 minutes */
+#define IPR_WRITE_BUFFER_TIMEOUT             (8 * 60)      /* 8 minutes */
+#define SET_DASD_TIMEOUTS_TIMEOUT            (2 * 60)
 #define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    50
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
 #define IPR_DRIVE_ELEM_STATUS_POPULATED      1
 #define IPR_DRIVE_ELEM_STATUS_UNSUPP         0
-#define IPR_TIMEOUT_SECOND_RADIX		0x0000
-#define IPR_TIMEOUT_MINUTE_RADIX		0x4000
-#define IPR_TIMEOUT_RADIX_MASK		0xC000
+#define IPR_TIMEOUT_SECOND_RADIX             0x0000
+#define IPR_TIMEOUT_MINUTE_RADIX             0x4000
+#define IPR_TIMEOUT_RADIX_MASK               0xC000
 #define IPR_TIMEOUT_RADIX_IS_MINUTE(to) \
         (((to) & IPR_TIMEOUT_RADIX_MASK) == IPR_TIMEOUT_MINUTE_RADIX)
 #define IPR_TIMEOUT_RADIX_IS_SECONDS(to) \
         (((to) & IPR_TIMEOUT_RADIX_MASK) == IPR_TIMEOUT_SECOND_RADIX)
-#define IPR_TIMEOUT_MASK			0x3FFF
+#define IPR_TIMEOUT_MASK                     0x3FFF
 
 #define IPR_IOA_DEBUG                        0xDDu
 #define   IPR_IOA_DEBUG_READ_IOA_MEM         0x00u
@@ -119,40 +119,41 @@
 #define   IPR_IOA_DEBUG_ENABLE_DBG_FUNC      0x0Au
 #define   IPR_IOA_DEBUG_DISABLE_DBG_FUNC     0x0Bu
 
-#define IPR_STD_INQ_Z0_TERM_LEN      8
-#define IPR_STD_INQ_Z1_TERM_LEN      12
-#define IPR_STD_INQ_Z2_TERM_LEN      4
-#define IPR_STD_INQ_Z3_TERM_LEN      5
-#define IPR_STD_INQ_Z4_TERM_LEN      4
-#define IPR_STD_INQ_Z5_TERM_LEN      2
-#define IPR_STD_INQ_Z6_TERM_LEN      10
-#define IPR_STD_INQ_PART_NUM_LEN     12
-#define IPR_STD_INQ_EC_LEVEL_LEN     10
-#define IPR_STD_INQ_FRU_NUM_LEN      12
+#define IPR_STD_INQ_Z0_TERM_LEN              8
+#define IPR_STD_INQ_Z1_TERM_LEN              12
+#define IPR_STD_INQ_Z2_TERM_LEN              4
+#define IPR_STD_INQ_Z3_TERM_LEN              5
+#define IPR_STD_INQ_Z4_TERM_LEN              4
+#define IPR_STD_INQ_Z5_TERM_LEN              2
+#define IPR_STD_INQ_Z6_TERM_LEN              10
+#define IPR_STD_INQ_PART_NUM_LEN             12
+#define IPR_STD_INQ_EC_LEVEL_LEN             10
+#define IPR_STD_INQ_FRU_NUM_LEN              12
 
-#define  IPR_START_STOP_STOP                 0x00
-#define  IPR_START_STOP_START                0x01
-#define  IPR_READ_CAPACITY_16                0x10
+#define IPR_START_STOP_STOP                  0x00
+#define IPR_START_STOP_START                 0x01
+#define IPR_READ_CAPACITY_16                 0x10
 #define IPR_SERVICE_ACTION_IN                0x9E
 #define IPR_MAINTENANCE_IN                   0xA3
-#define  IPR_QUERY_MULTI_ADAPTER_STATUS	   0x01
+#define IPR_QUERY_MULTI_ADAPTER_STATUS       0x01
 #define IPR_MAINTENANCE_OUT                  0xA4
-#define  IPR_CHANGE_MULTI_ADAPTER_ASSIGNMENT 0x02
+#define IPR_CHANGE_MULTI_ADAPTER_ASSIGNMENT  0x02
 #define IPR_QUERY_RESOURCE_STATE             0xC2
 #define IPR_QUERY_COMMAND_STATUS             0xCB
 #define IPR_SUSPEND_DEV_BUS                  0xC8
 #define IPR_RESUME_DEV_BUS                   0xC9
 #define IPR_IOA_SERVICE_ACTION               0xD2
-#define  IPR_QUERY_RES_ADDR_ALIASES          0x10
-#define  IPR_DISRUPT_DEVICE                  0x11
-#define  IPR_QUERY_SAS_EXPANDER_INFO         0x12
-#define  IPR_QUERY_RES_REDUNDANCY_INFO       0x13
+#define IPR_QUERY_RES_ADDR_ALIASES           0x10
+#define IPR_DISRUPT_DEVICE                   0x11
+#define IPR_QUERY_SAS_EXPANDER_INFO          0x12
+#define IPR_QUERY_RES_REDUNDANCY_INFO        0x13
 #define IPR_EVALUATE_DEVICE                  0xE4
-#define SKIP_READ					0xE8
-#define SKIP_WRITE				0xEA
-#define QUERY_DASD_TIMEOUTS			0xEB
-#define SET_DASD_TIMEOUTS			0xEC
-#define IPR_QUERY_ARRAY_CONFIG            0xF0
+#define SKIP_READ                            0xE8
+#define SKIP_WRITE                           0xEA
+#define QUERY_DASD_TIMEOUTS                  0xEB
+#define SET_DASD_TIMEOUTS                    0xEC
+#define IPR_MIGRATE_ARRAY_PROTECTION         0xEF
+#define IPR_QUERY_ARRAY_CONFIG               0xF0
 #define IPR_START_ARRAY_PROTECTION           0xF1
 #define IPR_STOP_ARRAY_PROTECTION            0xF2
 #define IPR_RESYNC_ARRAY_PROTECTION          0xF3
@@ -160,24 +161,24 @@
 #define IPR_REMOVE_ARRAY_DEVICE              0xF5
 #define IPR_REBUILD_DEVICE_DATA              0xF6
 #define IPR_RECLAIM_CACHE_STORE              0xF8
-#define  IPR_RECLAIM_ACTION                  0x68
-#define  IPR_RECLAIM_PERFORM                 0x00
-#define  IPR_RECLAIM_RESET_BATTERY_ERROR     0x08
-#define  IPR_RECLAIM_EXTENDED_INFO           0x10
-#define  IPR_RECLAIM_QUERY                   0x20
-#define  IPR_RECLAIM_RESET                   0x40
-#define  IPR_RECLAIM_FORCE_BATTERY_ERROR     0x60
-#define  IPR_RECLAIM_UNKNOWN_PERM            0x80
-#define SET_SUPPORTED_DEVICES			0xFB
+#define IPR_RECLAIM_ACTION                   0x68
+#define IPR_RECLAIM_PERFORM                  0x00
+#define IPR_RECLAIM_RESET_BATTERY_ERROR      0x08
+#define IPR_RECLAIM_EXTENDED_INFO            0x10
+#define IPR_RECLAIM_QUERY                    0x20
+#define IPR_RECLAIM_RESET                    0x40
+#define IPR_RECLAIM_FORCE_BATTERY_ERROR      0x60
+#define IPR_RECLAIM_UNKNOWN_PERM             0x80
+#define SET_SUPPORTED_DEVICES                0xFB
 #define IPR_STD_INQUIRY                      0xFF
 #ifndef REPORT_LUNS
-#define REPORT_LUNS				0xA0
+#define REPORT_LUNS                          0xA0
 #endif
 
 #define IPR_XLATE_DEV_FMT_RC(rc)	((((rc) & 127) == 51) ? -EIO : 0)
-#define IPR_TYPE_AF_DISK             0xC
-#define IPR_TYPE_ADAPTER             0x1f
-#define IPR_TYPE_EMPTY_SLOT          0xff
+#define IPR_TYPE_AF_DISK                     0xC
+#define IPR_TYPE_ADAPTER                     0x1f
+#define IPR_TYPE_EMPTY_SLOT                  0xff
 
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
@@ -638,9 +639,15 @@ struct ipr_array_cap_entry {
 #define IPR_DEFAULT_RAID_LVL "5"
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8   include_allowed:1;
-	u8   reserved:7;
+	u8   reserved:5;
+	u8   format_overlay_type:2;
+
+#define IPR_FORMAT_ADD_DEVICES 1
+#define IPR_FORMAT_REMOVE_DEVICES 2
+
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8   reserved:7;
+	u8   format_overlay_type:2;
+	u8   reserved:5;
 	u8   include_allowed:1;
 #endif
 	u16  reserved2;
@@ -686,7 +693,8 @@ struct ipr_array_record {
 	u8  start_cand:1;
 	u8  stop_cand:1;
 	u8  resync_cand:1;
-	u8  reserved4:5;
+	u8  migrate_cand:1;
+	u8  reserved4:4;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8  reserved3:3;
 	u8  no_config_entry:1;
@@ -695,7 +703,8 @@ struct ipr_array_record {
 	u8  exposed:1;
 	u8  established:1;
 
-	u8  reserved4:5;
+	u8  reserved4:4;
+	u8  migrate_cand:1;
 	u8  resync_cand:1;
 	u8  stop_cand:1;
 	u8  start_cand:1;
@@ -746,7 +755,8 @@ struct ipr_dev_record {
 
 	u8  add_hot_spare_cand:1;
 	u8  rmv_hot_spare_cand:1;
-	u8  reserved3:6;
+	u8  migrate_array_prot_cand:1;
+	u8  reserved3:5;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8  reserved2:2;
 	u8  no_cfgte_dev:1;
@@ -765,7 +775,8 @@ struct ipr_dev_record {
 	u8  parity_cand:1;
 	u8  start_cand:1;
 
-	u8  reserved3:6;
+	u8  reserved3:5;
+	u8  migrate_array_prot_cand:1;
 	u8  rmv_hot_spare_cand:1;
 	u8  add_hot_spare_cand:1;
 #endif
@@ -787,6 +798,10 @@ struct ipr_dev_record {
            ((unsigned long)rcd) < ((unsigned long)((unsigned long)(qac) + ntohs((qac)->resp_len))) && \
            ((unsigned long)rcd) < ((unsigned long)((qac)->data + sizeof((qac)->data))); \
            rcd = (type *)((unsigned long)rcd + ntohs(((struct ipr_common_record *)rcd)->record_len)))
+
+#define for_each_supported_arrays_rcd(rcd, qac) \
+      __for_each_qac_entry(rcd, qac, struct ipr_supported_arrays) \
+              if (rcd->common.record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS)
 
 #define for_each_qac_entry(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_common_record)
@@ -1783,7 +1798,7 @@ struct ipr_fabric_descriptor {
 #define IPR_PATH_NOT_ACTIVE		0x80
 
 #define IPR_PATH_STATE_MASK		0x0F
-#define IPR_PATH_STATE_NO_INFO	0x00
+#define IPR_PATH_STATE_NO_INFO		0x00
 #define IPR_PATH_HEALTHY		0x01
 #define IPR_PATH_DEGRADED		0x02
 #define IPR_PATH_FAILED			0x03
@@ -1979,11 +1994,12 @@ int set_ha_mode(struct ipr_ioa *, int);
 int set_preferred_primary(struct ipr_ioa *, int);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
+int open_and_lock(char *);
 void tool_init(int);
 void exit_on_error(char *, ...);
 bool is_af_blocked(struct ipr_dev *, int);
-int ipr_query_array_config(struct ipr_ioa *, bool, bool, int, void *);
-int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, int, void *);
+int ipr_query_array_config(struct ipr_ioa *, bool, bool, bool, int, void *);
+int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, bool, int, void *);
 int ipr_query_command_status(struct ipr_dev *, void *);
 int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);
@@ -1999,6 +2015,8 @@ int ipr_start_stop_stop(struct ipr_dev *);
 int ipr_stop_array_protection(struct ipr_ioa *);
 int ipr_remove_hot_spare(struct ipr_ioa *);
 int ipr_start_array_protection(struct ipr_ioa *, int, int);
+int ipr_migrate_array_protection(struct ipr_ioa *,
+	       			 struct ipr_array_query_data *, int, int, int);
 int ipr_add_hot_spare(struct ipr_ioa *);
 int ipr_rebuild_device_data(struct ipr_ioa *);
 int ipr_resync_array(struct ipr_ioa *);

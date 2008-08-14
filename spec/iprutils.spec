@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.9
+Version: 2.2.10
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,11 +81,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
-* Wed May 14 2008 Tseng-Hui Lin <tsenglin@us.ibm.com> 
-- Under heavy traffic, download microcode to a disk through /dev/sgX
-  may get -ENOMEM SG_IO ioctl. Change to use /dev/sdX. Fall back
-  to /dev/sgX if: (1) /dev/sdX does not exist or (2) max_sectors_kb
-  is not set large enough for microcode download.
+* Wed Aug 13 2008 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.10
+- Release 2.2.10
+- Add support for the array migration functionality.
 * Thu Apr 09 2008 Tseng-Hui Lin <tsenglin@us.ibm.com> 2.2.9
 - Release 2.2.9
 - Do not save preferred primary attribute to fix an infinite failover

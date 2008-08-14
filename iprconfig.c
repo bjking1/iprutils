@@ -130,6 +130,16 @@ static char *print_path_details(struct ipr_dev *, char *);
         for (i = 0; i < 2; i++) \
             (buf)[i] = print_device(dev, (buf)[i], fmt, type);
 
+static struct sysfs_dev *head_sdev;
+static struct sysfs_dev *tail_sdev;
+
+/**
+ * is_format_allowed - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   1 if format is allowed / 0 otherwise
+ **/
 static int is_format_allowed(struct ipr_dev *dev)
 {
 	int rc;
@@ -141,8 +151,8 @@ static int is_format_allowed(struct ipr_dev *dev)
 		rc = ipr_query_command_status(dev, &cmd_status);
 		if (rc == 0 && cmd_status.num_records != 0) {
 			status_record = cmd_status.record;
-			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL) &&
-			    (status_record->status != IPR_CMD_STATUS_FAILED))
+			if ((status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
+			    && (status_record->status != IPR_CMD_STATUS_FAILED))
 				return 0;
 		}
 	} else {
@@ -161,6 +171,13 @@ static int is_format_allowed(struct ipr_dev *dev)
 	return 1;
 }
 
+/**
+ * can_format_for_raid - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   1 if format for raid is allowed / 0 otherwise
+ **/
 static int can_format_for_raid(struct ipr_dev *dev)
 {
 	if (dev->ioa->is_secondary)
@@ -186,6 +203,12 @@ static int can_format_for_raid(struct ipr_dev *dev)
 	return 1;
 }
 
+/**
+ * flush_stdscr - 
+ *
+ * Returns:
+ *   nothing
+ **/
 /* not needed after screen_driver can do menus */
 static void flush_stdscr()
 {
@@ -201,6 +224,13 @@ static void flush_stdscr()
 	nodelay(stdscr, FALSE);
 }
 
+/**
+ * free_i_con - free memory from an i_container list
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   NULL
+ **/
 static i_container *free_i_con(i_container *i_con)
 {
 	i_container *temp_i_con;
@@ -219,6 +249,15 @@ static i_container *free_i_con(i_container *i_con)
 	return NULL;
 }
 
+/**
+ * add_i_con - create a new i_con list or add an i_container to a list
+ * @i_con:		i_container struct
+ * @f:			field data
+ * @d:			data buffer
+ *
+ * Returns:
+ *   i_container pointer
+ **/
 static i_container *add_i_con(i_container *i_con, char *f, void *d)
 {  
 	i_container *new_i_con;
@@ -241,6 +280,13 @@ static i_container *add_i_con(i_container *i_con, char *f, void *d)
 	return new_i_con;
 }
 
+/**
+ * exit_confirmed - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0
+ **/
 int exit_confirmed(i_container *i_con)
 {
 	exit_func();
@@ -248,6 +294,15 @@ int exit_confirmed(i_container *i_con)
 	return 0;
 }
 
+/**
+ * free_screen - 
+ * @panel:		
+ * @win:		
+ * @fields:		
+ *
+ * Returns:
+ *   nothing
+ **/
 /*not needed after screen_driver can do menus */
 static void free_screen(struct panel_l *panel, struct window_l *win,
 			FIELD **fields)
@@ -279,6 +334,15 @@ static void free_screen(struct panel_l *panel, struct window_l *win,
 	}
 }
 
+/**
+ * add_raid_cmd_tail - 
+ * @ioa:		ipr ioa struct
+ * @dev:		ipr dev struct
+ * @array_id:		array ID
+ *
+ * Returns:
+ *   nothing
+ **/
 static void add_raid_cmd_tail(struct ipr_ioa *ioa, struct ipr_dev *dev, u8 array_id)
 {
 	if (raid_cmd_head) {
@@ -295,6 +359,12 @@ static void add_raid_cmd_tail(struct ipr_ioa *ioa, struct ipr_dev *dev, u8 array
 	raid_cmd_tail->dev = dev;
 }
 
+/**
+ * free_raid_cmds - free the raid_cmd_head list
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_raid_cmds()
 {
 	struct array_cmd_data *cur = raid_cmd_head;
@@ -307,6 +377,12 @@ static void free_raid_cmds()
 	}
 }
 
+/**
+ * free_devs_to_init - free the dev_init_head list
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_devs_to_init()
 {
 	struct devs_to_init_t *dev = dev_init_head;
@@ -318,6 +394,13 @@ static void free_devs_to_init()
 	}
 }
 
+/**
+ * strip_trailing_whitespace - remove trailing white space from a string
+ * @p_str:		string
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static char *strip_trailing_whitespace(char *p_str)
 {
 	int len;
@@ -336,6 +419,12 @@ static char *strip_trailing_whitespace(char *p_str)
 	return p_str;
 }
 
+/**
+ * tool_exit_func - clean up curses stuff on exit if needed
+ *
+ * Returns:
+ *   nothing
+ **/
 static void tool_exit_func()
 {
 	if (use_curses) {
@@ -346,14 +435,29 @@ static void tool_exit_func()
 	}
 }
 
+/**
+ * cmdline_exit_func - 
+ *
+ * Returns:
+ *   nothing
+ **/
 static void cmdline_exit_func()
 {
 }
 
+/**
+ * ipr_list_opts - 
+ * @body:		
+ * @key:		
+ * @list_str:		
+ *
+ * Returns:
+ *   pointer to body string
+ **/
 static char *ipr_list_opts(char *body, char *key, char *list_str)
 {
-	char *string_buf = _("Select one of the following");
 	int   start_len = 0;
+	char *string_buf = _("Select one of the following");
 
 	if (!body) {
 		body = realloc(body, strlen(string_buf) + 8);
@@ -367,6 +471,13 @@ static char *ipr_list_opts(char *body, char *key, char *list_str)
 	return body;
 }
 
+/**
+ * ipr_end_list -
+ * @body:		
+ *
+ * Returns:
+ *   pointer to body string
+ **/
 static char *ipr_end_list(char *body)
 {
 	int start_len = 0;
@@ -379,42 +490,52 @@ static char *ipr_end_list(char *body)
 	return body;
 }
 
+/**
+ * screen_driver - Main driver for curses based display
+ * @screen:		s_node
+ * @header_lines:	number of header lines
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   screen_output struct
+ **/
 static struct screen_output *screen_driver(s_node *screen, int header_lines, i_container *i_con)
 {
 	WINDOW *w_pad = NULL,*w_page_header = NULL; /* windows to hold text */
-	FIELD **fields = NULL;                     /* field list for forms */
-	FORM *form = NULL;                       /* form for input fields */
+	FIELD **fields = NULL;                 /* field list for forms */
+	FORM *form = NULL;                     /* form for input fields */
 	int rc = 0;                            /* the status of the screen */
-	char *status;                            /* displays screen operations */
-	char buffer[100];                       /* needed for special status strings */
-	bool invalid = false;                   /* invalid status display */
+	char *status;                          /* displays screen operations */
+	char buffer[100];                      /* needed for special status strings */
+	bool invalid = false;                  /* invalid status display */
 
 	bool ground_cursor=false;
 
 	int stdscr_max_y,stdscr_max_x;
 	int w_pad_max_y=0,w_pad_max_x=0;       /* limits of the windows */
 	int pad_l=0,pad_scr_r,pad_t=0,viewable_body_lines;
-	int title_lines=2,footer_lines=2; /* position of the pad */
+	int title_lines=2,footer_lines=2;      /* position of the pad */
 	int center,len=0,ch;
 	int i=0,j,k,row=0,col=0,bt_len=0;      /* text positioning */
 	int field_width,num_fields=0;          /* form positioning */
 	int h,w,t,l,o,b;                       /* form querying */
 
 	int active_field = 0;                  /* return to same active field after a quit */
-	bool pages = false,is_bottom = false;   /* control page up/down in multi-page screens */
-	bool form_adjust = false;               /* correct cursor position in multi-page screens */
+	bool pages = false,is_bottom = false;  /* control page up/down in multi-page screens */
+	bool form_adjust = false;              /* correct cursor position in multi-page screens */
 	bool refresh_stdscr = true;
-	bool x_offscr,y_offscr;                 /* scrolling windows */
+	bool x_offscr,y_offscr;                /* scrolling windows */
 	bool pagedn, fakepagedn;
 	char *input = NULL;
 	struct screen_output *s_out;
-	struct screen_opts   *temp;             /* reference to another screen */
+	struct screen_opts   *temp;            /* reference to another screen */
 
-	char *title,*body,*body_text;           /* screen text */
+	char *title,*body,*body_text;          /* screen text */
 	i_container *temp_i_con;
 	int num_i_cons = 0;
 	int x, y;
 	int f_flags;
+
 	s_out = malloc(sizeof(struct screen_output)); /* passes an i_con and an rc value back to the function */
 
 	/* create text strings */
@@ -433,7 +554,8 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 	bt_len = strlen(body);
 	body_text = calloc(bt_len + 1, sizeof(char));
 
-	/* determine max size needed and find where to put form fields and device input in the text and add them
+	/* determine max size needed and find where to put form fields and device
+	 * input in the text and add them
 	 * '%' marks a field.  The number after '%' represents the field's width
 	 */
 	i=0;
@@ -953,8 +1075,8 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 		}
 	}
 
-	leave:
-		s_out->i_con = i_con_head;
+leave:
+	s_out->i_con = i_con_head;
 	s_out->rc = rc;
 	free(body_text);
 	unpost_form(form);
@@ -972,7 +1094,7 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 
 static char *status_hdr[] = {
 		/*   .        .                  .            .                           .          */
-		/*0123456789012345678901234567890123456789012345678901234567890123456789901234567890 */
+		/*012345678901234567890123456789012345678901234567890123456789012345678901234567890 */
 		"OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
 		"OPT Name   PCI/SCSI Location          Description               Status",
 		"Name   PCI/SCSI Location          Vendor   Product ID       Status",
@@ -981,6 +1103,7 @@ static char *status_hdr[] = {
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info"};
+
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
 		"--- ------ -------------------------- ------------------------- -----------------",
@@ -992,6 +1115,15 @@ static char *status_sep[] = {
 		"---------------------- ------------------ ------ ----------------- ----------"
 };
 
+/**
+ * status_header - 
+ * @buffer:		data buffer
+ * @num_lines:		number of lines
+ * @type:		type index
+ *
+ * Returns:
+ *   buffer
+ **/
 static char *status_header(char *buffer, int *num_lines, int type)
 {
 	int cur_len = strlen(buffer);
@@ -1006,9 +1138,18 @@ static char *status_header(char *buffer, int *num_lines, int type)
 	return buffer;
 }
 
-/* add_string_to_body adds a string of data to fit in the text window, putting
- carraige returns in when necessary
- NOTE:  This routine expect the language conversion to be done before
+/**
+ * add_string_to_body - adds a string of data to fit in the text window,
+ * 			putting carraige returns in when necessary
+ * @body:		
+ * @new_text:		
+ * @line_fill:		
+ * @line_num:		
+ *
+ * Returns:
+ *   body on success / 0 if no space available
+ **/
+/* NOTE:  This routine expects the language conversion to be done before
  entering this routine */
 static char *add_string_to_body(char *body, char *new_text, char *line_fill, int *line_num)
 {
@@ -1080,10 +1221,19 @@ static char *add_string_to_body(char *body, char *new_text, char *line_fill, int
 	return body;
 }
 
-/* add_line_to_body adds a single line to the body text of the screen,
- it is intented primarily to list items with the desciptor on the
- left of the screen and ". . . :" to the data field for the descriptor.
- NOTE:  This routine expect the language conversion to be done before
+/**
+ * add_line_to_body - adds a single line to the body text of the screen, it is
+ *		      intented primarily to list items with the desciptor on the
+ *		      left of the screen and ". . . :" to the data field for the
+ *		      descriptor.
+ * @body:		
+ * @new_text:		
+ * @field_data:		
+ *
+ * Returns:
+ *   body
+ **/
+/* NOTE:  This routine expects the language conversion to be done before
  entering this routine */
 #define DETAILS_DESCR_LEN 40
 static char *add_line_to_body(char *body, char *new_text, char *field_data)
@@ -1122,6 +1272,15 @@ static char *add_line_to_body(char *body, char *new_text, char *field_data)
 	return body;
 }
 
+/**
+ * __body_init_status - 
+ * @header:		
+ * @num_lines:		number of lines
+ * @type:		type index
+ *
+ * Returns:
+ *   data buffer
+ **/
 static char *__body_init_status(char **header, int *num_lines, int type)
 {
 	char *buffer = NULL;
@@ -1139,6 +1298,15 @@ static char *__body_init_status(char **header, int *num_lines, int type)
 	return buffer;
 }
 
+/**
+ * body_init_status - 
+ * @buffer:		char array
+ * @header:		
+ * @num_lines:		number of lines
+ *
+ * Returns:
+ *   nothing
+ **/
 static void body_init_status(char *buffer[2], char **header, int *num_lines)
 {
 	int z;
@@ -1147,6 +1315,15 @@ static void body_init_status(char *buffer[2], char **header, int *num_lines)
 		buffer[z] = __body_init_status(header, num_lines, z);
 }
 
+/**
+ * __body_init - 
+ * @buffer:		char array
+ * @header:		
+ * @num_lines:		number of lines
+ *
+ * Returns:
+ *   data buffer
+ **/
 static char *__body_init(char *buffer, char **header, int *num_lines)
 {
 	int j;
@@ -1168,6 +1345,14 @@ static char *__body_init(char *buffer, char **header, int *num_lines)
 	return buffer;
 }
 
+/**
+ * body_init - 
+ * @header:		
+ * @num_lines:		number of lines
+ *
+ * Returns:
+ *   data buffer
+ **/
 static char *body_init(char **header, int *num_lines)
 {
 	if (num_lines)
@@ -1175,6 +1360,15 @@ static char *body_init(char **header, int *num_lines)
 	return __body_init(NULL, header, num_lines);
 }
 
+/**
+ * __complete_screen_driver_curses - 
+ * @n_screen:		
+ * @complete:		% complete string
+ * @allow_exit:		allow exit flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __complete_screen_driver_curses(s_node *n_screen, char *complete, int allow_exit)
 {
 	int stdscr_max_y,stdscr_max_x,center,len;
@@ -1218,6 +1412,15 @@ static int __complete_screen_driver_curses(s_node *n_screen, char *complete, int
 	return 0;
 }
 
+/**
+ * __complete_screen_driver - 
+ * @n_screen:		
+ * @complete:		% complete string
+ * @allow_exit:		allow_exit flag
+ *
+ * Returns:
+ *   0
+ **/
 static int __complete_screen_driver(s_node *n_screen, char *complete, int allow_exit)
 {
 	fprintf(stdout, "\r%s", complete);
@@ -1225,6 +1428,15 @@ static int __complete_screen_driver(s_node *n_screen, char *complete, int allow_
 	return 0;
 }
 
+/**
+ * complete_screen_driver - 
+ * @n_screen:		
+ * @percent:		% complete value
+ * @allow_exit:		allow exit flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int complete_screen_driver(s_node *n_screen, int percent, int allow_exit)
 {
 	char *complete = _("Complete");
@@ -1243,6 +1455,15 @@ static int complete_screen_driver(s_node *n_screen, int percent, int allow_exit)
 	return rc;
 }
 
+/**
+ * time_screen_driver - 
+ * @n_screen:		
+ * @seconds:		number of seconds
+ * @allow_exit:		allow exit flag
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int time_screen_driver(s_node *n_screen, unsigned long seconds, int allow_exit)
 {
 	char *complete = _("Elapsed Time: ");
@@ -1266,6 +1487,15 @@ static int time_screen_driver(s_node *n_screen, unsigned long seconds, int allow
 	return rc;
 }
 
+/**
+ * evaluate_device - 
+ * @dev:		ipr dev struct
+ * @ioa:		ipr ioa struct
+ * @new_block_size:	not used?
+ *
+ * Returns:
+ *   nothing
+ **/
 static void evaluate_device(struct ipr_dev *dev, struct ipr_ioa *ioa,
 			    int new_block_size)
 {
@@ -1306,6 +1536,13 @@ static void evaluate_device(struct ipr_dev *dev, struct ipr_ioa *ioa,
 	}
 }
 
+/**
+ * verify_device - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void verify_device(struct ipr_dev *dev)
 {
 	int rc;
@@ -1343,6 +1580,12 @@ static void verify_device(struct ipr_dev *dev)
 	}
 }
 
+/**
+ * processing - displays "Processing" at the bottom of the screen
+ *
+ * Returns:
+ *   nothing
+ **/
 static void processing()
 {
 	int max_y, max_x;
@@ -1356,6 +1599,13 @@ static void processing()
 	refresh();
 }
 
+/**
+ * main_menu - Main menu
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int main_menu(i_container *i_con)
 {
 	int rc;
@@ -1394,6 +1644,16 @@ int main_menu(i_container *i_con)
 	return rc;
 }
 
+/**
+ * print_standalone_disks - 
+ * @ioa:		ipr ioa struct
+ * @i_con:		i_container struct
+ * @buffer:		
+ * @type:		
+ *
+ * Returns:
+ *   number of lines printed
+ **/
 static int print_standalone_disks(struct ipr_ioa *ioa,
 				  i_container **i_con, char **buffer, int type)
 {
@@ -1410,6 +1670,16 @@ static int print_standalone_disks(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+/**
+ * print_hotspare_disks - 
+ * @ioa:		ipr ioa struct
+ * @i_con:		i_container struct
+ * @buffer:		
+ * @type:		
+ *
+ * Returns:
+ *   number of lines printed
+ **/
 static int print_hotspare_disks(struct ipr_ioa *ioa,
 				i_container **i_con, char **buffer, int type)
 {
@@ -1426,6 +1696,16 @@ static int print_hotspare_disks(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+/**
+ * print_ses_devices - 
+ * @ioa:		ipr ioa struct
+ * @i_con:		i_container struct
+ * @buffer:		
+ * @type:		
+ *
+ * Returns:
+ *   number of lines printed
+ **/
 static int print_ses_devices(struct ipr_ioa *ioa,
 			     i_container **i_con, char **buffer, int type)
 {
@@ -1442,6 +1722,16 @@ static int print_ses_devices(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+/**
+ * print_sas_ses_devices - 
+ * @ioa:		ipr ioa struct
+ * @i_con:		i_container struct
+ * @buffer:		
+ * @type:		
+ *
+ * Returns:
+ *   number of lines printed
+ **/
 static int print_sas_ses_devices(struct ipr_ioa *ioa,
 				 i_container **i_con, char **buffer, int type)
 {
@@ -1461,6 +1751,16 @@ static int print_sas_ses_devices(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+/**
+ * print_vsets - 
+ * @ioa:		ipr ioa struct
+ * @i_con:		i_container struct
+ * @buffer:		
+ * @type:		
+ *
+ * Returns:
+ *   number of lines printed
+ **/
 static int print_vsets(struct ipr_ioa *ioa,
 		       i_container **i_con, char **buffer, int type)
 {
@@ -1484,6 +1784,13 @@ static int print_vsets(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+/**
+ * disk_status - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int disk_status(i_container *i_con)
 {
 	int rc, k;
@@ -1549,6 +1856,14 @@ int disk_status(i_container *i_con)
 	return rc;
 }
 
+/**
+ * device_details_get_device - 
+ * @i_con:		i_container struct
+ * @device:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int device_details_get_device(i_container *i_con,
 				     struct ipr_dev **device)
 {
@@ -1604,6 +1919,14 @@ static int device_details_get_device(i_container *i_con,
 	return 0;
 }
 
+/**
+ * ioa_details - get IOA details
+ * @body:		data buffer
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   body
+ **/
 static char *ioa_details(char *body, struct ipr_dev *dev)
 {
 	struct ipr_ioa_vpd ioa_vpd;
@@ -1694,6 +2017,14 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	return body;
 }
 
+/**
+ * vset_details - get vset details
+ * @body:		data buffer
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   body
+ **/
 static char *vset_details(char *body, struct ipr_dev *dev)
 {
 	struct ipr_read_cap16 read_cap16;
@@ -1769,6 +2100,15 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 	return body;
 }
 
+/**
+ * disk_extended_details - get extended disk details
+ * @body:		data buffer
+ * @dev:		ipr dev struct
+ * @std_inq:		ipr_std_inq_data_long struct
+ *
+ * Returns:
+ *   body
+ **/
 static char *disk_extended_details(char *body, struct ipr_dev *dev,
 				   struct ipr_std_inq_data_long *std_inq)
 {
@@ -1827,6 +2167,14 @@ static char *disk_extended_details(char *body, struct ipr_dev *dev,
 	return body;
 }
 
+/**
+ * disk_details - get disk details
+ * @body:		data buffer
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   body
+ **/
 static char *disk_details(char *body, struct ipr_dev *dev)
 {
 	int rc;
@@ -1960,6 +2308,14 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	return body;
 }
 
+/**
+ * ses_details - get ses details
+ * @body:		data buffer
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   body
+ **/
 static char *ses_details(char *body, struct ipr_dev *dev)
 {
 	int rc;
@@ -2012,6 +2368,13 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 	return body;
 }
 
+/**
+ * device_details - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int device_details(i_container *i_con)
 {
 	char *body = NULL;
@@ -2052,6 +2415,14 @@ int device_details(i_container *i_con)
 #define IPR_REMOVE  1
 #define IPR_ADD_HOT_SPARE 0
 #define IPR_RMV_HOT_SPARE 1
+
+/**
+* raid_screen - 
+* @i_con:            i_container struct
+*
+* Returns:
+*   0 if success / non-zero on failure
+**/
 int raid_screen(i_container *i_con)
 {
 	int rc;
@@ -2077,6 +2448,13 @@ int raid_screen(i_container *i_con)
 	return rc;
 }
 
+/**
+ * raid_status -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_status(i_container *i_con)
 {
 	int rc, k;
@@ -2133,6 +2511,14 @@ int raid_status(i_container *i_con)
 	return rc;
 }
 
+/**
+ * is_array_in_use -
+ * @ioa:		ipr ioa struct
+ * @array_id:		array ID
+ *
+ * Returns:
+ *   1 if the array is in use / 0 otherwise
+ **/
 static int is_array_in_use(struct ipr_ioa *ioa,
 			   u8 array_id)
 {
@@ -2157,6 +2543,13 @@ static int is_array_in_use(struct ipr_ioa *ioa,
 	return 0;
 }
 
+/**
+ * raid_stop - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_stop(i_container *i_con)
 {
 	int rc, k;
@@ -2223,6 +2616,13 @@ int raid_stop(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_raid_stop - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int confirm_raid_stop(i_container *i_con)
 {
 	struct ipr_dev *dev;
@@ -2299,6 +2699,12 @@ int confirm_raid_stop(i_container *i_con)
 	return rc;
 }
 
+/**
+ * raid_stop_complete - 
+ *
+ * Returns:
+ *   21 | EXIT_FLAG if success / 20 | EXIT_FLAG on failure
+ **/
 static int raid_stop_complete()
 {
 	struct ipr_cmd_status cmd_status;
@@ -2352,6 +2758,13 @@ static int raid_stop_complete()
 	}
 }
 
+/**
+ * do_confirm_raid_stop - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   21 | EXIT_FLAG if success / 20 | EXIT_FLAG on failure
+ **/
 int do_confirm_raid_stop(i_container *i_con)
 {
 	struct ipr_dev *vset;
@@ -2404,6 +2817,13 @@ int do_confirm_raid_stop(i_container *i_con)
 	return rc;
 }
 
+/**
+ * raid_start - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_start(i_container *i_con)
 {
 	int rc, k;
@@ -2468,6 +2888,13 @@ int raid_start(i_container *i_con)
 	return rc;
 }
 
+/**
+ * raid_start_loop -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_start_loop(i_container *i_con)
 {
 	int rc;
@@ -2505,6 +2932,13 @@ int raid_start_loop(i_container *i_con)
 	return rc;
 }
 
+/**
+ * configure_raid_start -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int configure_raid_start(i_container *i_con)
 {
 	char *input;
@@ -2596,8 +3030,8 @@ int configure_raid_start(i_container *i_con)
 		}
 	} while (rc & REFRESH_FLAG);
 
-	leave:
-		i_con2 = free_i_con(i_con2);
+leave:
+	i_con2 = free_i_con(i_con2);
 
 	i_con_head = i_con_head_saved;
 	for (k = 0; k < 2; k++) {
@@ -2608,6 +3042,14 @@ int configure_raid_start(i_container *i_con)
 	return rc;
 }
 
+/**
+ * display_input - 
+ * @field_start_row:	
+ * @userprt:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int display_input(int field_start_row, int *userptr)
 {
 	FIELD *input_fields[3];
@@ -2669,6 +3111,13 @@ int display_input(int field_start_row, int *userptr)
 	return rc;
 }
 
+/**
+ * configure_raid_parameters -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int configure_raid_parameters(i_container *i_con)
 {
 	FIELD *input_fields[5];
@@ -2990,8 +3439,8 @@ int configure_raid_parameters(i_container *i_con)
 		else if (isascii(ch))
 			form_driver(form, ch);
 	}
-	leave:
-		unpost_form(form);
+leave:
+	unpost_form(form);
 	free_form(form);
 	free_screen(NULL, NULL, input_fields);
 
@@ -2999,6 +3448,13 @@ int configure_raid_parameters(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_raid_start - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int confirm_raid_start(i_container *i_con)
 {
 	struct array_cmd_data *cur_raid_cmd;
@@ -3079,6 +3535,12 @@ int confirm_raid_start(i_container *i_con)
 	return rc;
 }
 
+/**
+ * raid_start_complete - 
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_start_complete()
 {
 	struct ipr_cmd_status cmd_status;
@@ -3185,6 +3647,13 @@ int raid_start_complete()
 	}
 }
 
+/**
+ * raid_rebuild - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_rebuild(i_container *i_con)
 {
 	int rc, k;
@@ -3255,6 +3724,13 @@ int raid_rebuild(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_raid_rebuild -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   
+ **/
 int confirm_raid_rebuild(i_container *i_con)
 {
 	struct array_cmd_data *cur_raid_cmd;
@@ -3333,6 +3809,12 @@ int confirm_raid_rebuild(i_container *i_con)
 	return (28 | EXIT_FLAG); 
 }
 
+/**
+ * raid_resync_complete -
+ *
+ * Returns:
+ *   EXIT_FLAG / 74 | EXIT_FLAG on success / 73 | EXIT_FLAG otherwise
+ **/
 static int raid_resync_complete()
 {
 	struct ipr_cmd_status cmd_status;
@@ -3400,6 +3882,13 @@ static int raid_resync_complete()
 	}
 }
 
+/**
+ * raid_resync - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_resync(i_container *i_con)
 {
 	int rc, k;
@@ -3466,6 +3955,14 @@ int raid_resync(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_raid_resync - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   EXIT_FLAG / 74 | EXIT_FLAG on success / 73 | EXIT_FLAG otherwise
+ *   INVALID_OPTION_STATUS if nothing to process
+ **/
 int confirm_raid_resync(i_container *i_con)
 {
 	struct array_cmd_data *cur_raid_cmd;
@@ -3542,6 +4039,981 @@ int confirm_raid_resync(i_container *i_con)
 	return raid_resync_complete();
 }
 
+/**
+ * do_raid_migrate - Process the command line Migrate Array command.  Check the
+ * 		     arguments against the qac data to make sure that the
+ * 		     migration is possible.  Then issue the migrate command.
+ * @ioa:		struct ipr_ioa
+ * @qac_data:		query array config data
+ * @vset:		struct ipr_dev
+ * @raid_level:		new raid level
+ * @stripe_size:	new stripe size
+ * @num_devs:		number of devices to add
+ * @fd:			file descriptor
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
+		    struct ipr_dev *vset, char *raid_level, int stripe_size,
+		    int num_devs, int fd)
+{
+	int found = 0, rc = 0;
+	int enc_raid_level;
+	struct ipr_dev *dev = NULL;
+	struct sysfs_dev *sdev;
+	struct ipr_array_cap_entry *cap;
+	struct ipr_array_record *array_rcd;
+	struct ipr_dev_record *dev_rcd;
+	struct ipr_supported_arrays *supported_arrays = NULL;
+
+	/* check that the given raid level is valid */
+	for_each_supported_arrays_rcd(supported_arrays, qac_data) {
+		cap = get_cap_entry(supported_arrays, raid_level);
+		if (cap)
+			break;
+	}
+
+	if (!cap) {
+		fprintf(stderr, "RAID level %s is unsupported.\n", raid_level);
+		return -EINVAL;
+	}
+	enc_raid_level = cap->prot_level;
+
+	/* loop through returned records - looking at array records */
+	for_each_array_rcd(array_rcd, qac_data) {
+		if (vset->array_rcd->resource_handle == array_rcd->resource_handle ) {
+			if (array_rcd->migrate_cand) {
+				array_rcd->issue_cmd = 1;
+				found = 1;
+			}
+			break;
+		}
+	}
+
+	/* device is valid, but array migration is not supported */
+	if (!found) {
+		fprintf(stderr, "Migrate array protection is not currently ");
+		fprintf(stderr, "possible on the %s device.\n", vset->gen_name);
+		return -EINVAL;
+	}
+
+	/* process stripe size */
+	if (stripe_size) {
+		/* is stripe size supported? */
+		if ((stripe_size & ntohs(cap->supported_stripe_sizes)) != stripe_size) {
+			fprintf(stderr, "Unsupported stripe size for ");
+			fprintf(stderr, "selected adapter. %d\n", stripe_size);
+			return -EINVAL;
+		}
+	} else
+		/* get current stripe size */
+		stripe_size = array_rcd->stripe_size;
+
+	/* if adding devices, check that there are a valid number of them */
+	if (cap->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
+ 		rc = raid_create_check_num_devs(cap, num_devs, 0);
+
+		if (rc != 0) {
+			fprintf(stderr,"Incorrect number of devices given.\n");
+			fprintf(stderr,"Minimum number of devices = %d\n",
+				       	cap->min_num_array_devices);
+			fprintf(stderr,"Maximum number of devices = %d\n",
+				       	cap->max_num_array_devices);
+			return rc;
+		}
+	}
+
+	/* if adding devs, verify them and set issue_cmd = 1 */
+	for_each_dev_rcd(dev_rcd, qac_data) {
+		if (num_devs == 0)
+			break;
+
+		/* check the given devices for migrate candidate status */
+		for (sdev = head_sdev; sdev; sdev = sdev->next) {
+			dev = ipr_sysfs_dev_to_dev(sdev);
+			if (dev_rcd->resource_handle == dev->dev_rcd->resource_handle) {
+				if (dev_rcd->migrate_array_prot_cand)
+					dev_rcd->issue_cmd = 1;
+				else {
+					fprintf(stderr, "%s is not available "
+					        "for migrate array "
+						"protection\n", dev->gen_name);
+					return -EINVAL;
+				}
+			}
+		}
+	}
+
+	/* send command to adapter */
+	rc = ipr_migrate_array_protection(ioa, qac_data, fd, stripe_size, enc_raid_level);
+
+	return rc;
+}
+
+/**
+ * raid_migrate_cmd - Command line handler for Migrate Array command.  Process
+ * 		      the command arguments and prepare for do_raid_migrate().
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int raid_migrate_cmd(char **args, int num_args)
+{
+	int i, fd, rc = 0;
+	int next_raid_level = 0, raid_level_set = 0;
+	int next_stripe_size = 0;
+	int stripe_size = 0;
+	int num_devs = 0;
+	char *raid_level = IPR_DEFAULT_RAID_LVL;
+	struct ipr_dev *dev = NULL, *vset = NULL;
+	struct ipr_ioa *ioa = NULL;
+	struct ipr_array_query_data qac_data;
+
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	for (i = 0; i < num_args; i++) {
+		if (strcmp(args[i], "-r") == 0)
+			next_raid_level = 1;
+		else if (strcmp(args[i], "-s") == 0)
+			next_stripe_size = 1;
+		else if (next_raid_level) {
+			next_raid_level = 0;
+			raid_level_set = 1;
+			raid_level = args[i];
+		} else if (next_stripe_size) {
+			next_stripe_size = 0;
+			stripe_size = strtoul(args[i], NULL, 10);
+		} else {
+			dev = find_dev(args[i]);
+			if (!dev) {
+				fprintf(stderr, "Cannot find %s\n", args[i]);
+				return -EINVAL;
+			}
+
+			if (ipr_is_volume_set(dev)) {
+				if (vset) {
+					fprintf(stderr, "Invalid parameters. "
+						"Only one disk "
+						"array can be specified.\n");
+					return -EINVAL;
+				}
+
+				vset = dev;
+				ioa = vset->ioa;
+				continue;
+			}
+
+			if (!ipr_is_af_dasd_device(dev)) {
+				fprintf(stderr, "Invalid device specified. "
+				        "Device must be formatted "
+					"to Advanced Function Format.\n");
+				return -EINVAL;
+			} else {
+				/* keep track of these */
+				num_devs++;
+				ipr_add_sysfs_dev(dev, &head_sdev, &tail_sdev);
+			}
+		}
+	}
+
+	if (vset == NULL) {
+		fprintf(stderr, "No RAID device specified\n");
+		return -EINVAL;
+	}
+	if (!raid_level_set) {
+		fprintf(stderr, "No RAID level specified\n");
+		return -EINVAL;
+	}
+
+	/* lock the ioa device */
+	fd = open_and_lock(ioa->ioa.gen_name);
+	if (fd <= 1)
+		return -EIO;
+
+	/* query array configuration for volume set migrate status */
+	rc = __ipr_query_array_config(ioa, fd, 0, 0, 1, vset->array_rcd->array_id, &qac_data);
+
+	if (rc != 0) {
+		fprintf(stderr, "Array query failed.  rc = %d\n", rc);
+		close(fd);
+		return -EINVAL;
+	}
+
+	/* Check arguments against the qac data and issue the migrate command */
+	rc = do_raid_migrate(ioa, &qac_data, vset, raid_level, stripe_size, num_devs, fd);
+	close(fd);
+
+	return rc;
+}
+
+/**
+ * raid_migrate_complete - Display a status screen showing the command
+ *                         completion percentage.
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int raid_migrate_complete()
+{
+	struct ipr_cmd_status cmd_status;
+	struct ipr_cmd_status_record *status_record;
+	int done_bad;
+	int not_done = 0;
+	int rc;
+	u32 percent_cmplt = 0;
+	int device_available = 0;
+	int exit_now = 0;
+	struct ipr_ioa *ioa;
+	struct array_cmd_data *cur_raid_cmd;
+	struct ipr_dev *dev;
+
+	while (1) {
+		rc = complete_screen_driver(&n_raid_migrate_complete,percent_cmplt,1);
+
+		if (rc & EXIT_FLAG || exit_now) {
+			exit_now = 1;
+
+			if (device_available)
+				return EXIT_FLAG;
+		}
+
+		percent_cmplt = 100;
+		done_bad = 0;
+		not_done = 0;
+
+		for_each_raid_cmd(cur_raid_cmd) {
+			if (cur_raid_cmd->do_cmd == 0)
+				continue;
+			ioa = cur_raid_cmd->ioa;
+			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
+
+			if (rc)   {
+				done_bad = 1;
+				continue;
+			}
+
+			for_each_cmd_status(status_record, &cmd_status) {
+				if ((status_record->command_code != IPR_MIGRATE_ARRAY_PROTECTION) ||
+				    (cur_raid_cmd->array_id != status_record->array_id))
+					continue;
+
+				if (!device_available &&
+				    (status_record->resource_handle != IPR_IOA_RESOURCE_HANDLE)) {
+
+					check_current_config(false);
+					dev = get_dev_from_handle(status_record->resource_handle);
+					if (dev && dev->scsi_dev_data)
+						device_available = 1;
+				}
+
+				if (status_record->status == IPR_CMD_STATUS_IN_PROGRESS) {
+					if (status_record->percent_complete < percent_cmplt)
+						percent_cmplt = status_record->percent_complete;
+					not_done = 1;
+				} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL) {
+					done_bad = 1;
+					ioa_err(ioa, "Migrate array protection failed.\n");
+					rc = RC_FAILED;
+				} else if (!device_available)
+					not_done = 1;
+
+				break;
+			}
+		}
+
+		if (!not_done) {
+			flush_stdscr();
+
+			if (done_bad)
+				/* Migrate Array Protection failed. */
+				return RC_80_Migrate_Prot_Fail;
+
+			check_current_config(false);
+
+			/* Migrate Array Protection completed successfully */
+			return RC_79_Migrate_Prot_Success;
+		}
+		not_done = 0;
+		sleep(1);
+	}
+}
+
+/**
+ * confirm_raid_migrate - Confirm that the migration choices are correct.
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int confirm_raid_migrate()
+{
+	struct array_cmd_data *cur_raid_cmd;
+	int rc, k;
+	char *buffer[2];
+	struct screen_output *s_out;
+	int toggle = 1;
+	int header_lines;
+	i_container *i_con;
+
+	body_init_status(buffer, n_confirm_raid_migrate.header, &header_lines);
+
+	/* Display the array being migrated.  Also display any disks if
+	   they are required for the migration.  */
+	for_each_raid_cmd(cur_raid_cmd) {
+		if (!cur_raid_cmd->do_cmd)
+			continue;
+
+		print_dev(k, cur_raid_cmd->dev, buffer, "1", 2+k);
+	}
+
+	rc = RC_SUCCESS;
+	toggle_field = 0;
+
+	do {
+		n_confirm_raid_migrate.body = buffer[toggle&1];
+		s_out = screen_driver(&n_confirm_raid_migrate, header_lines, i_con);
+		rc = s_out->rc;
+		free(s_out);
+		toggle++;
+	} while (rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_confirm_raid_migrate.body = NULL;
+
+	return rc;
+}
+
+/**
+ * choose_migrate_disks - Choose the additional disks required for migration.
+ * @qac:		i_query_array_data struct
+ * @cap_entry:
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int choose_migrate_disks(struct ipr_array_query_data *qac,
+			 struct ipr_array_cap_entry *cap_entry)
+{
+	struct array_cmd_data *tmp_raid_cmd;
+	struct ipr_dev_record *dev_rcd;
+	struct ipr_dev *dev;
+	i_container *dev_i_con, *temp_i_con;
+	int rc, min, max, mult;
+	int k = 0;
+	char *buffer[2];
+	char info[256];
+	int header_lines = 0;
+	struct screen_output *s_out;
+	int toggle = 0;
+	int found = 0;
+	char *input;
+
+	min = cap_entry->min_num_array_devices;
+	max = cap_entry->max_num_array_devices;
+	mult = cap_entry->min_mult_array_devices;
+
+	sprintf(info, _("A minimum of %d disks must be selected.\n"), min);
+	buffer[0] = add_string_to_body(NULL, info, "", &header_lines);
+	buffer[1] = add_string_to_body(NULL, info, "", &header_lines);
+
+	sprintf(info, _("A maximum of %d disks must be selected.\n"), max);
+	buffer[0] = add_string_to_body(buffer[0], info, "", &header_lines);
+	buffer[1] = add_string_to_body(buffer[1], info, "", &header_lines);
+
+	sprintf(info, _("The number of disks selected must be a multiple of %d.\n\n"), mult);
+	buffer[0] = add_string_to_body(buffer[0], info, "", &header_lines);
+	buffer[1] = add_string_to_body(buffer[1], info, "", &header_lines);
+
+	buffer[0] = status_header(buffer[0], &header_lines, 0);
+	buffer[1] = status_header(buffer[1], &header_lines, 1);
+
+	/* Ensure i_con_head gets set to the head of the
+	   disk candidate list in add_i_con() */
+	dev_i_con = NULL;
+
+	for_each_dev_rcd(dev_rcd, qac) {
+		if (!dev_rcd->migrate_array_prot_cand)
+			continue;
+
+		dev = get_dev_from_handle(dev_rcd->resource_handle);
+		if (dev) {
+			print_dev(k, dev, buffer, "%1", 2);
+
+			add_raid_cmd_tail(NULL, dev, 0);
+
+			/* Add disk candidates to the i_con list. */
+			dev_i_con = add_i_con(dev_i_con, "\0", raid_cmd_tail);
+		}
+	}
+
+	do {
+		toggle_field = 0;
+
+		do {
+			n_raid_migrate_add_disks.body = buffer[toggle&1];
+			/* select disks to use */
+			s_out = screen_driver(&n_raid_migrate_add_disks, header_lines, NULL);
+			rc = s_out->rc;
+			free(s_out);
+			toggle++;
+		} while (rc == TOGGLE_SCREEN);
+
+		if (rc)
+			break;
+
+		found = 0;
+
+		/* Loop through, count the selected devices and
+		 * set the do_cmd flag. */
+		for_each_icon(temp_i_con) {
+			tmp_raid_cmd = temp_i_con->data;
+			input = temp_i_con->field_data;
+
+			if (strcmp(input, "1") == 0) {
+				found++;
+				tmp_raid_cmd->do_cmd = 1;
+			}
+		}
+
+		if (found) {
+			rc = raid_create_check_num_devs(cap_entry, found, 1);
+			if (rc == 0)
+				break;
+			if (rc == RC_77_Too_Many_Disks) {
+				s_status.num = cap_entry->max_num_array_devices;
+				s_status.index = RC_77_Too_Many_Disks;
+			}
+			if (rc == RC_78_Too_Few_Disks) {
+				s_status.num = cap_entry->min_num_array_devices;
+				s_status.index = RC_78_Too_Few_Disks;
+			}
+			if (rc == RC_25_Devices_Multiple) {
+				s_status.num = cap_entry->min_mult_array_devices;
+				s_status.index = RC_25_Devices_Multiple;
+			}
+			/* clear the do_cmd flag */
+			for_each_icon(temp_i_con) {
+				tmp_raid_cmd = (struct array_cmd_data *)temp_i_con->data;
+				input = temp_i_con->field_data;
+
+				if (tmp_raid_cmd && strcmp(input, "1") == 0)
+					tmp_raid_cmd->do_cmd = 0;
+			}
+		}
+
+		rc = REFRESH_FLAG;
+
+	} while (rc & REFRESH_FLAG);
+
+	return rc;
+}
+
+/**
+ * do_ipr_migrate_array_protection - Migrate array protection for an array
+ * @array_i_con:	i_container for selected array
+ * @ioa:                ipr ioa struct
+ * @qac_data:           struct ipr_array_query_data
+ * @stripe_size:        new or existing stripe size for array
+ * @prot_level:         new protection (RAID) level for array
+ * @array_id:           array id
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int do_ipr_migrate_array_protection(i_container *array_i_con, struct ipr_ioa *ioa,
+				    struct ipr_array_query_data *qac,
+				    int stripe_size, int prot_level, u8 array_id)
+{
+	int fd, rc;
+	i_container *temp_i_con;
+	struct array_cmd_data *acd;
+	struct ipr_array_record *array_rcd;
+	struct ipr_dev_record *dev_rcd;
+	struct ipr_array_query_data new_qac;
+	char *input;
+
+	/* Now that we have the selected array, lock the ioa
+	 * device, then issue another query to make sure that
+	 * the adapter's version of the QAC data matches what
+	 * we are processing. */
+	fd = open_and_lock(ioa->ioa.gen_name);
+	if (fd <= 1)
+		return fd;
+
+	rc = __ipr_query_array_config(ioa, fd, 0, 0, 1, array_id, &new_qac);
+	if (rc) {
+		close(fd);
+		return rc;
+	}
+
+	/* Set the "do it" bit for the select disks if needed. */
+	for_each_icon(temp_i_con) {
+		acd = temp_i_con->data;
+		input = temp_i_con->field_data;
+
+		if (acd && strcmp(input, "1") == 0)
+			for_each_dev_rcd(dev_rcd, &new_qac)
+				if (acd->dev->dev_rcd->resource_handle == dev_rcd->resource_handle)
+					dev_rcd->issue_cmd = 1;
+	}
+
+	/* Set the "do it" bit for the selected array. */
+	acd = array_i_con->data;
+	for_each_array_rcd(array_rcd, &new_qac)
+		if (acd->dev->array_rcd->resource_handle == array_rcd->resource_handle)
+			array_rcd->issue_cmd = 1;
+
+	rc =ipr_migrate_array_protection(ioa, &new_qac, fd, stripe_size, prot_level);
+
+	close(fd);
+	return rc;
+}
+
+/**
+ * configure_raid_migrate - The array to migrate has been selected, now get the
+ * 			    new RAID level.
+ * @array_i_con:	i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int configure_raid_migrate(i_container *array_i_con)
+{
+	FIELD *input_fields[3];
+	FIELD *cur_field;
+	FORM *form;
+	ITEM **raid_item = NULL;
+	struct array_cmd_data *cur_raid_cmd;
+	int raid_index_default = 0;
+	unsigned long raid_index = 0;
+	unsigned long index;
+	int rc, i;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	struct ipr_array_query_data qac;
+	struct ipr_supported_arrays *supported_arrays;
+	struct ipr_array_cap_entry *cap_entry;
+	struct text_str
+	{
+		char line[16];
+	} *raid_menu_str = NULL;
+	char raid_str[16];
+	char dev_str[60];
+	int ch, start_row;
+	int cur_field_index;
+	struct prot_level *prot_level_list;
+	int *userptr = NULL;
+	int *retptr;
+	int max_x,max_y,start_y,start_x;
+	i_container *saved_i_con_head;
+
+	getmaxyx(stdscr,max_y,max_x);
+	getbegyx(stdscr,start_y,start_x);
+
+	/* get the array command data and associated data from the data field
+	   of the passed in array info container. */
+	cur_raid_cmd = array_i_con->data;
+	ioa = cur_raid_cmd->ioa;
+	dev = cur_raid_cmd->dev;
+
+	/* Get the QAC data for the chosen array. */
+	rc = ipr_query_array_config(ioa, 0, 0, 1, cur_raid_cmd->array_id, &qac);
+	if (rc)
+		return RC_80_Migrate_Prot_Fail | EXIT_FLAG;
+
+	/* allows cancelling out if the user doesn't change the existing
+	   protection level. */
+	rc = CANCEL_FLAG;
+
+	/* Save the current i_con_head, as it points to the list of array
+	   candidates.  We need to restore this before leaving this routine. */
+	saved_i_con_head = i_con_head;
+	i_con_head = NULL;
+
+	/* set up raid lists */
+	prot_level_list = malloc(sizeof(struct prot_level));
+	prot_level_list[raid_index].is_valid = 0;
+
+	for_each_supported_arrays_rcd(supported_arrays, &qac) {
+		for_each_cap_entry(cap_entry, supported_arrays) {
+
+			prot_level_list[raid_index].array_cap_entry = cap_entry;
+			prot_level_list[raid_index].is_valid = 1;
+
+			if (!strcmp((char *)cap_entry->prot_level_str, dev->prot_level_str))
+				raid_index_default = raid_index;
+
+			raid_index++;
+			prot_level_list = realloc(prot_level_list, sizeof(struct prot_level) * (raid_index + 1));
+			prot_level_list[raid_index].is_valid = 0;
+		}
+	}
+
+	if (!raid_index) {
+		/* We should never get here. */
+		free(prot_level_list);
+		scsi_err(dev, "The query data for the array indicate "
+			 "that there are no supported RAID levels.\n");
+		return RC_80_Migrate_Prot_Fail | EXIT_FLAG;
+	}
+
+	/* Title */
+	input_fields[0] = new_field(1, max_x - start_x,   /* new field size */
+				    0, 0,                 /* upper left corner */
+				    0,                    /* number of offscreen rows */
+				    0);                   /* number of working buffers */
+
+	/* Protection Level */
+	input_fields[1] = new_field(1, 9,        /* new field size */
+				    8, 44,       /*  */
+				    0,           /* number of offscreen rows */
+				    0);          /* number of working buffers */
+
+	input_fields[2] = NULL;
+
+	raid_index = raid_index_default;
+	cap_entry = prot_level_list[raid_index].array_cap_entry;
+
+	form = new_form(input_fields);
+
+	set_current_field(form, input_fields[1]);
+
+	set_field_just(input_fields[0], JUSTIFY_CENTER);
+
+	field_opts_off(input_fields[0], O_ACTIVE);
+	field_opts_off(input_fields[1], O_EDIT);
+
+	set_field_buffer(input_fields[0],	/* field to alter */
+			 0,			/* number of buffer to alter */
+			 _("Select Protection Level"));  /* string value to set */
+
+	form_opts_off(form, O_BS_OVERLOAD);
+
+	flush_stdscr();
+
+	clear();
+
+	set_form_win(form,stdscr);
+	set_form_sub(form,stdscr);
+	post_form(form);
+
+	mvaddstr(2, 1, _("Current RAID protection level is shown.  To change"));
+	mvaddstr(3, 1, _("setting hit \"c\" for options menu.  Highlight desired"));
+	mvaddstr(4, 1, _("option then hit Enter"));
+	mvaddstr(6, 1, _("c=Change Setting"));
+	sprintf(dev_str, "%s - Protection Level . . . . . . :", dev->dev_name);
+	mvaddstr(8, 0,  dev_str);
+	mvaddstr(max_y - 4, 0, _("Press Enter to Continue"));
+	mvaddstr(max_y - 2, 0, EXIT_KEY_LABEL CANCEL_KEY_LABEL);
+
+	form_driver(form,			/* form to pass input to */
+		    REQ_FIRST_FIELD );		/* form request code */
+
+	sprintf(raid_str, "RAID %s", dev->prot_level_str);
+
+	while (1) {
+		set_field_buffer(input_fields[1],      /* field to alter */
+				 0,                    /* number of buffer to alter */
+				 raid_str);            /* string value to set */
+
+		refresh();
+		ch = getch();
+
+		if (IS_EXIT_KEY(ch)) {
+			rc = EXIT_FLAG;
+			break;
+		} else if (IS_CANCEL_KEY(ch)) {
+			rc = CANCEL_FLAG;
+			break;
+		} else if (ch == 'c') {
+			cur_field = current_field(form);
+			cur_field_index = field_index(cur_field);
+
+			if (cur_field_index == 1) {
+				/* count the number of valid entries */
+				index = 0;
+				while (prot_level_list[index].is_valid)
+					index++;
+
+				/* get appropriate memory, the text portion
+				   needs to be done up front as the new_item()
+				   function uses the passed pointer to display data */
+				raid_item = realloc(raid_item, sizeof(ITEM **) * (index + 1));
+				raid_menu_str = realloc(raid_menu_str, sizeof(struct text_str) * (index));
+				userptr = realloc(userptr, sizeof(int) * (index + 1));
+
+				/* set up protection level menu */
+				index = 0;
+				while (prot_level_list[index].is_valid) {
+					raid_item[index] = NULL;
+					cap_entry = prot_level_list[index].array_cap_entry;
+					sprintf(raid_menu_str[index].line,
+						"RAID %s", cap_entry->prot_level_str);
+					raid_item[index] = new_item(raid_menu_str[index].line,"");
+					userptr[index] = index;
+					set_item_userptr(raid_item[index],
+							 (char *)&userptr[index]);
+					index++;
+				}
+
+				raid_item[index] = NULL;
+				start_row = 8;
+				/* select the desired new protection level */
+				rc = display_menu(raid_item, start_row, index, &retptr);
+				if (rc == RC_SUCCESS) {
+					raid_index = *retptr;
+					cap_entry = prot_level_list[raid_index].array_cap_entry;
+					sprintf(raid_str, "RAID %s", cap_entry->prot_level_str);
+
+				}
+
+				/* clean up */
+				for (i=0; raid_item[i] != NULL; i++)
+					free_item(raid_item[i]);
+
+				free(raid_item);
+				raid_item = NULL;
+			} else
+				continue;
+		} else if (IS_ENTER_KEY(ch)) {
+			/* don't change anything if Cancel or Exit */
+			if (rc != RC_SUCCESS)
+				break;
+
+			/* set protection level */
+			cur_raid_cmd->prot_level = cap_entry->prot_level;
+
+			/* are additional devices needed? */
+			if (cap_entry->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
+				rc = choose_migrate_disks(&qac, cap_entry);
+				if (rc)
+					break;
+
+			} else if (cap_entry->format_overlay_type != IPR_FORMAT_REMOVE_DEVICES) {
+				/* We should never get here. */
+				scsi_err(dev, "The capability entry for the array "
+					 "does not have a valid overlay type.\n");
+				return RC_80_Migrate_Prot_Fail | EXIT_FLAG;
+			}
+
+			rc = confirm_raid_migrate();
+
+			if (rc)
+				break;
+
+			/* set up qac and send command to adapter */
+			rc = do_ipr_migrate_array_protection(array_i_con, ioa, &qac,
+				       			     dev->array_rcd->stripe_size,
+							     cur_raid_cmd->prot_level,
+							     cur_raid_cmd->array_id);
+
+			break;
+
+		} else if (ch == KEY_RIGHT)
+			form_driver(form, REQ_NEXT_CHAR);
+		else if (ch == KEY_LEFT)
+			form_driver(form, REQ_PREV_CHAR);
+		else if ((ch == KEY_BACKSPACE) || (ch == 127))
+			form_driver(form, REQ_DEL_PREV);
+		else if (ch == KEY_DC)
+			form_driver(form, REQ_DEL_CHAR);
+		else if (ch == KEY_IC)
+			form_driver(form, REQ_INS_MODE);
+		else if (ch == KEY_EIC)
+			form_driver(form, REQ_OVL_MODE);
+		else if (ch == KEY_HOME)
+			form_driver(form, REQ_BEG_FIELD);
+		else if (ch == KEY_END)
+			form_driver(form, REQ_END_FIELD);
+		else if (ch == '\t')
+			form_driver(form, REQ_NEXT_FIELD);
+		else if (ch == KEY_UP)
+			form_driver(form, REQ_PREV_FIELD);
+		else if (ch == KEY_DOWN)
+			form_driver(form, REQ_NEXT_FIELD);
+		else if (isascii(ch))
+			form_driver(form, ch);
+	}
+
+	/* restore i_con_head */
+	i_con_head = saved_i_con_head;
+
+	free(prot_level_list);
+	free(raid_menu_str);
+	free(userptr);
+
+	unpost_form(form);
+	free_form(form);
+	free_screen(NULL, NULL, input_fields);
+
+	flush_stdscr();
+	return rc;
+}
+
+/**
+ * process_raid_migrate - Process the list of arrays that can be migrated.
+ * @buffer:
+ * @header_lines:
+ * @last_array_cmd:
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int process_raid_migrate(char *buffer[], int header_lines)
+{
+	struct array_cmd_data *acd, *saved_cmd_head;
+	struct array_cmd_data *last_array_cmd;
+	struct screen_output *s_out;
+	int found = 0;
+	int toggle = 1;
+	i_container *i_con, *temp_i_con;
+	char *input;
+	int rc = REFRESH_FLAG;
+
+	while (rc & REFRESH_FLAG) {
+		toggle_field = 0;
+
+		do {
+			n_raid_migrate.body = buffer[toggle&1];
+			/* display disk array selection screen */
+			s_out = screen_driver(&n_raid_migrate, header_lines, i_con);
+			rc = s_out->rc;
+			free(s_out);
+			toggle++;
+		} while (rc == TOGGLE_SCREEN);
+
+		if (rc & EXIT_FLAG || rc & CANCEL_FLAG)
+			break;
+
+		found = 0;
+		/* Only one migration is allowed at a time.  Set the do_cmd
+		 * flag for the first one that is found. */
+		for_each_icon(temp_i_con) {
+			acd = temp_i_con->data;
+			input = temp_i_con->field_data;
+
+			if (acd && strcmp(input, "1") == 0) {
+				found++;
+				acd->do_cmd = 1;
+				break;
+			}
+		}
+
+		if (found) {
+			last_array_cmd = raid_cmd_tail;
+
+			/* Go to protection level selection screen */
+			rc = configure_raid_migrate(temp_i_con);
+
+			/* Keep the array information in the list, but
+			 * strip off any disk inforamtion. */
+			saved_cmd_head = raid_cmd_head;
+			raid_cmd_head = last_array_cmd->next;
+			free_raid_cmds();
+			raid_cmd_head = saved_cmd_head;
+			raid_cmd_tail = last_array_cmd;
+			last_array_cmd->next = NULL;
+
+			/* Done on success or exit, otherwise refresh */
+			if (rc == RC_SUCCESS || rc & EXIT_FLAG)
+				break;
+
+			/* clear the do_cmd flag */
+			acd->do_cmd = 0;
+
+			rc = REFRESH_FLAG;
+		} else {
+			s_status.index = INVALID_OPTION_STATUS;
+			rc = REFRESH_FLAG;
+		}
+
+	}
+	return rc;
+}
+
+/**
+ * raid_migrate - GUI routine for migrate raid array protection.
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int raid_migrate(i_container *i_con)
+{
+	int rc, k;
+	int found = 0;
+	struct ipr_dev *vset;
+	char *buffer[2];
+	struct ipr_ioa *ioa;
+	struct screen_output *s_out;
+	int header_lines;
+
+	processing();
+
+	/* make sure the i_con list is empty */
+	i_con = free_i_con(i_con);
+
+	rc = RC_SUCCESS;
+
+	check_current_config(false);
+
+	body_init_status(buffer, n_raid_migrate.header, &header_lines);
+
+	for_each_primary_ioa(ioa) {
+		for_each_vset(ioa, vset) {
+			if (!vset->array_rcd->migrate_cand)
+				continue;
+			add_raid_cmd_tail(ioa, vset, vset->array_rcd->array_id);
+			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
+
+			print_dev(k, vset, buffer, "%1", k);
+			found++;
+		}
+	}
+
+	if (!found) {
+		n_raid_migrate_fail.body = body_init(n_raid_migrate_fail.header, NULL);
+		s_out = screen_driver(&n_raid_migrate_fail, 0, i_con);
+
+		free(n_raid_migrate_fail.body);
+		n_raid_migrate_fail.body = NULL;
+
+		rc = s_out->rc | CANCEL_FLAG;
+		free(s_out);
+	} else
+		rc = process_raid_migrate(buffer, header_lines);
+
+	/* Display a progress screen. */
+	if (rc == 0)
+		return raid_migrate_complete();
+
+	/* Free the remaining raid commands. */
+	free_raid_cmds();
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_raid_migrate.body = NULL;
+
+	return rc;
+}
+
+/**
+ * raid_include - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int raid_include(i_container *i_con)
 {
 	int k;
@@ -3618,6 +5090,14 @@ int raid_include(i_container *i_con)
 	return rc;
 }
 
+/**
+ * configure_raid_include - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ *   INVALID_OPTION_STATUS if nothing to process
+ **/
 int configure_raid_include(i_container *i_con)
 {
 	int k;
@@ -3663,7 +5143,7 @@ int configure_raid_include(i_container *i_con)
 	vset = cur_raid_cmd->dev;
 
 	/* Get Query Array Config Data */
-	rc = ipr_query_array_config(ioa, 0, 1, cur_raid_cmd->array_id, qac_data);
+	rc = ipr_query_array_config(ioa, 0, 1, 0, cur_raid_cmd->array_id, qac_data);
 
 	found = 0;
 
@@ -3766,12 +5246,18 @@ int configure_raid_include(i_container *i_con)
 	}
 	rc = confirm_raid_include(i_con);
 
-	leave:
-
-		free(s_out);
+leave:
+	free(s_out);
 	return rc;
 }
 
+/**
+ * confirm_raid_include - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_raid_include(i_container *i_con)
 {
 	struct array_cmd_data *cur_raid_cmd;
@@ -3834,6 +5320,12 @@ int confirm_raid_include(i_container *i_con)
 	return rc;
 }
 
+/**
+ * format_include_cand -
+ *
+ * Returns:
+ *   number of devices processed
+ **/
 int format_include_cand()
 {
 	struct scsi_dev_data *scsi_dev_data;
@@ -3891,6 +5383,14 @@ int format_include_cand()
 	return num_devs;
 }
 
+/**
+ * update_include_qac_data - 
+ * @old_qac:		ipr_array_query_data struct
+ * @new_qac:		ipr_array_query_data struct
+ *
+ * Returns:
+ *   0 if success / 26 on failure
+ **/
 static int update_include_qac_data(struct ipr_array_query_data *old_qac,
 				   struct ipr_array_query_data *new_qac)
 {
@@ -3919,6 +5419,15 @@ static int update_include_qac_data(struct ipr_array_query_data *old_qac,
 	return 0;
 }
 
+/**
+ * do_array_include - 
+ * @ioa:		ipr ioa struct
+ * @array_id:		array ID
+ * @qac:		ipr_array_query_data struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int do_array_include(struct ipr_ioa *ioa, int array_id,
 			    struct ipr_array_query_data *qac)
 {
@@ -3935,7 +5444,7 @@ static int do_array_include(struct ipr_ioa *ioa, int array_id,
 	if (rc)
 		goto out;
 
-	rc = __ipr_query_array_config(ioa, fd, 0, 1, array_id, &qac_data);
+	rc = __ipr_query_array_config(ioa, fd, 0, 1, 0, array_id, &qac_data);
 
 	if (rc)
 		goto out;
@@ -3951,6 +5460,13 @@ out:
 	return rc;
 }
 
+/**
+ * dev_include_complete - 
+ * @num_devs:		not used ?
+ *
+ * Returns:
+ *   27 | EXIT_FLAG on success / 26 | EXIT_FLAG otherwise
+ **/
 int dev_include_complete(u8 num_devs)
 {
 	int done_bad;
@@ -4090,6 +5606,14 @@ int dev_include_complete(u8 num_devs)
 	}
 }
 
+/**
+ * add_format_device - 
+ * @dev:		ipr dev struct
+ * @blk_size:		block size
+ *
+ * Returns:
+ *   nothing
+ **/
 static void add_format_device(struct ipr_dev *dev, int blk_size)
 {
 	if (dev_init_head) {
@@ -4110,6 +5634,14 @@ static void add_format_device(struct ipr_dev *dev, int blk_size)
 	dev_init_tail->dev = dev;
 }
 
+/**
+ * configure_af_device -
+ * @i_con:		i_container struct
+ * @action_code:	include or remove
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int configure_af_device(i_container *i_con, int action_code)
 {
 	int rc, j, k;
@@ -4260,6 +5792,13 @@ static int configure_af_device(i_container *i_con, int action_code)
 	return rc;
 }
 
+/**
+ * af_include - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int af_include(i_container *i_con)
 {
 	int rc;
@@ -4267,6 +5806,13 @@ int af_include(i_container *i_con)
 	return rc;
 }
 
+/**
+ * af_remove - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int af_remove(i_container *i_con)
 {
 	int rc;
@@ -4274,6 +5820,13 @@ int af_remove(i_container *i_con)
 	return rc;
 }
 
+/**
+ * add_hot_spare -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int add_hot_spare(i_container *i_con)
 {
 	int rc;
@@ -4284,6 +5837,13 @@ int add_hot_spare(i_container *i_con)
 	return rc;
 }
 
+/**
+ * remove_hot_spare -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int remove_hot_spare(i_container *i_con)
 {
 	int rc;
@@ -4294,6 +5854,14 @@ int remove_hot_spare(i_container *i_con)
 	return rc;
 }
 
+/**
+ * hot_spare - 
+ * @i_con:		i_container struct
+ * @action:		add or remove
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int hot_spare(i_container *i_con, int action)
 {
 	int rc, k;
@@ -4407,12 +5975,11 @@ int hot_spare(i_container *i_con, int action)
 		rc = REFRESH_FLAG | INVALID_OPTION_STATUS;
 
 
-	leave:
-
-		if (rc & CANCEL_FLAG) {
-			s_status.index = (rc & ~CANCEL_FLAG);
-			rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
-		}
+leave:
+	if (rc & CANCEL_FLAG) {
+		s_status.index = (rc & ~CANCEL_FLAG);
+		rc = (rc | REFRESH_FLAG) & ~CANCEL_FLAG;
+	}
 
 	i_con = free_i_con(i_con);
 
@@ -4427,6 +5994,14 @@ int hot_spare(i_container *i_con, int action)
 	return rc;
 }
 
+/**
+ * select_hot_spare - 
+ * @i_con:		i_container struct
+ * @action:		add or remove
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int select_hot_spare(i_container *i_con, int action)
 {
 	struct array_cmd_data *cur_raid_cmd;
@@ -4518,13 +6093,20 @@ int select_hot_spare(i_container *i_con, int action)
 		/* "No devices available for the selected hot spare operation"  */
 		rc = 52 | CANCEL_FLAG; 
 
-	leave:
-		i_con2 = free_i_con(i_con2);
+leave:
+	i_con2 = free_i_con(i_con2);
 	i_con_head = i_con_head_saved;
 	free(s_out);
 	return rc;
 }
 
+/**
+ * confirm_hot_spare - 
+ * @action:		add or remove
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_hot_spare(int action)
 {
 	struct array_cmd_data *cur_raid_cmd;
@@ -4580,11 +6162,17 @@ int confirm_hot_spare(int action)
 
 	rc = hot_spare_complete(action);
 
-	leave:
-
-		return rc;
+leave:
+	return rc;
 }
 
+/**
+ * hot_spare_complete -
+ * @action:		add or remove
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int hot_spare_complete(int action)
 {
 	int rc;
@@ -4626,6 +6214,13 @@ int hot_spare_complete(int action)
 	return rc;
 }
 
+/**
+ * disk_unit_recovery - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int disk_unit_recovery(i_container *i_con)
 {
 	int rc;
@@ -4649,6 +6244,16 @@ int disk_unit_recovery(i_container *i_con)
 	return rc;
 }
 
+/**
+ * get_elem_status - 
+ * @dev:		ipr dev struct
+ * @ses:		ipr dev struct
+ * @ses_data:		ipr_encl_status_ctl_pg struct
+ * @ses_config:		ipr_ses_config_pg struct
+ *
+ * Returns:
+ *   ipr_drive_elem_status struct if success / NULL otherwise
+ **/
 static struct ipr_drive_elem_status *
 get_elem_status(struct ipr_dev *dev, struct ipr_dev *ses,
 		struct ipr_encl_status_ctl_pg *ses_data, struct ipr_ses_config_pg *ses_cfg)
@@ -4685,6 +6290,14 @@ get_elem_status(struct ipr_dev *dev, struct ipr_dev *ses,
 	return NULL;
 }
 
+/**
+ * wait_for_new_dev -
+ * @ioa:		ipr ioa struct
+ * @res_addr:		ipr_res_addr struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void wait_for_new_dev(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr)
 {
 	int time = 12;
@@ -4709,6 +6322,14 @@ static void wait_for_new_dev(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr)
 	}
 }
 
+/**
+ * process_conc_maint -
+ * @i_con:		i_container struct
+ * @action:		add or remove
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int process_conc_maint(i_container *i_con, int action)
 {
 	i_container *temp_i_con;
@@ -4872,6 +6493,13 @@ int process_conc_maint(i_container *i_con, int action)
 	return rc;
 }
 
+/**
+ * format_in_prog - check to determine if format is in progress
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if format is not in progress / 1 if format is in progress
+ **/
 static int format_in_prog(struct ipr_dev *dev)
 {
 	struct ipr_cmd_status cmd_status;
@@ -4898,6 +6526,13 @@ static int format_in_prog(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * free_empty_slot - 
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_empty_slot(struct ipr_dev *dev)
 {
 	if (!dev->scsi_dev_data)
@@ -4909,6 +6544,14 @@ static void free_empty_slot(struct ipr_dev *dev)
 	free(dev);
 }
 
+/**
+ * free_empty_slots - 
+ * @dev:		ipr dev struct
+ * @num:		number of slots to free
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_empty_slots(struct ipr_dev **dev, int num)
 {
 	int i;
@@ -4923,6 +6566,13 @@ static void free_empty_slots(struct ipr_dev **dev, int num)
 	}
 }
 
+/**
+ * get_res_addrs -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0
+ **/
 static int get_res_addrs(struct ipr_dev *dev)
 {
 	struct ipr_res_addr *ra;
@@ -4944,6 +6594,15 @@ static int get_res_addrs(struct ipr_dev *dev)
 	return 0;
 }
 
+/**
+ * alloc_empty_slot -
+ * @ses:		ipr dev struct
+ * @slot:		slot number
+ * @is_vses:		vses flag
+ *
+ * Returns:
+ *   ipr_dev struct
+ **/
 static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vses)
 {
 	struct ipr_ioa *ioa = ses->ioa;
@@ -4978,6 +6637,14 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	return dev;
 }
 
+/**
+ * can_perform_conc_action -
+ * @dev:		ipr dev struct
+ * @action:		action type
+ *
+ * Returns:
+ *   1 if able to perform the action / 0 otherwise
+ **/
 static int can_perform_conc_action(struct ipr_dev *dev, int action)
 {
 	if (action == IPR_CONC_REMOVE) {
@@ -4990,6 +6657,15 @@ static int can_perform_conc_action(struct ipr_dev *dev, int action)
 	return 1;
 }
 
+/**
+ * get_dev_for_slot -
+ * @ses:		ipr dev struct
+ * @slot:		slot number
+ * @is_vses:		action type
+ *
+ * Returns:
+ *   ipr_dev struct if success / NULL otherwise
+ **/
 static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vses)
 {
 	struct ipr_dev *dev;
@@ -5020,6 +6696,15 @@ static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vs
 	return NULL;
 }
 
+/**
+ * conc_dev_is_dup -
+ * @dev:		ipr dev struct
+ * @devs:		ipr dev struct array
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   1 if duplicate device detected / 0 otherwise
+ **/
 static int conc_dev_is_dup(struct ipr_dev *dev, struct ipr_dev **devs, int num_devs)
 {
 	int i;
@@ -5030,6 +6715,14 @@ static int conc_dev_is_dup(struct ipr_dev *dev, struct ipr_dev **devs, int num_d
 	return 0;
 }
 
+/**
+ * dev_is_dup - indicate whether or not the devices are the same
+ * @first:		ipr dev struct
+ * @second:		ipr dev struct
+ *
+ * Returns:
+ *   1 if devices are the same / 0 otherwise
+ **/
 static int dev_is_dup(struct ipr_dev *first, struct ipr_dev *second)
 {
 	struct ipr_res_addr *first_ra;
@@ -5048,6 +6741,15 @@ static int dev_is_dup(struct ipr_dev *first, struct ipr_dev *second)
 	return 0;
 }
 
+/**
+ * find_dup -
+ * @dev:		ipr dev struct
+ * @devs:		ipr dev struct array
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   ipr_dev struct if duplicate found / NULL otherwise
+ **/
 static struct ipr_dev *find_dup(struct ipr_dev *dev, struct ipr_dev **devs, int num_devs)
 {
 	int i;
@@ -5060,6 +6762,15 @@ static struct ipr_dev *find_dup(struct ipr_dev *dev, struct ipr_dev **devs, int 
 	return NULL;
 }
 
+/**
+ * remove_dup_dev -
+ * @dev:		ipr dev struct
+ * @devs:		ipr dev struct array
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   num_devs
+ **/
 static int remove_dup_dev(struct ipr_dev *dev, struct ipr_dev **devs, int num_devs)
 {
 	int i, j;
@@ -5079,6 +6790,14 @@ static int remove_dup_dev(struct ipr_dev *dev, struct ipr_dev **devs, int num_de
 	return num_devs;
 }
 
+/**
+ * remove_conc_dups -
+ * @devs:		ipr dev struct array
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   num_devs
+ **/
 static int remove_conc_dups(struct ipr_dev **devs, int num_devs)
 {
 	int i;
@@ -5094,6 +6813,14 @@ static int remove_conc_dups(struct ipr_dev **devs, int num_devs)
 	return num_devs;
 }
 
+/**
+ * get_conc_devs -
+ * @ret:		ipr dev struct 
+ * @action:		action typoe
+ *
+ * Returns:
+ *   num)devs
+ **/
 static int get_conc_devs(struct ipr_dev ***ret, int action)
 {
 	struct ipr_ioa *ioa;
@@ -5160,6 +6887,14 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	return num_devs;  
 }
 
+/**
+ * start_conc_maint -
+ * @i_con:		i_container struct
+ * @action:		action type
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int start_conc_maint(i_container *i_con, int action)
 {
 	int rc, i, k;
@@ -5232,16 +6967,37 @@ int start_conc_maint(i_container *i_con, int action)
 	return rc;  
 }
 
+/**
+ * concurrent_add_device -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int concurrent_add_device(i_container *i_con)
 {
 	return start_conc_maint(i_con, IPR_CONC_ADD);
 }
 
+/**
+ * concurrent_remove_device -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int concurrent_remove_device(i_container *i_con)
 {
 	return start_conc_maint(i_con, IPR_CONC_REMOVE);
 }
 
+/**
+ * path_details -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int path_details(i_container *i_con)
 {
 	int rc, header_lines = 2;
@@ -5281,6 +7037,13 @@ int path_details(i_container *i_con)
 	return rc;
 }
 
+/**
+ * path_status -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int path_status(i_container * i_con)
 {
 	int rc, k, header_lines;
@@ -5335,6 +7098,13 @@ int path_status(i_container * i_con)
 	return rc;
 }
 
+/**
+ * init_device -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int init_device(i_container *i_con)
 {
 	int rc, k;
@@ -5442,6 +7212,13 @@ int init_device(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_init_device -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_init_device(i_container *i_con)
 {
 	char *input;
@@ -5519,6 +7296,13 @@ int confirm_init_device(i_container *i_con)
 	return rc;
 }
 
+/**
+ * dev_init_complete -
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   50 | EXIT_FLAG if success /  51 | EXIT_FLAG on failure
+ **/
 static int dev_init_complete(u8 num_devs)
 {
 	int done_bad = 0;
@@ -5663,6 +7447,13 @@ static int dev_init_complete(u8 num_devs)
 	}
 }
 
+/**
+ * send_dev_inits -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   50 | EXIT_FLAG if success /  51 | EXIT_FLAG on failure
+ **/
 int send_dev_inits(i_container *i_con)
 {
 	u8 num_devs = 0;
@@ -5841,6 +7632,13 @@ int send_dev_inits(i_container *i_con)
 		return 51 | EXIT_FLAG; 
 }
 
+/**
+ * reclaim_cache -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int reclaim_cache(i_container* i_con)
 {
 	int rc;
@@ -5912,7 +7710,13 @@ leave:
 	return rc;
 }
 
-
+/**
+ * confirm_reclaim -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_reclaim(i_container *i_con)
 {
 	struct ipr_ioa *ioa, *reclaim_ioa;
@@ -5994,6 +7798,13 @@ int confirm_reclaim(i_container *i_con)
 	return rc;
 }
 
+/**
+ * reclaim_warning -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int reclaim_warning(i_container *i_con)
 {
 	struct ipr_ioa *reclaim_ioa;
@@ -6032,6 +7843,13 @@ int reclaim_warning(i_container *i_con)
 	return rc;
 }
 
+/**
+ * get_reclaim_results -
+ * @buf:		ipr_reclaim_query_data struct
+ *
+ * Returns:
+ *   ipr_reclaim_results struct
+ **/
 static char *get_reclaim_results(struct ipr_reclaim_query_data *buf)
 {
 	char *body = NULL;
@@ -6066,6 +7884,13 @@ static char *get_reclaim_results(struct ipr_reclaim_query_data *buf)
 	return body;
 }
 
+/**
+ * print_reclaim_results - display reclaim results
+ * @buf:		ipr_reclaim_query_data struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void print_reclaim_results(struct ipr_reclaim_query_data *buf)
 {
 	char *body = get_reclaim_results(buf);
@@ -6074,6 +7899,13 @@ static void print_reclaim_results(struct ipr_reclaim_query_data *buf)
 	free(body);
 }
 
+/**
+ * reclaim_result -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   EXIT_FLAG if success / 37 | EXIT_FLAG on failure
+ **/
 int reclaim_result(i_container *i_con)
 {
 	int rc;
@@ -6131,6 +7963,13 @@ int reclaim_result(i_container *i_con)
 	return rc;
 }
 
+/**
+ * battery_maint -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int battery_maint(i_container *i_con)
 {
 	int rc, k;
@@ -6182,7 +8021,6 @@ int battery_maint(i_container *i_con)
 	free(s_out);
 
 leave:
-
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
 		buffer[k] = NULL;
@@ -6193,6 +8031,13 @@ leave:
 	return rc;
 }
 
+/**
+ * get_battery_info -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   char *
+ **/
 static char *get_battery_info(struct ipr_ioa *ioa)
 {
 	struct ipr_reclaim_query_data *reclaim_data = ioa->reclaim_data;
@@ -6282,6 +8127,13 @@ static char *get_battery_info(struct ipr_ioa *ioa)
 	return body;
 }
 
+/**
+ * show_battery_info -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int show_battery_info(struct ipr_ioa *ioa)
 {
 	struct screen_output *s_out;
@@ -6297,6 +8149,12 @@ int show_battery_info(struct ipr_ioa *ioa)
 	return rc;
 }
 
+/**
+ * confirm_force_battery_error -
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_force_battery_error(void)
 {
 	int rc,k;
@@ -6335,6 +8193,13 @@ int confirm_force_battery_error(void)
 	return rc;
 }
 
+/**
+ * enable_battery -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   71 | EXIT_FLAG if success / 70 | EXIT_FLAG on failure
+ **/
 int enable_battery(i_container *i_con)
 {
 	int rc, reclaim_rc;
@@ -6365,6 +8230,12 @@ int enable_battery(i_container *i_con)
 	return 71 | EXIT_FLAG;
 }
 
+/**
+ * confirm_enable_battery -
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_enable_battery(void)
 {
 	int rc,k;
@@ -6402,6 +8273,13 @@ int confirm_enable_battery(void)
 	return rc;
 }
 
+/**
+ * battery_fork -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int battery_fork(i_container *i_con)
 {
 	int rc = 0;
@@ -6439,6 +8317,13 @@ int battery_fork(i_container *i_con)
 	return INVALID_OPTION_STATUS;
 }
 
+/**
+ * force_battery_error -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   72 | EXIT_FLAG if success / 43 | EXIT_FLAG on failure
+ **/
 int force_battery_error(i_container *i_con)
 {
 	int rc, reclaim_rc;
@@ -6470,6 +8355,13 @@ int force_battery_error(i_container *i_con)
 	return 72 | EXIT_FLAG;
 }
 
+/**
+ * bus_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int bus_config(i_container *i_con)
 {
 	int rc, k;
@@ -6550,6 +8442,13 @@ struct bus_attr {
 };
 struct bus_attr *bus_attr_head = NULL;
 
+/**
+ * get_bus_attr_buf - Start array protection for an array
+ * @bus_attr:		bus_attr struct
+ *
+ * Returns:
+ *   bus_attr struct
+ **/
 static struct bus_attr *get_bus_attr_buf(struct bus_attr *bus_attr)
 {
 	if (!bus_attr) {
@@ -6563,6 +8462,12 @@ static struct bus_attr *get_bus_attr_buf(struct bus_attr *bus_attr)
 	return bus_attr->next;
 }
 
+/**
+ * free_all_bus_attr_buf -
+ *
+ * Returns:
+ *   nothing
+ **/
 static void free_all_bus_attr_buf(void)
 {
 	struct bus_attr *bus_attr;
@@ -6574,6 +8479,15 @@ static void free_all_bus_attr_buf(void)
 	}
 }	
 
+/**
+ * get_changeable_bus_attr -
+ * @ioa:		ipr ioa struct
+ * @page28:		ipr_scsi_buses struct
+ * @num_buses:		number of busses
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_changeable_bus_attr(struct ipr_ioa *ioa,
 				    struct ipr_scsi_buses *page28, int num_buses)
 {
@@ -6613,6 +8527,13 @@ static void get_changeable_bus_attr(struct ipr_ioa *ioa,
 	}
 }
 
+/**
+ * change_bus_attr -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int change_bus_attr(i_container *i_con)
 {
 	struct ipr_ioa *ioa;
@@ -6793,9 +8714,8 @@ int change_bus_attr(i_container *i_con)
 			goto leave;
 	}
 
-	leave:
-
-		free_all_bus_attr_buf();
+leave:
+	free_all_bus_attr_buf();
 	free(n_change_bus_attr.body);
 	n_change_bus_attr.body = NULL;
 	free_i_con(i_con);
@@ -6803,6 +8723,13 @@ int change_bus_attr(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_change_bus_attr -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / 45 | EXIT_FLAG on failure
+ **/
 int confirm_change_bus_attr(i_container *i_con)
 {
 	struct ipr_ioa *ioa;
@@ -6879,6 +8806,16 @@ int confirm_change_bus_attr(i_container *i_con)
 	return rc;
 }
 
+/**
+ * bus_attr_menu -
+ * @ioa:		ipr ioa struct
+ * @bus_attr:		bus_attr struct
+ * @start_row:		starting row number
+ * @header_lines:	number of header lines
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int bus_attr_menu(struct ipr_ioa *ioa, struct bus_attr *bus_attr, int start_row, int header_lines)
 {
 	int i, scsi_id, found;
@@ -7136,6 +9073,16 @@ int bus_attr_menu(struct ipr_ioa *ioa, struct bus_attr *bus_attr, int start_row,
 	return rc;
 }
 
+/**
+ * display_menu -
+ * @menu_item:		menu items
+ * @menu_start_row:	start row
+ * @menu_index_max:	max menu index
+ * @userptrptr:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int display_menu(ITEM **menu_item,
 		 int menu_start_row,
 		 int menu_index_max,
@@ -7265,6 +9212,13 @@ int display_menu(ITEM **menu_item,
 	return rc;
 }
 
+/**
+ * driver_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int driver_config(i_container *i_con)
 {
 	int rc, k;
@@ -7306,6 +9260,13 @@ int driver_config(i_container *i_con)
 	return rc;
 }
 
+/**
+ * get_log_level - return the log level
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   log level value if success / 0 on failure
+ **/
 int get_log_level(struct ipr_ioa *ioa)
 {
 	struct sysfs_class_device *class_device;
@@ -7328,6 +9289,14 @@ int get_log_level(struct ipr_ioa *ioa)
 	return value;
 }
 
+/**
+ * set_log_level - set the log level
+ * @ioa:		ipr ioa struct
+ * @log_level:		log level string
+ *
+ * Returns:
+ *   nothing
+ **/
 void set_log_level(struct ipr_ioa *ioa, char *log_level)
 {
 	struct sysfs_class_device *class_device;
@@ -7347,6 +9316,13 @@ void set_log_level(struct ipr_ioa *ioa, char *log_level)
 	sysfs_close_class_device(class_device);
 }
 
+/**
+ * change_driver_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int change_driver_config(i_container *i_con)
 {
 	int rc, i, digits;
@@ -7413,6 +9389,13 @@ int change_driver_config(i_container *i_con)
 	return rc;
 }
 
+/**
+ * disk_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int disk_config(i_container * i_con)
 {
 	int rc, k;
@@ -7474,6 +9457,15 @@ struct disk_config_attr {
 	int tcq_enabled;
 };
 
+/**
+ * disk_config_menu -
+ * @disk_config_attr:	disk_config_attr struct
+ * @start_row:		start row number
+ * @header_lines:	number of header lines
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int disk_config_menu(struct disk_config_attr *disk_config_attr,
 			    int start_row, int header_lines)
 {
@@ -7577,6 +9569,13 @@ static int disk_config_menu(struct disk_config_attr *disk_config_attr,
 	return rc;
 }
 
+/**
+ * change_disk_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *    non-zero
+ **/
 int change_disk_config(i_container * i_con)
 {
 	int rc;
@@ -7732,8 +9731,7 @@ int change_disk_config(i_container * i_con)
 
 	ipr_set_dev_attr(dev, &disk_attr, 1);
 
-	leave:
-
+leave:
 	free(n_change_disk_config.body);
 	n_change_disk_config.body = NULL;
 	free_i_con(i_con);
@@ -7742,6 +9740,13 @@ int change_disk_config(i_container * i_con)
 	return rc;
 }
 
+/**
+ * ioa_config - 
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int ioa_config(i_container * i_con)
 {
 	int rc, k;
@@ -7803,6 +9808,15 @@ struct ioa_config_attr {
 	int gscsi_only_ha;
 };
 
+/**
+ * ioa_config_menu -
+ * @ioa_config_attr:	ipr_config_attr struct
+ * @start_row:		start row
+ * @header_lines:	number of header lines
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 		    int start_row, int header_lines)
 {
@@ -7866,6 +9880,13 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 	return rc;
 }
 
+/**
+ * change_ioa_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   non-zero on exit
+ **/
 int change_ioa_config(i_container * i_con)
 {
 	int rc;
@@ -7978,8 +9999,7 @@ int change_ioa_config(i_container * i_con)
 	processing();
 	ipr_set_ioa_attr(dev->ioa, &ioa_attr, 1);
 
-	leave:
-
+leave:
 	free(n_change_ioa_config.body);
 	n_change_ioa_config.body = NULL;
 	free_i_con(i_con);
@@ -7988,6 +10008,13 @@ int change_ioa_config(i_container * i_con)
 	return rc;
 }
 
+/**
+ * download_ucode -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int download_ucode(i_container * i_con)
 {
 	int rc, k;
@@ -8062,6 +10089,14 @@ int download_ucode(i_container * i_con)
 	return rc;
 }
 
+/**
+ * update_ucode -
+ * @dev:		ipr dev struct
+ * @fw_image:		ipr_fw_images struct
+ *
+ * Returns:
+ *   0 if success / 67 | EXIT_FLAG on failure
+ **/
 static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 {
 	char *body;
@@ -8105,6 +10140,13 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 	return rc;
 }
 
+/**
+ * process_choose_ucode -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / 67 | EXIT_FLAG on failure
+ **/
 int process_choose_ucode(struct ipr_dev *dev)
 {
 	struct ipr_fw_images *list;
@@ -8248,15 +10290,21 @@ int process_choose_ucode(struct ipr_dev *dev)
 	if (!s_out->rc)
 		rc = update_ucode(dev, fw_image);
 
-	leave:
-		free(list);
-
+leave:
+	free(list);
 	i_con = free_i_con(i_con);
 	i_con_head = i_con_head_saved;
 	free(s_out);
 	return rc;
 }
 
+/**
+ * choose_ucode -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / 67 | EXIT_FLAG on failure
+ **/
 int choose_ucode(i_container * i_con)
 {
 	i_container *temp_i_con;
@@ -8293,6 +10341,14 @@ int choose_ucode(i_container * i_con)
 }
 
 #define MAX_CMD_LENGTH 1000
+
+/**
+* log_menu -
+* @i_con:            i_container struct
+*
+* Returns:
+*   0 if success / non-zero on failure FIXME
+**/
 int log_menu(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
@@ -8325,6 +10381,13 @@ int log_menu(i_container *i_con)
 	return rc;
 }
 
+/**
+ * ibm_storage_log_tail -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   1 if no status / 65 on failure
+ **/
 
 int ibm_storage_log_tail(i_container *i_con)
 {
@@ -8373,6 +10436,13 @@ int ibm_storage_log_tail(i_container *i_con)
 		return 1; 
 }
 
+/**
+ * select_log_file -
+ * @dir_entry:		dirent struct
+ *
+ * Returns:
+ *   1 if "messages" if found in the dir_entry->d_name / 0 otherwise
+ **/
 static int select_log_file(const struct dirent *dir_entry)
 {
 	if (dir_entry) {
@@ -8382,6 +10452,14 @@ static int select_log_file(const struct dirent *dir_entry)
 	return 0;
 }
 
+/**
+ * compare_log_file -
+ * @log_file1:		
+ * @log_file2:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int compare_log_file(const void *log_file1, const void *log_file2)
 {
 	struct dirent **first_dir, **second_dir;
@@ -8411,6 +10489,13 @@ static int compare_log_file(const void *log_file1, const void *log_file2)
 	return 0;
 }
 
+/**
+ * ibm_storage_log -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int ibm_storage_log(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
@@ -8486,6 +10571,13 @@ int ibm_storage_log(i_container *i_con)
 		return 1; 
 }
 
+/**
+ * kernel_log -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int kernel_log(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
@@ -8555,6 +10647,13 @@ int kernel_log(i_container *i_con)
 		return 1; 
 }
 
+/**
+ * iprconfig_log -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int iprconfig_log(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
@@ -8620,6 +10719,13 @@ int iprconfig_log(i_container *i_con)
 		return 1; 
 }
 
+/**
+ * kernel_root -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int kernel_root(i_container *i_con)
 {
 	int rc;
@@ -8646,6 +10752,13 @@ int kernel_root(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_kernel_root -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int confirm_kernel_root(i_container *i_con)
 {
 	int rc;
@@ -8695,6 +10808,13 @@ int confirm_kernel_root(i_container *i_con)
 	return rc;
 }
 
+/**
+ * set_default_editor -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int set_default_editor(i_container *i_con)
 {
 	int rc = 0;
@@ -8719,6 +10839,13 @@ int set_default_editor(i_container *i_con)
 	return rc;
 }
 
+/**
+ * confirm_set_default_editor -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   EXIT_FLAG | 62 if editor changed / EXIT_FLAG | 63 if editor unchanged
+ **/
 int confirm_set_default_editor(i_container *i_con)
 {
 	int rc;
@@ -8758,6 +10885,13 @@ int confirm_set_default_editor(i_container *i_con)
 	return rc;
 }
 
+/**
+ * restore_log_defaults -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   64
+ **/
 int restore_log_defaults(i_container *i_con)
 {
 	strcpy(log_root_dir, DEFAULT_LOG_DIR);
@@ -8765,6 +10899,13 @@ int restore_log_defaults(i_container *i_con)
 	return 64; /*"Default log values restored"*/
 }
 
+/**
+ * ibm_boot_log -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 int ibm_boot_log(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
@@ -8811,6 +10952,16 @@ int ibm_boot_log(i_container *i_con)
 		return 1; /* return with no status */
 }
 
+/**
+ * get_status -
+ * @dev:		ipr dev struct
+ * @buf:		data buffer
+ * @percent:		
+ * @path_status:	
+ *
+ * Returns:
+ *   nothing
+ **/
 static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_status)
 {
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -8984,6 +11135,13 @@ static const struct {
 	{ IPR_PATH_INCORRECT_CONN, "Incorrect connect" }
 };
 
+/**
+ * get_phy_state -
+ * @state:		state value
+ *
+ * Returns:
+ *   state description
+ **/
 static const char *get_phy_state(u8 state)
 {
 	int i;
@@ -9007,6 +11165,13 @@ static const struct {
 	{ IPR_PATH_CFG_DEVICE_LUN, "Device LUN" }
 };
 
+/**
+ * get_phy_type -
+ * @type:		type value
+ *
+ * Returns:
+ *   type description
+ **/
 static const char *get_phy_type(u8 type)
 {
 	int i;
@@ -9049,6 +11214,13 @@ static const struct {
 	{ IPR_PATH_FAILED, "Failed" }
 };
 
+/**
+ * get_path_state -
+ * @path_state:		path_state value
+ *
+ * Returns:
+ *   path state description
+ **/
 static const char *get_path_state(u8 path_state)
 {
 	int i;
@@ -9062,6 +11234,14 @@ static const char *get_path_state(u8 path_state)
 	return "Unknown";
 }
 
+/**
+ * print_phy -
+ * @cfg:		ipr_fabric_config_element struct
+ * @body:		message buffer
+ *
+ * Returns:
+ *   body
+ **/
 static char *print_phy(struct ipr_fabric_config_element *cfg, char *body)
 {
 	int len = strlen(body);
@@ -9079,6 +11259,14 @@ static char *print_phy(struct ipr_fabric_config_element *cfg, char *body)
 	return body;
 }
 
+/**
+ * print_path -
+ * @ioa:		ipr_fabric_descriptor struct
+ * @body:		message buffer
+ *
+ * Returns:
+ *   body
+ **/
 static char *print_path(struct ipr_fabric_descriptor *fabric, char *body)
 {
 	int len = strlen(body);
@@ -9105,6 +11293,14 @@ static char *print_path(struct ipr_fabric_descriptor *fabric, char *body)
 	return body;
 }
 
+/**
+ * print_path_details -
+ * @dev:		ipr dev struct
+ * @body:		message buffer
+ *
+ * Returns:
+ *   body
+ **/
 static char *print_path_details(struct ipr_dev *dev, char *body)
 {
 	int rc, len = 0;
@@ -9127,6 +11323,22 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
 	return body;
 }
 
+/**
+ * __print_device -
+ * @dev:		ipr dev struct
+ * @body:		message buffer
+ * @option:		
+ * @sd:			
+ * @sg:			
+ * @vpd:		
+ * @percent:		
+ * @indent:		
+ * @ra:			
+ * @path_status:	
+ *
+ * Returns:
+ *   char * buffer
+ **/
 char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		     int sd, int sg, int vpd, int percent, int indent, int ra, int path_status)
 {
@@ -9243,6 +11455,16 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	return body;
 }
 
+/**
+ * print_device -
+ * @dev:		ipr dev struct
+ * @body:		message buffer
+ * @option:		
+ * @type:		bitfield - type if information to print
+ *
+ * Returns:
+ *   char * buffer
+ **/
 /*
  * Print the given device to a buffer. The type parameter is defined as
  * a bitfield which has the following behavior:
@@ -9275,6 +11497,12 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, type&1, 0);
 }
 
+/**
+ * usage - display usage information
+ *
+ * Returns:
+ *   nothing
+ **/
 static void usage()
 {
 	printf(_("Usage: iprconfig [options]\n"));
@@ -9288,9 +11516,13 @@ static void usage()
 	printf(_("  Use quotes around parameters with spaces\n"));
 }
 
-static struct sysfs_dev *head_sdev;
-static struct sysfs_dev *tail_sdev;
-
+/**
+ * find_and_add_dev -
+ * @name:		device name
+ *
+ * Returns:
+ *   ipr_dev struct if success / NULL on failure
+ **/
 static struct ipr_dev *find_and_add_dev(char *name)
 {
 	struct ipr_dev *dev = find_dev(name);
@@ -9304,6 +11536,13 @@ static struct ipr_dev *find_and_add_dev(char *name)
 	return dev;
 }
 
+/**
+ * raid_create_add_dev -
+ * @name:		device name
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int raid_create_add_dev(char *name)
 {
 	struct ipr_dev *dev = find_and_add_dev(name);
@@ -9323,31 +11562,63 @@ static int raid_create_add_dev(char *name)
 	return 0;
 }
 
+/**
+ * raid_create_check_num_devs -
+ * @ioa:		ipr_array_cap_entry struct
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int raid_create_check_num_devs(struct ipr_array_cap_entry *cap,
-				      int num_devs)
+				      int num_devs, int err_type)
 {
 	if (num_devs < cap->min_num_array_devices ||
 	    num_devs > cap->max_num_array_devices ||
 	    (num_devs % cap->min_mult_array_devices) != 0) {
-		syslog(LOG_ERR, _("Invalid number of devices selected for RAID %s array. %d. "
-				  "Must select minimum of %d devices, maximum of %d devices, "
-				  "and must be a multiple of %d devices\n"),
-		       cap->prot_level_str, num_devs, cap->min_num_array_devices,
+		syslog(LOG_ERR, _("Invalid number of devices (%d) selected for "
+				  "RAID %s array.\n"
+				  "Must select a minimum of %d devices, a "
+				  "maximum of %d devices, "
+				  "and must be a multiple of %d devices.\n"),
+		       num_devs, cap->prot_level_str, cap->min_num_array_devices,
 		       cap->max_num_array_devices, cap->min_mult_array_devices);
-		return -EINVAL;
+		if (err_type == 0)
+			return -EINVAL;
+		else if (num_devs > cap->min_num_array_devices)
+			return RC_77_Too_Many_Disks;
+		else if (num_devs < cap->min_num_array_devices)
+			return RC_78_Too_Few_Disks;
+		else if ((num_devs % cap->min_num_array_devices) != 0)
+			return RC_25_Devices_Multiple;
 	}
 	return 0;
 }
 
+/**
+ * curses_init - initialize curses
+ *
+ * Returns:
+ *   nothing
+ **/
 static void curses_init()
 {
 	/* makes program compatible with all terminals -
-	 originally did not display text correctly when user was running xterm */
+	 originally didn't display text correctly when user was running xterm */
 	setenv("TERM", "vt100", 1);
 	setlocale(LC_ALL, "");
 	initscr();
 }
 
+/**
+ * format_devices -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ * @blksz:		block size
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int format_devices(char **args, int num_args, int blksz)
 {
 	int i, rc;
@@ -9382,16 +11653,40 @@ static int format_devices(char **args, int num_args, int blksz)
 	return IPR_XLATE_DEV_FMT_RC(rc);
 }
 
+/**
+ * recovery_format -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int recovery_format(char **args, int num_args)
 {
 	return format_devices(args, num_args, 0);
 }
 
+/**
+ * format_for_jbod -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int format_for_jbod(char **args, int num_args)
 {
 	return format_devices(args, num_args, IPR_JBOD_BLOCK_SIZE);
 }
 
+/**
+ * format_for_raid -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int format_for_raid(char **args, int num_args)
 {
 	int i, rc;
@@ -9413,6 +11708,14 @@ static int format_for_raid(char **args, int num_args)
 	return IPR_XLATE_DEV_FMT_RC(rc);
 }
 
+/**
+ * raid_create -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
@@ -9481,7 +11784,7 @@ static int raid_create(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if ((rc = raid_create_check_num_devs(cap, num_devs)))
+	if ((rc = raid_create_check_num_devs(cap, num_devs, 0)))
 		return rc;
 
 	if (!stripe_size)
@@ -9526,6 +11829,14 @@ static int raid_create(char **args, int num_args)
 	return raid_start_complete();
 }
 
+/**
+ * hot_spare_delete -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int hot_spare_delete(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9540,6 +11851,14 @@ static int hot_spare_delete(char **args, int num_args)
 	return ipr_remove_hot_spare(dev->ioa);
 }
 
+/**
+ * hot_spare_create -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int hot_spare_create(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9554,6 +11873,14 @@ static int hot_spare_create(char **args, int num_args)
 	return ipr_add_hot_spare(dev->ioa);
 }
 
+/**
+ * raid_include_cmd -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int raid_include_cmd(char **args, int num_args)
 {
 	int i, rc, zeroed = 0;
@@ -9619,6 +11946,14 @@ static int raid_include_cmd(char **args, int num_args)
 				vset->ioa->qac_data);
 }
 
+/**
+ * raid_delete -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
 static int raid_delete(char **args, int num_args)
 {
 	int rc;
@@ -9642,6 +11977,14 @@ static int raid_delete(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * printf_device - Display the given device 
+ * @dev:		ipr dev struct
+ * @type:		type of information to print
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_device(struct ipr_dev *dev, int type)
 {
 	char *buf = print_device(dev, NULL, NULL, type);
@@ -9649,6 +11992,18 @@ static void printf_device(struct ipr_dev *dev, int type)
 	free(buf);
 }
 
+/**
+ * __printf_device -
+ * @dev:		ipr dev struct
+ * @sd:			
+ * @sg:			
+ * @vpd:		
+ * @percent:		
+ * @indent:		
+ *
+ * Returns:
+ *   nothing
+ **/
 static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 			    int percent, int indent)
 {
@@ -9657,6 +12012,14 @@ static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 	free(buf);
 }
 
+/**
+ * printf_vsets -
+ * @ioa:		ipr ioa struct
+ * @type:		type of information to print
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_vsets(struct ipr_ioa *ioa, int type)
 {
 	struct ipr_dev *vset, *dev;
@@ -9668,6 +12031,14 @@ static void printf_vsets(struct ipr_ioa *ioa, int type)
 	}
 }
 
+/**
+ * printf_hot_spare_disks -
+ * @ioa:		ipr ioa struct
+ * @type:		type of information to print
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_hot_spare_disks(struct ipr_ioa *ioa, int type)
 {
 	struct ipr_dev *dev;
@@ -9676,6 +12047,14 @@ static void printf_hot_spare_disks(struct ipr_ioa *ioa, int type)
 		printf_device(dev, type);
 }
 
+/**
+ * printf_standlone_disks -
+ * @ioa:		ipr ioa struct
+ * @type:		type of information to print
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_standlone_disks(struct ipr_ioa *ioa, int type)
 {
 	struct ipr_dev *dev;
@@ -9684,6 +12063,14 @@ static void printf_standlone_disks(struct ipr_ioa *ioa, int type)
 		printf_device(dev, type);
 }
 
+/**
+ * printf_ses_devices -
+ * @ioa:		ipr ioa struct
+ * @type:		type of information to print
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_ses_devices(struct ipr_ioa *ioa, int type)
 {
 	struct ipr_dev *dev;
@@ -9695,6 +12082,14 @@ static void printf_ses_devices(struct ipr_ioa *ioa, int type)
 		printf_device(dev, type);
 }
 
+/**
+ * printf_ioa -
+ * @ioa:		ipr ioa struct
+ * @type:		type of information to print
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_ioa(struct ipr_ioa *ioa, int type)
 {
 	if (!ioa->ioa.scsi_dev_data)
@@ -9707,6 +12102,14 @@ static void printf_ioa(struct ipr_ioa *ioa, int type)
 	printf_ses_devices(ioa, type);
 }
 
+/**
+ * query_raid_create -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_raid_create(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9742,6 +12145,14 @@ static int query_raid_create(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_raid_delete -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_raid_delete(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9770,6 +12181,14 @@ static int query_raid_delete(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_hot_spare_create -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_hot_spare_create(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9799,6 +12218,14 @@ static int query_hot_spare_create(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_hot_spare_delete -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_hot_spare_delete(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -9828,6 +12255,14 @@ static int query_hot_spare_delete(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_raid_consistency_check -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_raid_consistency_check(char **args, int num_args)
 {
 	struct ipr_dev *vset;
@@ -9850,6 +12285,14 @@ static int query_raid_consistency_check(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * raid_consistency_check -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int raid_consistency_check(char **args, int num_args)
 {
 	struct ipr_dev *vset = find_dev(args[0]);
@@ -9863,6 +12306,14 @@ static int raid_consistency_check(char **args, int num_args)
 	return ipr_resync_array(vset->ioa);
 }
 
+/**
+ * start_ioa_cache -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int start_ioa_cache(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -9887,6 +12338,14 @@ static int start_ioa_cache(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * force_cache_battery_error -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int force_cache_battery_error(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -9901,6 +12360,14 @@ static int force_cache_battery_error(char **args, int num_args)
 				       &reclaim_buffer);
 }
 
+/**
+ * set_bus_width -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_bus_width(char **args, int num_args)
 {
 	int rc;
@@ -9944,6 +12411,14 @@ static int set_bus_width(char **args, int num_args)
 	return ipr_set_bus_attr(ioa, &page_28_cur, 1);
 }
 
+/**
+ * set_bus_speed -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_bus_speed(char **args, int num_args)
 {
 	int rc, max_speed, new_xfer_rate;
@@ -9991,6 +12466,14 @@ static int set_bus_speed(char **args, int num_args)
 	return ipr_set_bus_attr(ioa, &page_28_cur, 1);
 }
 
+/**
+ * set_initiator_id -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_initiator_id(char **args, int num_args)
 {
 	int rc;
@@ -10050,6 +12533,15 @@ static int set_initiator_id(char **args, int num_args)
 	return ipr_set_bus_attr(ioa, &page_28_cur, 1);
 }
 
+/**
+ * find_slot -
+ * @devs:		ipr_dev struct
+ * @num_devs:		number of devices
+ * @slot:		slot description
+ *
+ * Returns:
+ *   ipr_dev struct on success / NULL otherwise
+ **/
 static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot)
 {
 	int i;
@@ -10066,6 +12558,14 @@ static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot
 	return NULL;
 }
 
+/**
+ * __add_device -
+ * @dev:		ipr dev struct
+ * @on:			
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __add_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses = dev->ses[0];
@@ -10101,6 +12601,14 @@ static int __add_device(struct ipr_dev *dev, int on)
 	return rc;
 }
 
+/**
+ * __remove_device -
+ * @dev:		ipr dev struct
+ * @on:			
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __remove_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses = dev->ses[0];
@@ -10147,6 +12655,14 @@ static int __remove_device(struct ipr_dev *dev, int on)
 	return rc;
 }
 
+/**
+ * add_slot -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int add_slot(char **args, int num_args)
 {
 	int num_devs, rc;
@@ -10167,6 +12683,14 @@ static int add_slot(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * remove_slot -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int remove_slot(char **args, int num_args)
 {
 	int num_devs, rc;
@@ -10187,6 +12711,14 @@ static int remove_slot(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * remove_disk -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int remove_disk(char **args, int num_args)
 {
 	int num_devs, i;
@@ -10213,6 +12745,14 @@ static int remove_disk(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * __identify_device -
+ * @dev:		ipr dev struct
+ * @on:			
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __identify_device(struct ipr_dev *dev, int on)
 {
 	struct ipr_dev *ses = dev->ses[0];
@@ -10239,6 +12779,14 @@ static int __identify_device(struct ipr_dev *dev, int on)
 	return ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 }
 
+/**
+ * identify_slot -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int identify_slot(char **args, int num_args)
 {
 	int num_devs, rc;
@@ -10259,6 +12807,14 @@ static int identify_slot(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * identify_disk -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int identify_disk(char **args, int num_args)
 {
 	int num_devs, i;
@@ -10284,6 +12840,14 @@ static int identify_disk(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * set_log_level_cmd -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_log_level_cmd(char **args, int num_args)
 {
 	char buf[4];
@@ -10304,6 +12868,14 @@ static int set_log_level_cmd(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * set_tcq_enable -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_tcq_enable(char **args, int num_args)
 {
 	int rc;
@@ -10335,6 +12907,14 @@ static int set_tcq_enable(char **args, int num_args)
 	return ipr_set_dev_attr(dev, &attr, 1);
 }
 
+/**
+ * set_qdepth -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_qdepth(char **args, int num_args)
 {
 	int rc;
@@ -10366,6 +12946,14 @@ static int set_qdepth(char **args, int num_args)
 	return ipr_set_dev_attr(dev, &attr, 1);
 }
 
+/**
+ * set_format_timeout -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_format_timeout(char **args, int num_args)
 {
 	int rc;
@@ -10392,6 +12980,14 @@ static int set_format_timeout(char **args, int num_args)
 	return ipr_set_dev_attr(dev, &attr, 1);
 }
 
+/**
+ * update_ioa_ucode -
+ * @ioa:		ipr ioa struct
+ * @file:		file name
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int update_ioa_ucode(struct ipr_ioa *ioa, char *file)
 {
 	struct ipr_fw_images image;
@@ -10408,6 +13004,14 @@ static int update_ioa_ucode(struct ipr_ioa *ioa, char *file)
 	return rc;
 }
 
+/**
+ * update_dev_ucode -
+ * @dev:		ipr dev struct
+ * @file:		file name
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int update_dev_ucode(struct ipr_dev *dev, char *file)
 {
 	struct ipr_fw_images image;
@@ -10424,6 +13028,14 @@ static int update_dev_ucode(struct ipr_dev *dev, char *file)
 	return rc;
 }
 
+/**
+ * update_ucode_cmd -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int update_ucode_cmd(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10439,6 +13051,14 @@ static int update_ucode_cmd(char **args, int num_args)
 		return update_dev_ucode(dev, args[1]);
 }
 
+/**
+ * disrupt_device_cmd -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int disrupt_device_cmd(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10456,6 +13076,14 @@ static int disrupt_device_cmd(char **args, int num_args)
 	return ipr_disrupt_device(dev);
 }
 
+/**
+ * raid_rebuild_cmd -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int raid_rebuild_cmd(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10470,6 +13098,15 @@ static int raid_rebuild_cmd(char **args, int num_args)
 	return ipr_rebuild_device_data(dev->ioa);
 }
 
+/**
+ * ipr_start_array_protection - Start array protection for an array
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ * @action:		
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __reclaim(char **args, int num_args, int action)
 {
 	struct ipr_reclaim_query_data buf;
@@ -10500,17 +13137,41 @@ static int __reclaim(char **args, int num_args, int action)
 	return 0;
 }
 
+/**
+ * reclaim -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int reclaim(char **args, int num_args)
 {
 	return __reclaim(args, num_args, IPR_RECLAIM_PERFORM);
 }
 
+/**
+ * reclaim_unknown -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int reclaim_unknown(char **args, int num_args)
 {
 	return __reclaim(args, num_args,
 			 IPR_RECLAIM_PERFORM | IPR_RECLAIM_UNKNOWN_PERM);
 }
 
+/**
+ * query_path_details -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 
 static int query_path_details(char **args, int num_args)
 {
@@ -10532,6 +13193,13 @@ static int query_path_details(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * printf_path_status -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void printf_path_status(struct ipr_dev *dev)
 {
 	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 1);
@@ -10539,6 +13207,13 @@ static void printf_path_status(struct ipr_dev *dev)
 	free(buf);
 }
 
+/**
+ * printf_ioa_path_status -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0
+ **/
 static int printf_ioa_path_status(struct ipr_ioa *ioa)
 {
 	struct ipr_dev *dev;
@@ -10552,6 +13227,14 @@ static int printf_ioa_path_status(struct ipr_ioa *ioa)
 	return 0;
 }
 
+/**
+ * query_path_status -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_path_status(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -10584,6 +13267,14 @@ static int query_path_status(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_recommended_stripe_size -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_recommended_stripe_size(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10605,6 +13296,14 @@ static int query_recommended_stripe_size(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_supp_stripe_sizes -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_supp_stripe_sizes(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10633,6 +13332,14 @@ static int query_supp_stripe_sizes(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_min_mult_in_array - Start array protection for an array
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_min_mult_in_array(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10654,6 +13361,14 @@ static int query_min_mult_in_array(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_min_array_devices -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_min_array_devices(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10675,6 +13390,14 @@ static int query_min_array_devices(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_max_array_devices -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_max_array_devices(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10696,6 +13419,14 @@ static int query_max_array_devices(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_include_allowed -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_include_allowed(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10725,6 +13456,14 @@ static int query_include_allowed(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_raid_levels -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_raid_levels(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10745,6 +13484,14 @@ static int query_raid_levels(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_bus_width -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_bus_width(char **args, int num_args)
 {
 	int rc, bus;
@@ -10777,6 +13524,14 @@ static int query_bus_width(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_bus_speed -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_bus_speed(char **args, int num_args)
 {
 	int rc, bus;
@@ -10811,6 +13566,14 @@ static int query_bus_speed(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_initiator_id -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_initiator_id(char **args, int num_args)
 {
 	int rc, bus;
@@ -10843,6 +13606,13 @@ static int query_initiator_id(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_add_remove -
+ * @action:		action type
+ *
+ * Returns:
+ *   0
+ **/
 static int query_add_remove(int action)
 {
 	int i, num_devs;
@@ -10864,16 +13634,40 @@ static int query_add_remove(int action)
 
 }
 
+/**
+ * query_remove_device -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_remove_device(char **args, int num_args)
 {
 	return query_add_remove(IPR_CONC_REMOVE);
 }
 
+/**
+ * query_add_device -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_add_device(char **args, int num_args)
 {
 	return query_add_remove(IPR_CONC_ADD);
 }
 
+/**
+ * query_log_level -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_log_level(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10892,6 +13686,14 @@ static int query_log_level(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_tcq_enable -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_tcq_enable(char **args, int num_args)
 {
 	int rc;
@@ -10912,6 +13714,14 @@ static int query_tcq_enable(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_qdepth -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_qdepth(char **args, int num_args)
 {
 	int rc;
@@ -10932,6 +13742,14 @@ static int query_qdepth(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_format_timeout -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_format_timeout(char **args, int num_args)
 {
 	int rc;
@@ -10957,6 +13775,14 @@ static int query_format_timeout(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_ucode_level -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_ucode_level(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -10985,6 +13811,14 @@ static int query_ucode_level(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_format_for_raid -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_format_for_raid(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11011,6 +13845,14 @@ static int query_format_for_raid(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_raid_rebuild -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_raid_rebuild(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11034,6 +13876,14 @@ static int query_raid_rebuild(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_recovery_format -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_recovery_format(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11064,6 +13914,14 @@ static int query_recovery_format(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_devices_include -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_devices_include(char **args, int num_args)
 {
 	int rc, hdr = 0;;
@@ -11081,7 +13939,7 @@ static int query_devices_include(char **args, int num_args)
 	ioa = vset->ioa;
 	memset(&qac_data, 0, sizeof(qac_data));
 
-	rc = ipr_query_array_config(ioa, 0, 1, vset->array_rcd->array_id, &qac_data);
+	rc = ipr_query_array_config(ioa, 0, 1, 0, vset->array_rcd->array_id, &qac_data);
 
 	if (rc)
 		return rc;
@@ -11104,6 +13962,14 @@ static int query_devices_include(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_arrays_include -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_arrays_include(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11133,6 +13999,14 @@ static int query_arrays_include(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_reclaim -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_reclaim(char **args, int num_args)
 {
 	struct ipr_reclaim_query_data buf;
@@ -11159,6 +14033,256 @@ static int query_reclaim(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * query_arrays_raid_migrate - Show the arrays that can be migrated to a
+ * 			       different protection level.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_arrays_raid_migrate(char **args, int num_args)
+{
+	int hdr = 0;
+	struct ipr_dev *vset;
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa) {
+		for_each_vset(ioa, vset) {
+			if (!vset->array_rcd->migrate_cand)
+				continue;
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			}
+			printf_device(vset, 1);
+		}
+	}
+	return 0;
+}
+
+/**
+ * query_devices_raid_migrate - Given an array, show the AF disks that are
+ * 				candidates to be used in a migration.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_devices_raid_migrate(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	struct ipr_dev_record *dev_rcd;
+	int hdr = 0;
+	int rc = 0;
+	struct ipr_array_query_data qac_data;
+
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_volume_set(dev)) {
+		fprintf(stderr, "%s is not an array.\n", args[0]);
+		return -EINVAL;
+	}
+
+	/* query array config for volume set migrate status */
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	if (rc != 0)
+		return rc;
+
+	for_each_dev_rcd(dev_rcd, &qac_data) {
+		if (!dev_rcd->migrate_array_prot_cand)
+			continue;
+		if (!hdr) {
+			hdr = 1;
+			printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+		}
+
+		dev = get_dev_from_handle(dev_rcd->resource_handle);
+		if (dev)
+			printf_device(dev, 2);
+	}
+	return 0;
+}
+
+/**
+ * query_raid_levels_raid_migrate - Given an array, display the protection
+ * 				    levels to which the array can be migrated.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_raid_levels_raid_migrate(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	int rc = 0;
+	struct ipr_array_query_data qac_data;
+	struct ipr_supported_arrays *sa_rcd;
+	struct ipr_array_cap_entry *cap_entry;
+
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_volume_set(dev)) {
+		fprintf(stderr, "%s is not an array.\n", args[0]);
+		return -EINVAL;
+	}
+
+	/* query array config for volume set migrate status */
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	if (rc)
+		return rc;
+
+	for_each_supported_arrays_rcd(sa_rcd, &qac_data)
+		for_each_cap_entry(cap_entry, sa_rcd)
+			printf("%s ", cap_entry->prot_level_str);
+
+	printf("\n");
+	return 0;
+}
+
+/**
+ * query_stripe_sizes_raid_migrate - Given an array and a protection level,
+ * 				     show the valid stripe sizes to which the
+ * 				     array can be migrated.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_stripe_sizes_raid_migrate(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	int i;
+	int rc = 0;
+	struct ipr_array_query_data qac_data;
+	struct ipr_supported_arrays *sa_rcd;
+	struct ipr_array_cap_entry *cap_entry;
+
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_volume_set(dev)) {
+		fprintf(stderr, "%s is not an array.\n", args[0]);
+		return -EINVAL;
+	}
+
+	/* query array config for volume set migrate status */
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	if (rc)
+		return rc;
+
+	for_each_supported_arrays_rcd(sa_rcd, &qac_data) {
+		for_each_cap_entry(cap_entry, sa_rcd) {
+			if (strcmp(args[1], (char *)cap_entry->prot_level_str))
+				continue;
+
+			for (i = 0; i < (sizeof(cap_entry->supported_stripe_sizes) * 8); i++)
+				if (ntohs(cap_entry->supported_stripe_sizes) & (1 << i))
+					printf("%d ", (1 << i));
+
+			printf("\n");
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * query_devices_min_max_raid_migrate - Given an array and a protection level,
+ * 					show the minimum and maximum number of
+ * 					devices needed to do the migration.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int query_devices_min_max_raid_migrate(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+	int rc = 0;
+	struct ipr_array_query_data qac_data;
+	struct ipr_supported_arrays *supported_arrays;
+	struct ipr_array_cap_entry *cap;
+
+	memset(&qac_data, 0, sizeof(qac_data));
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_volume_set(dev)) {
+		fprintf(stderr, "%s is not an array.\n", args[0]);
+		return -EINVAL;
+	}
+
+	/* query array config for volume set migrate status */
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	if (rc)
+		return rc;
+
+	/* check that the given raid level is valid */
+	for_each_supported_arrays_rcd(supported_arrays, &qac_data) {
+		cap = get_cap_entry(supported_arrays, args[1]);
+		if (cap)
+			break;
+	}
+
+	if (!cap) {
+		fprintf(stderr, "RAID level %s is unsupported.\n", args[1]);
+		return -EINVAL;
+	}
+
+	if (cap->format_overlay_type == IPR_FORMAT_REMOVE_DEVICES)
+		fprintf(stderr, "%d devices will be removed from the array\n",
+				cap->min_num_array_devices);
+	else if (cap->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
+		fprintf(stderr, "Minimum number of devices required = %d\n",
+				cap->min_num_array_devices);
+		fprintf(stderr, "Maximum number of devices allowed = %d\n",
+				cap->max_num_array_devices);
+		fprintf(stderr, "Number of devices must be a multiple of %d\n",
+				cap->min_mult_array_devices);
+	} else {
+		fprintf(stderr, "Unknown overlay type in qac data\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * query_format_for_jbod -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int query_format_for_jbod(char **args, int num_args)
 {
 	struct ipr_dev *dev;
@@ -11184,6 +14308,13 @@ static int query_format_for_jbod(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_dev_details -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void show_dev_details(struct ipr_dev *dev)
 {
 	char *body = NULL;
@@ -11199,6 +14330,14 @@ static void show_dev_details(struct ipr_dev *dev)
 	free(body);
 }
 
+/**
+ * show_jbod_disks -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_jbod_disks(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11219,6 +14358,14 @@ static int show_jbod_disks(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_all_af_disks -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_all_af_disks(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11239,6 +14386,14 @@ static int show_all_af_disks(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_af_disks -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_af_disks(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11259,6 +14414,14 @@ static int show_af_disks(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_hot_spares -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_hot_spares(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11279,6 +14442,14 @@ static int show_hot_spares(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_details -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_details(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -11293,6 +14464,15 @@ static int show_details(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * __print_status -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ * @percent:		percent value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __print_status(char **args, int num_args, int percent)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
@@ -11308,16 +14488,39 @@ static int __print_status(char **args, int num_args, int percent)
 	return 0;
 }
 
+/**
+ * print_alt_status -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int print_alt_status(char **args, int num_args)
 {
 	return __print_status(args, num_args, 1);
 }
 
+/**
+ * print_status -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int print_status(char **args, int num_args)
 {
 	return __print_status(args, num_args, 0);
 }
 
+/**
+ * __show_config -
+ * @type:		type value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __show_config(int type)
 {
 	struct ipr_ioa *ioa;
@@ -11328,16 +14531,40 @@ static int __show_config(int type)
 	return 0;
 }
 
+/**
+ * show_config -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_config(char **args, int num_args)
 {
 	return __show_config(3);
 }
 
+/**
+ * show_alt_config - 
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_alt_config(char **args, int num_args)
 {
 	return __show_config(2);
 }
 
+/**
+ * show_ioas -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_ioas(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11350,6 +14577,14 @@ static int show_ioas(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_arrays -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int show_arrays(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11370,6 +14605,14 @@ static int show_arrays(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * battery_info -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int battery_info(char **args, int num_args)
 {
 	struct ipr_reclaim_query_data reclaim;
@@ -11398,6 +14641,14 @@ static int battery_info(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * get_ha_mode -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int get_ha_mode(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_gen_dev(args[0]);
@@ -11412,6 +14663,14 @@ static int get_ha_mode(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * __set_ha_mode -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __set_ha_mode(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_gen_dev(args[0]);
@@ -11427,6 +14686,14 @@ static int __set_ha_mode(char **args, int num_args)
 	return -EINVAL; 
 }
 
+/**
+ * __set_preferred_primary -
+ * @sg_name:		sg device name
+ * @preferred_primary:	preferred primary value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int __set_preferred_primary(char *sg_name, int preferred_primary)
 {
 	struct ipr_dev *dev = find_gen_dev(sg_name);
@@ -11436,16 +14703,40 @@ static int __set_preferred_primary(char *sg_name, int preferred_primary)
 	return -ENXIO;
 }
 
+/**
+ * set_primary -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_primary(char **args, int num_args)
 {
 	return __set_preferred_primary(args[0], 1);
 }
 
+/**
+ * set_secondary -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_secondary(char **args, int num_args)
 {
 	return __set_preferred_primary(args[0], 0);
 }
 
+/**
+ * set_all_primary -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_all_primary(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11456,6 +14747,14 @@ static int set_all_primary(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * set_all_secondary -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int set_all_secondary(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
@@ -11474,17 +14773,17 @@ static const struct {
 	int (*func)(char **, int);
 	char *usage;
 } command [] = {
-	{ "show-config",				0, 0, 0, show_config, "" },
+	{ "show-config",			0, 0, 0, show_config, "" },
 	{ "show-alt-config",			0, 0, 0, show_alt_config, "" },
 	{ "show-ioas",				0, 0, 0, show_ioas, "" },
-	{ "show-arrays",				0, 0, 0, show_arrays, "" },
+	{ "show-arrays",			0, 0, 0, show_arrays, "" },
 	{ "show-battery-info",			1, 0, 1, battery_info, "sg5" },
-	{ "show-details",				1, 0, 1, show_details, "sda" },
+	{ "show-details",			1, 0, 1, show_details, "sda" },
 	{ "show-hot-spares",			0, 0, 0, show_hot_spares, "" },
 	{ "show-af-disks",			0, 0, 0, show_af_disks, "" },
 	{ "show-all-af-disks",			0, 0, 0, show_all_af_disks, "" },
 	{ "show-jbod-disks",			0, 0, 0, show_jbod_disks, "" },
-	{ "status",					1, 0, 1, print_status, "sda" },
+	{ "status",				1, 0, 1, print_status, "sda" },
 	{ "alt-status",				1, 0, 1, print_alt_status, "sda" },
 	{ "query-raid-create",			1, 0, 1, query_raid_create, "sg5" },
 	{ "query-raid-delete",			1, 0, 1, query_raid_delete, "sg5" },
@@ -11493,14 +14792,19 @@ static const struct {
 	{ "query-raid-consistency-check",	0, 0, 0, query_raid_consistency_check, "" },
 	{ "query-format-for-jbod",		0, 0, 0, query_format_for_jbod, "" },
 	{ "query-reclaim",			0, 0, 0, query_reclaim, "" },
-	{ "query-arrays-raid-include",	0, 0, 0, query_arrays_include, "" },
-	{ "query-devices-raid-include",	1, 0, 1, query_devices_include, "sdb" },
+	{ "query-arrays-raid-include",		0, 0, 0, query_arrays_include, "" },
+	{ "query-devices-raid-include",		1, 0, 1, query_devices_include, "sdb" },
+	{ "query-arrays-raid-migrate",		0, 0, 0, query_arrays_raid_migrate, "" },
+	{ "query-devices-raid-migrate",		1, 0, 1, query_devices_raid_migrate, "sda" },
+	{ "query-raid-levels-raid-migrate",	1, 0, 1, query_raid_levels_raid_migrate, "sda" },
+	{ "query-stripe-sizes-raid-migrate",	2, 0, 2, query_stripe_sizes_raid_migrate, "sg5 10" },
+	{ "query-devices-min-max-raid-migrate",	2, 0, 2, query_devices_min_max_raid_migrate, "sg5 10" },
 	{ "query-recovery-format",		0, 0, 0, query_recovery_format, "" },
 	{ "query-raid-rebuild",			0, 0, 0, query_raid_rebuild, "" },
 	{ "query-format-for-raid",		0, 0, 0, query_format_for_raid, "" },
 	{ "query-ucode-level",			1, 0, 1, query_ucode_level, "sda" },
 	{ "query-format-timeout",		1, 0, 1, query_format_timeout, "sg6" },
-	{ "query-qdepth",				1, 0, 1, query_qdepth, "sda" },
+	{ "query-qdepth",			1, 0, 1, query_qdepth, "sda" },
 	{ "query-tcq-enable",			1, 0, 1, query_tcq_enable, "sda" },
 	{ "query-log-level",			1, 0, 1, query_log_level, "sg5" },
 	{ "query-add-device",			0, 0, 0, query_add_device, "" },
@@ -11510,8 +14814,8 @@ static const struct {
 	{ "query-bus-width",			2, 0, 2, query_bus_width, "sg5 0" },
 	{ "query-supported-raid-levels",	1, 0, 1, query_raid_levels, "sg5" },
 	{ "query-include-allowed",		2, 0, 2, query_include_allowed, "sg5 5" },
-	{ "query-max-devices-in-array",	2, 0, 2, query_max_array_devices, "sg5 5" },
-	{ "query-min-devices-in-array",	2, 0, 2, query_min_array_devices, "sg5 5" },
+	{ "query-max-devices-in-array",		2, 0, 2, query_max_array_devices, "sg5 5" },
+	{ "query-min-devices-in-array",		2, 0, 2, query_min_array_devices, "sg5 5" },
 	{ "query-min-mult-in-array",		2, 0, 2, query_min_mult_in_array, "sg5 5" },
 	{ "query-supp-stripe-sizes",		2, 0, 2, query_supp_stripe_sizes, "sg5 5" },
 	{ "query-recommended-stripe-size",	2, 0, 2, query_recommended_stripe_size, "sg5 5" },
@@ -11522,10 +14826,10 @@ static const struct {
 	{ "set-all-primary",			0, 0, 0, set_all_primary, "" },
 	{ "set-all-secondary",			0, 0, 0, set_all_secondary, "" },
 	{ "query-ha-mode",			1, 0, 1, get_ha_mode, "sg5" },
-	{ "set-ha-mode",				2, 0, 2, __set_ha_mode, "sg5 [Normal | JBOD]" },
-	{ "raid-create",				1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
-	{ "raid-delete",				1, 0, 1, raid_delete, "sdb" },
-	{ "raid-include",				2, 0, 17, raid_include_cmd, "sda sg6 sg7" },
+	{ "set-ha-mode",			2, 0, 2, __set_ha_mode, "sg5 [Normal | JBOD]" },
+	{ "raid-create",			1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
+	{ "raid-delete",			1, 0, 1, raid_delete, "sdb" },
+	{ "raid-include",			2, 0, 17, raid_include_cmd, "sda sg6 sg7" },
 	{ "format-for-raid",			1, 1, 0, format_for_raid, "sda sdb sdc" },
 	{ "format-for-jbod",			1, 1, 0, format_for_jbod, "sg6 sg7 sg8" },
 	{ "recovery-format",			1, 1, 0, recovery_format, "sda sg7" },
@@ -11533,26 +14837,36 @@ static const struct {
 	{ "hot-spare-delete",			1, 0, 1, hot_spare_delete, "sg6" },
 	{ "reclaim-cache",			1, 0, 1, reclaim, "sg5" },
 	{ "reclaim-unknown-cache",		1, 0, 1, reclaim_unknown, "sg5" },
-	{ "force-cache-battery-error",	1, 0, 1, force_cache_battery_error, "sg5" },
+	{ "force-cache-battery-error",		1, 0, 1, force_cache_battery_error, "sg5" },
 	{ "start-ioa-cache",			1, 0, 1, start_ioa_cache, "sg5" },
 	{ "raid-consistency-check",		1, 0, 1, raid_consistency_check, "sg5" },
-	{ "raid-rebuild",				1, 0, 1, raid_rebuild_cmd, "sg6" },
+	{ "raid-rebuild",			1, 0, 1, raid_rebuild_cmd, "sg6" },
 	{ "disrupt-device",			1, 0, 1, disrupt_device_cmd, "sg6" },
-	{ "update-ucode",				2, 0, 2, update_ucode_cmd, "sg5 /root/ucode.bin" },
+	{ "update-ucode",			2, 0, 2, update_ucode_cmd, "sg5 /root/ucode.bin" },
 	{ "set-format-timeout",			2, 0, 2, set_format_timeout, "sg6 4" },
 	{ "set-qdepth",				2, 0, 2, set_qdepth, "sda 16" },
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable, "sda 0" },
 	{ "set-log-level",			2, 0, 2, set_log_level_cmd, "sg5 2" },
 	{ "identify-disk",			2, 0, 2, identify_disk, "sda 1" },
 	{ "identify-slot",			2, 0, 2, identify_slot, "0000:d8:01.0/0:1:1: 1" },
-	{ "remove-disk",				2, 0, 2, remove_disk, "sda 1" },
-	{ "remove-slot",				2, 0, 2, remove_slot, "0000:d8:01.0/0:1:1: 1" },
+	{ "remove-disk",			2, 0, 2, remove_disk, "sda 1" },
+	{ "remove-slot",			2, 0, 2, remove_slot, "0000:d8:01.0/0:1:1: 1" },
 	{ "add-slot",				2, 0, 2, add_slot, "0000:d8:01.0/0:1:1: 1" },
 	{ "set-initiator-id",			3, 0, 3, set_initiator_id, "sg5 0 7" },
 	{ "set-bus-speed",			3, 0, 3, set_bus_speed, "sg5 0 320" },
 	{ "set-bus-width",			3, 0, 3, set_bus_width, "sg5 0 16" },
+	{ "raid-migrate",			3, 1, 0, raid_migrate_cmd, "-r 10 [-s 256] sda sg6 sg7" },
 };
 
+/**
+ * non_interactive_cmd - process a command line command
+ * @cmd:		command string
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 static int non_interactive_cmd(char *cmd, char **args, int num_args)
 {
 	int rc, i;
@@ -11590,6 +14904,14 @@ static int non_interactive_cmd(char *cmd, char **args, int num_args)
 	return -EINVAL;
 }
 
+/**
+ * main - program entry point
+ * @argc:		number of arguments
+ * @argv:		argument vector
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
 int main(int argc, char *argv[])
 {
 	int  next_editor, next_dir, next_cmd, next_args, i, rc = 0;

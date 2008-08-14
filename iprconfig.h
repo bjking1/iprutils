@@ -12,30 +12,31 @@
  **/
 
 #include <libintl.h>
+
 #define _(string) gettext(string)
 #define __(string) (string)
-#define EXIT_FLAG 0x8000	/* stops at given screen on exit call */
-#define CANCEL_FLAG 0x4000	/* stops at given screen on quit call */
-#define REFRESH_FLAG 0x2000	/* refreshes screen on quit or exit */
-#define TOGGLE_FLAG 0x1000
-#define FWD_FLAG 0x0800
-#define CONFIRM_FLAG 0x0400
-#define CONFIRM_REC_FLAG 0x0200
-#define MENU_FLAG 0x0100
-#define ENTER_FLAG 0x0080
+#define EXIT_FLAG		0x8000	/* stops at given screen on exit call */
+#define CANCEL_FLAG		0x4000	/* stops at given screen on quit call */
+#define REFRESH_FLAG		0x2000	/* refreshes screen on quit or exit */
+#define TOGGLE_FLAG		0x1000
+#define FWD_FLAG		0x0800
+#define CONFIRM_FLAG		0x0400
+#define CONFIRM_REC_FLAG	0x0200
+#define MENU_FLAG		0x0100
+#define ENTER_FLAG		0x0080
 
 #define NUM_OPTS(x) (sizeof(x)/sizeof(struct screen_opts))
 
-#define REFRESH_SCREEN -13
-#define TOGGLE_SCREEN -14
+#define REFRESH_SCREEN		-13
+#define TOGGLE_SCREEN		-14
 
-#define INVALID_OPTION_STATUS 2
-#define PGUP_STATUS 3
-#define TOP_STATUS 4
-#define PGDN_STATUS 5
-#define BTM_STATUS 6
+#define INVALID_OPTION_STATUS	2
+#define PGUP_STATUS		3
+#define TOP_STATUS		4
+#define PGDN_STATUS		5
+#define BTM_STATUS		6
 
-#define MAX_FIELD_SIZE 39
+#define MAX_FIELD_SIZE		39
 
 typedef struct info_container i_container;
 
@@ -43,8 +44,8 @@ struct info_container {
 	i_container *next_item;	/* reference to next info_container */
 	char field_data[MAX_FIELD_SIZE + 1]; /* stores characters entered into a user-entry field */
 	void *data;		/* stores a field pointer */
-	int y;            /* cursor y position of user selection */
-	int x;            /* cursor x position of user selection */
+	int y;			/* cursor y position of user selection */
+	int x;			/* cursor x position of user selection */
 };
 
 #define for_each_icon(icon) for (icon = i_con_head; icon; icon = icon->next_item)
@@ -107,6 +108,8 @@ int select_hot_spare(i_container * i_con, int action);
 int confirm_hot_spare(int action);
 int hot_spare_complete(int action);
 
+int raid_migrate(i_container * i_con);
+
 int raid_rebuild(i_container * i_con);
 int confirm_raid_rebuild(i_container * i_con);
 int raid_resync(i_container * i_con);
@@ -143,6 +146,8 @@ int confirm_set_default_editor_change2(i_container *);
 int restore_log_defaults(i_container *);
 int ibm_boot_log(i_container *);
 int exit_confirmed(i_container *);
+
+static int raid_create_check_num_devs(struct ipr_array_cap_entry *, int, int);
 
 /* constant strings */
 const char *no_dev_found = __("No devices found");
@@ -260,6 +265,68 @@ struct screen_opts raid_screen_opt[] = {
 	{add_hot_spare,    "7", __("Create a hot spare")},
 	{remove_hot_spare, "8", __("Delete a hot spare")},
 	{raid_resync,      "9", __("Force RAID Consistency Check")},
+	{raid_migrate,     "0", __("Migrate disk array protection")},
+};
+
+s_node n_raid_migrate_complete = {
+	.title    = __("Migrate Disk Array Status"),
+	.body     = __("You selected to migrate a disk array")
+};
+
+s_node n_confirm_raid_migrate = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Confirm Migrate a Disk Array"),
+	.header   = {
+		__("ATTENTION: Disk array will be migrated.\n\n"),
+		__("Press Enter to continue.\n"),
+		__("  q=Cancel to return and change your choice.\n\n"),
+		"" }
+};
+
+s_node n_raid_migrate = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG ),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Migrate Disk Array Protection"),
+	.header   = {
+		__("Select only one disk array for migration.\n\n"),
+		__("Type choice, press Enter.\n"),
+		__("  1=migrate protection for a disk array\n\n"),
+ 		"" }
+};
+
+s_node n_raid_migrate_fail = {
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
+	.title    = __("Disk Array Migration Failed"),
+	.header   = {
+		__("There are no arrays eligible for the selected operation "
+		   "due to one or more of the following reasons:\n\n"),
+		__("o There are no disk arrays in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
+		   "it read/write protected. Examine the kernel messages log "
+		   "for any errors that are logged for the IO subsystem "
+		   "and follow the appropriate procedure for the reference "
+		   "code to correct the problem, if necessary.\n"),
+		__("o Not all disks attached to an advanced function IOA have"
+		   "reported to the system. Retry the operation.\n"),
+		__("o There are not enough unused AF disks for the migration.\n"),
+		"" }
+};
+
+s_node n_raid_migrate_add_disks = {
+	.rc_flags = (CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Select Disk Units for Migration"),
+	.header   = {
+		__("Type option, press Enter.\n"),
+		__("  1=Select\n\n"),
+		"" }
 };
 
 s_node n_raid_screen = {
@@ -424,8 +491,8 @@ s_node n_raid_include_fail = {
 		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
 		   "for any errors that are logged for the IO subsystem "
-		   "and follow the appropriate procedure for the reference code to "
-		   "correct the problem, if necessary.\n"),
+		   "and follow the appropriate procedure for the reference "
+		   "code to correct the problem, if necessary.\n"),
 		__("o Not all disks attached to an advanced function IOA have"
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
@@ -1424,8 +1491,8 @@ const char *screen_status[] = {
 	/* 63 */ __("Editor unchanged"),
 	/* 64 */ __("Default log values restored"),
 	/* 65 */ __("Editor returned %d. Try setting the default editor."),
-      /* 66 */ __("Failed to change disk configuration."),
-      /* 67 */ __("Microcode Download failed."),
+	/* 66 */ __("Failed to change disk configuration."),
+	/* 67 */ __("Microcode Download failed."),
 	/* 68 */ __("Failed to enable IOA cache."),
 	/* 69 */ __("Invalid number of devices selected."),
 	/* 70 */ __("Failed to start IOA cache."),
@@ -1435,7 +1502,98 @@ const char *screen_status[] = {
 	/* 74 */ __("RAID Consistency check successful"),
 	/* 75 */ __("Failed to read error log. Try setting root kernel message log directory."),
 	/* 76 */ __("No SAS disks available"),
+	/* 77 */ __("Too many disks were selected.  The maximum is %d."),
+	/* 78 */ __("Too few disks were selected.  The minimum is %d."),
+	/* 79 */ __("Migrate Array Protection completed successfully."),
+	/* 80 */ __("Migrate Array Protection failed."),
+
       /* NOTE:  127 maximum limit */
 };
 
-#endif
+/* TODO - replace constants in iprconfig.c with the following enums/defines */
+enum {
+	RC_0_Success = 0,
+	RC_1_Blank,
+	RC_2_Invalid_Option,
+	RC_3_Screen_Up,
+	RC_4_At_Top,
+	RC_5_Screen_Down,
+	RC_6_At_Bottom,
+	RC_7_Blank,
+	RC_8_Blank,
+	RC_9_Blank,
+	RC_10_No_Devices,
+	RC_11_Blank,
+	RC_12_Blank,
+	RC_13_Blank,
+	RC_14_Blank,
+	RC_15_Invalid_Selection,
+	RC_16_More_Than_One_Dev,
+	RC_17_Invalid_Option,
+	RC_18_Array_Created,
+	RC_19_Create_Fail,
+	RC_20_Delete_Fail,
+	RC_21_Delete_Success,
+	RC_22_Blank,
+	RC_23_Blank,
+	RC_24_Blank,
+	RC_25_Devices_Multiple,
+	RC_26_Add_Fail,
+	RC_27_Add_Success,
+	RC_28_Rebuild_Started,
+	RC_29_Rebuild_Fail,
+	RC_30_Maint_Fail,
+	RC_31_Maint_Fail_In_Use,
+	RC_32_Maint_Success,
+	RC_33_No_Units,
+	RC_34_Init_Format_Success,
+	RC_35_Init_Format_Fail,
+	RC_36_Reclaim_Cache_Success,
+	RC_37_Reclaim_Cache_Fail,
+	RC_38_No_Reclaim_Needed,
+	RC_39_No_Reclaim_Performed,
+	RC_40_Rebuild_Started,
+	RC_41_Rebuild_Failed,
+	RC_42_Battery_Err_State_Success,
+	RC_43_Battery_Err_State_Fail,
+	RC_44_No_Battery_Pack,
+	RC_45_Change_Bus_Conf_Success,
+	RC_46_Change_Bus_Conf_Fail,
+	RC_47_Change_Driver_Conf_Success,
+	RC_48_Change_Driver_Conf_Fail,
+	RC_49_No_Units_Available,
+	RC_50_Init_Format_Success,
+	RC_51_Init_Format_Fail,
+	RC_52_No_Devices_Available,
+	RC_53_Hot_Spare_Created,
+	RC_54_Hot_Spare_Deleted,
+	RC_55_Failed_Create,
+	RC_56_Failed_Delete,
+	RC_57_Change_Driver_Conf_Success,
+	RC_58_Change_Driver_Conf_Fail,
+	RC_59_Invalid_Dir,
+	RC_60_Root_Changed,
+	RC_61_Root_Unchanged,
+	RC_62_Editor_Changed,
+	RC_63_Editor_Unchanged,
+	RC_64_Log_Restored,
+	RC_65_Set_Default_Editor,
+	RC_66_Disk_Conf_Fail,
+	RC_67_uCode_Download_Fail,
+	RC_68_Cache_Enable_Fail,
+	RC_69_Invalid_Number_Devs,
+	RC_70_Cache_Start_Fail,
+	RC_71_Cache_Start_Success,
+	RC_72_Battery_Err_State,
+	RC_73_Force_Check_Fail,
+	RC_74_Check_Success,
+	RC_75_Failed_Read_Err_Log,
+	RC_76_No_SAS_Disks,
+	RC_77_Too_Many_Disks,
+	RC_78_Too_Few_Disks,
+	RC_79_Migrate_Prot_Success,
+	RC_80_Migrate_Prot_Fail,
+	/* NOTE:  127 maximum limit */
+};
+
+#endif /* iprconfig_h */
