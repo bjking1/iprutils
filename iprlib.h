@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.101 2008/08/14 01:12:54 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.102 2008/08/20 22:59:29 wboyer Exp $
  */
 
 #include <stdarg.h>
@@ -637,19 +637,19 @@ struct ipr_res_addr_aliases {
 struct ipr_array_cap_entry {
 	u8   prot_level;
 #define IPR_DEFAULT_RAID_LVL "5"
+
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8   include_allowed:1;
 	u8   reserved:5;
 	u8   format_overlay_type:2;
-
-#define IPR_FORMAT_ADD_DEVICES 1
-#define IPR_FORMAT_REMOVE_DEVICES 2
-
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8   format_overlay_type:2;
 	u8   reserved:5;
 	u8   include_allowed:1;
 #endif
+#define IPR_FORMAT_ADD_DEVICES 1
+#define IPR_FORMAT_REMOVE_DEVICES 2
+
 	u16  reserved2;
 	u8   reserved3;
 	u8   max_num_array_devices;
