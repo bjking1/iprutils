@@ -2014,6 +2014,14 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 		}
 	}
 
+	if (dev->ioa->asymmetric_access) {
+		body = add_line_to_body(body,"", NULL);
+		if (dev->ioa->asymmetric_access_enabled)
+			body = add_line_to_body(body,_("Current Asymmetric Access State"), _("Enabled"));
+		else
+			body = add_line_to_body(body,_("Current Asymmetric Access State"), _("Disabled"));
+	}
+
 	return body;
 }
 
@@ -2415,6 +2423,38 @@ int device_details(i_container *i_con)
 #define IPR_REMOVE  1
 #define IPR_ADD_HOT_SPARE 0
 #define IPR_RMV_HOT_SPARE 1
+
+/**
+* hot_spare_screen - Display choices for working with hot spares.
+* @i_con:            i_container struct
+*
+* Returns:
+*   0 if success / non-zero on failure
+**/
+int hot_spare_screen(i_container *i_con)
+{
+	int rc;
+	struct screen_output *s_out;
+	int loop;
+
+	free_raid_cmds();
+
+	for (loop = 0; loop < n_hot_spare_screen.num_opts; loop++) {
+		n_hot_spare_screen.body =
+			ipr_list_opts(n_hot_spare_screen.body,
+				      n_hot_spare_screen.options[loop].key,
+				      n_hot_spare_screen.options[loop].list_str);
+	}
+
+	n_hot_spare_screen.body = ipr_end_list(n_hot_spare_screen.body);
+
+	s_out = screen_driver(&n_hot_spare_screen,0,NULL);
+	free(n_hot_spare_screen.body);
+	n_hot_spare_screen.body = NULL;
+	rc = s_out->rc;
+	free(s_out);
+	return rc;
+}
 
 /**
 * raid_screen - 
@@ -4356,7 +4396,6 @@ int confirm_raid_migrate()
 	struct screen_output *s_out;
 	int toggle = 1;
 	int header_lines;
-	i_container *i_con;
 
 	body_init_status(buffer, n_confirm_raid_migrate.header, &header_lines);
 
@@ -4374,7 +4413,7 @@ int confirm_raid_migrate()
 
 	do {
 		n_confirm_raid_migrate.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_raid_migrate, header_lines, i_con);
+		s_out = screen_driver(&n_confirm_raid_migrate, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -5003,6 +5042,45 @@ int raid_migrate(i_container *i_con)
 	}
 
 	n_raid_migrate.body = NULL;
+
+	return rc;
+}
+
+/**
+ * asym_access - GUI routine for setting array asymmetric access.
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int asym_access(i_container *i_con)
+{
+	int rc;
+	int found = 0;
+	char *buffer[2];
+	struct screen_output *s_out;
+	int header_lines;
+
+	processing();
+
+	/* make sure the i_con list is empty */
+	i_con = free_i_con(i_con);
+
+	rc = RC_SUCCESS;
+
+	body_init_status(buffer, n_asym_access.header, &header_lines);
+
+	if (!found) {
+		n_asym_access_fail.body = body_init(n_asym_access_fail.header, NULL);
+		s_out = screen_driver(&n_asym_access_fail, 0, i_con);
+
+		free(n_asym_access_fail.body);
+		n_asym_access_fail.body = NULL;
+
+		rc = s_out->rc | CANCEL_FLAG;
+		free(s_out);
+	} else
+		rc = 1; //process_asym_access(buffer, header_lines);
 
 	return rc;
 }
@@ -9806,6 +9884,7 @@ struct ioa_config_attr {
 	int option;
 	int preferred_primary;
 	int gscsi_only_ha;
+	int active_active;
 };
 
 /**
@@ -9833,16 +9912,19 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 	 same line as the field in which the menu is opened for*/
 	start_row += 2; /* for title */  /* FIXME */
 
-	if (ioa_config_attr->option == 1 || ioa_config_attr->option == 2) {
-		num_menu_items = 2;
+	if (ioa_config_attr->option == 1 || ioa_config_attr->option == 2
+	    || ioa_config_attr->option == 3) {
+		num_menu_items = 3;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
 
 		menu_index = 0;
 		if (ioa_config_attr->option == 1)
 			menu_item[menu_index] = new_item("None","");
-		else
+		else if (ioa_config_attr->option == 2)
 			menu_item[menu_index] = new_item("RAID","");
+		else
+			menu_item[menu_index] = new_item("Disabled","");
 
 		userptr[menu_index] = 0;
 		set_item_userptr(menu_item[menu_index],
@@ -9852,8 +9934,10 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 
 		if (ioa_config_attr->option == 1)
 			menu_item[menu_index] = new_item("Primary","");
-		else
+		else if (ioa_config_attr->option == 2)
 			menu_item[menu_index] = new_item("JBOD","");
+		else
+			menu_item[menu_index] = new_item("Enabled","");
 
 		userptr[menu_index] = 1;
 		set_item_userptr(menu_item[menu_index],
@@ -9865,8 +9949,10 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 		if (rc == RC_SUCCESS) {
 			if (ioa_config_attr->option == 1)
 				ioa_config_attr->preferred_primary = *retptr;
-			else
+			else if (ioa_config_attr->option == 2)
 				ioa_config_attr->gscsi_only_ha = *retptr;
+			else
+				ioa_config_attr->active_active = *retptr;
 		}
 
 		i = 0;
@@ -9928,7 +10014,7 @@ int change_ioa_config(i_container * i_con)
 	i_con_head_saved = i_con_head; /* FIXME */
 	i_con_head = i_con = NULL;
 
-	body = body_init(n_change_disk_config.header, &header_lines);
+	body = body_init(n_change_ioa_config.header, &header_lines);
 	sprintf(buffer, "Adapter: %s/%d   %s %s\n", dev->ioa->pci_address,
 		dev->ioa->host_num, dev->scsi_dev_data->vendor_id,
 		dev->scsi_dev_data->product_id);
@@ -9954,6 +10040,16 @@ int change_ioa_config(i_container * i_con)
 			sprintf(pref_str, "JBOD");
 		else
 			sprintf(pref_str, "Normal");
+		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
+	}
+	if (dev->ioa->asymmetric_access) {
+		body = add_line_to_body(body,_("Active/Active Mode"), "%13");
+		ioa_config_attr[index].option = 3;
+		ioa_config_attr[index].active_active = ioa_attr.active_active;
+		if (ioa_attr.active_active)
+			sprintf(pref_str, "Enabled");
+		else
+			sprintf(pref_str, "Disabled");
 		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
 	}
 
@@ -9983,6 +10079,12 @@ int change_ioa_config(i_container * i_con)
 					else
 						sprintf(temp_i_con->field_data, "Normal");
 					ioa_attr.gscsi_only_ha = config_attr->gscsi_only_ha;
+				} else if (config_attr->option == 3) {
+					if (config_attr->active_active)
+						sprintf(temp_i_con->field_data, "Enabled");
+					else
+						sprintf(temp_i_con->field_data, "Disabled");
+					ioa_attr.active_active = config_attr->active_active;
 				}
 				found++;
 				break;
@@ -11112,6 +11214,10 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 				sprintf(buf, "Degraded");
 			else if (res_state.degraded_oper || res_state.service_req)
 				sprintf(buf, "Degraded");
+			else if ((dev->ioa->asymmetric_access &&
+				 dev->array_rcd->current_asym_access_state == IPR_ACTIVE_OPTIMIZED)
+				 || (!dev->ioa->is_secondary && !dev->ioa->asymmetric_access))
+				sprintf(buf, "Optimized");
 			else
 				sprintf(buf, "Active");
 		} else if (format_req)
@@ -14276,6 +14382,128 @@ int query_devices_min_max_raid_migrate(char **args, int num_args)
 }
 
 /**
+ * query_ioas_asym_access - Show the ioas that support asymmetric access.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_ioas_asym_access(char **args, int num_args)
+{
+	int hdr = 0;
+	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa) {
+		if (!ioa->asymmetric_access);
+			continue;
+		if (!hdr) {
+			hdr = 1;
+			printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+		}
+		printf_device(&ioa->ioa, 1);
+	}
+	return 0;
+}
+
+/**
+ * query_arrays_asym_access - Show the arrays that support asymmetric access.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_arrays_asym_access(char **args, int num_args)
+{
+	int hdr = 0;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset;
+
+	for_each_ioa(ioa) {
+		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
+			continue;
+		for_each_vset(ioa, vset) {
+			if (!vset->array_rcd->asym_access_cand)
+				continue;
+			if (!hdr) {
+				hdr = 1;
+				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			}
+			printf_device(vset, 1);
+		}
+	}
+	return 0;
+}
+
+/**
+ * query_ioa_asym_access_mode - Show the current asymmetric access state for
+ * 				the given IOA.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_ioa_asym_access_mode(char **args, int num_args)
+{
+	struct ipr_dev *dev;
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev != &dev->ioa->ioa) {
+		fprintf(stderr, "%s is not an IOA.\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (dev->ioa->asymmetric_access_enabled)
+		printf("Enabled\n");
+	else if (dev->ioa->asymmetric_access)
+		printf("Disabled\n");
+	else
+		printf("Unsupported\n");
+
+	return 0;
+}
+
+/**
+ * query_array_asym_access_mode - Show the current asymmetric access state for
+ * 				  the given array.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_array_asym_access_mode(char **args, int num_args)
+{
+	struct ipr_dev *vset;
+
+	vset = find_dev(args[0]);
+	if (!vset) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_volume_set(vset)) {
+		fprintf(stderr, "%s is not an array.\n", vset->gen_name);
+		return -EINVAL;
+	}
+
+	if (!vset->array_rcd->asym_access_cand)
+		printf("Unsupported\n");
+	else if (vset->array_rcd->current_asym_access_state == IPR_ACTIVE_OPTIMIZED)
+		printf("Optimized\n");
+	else
+		printf("Not Optimized\n");
+
+	return 0;
+}
+
+/**
  * query_format_for_jbod -
  * @args:		argument vector
  * @num_args:		number of arguments
@@ -14765,6 +14993,133 @@ static int set_all_secondary(char **args, int num_args)
 	return 0;
 }
 
+/**
+ * check_and_set_active_active - Do some sanity checks and then set the
+ * 				 active/active state to the requested mode.
+ * @dev_name:		specified IOA
+ * @mode:		mode to set - enable or disable
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int check_and_set_active_active(char *dev_name, int mode)
+{
+	struct ipr_dev *dev;
+
+	dev = find_dev(dev_name);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", dev_name);
+		return -EINVAL;
+	}
+	if (dev != &dev->ioa->ioa) {
+		fprintf(stderr, "%s is not an IOA.\n", dev_name);
+		return -EINVAL;
+	}
+
+	/* Check that asymmetric access is supported by the adapter. */
+	if (!dev->ioa->asymmetric_access) {
+		ioa_err(dev->ioa, "IOA does not support asymmetric access.\n");
+		return -EINVAL;
+	}
+
+	/* Check the state of asymmetric access. */
+	if (dev->ioa->asymmetric_access_enabled == mode) {
+		ioa_dbg(dev->ioa, "Asymmetric access is already %s.\n",
+			mode == 0 ? "disabled" : "enabled");
+		return 0;
+	}
+
+	return set_active_active_mode(dev->ioa, mode);
+}
+
+/**
+ * set_ioa_asymmetric_access - Change the asymmetric access mode for an IOA.
+ *			       Enabling occurs by sending a change multi adapter
+ *			       assignment command from ipr_set_ioa_attr().
+ *			       Disabling occurs by sending a mode select
+ *			       page 24 in ipr_set_active_active_mode().
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int set_ioa_asymmetric_access(char **args, int num_args)
+{
+	if (!strncasecmp(args[1], "Enable", 4))
+		return check_and_set_active_active(args[0], 1);
+	else if (!strncasecmp(args[1], "Disable", 4))
+		return check_and_set_active_active(args[0], 0);
+	return -EINVAL;
+}
+
+/**
+ * set_array_asymmetric_access - Set the desired asymmetric access state of the
+ * 				 array to "Optimized" or "Non-Optimized".
+ *
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int set_array_asymmetric_access(char **args, int num_args)
+{
+	int state;
+	struct ipr_dev *vset = NULL;
+	struct ipr_ioa *ioa = NULL;
+
+	vset = find_dev(args[0]);
+	if (!vset) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_volume_set(vset)) {
+		scsi_err(vset,  "Given device is not an array.");
+		return -EINVAL;
+	}
+
+	/* Check that asymmetric access is supported by the adapter. */
+	if (!vset->ioa->asymmetric_access) {
+		ioa_err(vset->ioa, "Asymmetric access is not supported.");
+		return -EINVAL;
+	}
+
+	/* Check that asymmetric access is enabled on the adapter. */
+	if (!vset->ioa->asymmetric_access_enabled) {
+		ioa_err(vset->ioa, "Asymmetric access is not enabled.");
+		return -EINVAL;
+	}
+
+	/* Optimized or Non-optimized? */
+	if (!strncasecmp(args[1], "Optimized", 3))
+		state = IPR_ACTIVE_OPTIMIZED;
+	else if (!strncasecmp(args[1], "Non-Optimized", 3))
+		state = IPR_ACTIVE_NON_OPTIMIZED;
+	else {
+		scsi_err(vset, "Unrecognized state given for asymmetric access.");
+		return -EINVAL;
+	}
+
+	if (vset->array_rcd->saved_asym_access_state == state) {
+		scsi_dbg(vset, "Array is already set to requested state.");
+		return 0;
+	}
+
+	if (vset->array_rcd->asym_access_cand)
+		vset->array_rcd->issue_cmd = 1;
+	else {
+		scsi_err(vset, "%s is not a candidate for "
+			 "asymmetric access.", vset->gen_name);
+		return -EINVAL;
+	}
+
+	vset->array_rcd->saved_asym_access_state = state;
+
+	return ipr_set_array_asym_access(vset, ioa->qac_data);
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -14799,6 +15154,10 @@ static const struct {
 	{ "query-raid-levels-raid-migrate",	1, 0, 1, query_raid_levels_raid_migrate, "sda" },
 	{ "query-stripe-sizes-raid-migrate",	2, 0, 2, query_stripe_sizes_raid_migrate, "sg5 10" },
 	{ "query-devices-min-max-raid-migrate",	2, 0, 2, query_devices_min_max_raid_migrate, "sg5 10" },
+	{ "query-ioas-asymmetric-access",	0, 0, 0, query_ioas_asym_access, "" },
+	{ "query-arrays-asymmetric-access",	0, 0, 0, query_arrays_asym_access, "" },
+	{ "query-ioa-asymmetric-access-mode",	1, 0, 1, query_ioa_asym_access_mode, "sg5" },
+	{ "query-array-asymmetric-access-mode",	1, 0, 1, query_array_asym_access_mode, "sda" },
 	{ "query-recovery-format",		0, 0, 0, query_recovery_format, "" },
 	{ "query-raid-rebuild",			0, 0, 0, query_raid_rebuild, "" },
 	{ "query-format-for-raid",		0, 0, 0, query_format_for_raid, "" },
@@ -14827,6 +15186,8 @@ static const struct {
 	{ "set-all-secondary",			0, 0, 0, set_all_secondary, "" },
 	{ "query-ha-mode",			1, 0, 1, get_ha_mode, "sg5" },
 	{ "set-ha-mode",			2, 0, 2, __set_ha_mode, "sg5 [Normal | JBOD]" },
+	{ "set-ioa-asymmetric-access",		2, 0, 2, set_ioa_asymmetric_access, "sg5 [Enabled | Disabled]" },
+	{ "set-array-asymmetric-access",	2, 0, 2, set_array_asymmetric_access, "sda [Optimized | Non-Optimized]" },
 	{ "raid-create",			1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
 	{ "raid-delete",			1, 0, 1, raid_delete, "sdb" },
 	{ "raid-include",			2, 0, 17, raid_include_cmd, "sda sg6 sg7" },

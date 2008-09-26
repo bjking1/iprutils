@@ -100,6 +100,7 @@ int reclaim_warning(i_container * i_con);
 int reclaim_result(i_container * i_con);
 int af_include(i_container * i_con);
 int af_remove(i_container * i_con);
+int hot_spare_screen(i_container *i_con);
 int add_hot_spare(i_container * i_con);
 int remove_hot_spare(i_container * i_con);
 int hot_spare(i_container * i_con, int action);
@@ -109,6 +110,7 @@ int confirm_hot_spare(int action);
 int hot_spare_complete(int action);
 
 int raid_migrate(i_container * i_con);
+int asym_access(i_container *i_con);
 
 int raid_rebuild(i_container * i_con);
 int confirm_raid_rebuild(i_container * i_con);
@@ -262,10 +264,50 @@ struct screen_opts raid_screen_opt[] = {
 	{raid_include,     "4", __("Add a device to a disk array")},
 	{af_include,       "5", __("Format device for RAID function")},
 	{af_remove,        "6", __("Format device for JBOD function (512)")},
-	{add_hot_spare,    "7", __("Create a hot spare")},
-	{remove_hot_spare, "8", __("Delete a hot spare")},
+	{hot_spare_screen, "7", __("Work with hot spares")},
+	{asym_access,      "8", __("Work with asymmetric access")},
 	{raid_resync,      "9", __("Force RAID Consistency Check")},
 	{raid_migrate,     "0", __("Migrate disk array protection")},
+};
+
+struct screen_opts hot_spare_opt[] = {
+	{add_hot_spare,    "1", __("Create a hot spare")},
+	{remove_hot_spare, "2", __("Delete a hot spare")},
+};
+
+
+s_node n_asym_access = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG ),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Array Asymmetric Access"),
+	.header   = {
+		__("Select the disk array path.\n\n"),
+		__("Type choice, press Enter.\n"),
+		__("  1=change asymmetric access for a disk array\n\n"),
+ 		"" }
+};
+
+s_node n_asym_access_fail = {
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
+	.title    = __("Setting Array Asymmetric Access Failed"),
+	.header   = {
+		__("There are no arrays eligible for the selected operation "
+		   "due to one or more of the following reasons:\n\n"),
+		__("o There are no disk arrays in the system.\n"),
+		__("o An IOA is in a condition that makes the disks attached to "
+		   "it read/write protected. Examine the kernel messages log "
+		   "for any errors that are logged for the IO subsystem "
+		   "and follow the appropriate procedure for the reference "
+		   "code to correct the problem, if necessary.\n"),
+		__("o Not all disks attached to an advanced function IOA have "
+		   "reported to the system. Retry the operation.\n"),
+		__("o None of the disk arrays in the system are capable of "
+		   "changing asymmetric access attributes.\n"),
+		__("o An IOA needs updated microcode in order to support "
+		   "active/active configurations.\n"),
+		"" }
 };
 
 s_node n_raid_migrate_complete = {
@@ -311,7 +353,7 @@ s_node n_raid_migrate_fail = {
 		   "for any errors that are logged for the IO subsystem "
 		   "and follow the appropriate procedure for the reference "
 		   "code to correct the problem, if necessary.\n"),
-		__("o Not all disks attached to an advanced function IOA have"
+		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
 		__("o There are not enough unused AF disks for the migration.\n"),
 		"" }
@@ -327,6 +369,14 @@ s_node n_raid_migrate_add_disks = {
 		__("Type option, press Enter.\n"),
 		__("  1=Select\n\n"),
 		"" }
+};
+
+s_node n_hot_spare_screen = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG),
+	.num_opts = NUM_OPTS(hot_spare_opt),
+	.options  = &hot_spare_opt[0],
+	.title    = __("Work with Hot Spares")
 };
 
 s_node n_raid_screen = {

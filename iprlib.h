@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.102 2008/08/20 22:59:29 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.103 2008/09/26 20:54:17 wboyer Exp $
  */
 
 #include <stdarg.h>
@@ -161,6 +161,7 @@
 #define IPR_REMOVE_ARRAY_DEVICE              0xF5
 #define IPR_REBUILD_DEVICE_DATA              0xF6
 #define IPR_RECLAIM_CACHE_STORE              0xF8
+#define IPR_SET_ARRAY_ASYMMETRIC_ACCESS      0xFA
 #define IPR_RECLAIM_ACTION                   0x68
 #define IPR_RECLAIM_PERFORM                  0x00
 #define IPR_RECLAIM_RESET_BATTERY_ERROR      0x08
@@ -179,6 +180,12 @@
 #define IPR_TYPE_AF_DISK                     0xC
 #define IPR_TYPE_ADAPTER                     0x1f
 #define IPR_TYPE_EMPTY_SLOT                  0xff
+
+#define IPR_ACTIVE_OPTIMIZED                 0x0
+#define IPR_ACTIVE_NON_OPTIMIZED             0x1
+#define IPR_ACTIVE_STANDYBY                  0x2
+#define IPR_CLEAR_ASYMMETRIC_STATE           0x0
+#define IPR_PRESERVE_ASYMMETRIC_STATE        0x1
 
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
@@ -214,8 +221,7 @@ extern char *tool_name;
 extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
 
-struct sysfs_dev
-{
+struct sysfs_dev {
 	char sysfs_device_name[16];
 	struct sysfs_dev *next, *prev;
 };
@@ -680,7 +686,14 @@ struct ipr_array_record {
 	u8  issue_cmd:1;
 #endif
 
-	u8  reserved2;
+	//u8  reserved2;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8  saved_asym_access_state:4;
+	u8  current_asym_access_state:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8  current_asym_access_state:4;
+	u8  saved_asym_access_state:4;
+#endif
 
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8  established:1;
@@ -694,7 +707,8 @@ struct ipr_array_record {
 	u8  stop_cand:1;
 	u8  resync_cand:1;
 	u8  migrate_cand:1;
-	u8  reserved4:4;
+	u8  asym_access_cand:1;
+	u8  reserved4:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8  reserved3:3;
 	u8  no_config_entry:1;
@@ -703,7 +717,8 @@ struct ipr_array_record {
 	u8  exposed:1;
 	u8  established:1;
 
-	u8  reserved4:4;
+	u8  reserved4:3;
+	u8  asym_access_cand:1;
 	u8  migrate_cand:1;
 	u8  resync_cand:1;
 	u8  stop_cand:1;
@@ -973,6 +988,7 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 
 #define IPR_CATEGORY_IOA "Adapter"
 #define IPR_GSCSI_HA_ONLY "JBOD_ONLY_HA"
+#define IPR_DUAL_ADAPTER_ACTIVE_ACTIVE "DUAL_ADAPTER_ACTIVE_ACTIVE"
 
 #define IPR_CATEGORY_BUS "Bus"
 #define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
@@ -1023,7 +1039,7 @@ struct scsi_dev_data {
 struct ipr_path_entry {
 	u8 state;
 #define IPR_PATH_FUNCTIONAL		0
-#define IPR_PATH_NOT_FUNCTIONAL	1
+#define IPR_PATH_NOT_FUNCTIONAL		1
 	u8 local_bus_num;
 	u8 remote_bus_num;
 	u8 reserved;
@@ -1040,10 +1056,11 @@ struct ipr_dual_ioa_entry {
 	u32 length;
 	u8 link_state;
 #define IPR_IOA_LINK_STATE_NOT_OPER	0
-#define IPR_IOA_LINK_STATE_OPER	1
+#define IPR_IOA_LINK_STATE_OPER		1
 	u8 cur_state;
+#define IPR_IOA_STATE_NO_CHANGE 	0
 #define IPR_IOA_STATE_PRIMARY		2
-#define IPR_IOA_STATE_SECONDARY	3
+#define IPR_IOA_STATE_SECONDARY		3
 #define IPR_IOA_STATE_NO_PREFERENCE	4
 	u8 fmt;
 	u8 multi_adapter_type;
@@ -1107,6 +1124,7 @@ struct ipr_vset_attr {
 struct ipr_ioa_attr {
 	int preferred_primary;
 	int gscsi_only_ha;
+	int active_active;
 };
 
 #define IPR_DEV_MAX_PATHS	2
@@ -1152,7 +1170,6 @@ struct ipr_ioa {
 	u32 num_raid_cmds;
 	u32 msl;
 	u16 num_devices;
-	u8 rw_protected:1; /* FIXME */
 	u8 ioa_dead:1;
 	u8 nr_ioa_microcode:1;
 	u8 scsi_id_changeable:1;
@@ -1163,6 +1180,8 @@ struct ipr_ioa {
 	u8 protect_last_bus:1;
 	u8 gscsi_only_ha:1;
 	u8 in_gscsi_only_ha:1;
+	u8 asymmetric_access:1;
+	u8 asymmetric_access_enabled:1;
 	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
@@ -1311,12 +1330,16 @@ struct ipr_ioa_mode_page {
 struct ipr_mode_page24 {
 	struct ipr_mode_page_hdr hdr;
 #if defined (__BIG_ENDIAN_BITFIELD)
-	u8 enable_dual_ioa_af:1;
+	u8 dual_adapter_af:2;
 	u8 reserved:7;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 reserved:7;
-	u8 enable_dual_ioa_af:1;
+	u8 dual_adapter_af:2;
 #endif
+
+#define DISABLE_DUAL_IOA_AF		0x00
+#define ENABLE_DUAL_IOA_AF		0x02
+#define ENABLE_DUAL_IOA_ACTIVE_ACTIVE	0x03
 };
 
 struct ipr_config_term_hdr {
@@ -1488,7 +1511,8 @@ struct ipr_inquiry_ioa_cap {
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 dual_ioa_raid:1;
 	u8 dual_ioa_wcache:1;
-	u8 reserved:6;
+	u8 dual_ioa_asymmetric_access:1;
+	u8 reserved:5;
 
 	u8 can_attach_to_aux_cache:1;
 	u8 is_aux_cache:1;
@@ -1498,7 +1522,8 @@ struct ipr_inquiry_ioa_cap {
 
 	u8 reserved4[2];
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 reserved:6;
+	u8 reserved:5;
+	u8 dual_ioa_asymmetric_access:1;
 	u8 dual_ioa_wcache:1;
 	u8 dual_ioa_raid:1;
 
@@ -1989,7 +2014,7 @@ static inline int ipr_max_dev_elems(struct ipr_ses_config_pg *ses_cfg)
 
 int sg_ioctl(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
 int sg_ioctl_noretry(int, u8 *, void *, u32, u32, struct sense_data_t *, u32);
-int ipr_set_preferred_primary(struct ipr_ioa *, int);
+int ipr_change_multi_adapter_assignment(struct ipr_ioa *, int, int);
 int set_ha_mode(struct ipr_ioa *, int);
 int set_preferred_primary(struct ipr_ioa *, int);
 void check_current_config(bool);
@@ -2017,6 +2042,7 @@ int ipr_remove_hot_spare(struct ipr_ioa *);
 int ipr_start_array_protection(struct ipr_ioa *, int, int);
 int ipr_migrate_array_protection(struct ipr_ioa *,
 	       			 struct ipr_array_query_data *, int, int, int);
+int ipr_set_array_asym_access(struct ipr_dev *, struct ipr_array_query_data *);
 int ipr_add_hot_spare(struct ipr_ioa *);
 int ipr_rebuild_device_data(struct ipr_ioa *);
 int ipr_resync_array(struct ipr_ioa *);
@@ -2051,7 +2077,10 @@ int ipr_get_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *);
 int ipr_get_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
 int ipr_modify_dev_attr(struct ipr_dev *, struct ipr_disk_attr *);
 int ipr_set_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *, int);
+int ipr_modify_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
+int set_active_active_mode(struct ipr_ioa *, int);
+
 int ipr_query_dasd_timeouts(struct ipr_dev *, struct ipr_query_dasd_timeouts *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
@@ -2286,4 +2315,5 @@ if (!ioa->ioa_dead) { \
       } \
 } \
 } while (0)
-#endif
+
+#endif /* iprlib_h */

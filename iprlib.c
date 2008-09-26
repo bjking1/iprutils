@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.119 2008/08/14 01:12:54 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.120 2008/09/26 20:54:17 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -3625,7 +3625,48 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 }
 
 /**
- * get_write_buffer_dev - 
+ * ipr_set_array_asym_access -
+ * @dev:		ipr_dev struct
+ * @qac:		ipr_array_query_data struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_set_array_asym_access(struct ipr_dev *dev, struct ipr_array_query_data *qac)
+{
+	char *name = dev->gen_name;
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	int fd, rc;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_SET_ARRAY_ASYMMETRIC_ACCESS;
+	cdb[7] = (sizeof(*qac) >> 8) & 0xff;
+	cdb[8] = sizeof(*qac) & 0xff;
+
+	rc = sg_ioctl(fd, cdb, qac, sizeof(*qac), SG_DXFER_TO_DEV,
+		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
+
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		ioa_cmd_err(dev->ioa, &sense_data, "Set Array Asymmetric Access", rc);
+
+	close(fd);
+	return rc;
+}
+
+/**
+ * get_write_buffer_dev - FIXME - probably need to remove this routine.
  * @dev:		ipr dev struct
  *
  * Returns:
@@ -4460,14 +4501,16 @@ int ipr_set_ha_mode(struct ipr_ioa *ioa, int gscsi_only_ha)
 }
 
 /**
- * ipr_set_preferred_primary - set the preferred primary state
+ * ipr_change_multi_adapter_assignment - set the preferred primary state and/or
+ *                                       the asymmetric access state
  * @ioa:		ipr ioa struct
  * @preferred_primary:	set preferred primary flag
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
+int ipr_change_multi_adapter_assignment(struct ipr_ioa *ioa, int preferred_primary,
+					int asym_access)
 {
 	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
@@ -4488,6 +4531,8 @@ int ipr_set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 
 	cdb[0] = IPR_MAINTENANCE_OUT;
 	cdb[1] = IPR_CHANGE_MULTI_ADAPTER_ASSIGNMENT;
+	if (asym_access)
+		cdb[2] = IPR_PRESERVE_ASYMMETRIC_STATE;
 	if (preferred_primary)
 		cdb[3] = IPR_IOA_STATE_PRIMARY;
 	else
@@ -4519,7 +4564,7 @@ int set_preferred_primary(struct ipr_ioa *ioa, int preferred_primary)
 	char temp[100];
 
 	sprintf(temp, "%d", preferred_primary);
-	if (ipr_set_preferred_primary(ioa, preferred_primary))
+	if (ipr_change_multi_adapter_assignment(ioa, preferred_primary, IPR_PRESERVE_ASYMMETRIC_STATE))
 		return -EIO;
 
 	return 0;
@@ -4547,6 +4592,70 @@ int set_ha_mode(struct ipr_ioa *ioa, int gscsi_only)
 		ipr_reset_adapter(ioa);
 
 	return 0;
+}
+
+/**
+ * ipr_set_active_active_mode -
+ * @ioa:		ipr ioa struct
+ * @mode:		enable or disable
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_set_active_active_mode(struct ipr_ioa *ioa)
+{
+	int len, rc;
+	struct ipr_mode_pages mode_pages;
+	struct ipr_mode_page24 *page24;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+	rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
+	if (!rc) {
+		page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
+				 mode_pages.hdr.block_desc_len +
+				 sizeof(mode_pages.hdr));
+		len = mode_pages.hdr.length +1;
+		mode_pages.hdr.length = 0;
+		page24->dual_adapter_af = ENABLE_DUAL_IOA_ACTIVE_ACTIVE;
+		return ipr_mode_select(&ioa->ioa, &mode_pages, len);
+	}
+
+	return rc;
+}
+
+/**
+ * set_active_active_mode -
+ * @ioa:		ipr ioa struct
+ * @mode:		enable or disable
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int set_active_active_mode(struct ipr_ioa *ioa, int mode)
+{
+	struct ipr_ioa_attr attr;
+	int rc;
+
+	/* Get the current ioa attributes. */
+	rc = ipr_get_ioa_attr(ioa, &attr);
+
+	if (rc)
+		return rc;
+
+	/* Get the saved ioa attributes from the config file. */
+	rc = ipr_modify_ioa_attr(ioa, &attr);
+
+	if (rc)
+		return rc;
+
+	if (attr.active_active == mode) {
+		/* We should never get here. */
+		ioa_dbg(ioa, "Requested and current asymmetric access mode are the same.\n");
+		return 0;
+	}
+
+	attr.active_active = mode;
+	return ipr_set_ioa_attr(ioa, &attr, 1);
 }
 
 /**
@@ -4920,7 +5029,7 @@ static u16 get_af_block_size(struct ipr_inquiry_ioa_cap *ioa_cap)
 }
 
 /**
- * get_ioa_cap - get the capability information for the ioa
+ * get_ioa_cap - get the capability information for the ioa (inquiry page D0)
  * @ioa:		ipr ioa struct
  *
  * Returns:
@@ -4939,35 +5048,48 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 
 	rc = ipr_inquiry(&ioa->ioa, 0, &page0_inq, sizeof(page0_inq));
 
-	if (!rc) {
-		for (j = 0; j < page0_inq.page_length; j++) {
-			if (page0_inq.supported_page_codes[j] != 0xD0)
-				continue;
-			rc = ipr_inquiry(&ioa->ioa, 0xD0, &ioa_cap, sizeof(ioa_cap));
+	if (rc) {
+		ioa->ioa_dead = 1;
+		return;
+	}
+
+	for (j = 0; j < page0_inq.page_length; j++) {
+		if (page0_inq.supported_page_codes[j] != 0xD0)
+			continue;
+		rc = ipr_inquiry(&ioa->ioa, 0xD0, &ioa_cap, sizeof(ioa_cap));
+		if (rc)
+			break;
+
+		ioa->af_block_size = get_af_block_size(&ioa_cap);
+		if (ioa_cap.is_aux_cache)
+			ioa->is_aux_cache = 1;
+		if (ioa_cap.can_attach_to_aux_cache && ioa_cap.is_dual_wide)
+			ioa->protect_last_bus = 1;
+		if (ioa_cap.gscsi_only_ha)
+			ioa->gscsi_only_ha = 1;
+
+		if (ioa_cap.dual_ioa_raid || ioa_cap.dual_ioa_asymmetric_access) {
+			memset(&mode_pages, 0, sizeof(mode_pages));
+			rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
 			if (rc)
 				break;
-			if (ioa_cap.dual_ioa_raid) {
-				memset(&mode_pages, 0, sizeof(mode_pages));
-				rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
-				if (!rc) {
-					page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
-									     mode_pages.hdr.block_desc_len +
-									     sizeof(mode_pages.hdr));
 
-					if (page24->enable_dual_ioa_af)
-						ioa->dual_raid_support = 1;
+			page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
+							     mode_pages.hdr.block_desc_len +
+							     sizeof(mode_pages.hdr));
+
+			if (ioa_cap.dual_ioa_raid && page24->dual_adapter_af == ENABLE_DUAL_IOA_AF)
+				ioa->dual_raid_support = 1;
+
+			if (ioa_cap.dual_ioa_asymmetric_access) {
+				ioa->asymmetric_access = 1;
+				if (page24->dual_adapter_af == ENABLE_DUAL_IOA_ACTIVE_ACTIVE) {
+					ioa->dual_raid_support = 1;
+					ioa->asymmetric_access_enabled = 1;
 				}
 			}
-			ioa->af_block_size = get_af_block_size(&ioa_cap);
-			if (ioa_cap.is_aux_cache)
-				ioa->is_aux_cache = 1;
-			if (ioa_cap.can_attach_to_aux_cache && ioa_cap.is_dual_wide)
-				ioa->protect_last_bus = 1;
-			if (ioa_cap.gscsi_only_ha)
-				ioa->gscsi_only_ha = 1;
 		}
-	} else
-		ioa->ioa_dead = 1;
+	}
 }
 
 /**
@@ -5401,7 +5523,7 @@ static void ipr_config_file_hdr(char *file_name)
 }
 
 /**
- * ipr_save_attr - Start array protection for an array
+ * ipr_save_attr -
  * @ioa:		ipr ioa struct
  * @category:		
  * @field:		
@@ -5475,7 +5597,6 @@ static void ipr_save_attr(struct ipr_ioa *ioa, char *category,
 		syslog(LOG_ERR, "Could not save %s.\n", fname);
 	fclose(fd);
 	fclose(temp_fd);
-
 }
 
 /**
@@ -5888,6 +6009,7 @@ int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 
 	attr->preferred_primary = 0;
 	attr->gscsi_only_ha = ioa->in_gscsi_only_ha;
+	attr->active_active = ioa->asymmetric_access_enabled;
 
 	if (!ioa->dual_raid_support)
 		return 0;
@@ -5944,6 +6066,11 @@ int ipr_modify_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	rc = ipr_get_saved_ioa_attr(ioa, IPR_GSCSI_HA_ONLY, temp);
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &attr->gscsi_only_ha);
+
+	rc = ipr_get_saved_ioa_attr(ioa, IPR_DUAL_ADAPTER_ACTIVE_ACTIVE, temp);
+	if (rc == RC_SUCCESS)
+		sscanf(temp, "%d", &attr->active_active);
+
 	return 0;
 }
 
@@ -6017,11 +6144,12 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	if (ipr_get_ioa_attr(ioa, &old_attr))
 		return -EIO;
 
-	if (attr->preferred_primary != old_attr.preferred_primary) {
-		sprintf(temp, "%d", attr->preferred_primary);
-		if (ipr_set_preferred_primary(ioa, attr->preferred_primary))
+	/* FIXME - preferred_primary and active_active may change at the same
+	 * time.  This code may need to change.
+ 	 */
+	if (attr->preferred_primary != old_attr.preferred_primary)
+		if (ipr_change_multi_adapter_assignment(ioa, attr->preferred_primary, IPR_PRESERVE_ASYMMETRIC_STATE))
 			return -EIO;
-	}
 
 	if (attr->gscsi_only_ha != old_attr.gscsi_only_ha) {
 		sprintf(temp, "%d", attr->gscsi_only_ha);
@@ -6033,8 +6161,24 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 		ipr_reset_adapter(ioa);
 	}
 
-	get_dual_ioa_state(ioa);
-	get_subsys_config(ioa);
+	if (attr->active_active != old_attr.active_active && ioa->asymmetric_access) {
+		sprintf(temp, "%d", attr->active_active);
+
+		/* If setting active/active, use mode page 24.
+		 * If clearing, use Change Multi Adapter Assignment. */
+		if (attr->active_active) {
+			if (ipr_set_active_active_mode(ioa))
+				return -EIO;
+		} else if (ipr_change_multi_adapter_assignment(ioa,
+							       attr->preferred_primary,
+							       attr->active_active))
+				return -EIO;
+		if (save)
+			ipr_save_ioa_attr(ioa, IPR_DUAL_ADAPTER_ACTIVE_ACTIVE, temp, 1);
+	}
+
+	get_dual_ioa_state(ioa);	/* for preferred_primary */
+	get_subsys_config(ioa);		/* for gscsi_only_ha */
 	return 0;
 }
 

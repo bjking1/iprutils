@@ -1,4 +1,4 @@
-.\" (C) Copyright 2000, 2004
+.\" (C) Copyright 2000, 2008
 .\" International Business Machines Corporation and others.
 .\" All Rights Reserved. This program and the accompanying
 .\" materials are made available under the terms of the
@@ -60,16 +60,31 @@ as standalone disks. Only disks which are not formatted for JBOD function
 or are formatted for JBOD function and are in the Format Required state
 will be available for this function.
 .PP
-.B Create a hot spare
-is used to designate a device as a dedicated hot spare.
+.B Work with hot spares
+is used to create a hot spare which designates a device as a dedicated hot
+spare.  It is also used to delete a hot spare which unconfigures a previously
+configured hot spare.
+.\".B Create a hot spare
+.\"is used to designate a device as a dedicated hot spare.
+.\".PP
+.\".B Delete a hot spare
+.\"is used to unconfigure a previously configured hot spare.
 .PP
-.B Delete a hot spare
-is used to unconfigure a previously configured hot spare.
+.B Work with asymmetric access
+is used to select which path of a disk array will be the primary path in a dual
+controller environment.  Asymmetric Access must be enabled on the adapter first.
+Not all adapters support asymmetric access and adapters that do provide support
+may require updated microcode.
 .PP
 .B Force RAID Consistency Check
 is used to force a consistency check on a RAID array. All ipr adapters 
 continually perform background consistency checking when idle. This 
 option can be used to force a consistency check to be performed.
+.PP
+.B Migrate disk array protection
+is used to change the RAID protection level for an array to another supported
+level.  In some cases, this will require adding more disks to the array.  In
+other cases, disks will be freed.
 .PP
 .B 3. Work with disk unit recovery
 is used to perform the following disk unit recovery actions:
@@ -123,9 +138,10 @@ is used to change driver configurable attributes, such as log_level.
 is used to change configurable disk attributes, such as queue depth.
 .PP
 .B 7. Work with adapter configuration
-is used to change configurable adapter attributes, such as dual adapter settings.
-Refer to the following command line options: primary, secondary, query-ha-mode, 
-and set-ha-mode for more information regarding these settings.
+is used to change configurable adapter attributes, such as dual adapter
+settings.  Refer to the following command line options: primary, secondary,
+query-ha-mode, set-ha-mode, set-ioa-asymmetric-access and
+set-array-asymmetric-access for more information regarding these settings.
 .PP
 .B 8. Download microcode
 is used to download microcode to ipr adapters and attached SCSI disks.
@@ -391,6 +407,23 @@ level that requires fewer devices.  Or, show the minmum number of devices
 required, the maximum number of devices allowed and the multiple of the number
 of devices required for a migration that requires more devices.
 .TP
+.B query-ioas-asymmetric-access
+.br
+Show the IOAs that support asymmetric access.
+.TP
+.B query-arrays-asymmetric-access
+.br
+Show the disk arrays that are candidates for setting their asymmetric access
+mode to Optimized or Non-Optimized.
+.TP
+.B query-ioa-asymmetric-access-mode [IOA]
+.br
+Show the current asymmetric access mode for the given IOA.
+.TP
+.B query-array-asymmetric-access-mode [array]
+.br
+Show the current asymmetric access mode for the given disk array.
+.TP
 .B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
@@ -641,6 +674,16 @@ Used to set the high-availability mode of the adapter. Refer to the
 command for more information regarding these settings. Example:
 .br
 .B iprconfig -c set-ha-mode sg5 Normal
+.TP
+.B set-array-asymmetric-access-mode [array] [Optimized | Non-Optimized]
+Used to set the asymmetric access mode of the disk array.  Example:
+.br
+.B iprconfig -c set-array-asymmetric-access-mode sda Optimized
+.TP
+.B set-ioa-asymmetric-access-mode [IOA] [Enabled | Disabled]
+Used to set the asymmetric access mode of the IOA.  Example:
+.br
+.B iprconfig -c set-ioa-asymmetric-access-mode sg5 Enabled
 .RE
 .TP
 .B \-\-version
