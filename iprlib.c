@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.120 2008/09/26 20:54:17 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.121 2008/10/23 17:11:20 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -3632,12 +3632,13 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
  * Returns:
  *   0 if success / non-zero on failure
  **/
-int ipr_set_array_asym_access(struct ipr_dev *dev, struct ipr_array_query_data *qac)
+int ipr_set_array_asym_access(struct ipr_ioa *ioa)
 {
-	char *name = dev->gen_name;
+	char *name = ioa->ioa.gen_name;
 	struct sense_data_t sense_data;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	int fd, rc;
+	int length = ntohs(ioa->qac_data->resp_len);
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -3652,14 +3653,14 @@ int ipr_set_array_asym_access(struct ipr_dev *dev, struct ipr_array_query_data *
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
 	cdb[0] = IPR_SET_ARRAY_ASYMMETRIC_ACCESS;
-	cdb[7] = (sizeof(*qac) >> 8) & 0xff;
-	cdb[8] = sizeof(*qac) & 0xff;
+	cdb[7] = (length >> 8) & 0xff;
+	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, qac, sizeof(*qac), SG_DXFER_TO_DEV,
+	rc = sg_ioctl(fd, cdb, ioa->qac_data, length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
-	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
-		ioa_cmd_err(dev->ioa, &sense_data, "Set Array Asymmetric Access", rc);
+	if (rc != 0 && (sense_data.sense_key != ILLEGAL_REQUEST || ipr_debug))
+		ioa_cmd_err(ioa, &sense_data, "Set Array Asymmetric Access", rc);
 
 	close(fd);
 	return rc;
@@ -4541,7 +4542,7 @@ int ipr_change_multi_adapter_assignment(struct ipr_ioa *ioa, int preferred_prima
 	rc = sg_ioctl(fd, cdb, NULL, 0, SG_DXFER_NONE,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
-	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+	if (rc != 0 && (sense_data.sense_key != ILLEGAL_REQUEST || ipr_debug))
 		scsi_cmd_err(dev, &sense_data, "Change Multi Adapter Assignment", rc);
 
 	close(fd);
@@ -6165,14 +6166,18 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 		sprintf(temp, "%d", attr->active_active);
 
 		/* If setting active/active, use mode page 24.
-		 * If clearing, use Change Multi Adapter Assignment. */
+		 * If clearing, reset the adapter and then use
+		 * Change Multi Adapter Assignment. */
 		if (attr->active_active) {
 			if (ipr_set_active_active_mode(ioa))
 				return -EIO;
-		} else if (ipr_change_multi_adapter_assignment(ioa,
+		} else {
+			ipr_reset_adapter(ioa);
+		       	if (ipr_change_multi_adapter_assignment(ioa,
 							       attr->preferred_primary,
 							       attr->active_active))
 				return -EIO;
+		}
 		if (save)
 			ipr_save_ioa_attr(ioa, IPR_DUAL_ADAPTER_ACTIVE_ACTIVE, temp, 1);
 	}
@@ -7900,7 +7905,7 @@ static void init_ioa_dev(struct ipr_dev *dev)
 	if (ipr_get_ioa_attr(dev->ioa, &attr))
 		return;
 	ipr_modify_ioa_attr(dev->ioa, &attr);
-	if (ipr_set_ioa_attr(dev->ioa, &attr, 1))
+	if (ipr_set_ioa_attr(dev->ioa, &attr, 0))
 		return;
 	if (ipr_get_bus_attr(dev->ioa, &buses))
 		return;

@@ -5047,6 +5047,239 @@ int raid_migrate(i_container *i_con)
 }
 
 /**
+ * asym_access_menu - Display the Optimized and Non-Optimized choices.
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int asym_access_menu(i_container *i_con)
+{
+	struct array_cmd_data *acd;
+	int start_row;
+	int num_menu_items;
+	int menu_index = 0;
+	ITEM ** menu_item = NULL;
+	int *userptr = NULL;
+	int *new_state;
+	int rc;
+
+	acd = (struct array_cmd_data *)i_con->data;
+
+	start_row = i_con->y + 2;
+
+	num_menu_items = ipr_debug ? 3 : 2;
+
+	menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+	userptr = malloc(sizeof(int) * num_menu_items);
+
+	menu_item[menu_index] = new_item("Optimized","");
+	userptr[menu_index] = 0;
+	set_item_userptr(menu_item[menu_index],
+			 (char *)&userptr[menu_index]);
+
+	menu_index++;
+	menu_item[menu_index] = new_item("Non-Optimized","");
+	userptr[menu_index] = 1;
+	set_item_userptr(menu_item[menu_index],
+			 (char *)&userptr[menu_index]);
+
+	if (ipr_debug) {
+		menu_index++;
+		menu_item[menu_index] = new_item("Not Set","");
+		userptr[menu_index] = 2;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+	}
+
+	menu_index++;
+	menu_item[menu_index] = NULL;
+	rc = display_menu(menu_item, start_row, menu_index, &new_state);
+
+	if (rc == RC_SUCCESS) {
+		/* set field_data based on menu choice */
+		if (*new_state == IPR_ACTIVE_OPTIMIZED)
+			sprintf(i_con->field_data, "Optimized");
+		else if (*new_state == IPR_ACTIVE_NON_OPTIMIZED)
+			sprintf(i_con->field_data, "Non-Optimized");
+		else if (ipr_debug && *new_state == IPR_ACTIVE_STANDBY)
+			sprintf(i_con->field_data, "Not Set");
+		/* only issue the command if the state selection changed */
+		if (acd->dev->array_rcd->saved_asym_access_state != *new_state)
+			acd->do_cmd = 1;
+		else
+			acd->do_cmd = 0;
+	} else {
+		/* set field_data based on existing value */
+		if (acd->dev->array_rcd->saved_asym_access_state == IPR_ACTIVE_OPTIMIZED)
+			sprintf(i_con->field_data, "Optimized");
+		else if (acd->dev->array_rcd->saved_asym_access_state == IPR_ACTIVE_NON_OPTIMIZED)
+			sprintf(i_con->field_data, "Non-Optimized");
+		else
+			sprintf(i_con->field_data, "Not Set");
+	}
+
+	menu_index = 0;
+	while (menu_item[menu_index] != NULL)
+		free_item(menu_item[menu_index++]);
+	free(menu_item);
+	free(userptr);
+	menu_item = NULL;
+
+	return rc;
+}
+
+/**
+ * configure_asym_access - Configure the array setting for asymmetric access.
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int configure_asym_access(i_container *i_con)
+{
+	struct array_cmd_data *acd;
+	i_container *new_i_con, *i_con_head_saved;
+	int header_lines = 0;
+	char pref_str[20];
+	char buffer[128];
+	char *body = NULL;
+	struct screen_output *s_out;
+	int state = 0, rc = REFRESH_FLAG;
+
+	i_con_head_saved = i_con_head;
+	i_con_head = new_i_con = NULL;
+
+	acd = i_con->data;
+
+	body = body_init(n_change_array_asym_access.header, &header_lines);
+	sprintf(buffer, "Array: %s", acd->dev->dev_name);
+	body = add_line_to_body(body, buffer, NULL);
+	if (acd->dev->array_rcd->current_asym_access_state == IPR_ACTIVE_OPTIMIZED)
+		sprintf(buffer, "Current asymmetric access state: Optimized");
+	else
+		sprintf(buffer, "Current asymmetric access state: Non-Optimized");
+	body = add_line_to_body(body, buffer, NULL);
+	if (acd->dev->array_rcd->saved_asym_access_state == IPR_ACTIVE_OPTIMIZED) {
+		sprintf(buffer, "Saved asymmetric access state: Optimized\n");
+		sprintf(pref_str, "Optimized");
+	} else if (acd->dev->array_rcd->saved_asym_access_state == IPR_ACTIVE_NON_OPTIMIZED) {
+		sprintf(buffer, "Saved asymmetric access state: Non-Optimized\n");
+		sprintf(pref_str, "Non-Optimized");
+	} else {
+		sprintf(buffer, "Saved asymmetric access state: Not Set\n");
+		sprintf(pref_str, "Not Set");
+	}
+	body = add_line_to_body(body, buffer, NULL);
+
+	header_lines += 2;
+
+	body = add_line_to_body(body,_("Preferred Asymmetric Access State"), "%13");
+
+	new_i_con = add_i_con(new_i_con, pref_str, acd);
+
+	n_change_array_asym_access.body = body;
+
+	while (rc & REFRESH_FLAG) {
+		s_out = screen_driver(&n_change_array_asym_access, header_lines, NULL);
+
+		rc = s_out->rc;
+
+		if (rc == RC_SUCCESS) {
+			if (!acd->do_cmd) {
+				rc = REFRESH_FLAG;
+				break;
+			}
+
+			if (!strncmp(new_i_con->field_data, "Optimized", 8))
+				state = IPR_ACTIVE_OPTIMIZED;
+			else if (!strncmp(new_i_con->field_data, "Non-Optimized", 8))
+				state = IPR_ACTIVE_NON_OPTIMIZED;
+			else if (ipr_debug)
+				state = IPR_ACTIVE_STANDBY;
+			else
+				/* We should never get here. */
+				break;
+
+			acd->dev->array_rcd->issue_cmd = 1;
+			acd->dev->array_rcd->saved_asym_access_state = state;
+			rc = ipr_set_array_asym_access(acd->ioa);
+		}
+	}
+	processing();
+
+	free(n_change_array_asym_access.body);
+	n_change_array_asym_access.body = NULL;
+	free_i_con(new_i_con);
+	i_con_head = i_con_head_saved;
+	free(s_out);
+	return rc;
+}
+
+/**
+ * process_asym_access - Process the arrays that support asymmetric access.
+ * @buffer:
+ * @header_lines:
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int process_asym_access(char *buffer[], int header_lines)
+{
+	struct screen_output *s_out;
+	int found = 0;
+	int toggle = 1;
+	i_container *i_con, *temp_i_con;
+	char *input;
+	int rc;
+	struct array_cmd_data *acd;
+
+	while (1) {
+		toggle_field = 0;
+
+		do {
+			n_asym_access.body = buffer[toggle&1];
+			/* display array selection screen */
+			s_out = screen_driver(&n_asym_access, header_lines, i_con);
+			rc = s_out->rc;
+			free(s_out);
+			toggle++;
+		} while (rc == TOGGLE_SCREEN);
+
+		if (rc & EXIT_FLAG || rc & CANCEL_FLAG)
+			break;
+
+		found = 0;
+		 /* do one at a time */
+		for_each_icon(temp_i_con) {
+			acd = temp_i_con->data;
+			input = temp_i_con->field_data;
+
+			if (acd && strcmp(input, "1") == 0) {
+				found++;
+				break;
+			}
+		}
+
+		if (found) {
+			/* Go to asymmetric access selection screen */
+			rc = configure_asym_access(temp_i_con);
+
+			/* Done on success or exit */
+			if (rc == RC_SUCCESS || rc & EXIT_FLAG)
+				break;
+
+			/* clear the do_cmd flag */
+			acd->do_cmd = 0;
+		} else
+			s_status.index = INVALID_OPTION_STATUS;
+	}
+
+	check_current_config(false);
+	return rc;
+}
+
+/**
  * asym_access - GUI routine for setting array asymmetric access.
  * @i_con:		i_container struct
  *
@@ -5055,11 +5288,13 @@ int raid_migrate(i_container *i_con)
  **/
 int asym_access(i_container *i_con)
 {
-	int rc;
+	int rc, k;
 	int found = 0;
 	char *buffer[2];
 	struct screen_output *s_out;
 	int header_lines;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset;
 
 	processing();
 
@@ -5069,6 +5304,20 @@ int asym_access(i_container *i_con)
 	rc = RC_SUCCESS;
 
 	body_init_status(buffer, n_asym_access.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
+			continue;
+		for_each_vset(ioa, vset) {
+			if (!vset->array_rcd->asym_access_cand)
+				continue;
+			add_raid_cmd_tail(ioa, vset, vset->array_rcd->array_id);
+			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
+
+			print_dev(k, vset, buffer, "%1", k);
+			found++;
+		}
+	}
 
 	if (!found) {
 		n_asym_access_fail.body = body_init(n_asym_access_fail.header, NULL);
@@ -5080,7 +5329,12 @@ int asym_access(i_container *i_con)
 		rc = s_out->rc | CANCEL_FLAG;
 		free(s_out);
 	} else
-		rc = 1; //process_asym_access(buffer, header_lines);
+		rc = process_asym_access(buffer, header_lines);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
 
 	return rc;
 }
@@ -9818,68 +10072,6 @@ leave:
 	return rc;
 }
 
-/**
- * ioa_config - 
- * @i_con:		i_container struct
- *
- * Returns:
- *   0 if success / non-zero on failure FIXME
- **/
-int ioa_config(i_container * i_con)
-{
-	int rc, k;
-	int len = 0;
-	int num_lines = 0;
-	struct ipr_ioa *ioa;
-	struct screen_output *s_out;
-	int header_lines;
-	char *buffer[2];
-	int toggle = 1;
-
-	processing();
-	rc = RC_SUCCESS;
-	i_con = free_i_con(i_con);
-
-	check_current_config(false);
-	body_init_status(buffer, n_ioa_config.header, &header_lines);
-
-	for_each_ioa(ioa) {
-		if (ioa->ioa.scsi_dev_data == NULL)
-			continue;
-		if (!ioa->dual_raid_support && !ioa->gscsi_only_ha)
-			continue;
-
-		print_dev(k, &ioa->ioa, buffer, "%1", k);
-		i_con = add_i_con(i_con, "\0", &ioa->ioa);
-		num_lines++;
-	}
-
-	if (num_lines == 0) {
-		for (k = 0; k < 2; k++) {
-			len = strlen(buffer[k]);
-			buffer[k] = realloc(buffer[k], len +
-						strlen(_(no_dev_found)) + 8);
-			sprintf(buffer[k] + len, "\n%s", _(no_dev_found));
-		}
-	}
-
-	do {
-		n_ioa_config.body = buffer[toggle&1];
-		s_out = screen_driver(&n_ioa_config,header_lines,i_con);
-		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	for (k = 0; k < 2; k++) {
-		free(buffer[k]);
-		buffer[k] = NULL;
-	}
-	n_ioa_config.body = NULL;
-
-	rc = s_out->rc;
-	free(s_out);
-	return rc;
-}
-
 struct ioa_config_attr {
 	int option;
 	int preferred_primary;
@@ -10099,13 +10291,76 @@ int change_ioa_config(i_container * i_con)
 	}
 
 	processing();
-	ipr_set_ioa_attr(dev->ioa, &ioa_attr, 1);
+	rc = ipr_set_ioa_attr(dev->ioa, &ioa_attr, 1);
+	check_current_config(false);
 
 leave:
 	free(n_change_ioa_config.body);
 	n_change_ioa_config.body = NULL;
 	free_i_con(i_con);
 	i_con_head = i_con_head_saved;
+	free(s_out);
+	return rc;
+}
+
+/**
+ * ioa_config -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int ioa_config(i_container * i_con)
+{
+	int rc, k;
+	int len = 0;
+	int num_lines = 0;
+	struct ipr_ioa *ioa;
+	struct screen_output *s_out;
+	int header_lines;
+	char *buffer[2];
+	int toggle = 1;
+
+	processing();
+	rc = RC_SUCCESS;
+	i_con = free_i_con(i_con);
+
+	check_current_config(false);
+	body_init_status(buffer, n_ioa_config.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		if (ioa->ioa.scsi_dev_data == NULL)
+			continue;
+		if (!ioa->dual_raid_support && !ioa->gscsi_only_ha)
+			continue;
+
+		print_dev(k, &ioa->ioa, buffer, "%1", k);
+		i_con = add_i_con(i_con, "\0", &ioa->ioa);
+		num_lines++;
+	}
+
+	if (num_lines == 0) {
+		for (k = 0; k < 2; k++) {
+			len = strlen(buffer[k]);
+			buffer[k] = realloc(buffer[k], len +
+						strlen(_(no_dev_found)) + 8);
+			sprintf(buffer[k] + len, "\n%s", _(no_dev_found));
+		}
+	}
+
+	do {
+		n_ioa_config.body = buffer[toggle&1];
+		s_out = screen_driver(&n_ioa_config, header_lines, i_con);
+		toggle++;
+	} while (s_out->rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+	n_ioa_config.body = NULL;
+
+	rc = s_out->rc;
 	free(s_out);
 	return rc;
 }
@@ -11459,6 +11714,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	char product_id[IPR_PROD_ID_LEN + 1];
 	struct ipr_ioa *ioa = dev->ioa;
 
+	/* In cases where we're having problems with the device */
+	if (!ioa)
+		return body;
+
 	if (body)
 		len = strlen(body);
 	body = realloc(body, len + 256);
@@ -11872,9 +12131,14 @@ static int raid_create(char **args, int num_args)
 		if (!ioa)
 			ioa = dev->ioa;
 		else if (ioa != dev->ioa) {
-			syslog(LOG_ERR, _("All devices must be attached to the same adapter\n"));
+			syslog(LOG_ERR, _("All devices must be attached to the same adapter.\n"));
 			return -EINVAL;
 		}
+	}
+
+	if (!ioa) {
+		syslog(LOG_ERR, _("No valid devices specified.\n"));
+		return -EINVAL;
 	}
 
 	cap = get_cap_entry(ioa->supported_arrays, raid_level);
@@ -12067,7 +12331,7 @@ static int raid_delete(char **args, int num_args)
 
 	dev = find_and_add_dev(args[0]);
 
-	if (!dev) {
+	if (!dev || !ipr_is_volume_set(dev)) {
 		syslog(LOG_ERR, _("Invalid device specified: %s\n"), args[0]);
 		return -EINVAL;
 	}
@@ -12094,8 +12358,10 @@ static int raid_delete(char **args, int num_args)
 static void printf_device(struct ipr_dev *dev, int type)
 {
 	char *buf = print_device(dev, NULL, NULL, type);
-	printf("%s", buf);
-	free(buf);
+	if (buf) {
+		printf("%s", buf);
+		free(buf);
+	}
 }
 
 /**
@@ -12114,8 +12380,10 @@ static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 			    int percent, int indent)
 {
 	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, 0, 0);
-	printf("%s", buf);
-	free(buf);
+	if (buf) {
+		printf("%s", buf);
+		free(buf);
+	}
 }
 
 /**
@@ -13309,8 +13577,10 @@ static int query_path_details(char **args, int num_args)
 static void printf_path_status(struct ipr_dev *dev)
 {
 	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 1);
-	printf("%s", buf);
-	free(buf);
+	if (buf) {
+		printf("%s", buf);
+		free(buf);
+	}
 }
 
 /**
@@ -14395,13 +14665,13 @@ static int query_ioas_asym_access(char **args, int num_args)
 	struct ipr_ioa *ioa;
 
 	for_each_ioa(ioa) {
-		if (!ioa->asymmetric_access);
+		if (!ioa->asymmetric_access)
 			continue;
 		if (!hdr) {
 			hdr = 1;
 			printf("%s\n%s\n", status_hdr[3], status_sep[3]);
 		}
-		printf_device(&ioa->ioa, 1);
+		printf_device(&ioa->ioa, 2);
 	}
 	return 0;
 }
@@ -14497,8 +14767,10 @@ static int query_array_asym_access_mode(char **args, int num_args)
 		printf("Unsupported\n");
 	else if (vset->array_rcd->current_asym_access_state == IPR_ACTIVE_OPTIMIZED)
 		printf("Optimized\n");
-	else
+	else if (vset->array_rcd->current_asym_access_state == IPR_ACTIVE_NON_OPTIMIZED)
 		printf("Not Optimized\n");
+	else
+		scsi_dbg(vset, "Unrecognized state - %d.", vset->array_rcd->current_asym_access_state);
 
 	return 0;
 }
@@ -15036,7 +15308,8 @@ static int check_and_set_active_active(char *dev_name, int mode)
  * set_ioa_asymmetric_access - Change the asymmetric access mode for an IOA.
  *			       Enabling occurs by sending a change multi adapter
  *			       assignment command from ipr_set_ioa_attr().
- *			       Disabling occurs by sending a mode select
+ *			       Disabling occurs by resetting the adapter and
+ *			       then sending a mode select
  *			       page 24 in ipr_set_active_active_mode().
  * @args:		argument vector
  * @num_args:		number of arguments
@@ -15067,7 +15340,6 @@ static int set_array_asymmetric_access(char **args, int num_args)
 {
 	int state;
 	struct ipr_dev *vset = NULL;
-	struct ipr_ioa *ioa = NULL;
 
 	vset = find_dev(args[0]);
 	if (!vset) {
@@ -15110,14 +15382,14 @@ static int set_array_asymmetric_access(char **args, int num_args)
 	if (vset->array_rcd->asym_access_cand)
 		vset->array_rcd->issue_cmd = 1;
 	else {
-		scsi_err(vset, "%s is not a candidate for "
-			 "asymmetric access.", vset->gen_name);
+		scsi_err(vset, "%s is not a candidate for asymmetric access.",
+			 vset->dev_name);
 		return -EINVAL;
 	}
 
 	vset->array_rcd->saved_asym_access_state = state;
 
-	return ipr_set_array_asym_access(vset, ioa->qac_data);
+	return ipr_set_array_asym_access(vset->ioa);
 }
 
 static const struct {
@@ -15186,8 +15458,8 @@ static const struct {
 	{ "set-all-secondary",			0, 0, 0, set_all_secondary, "" },
 	{ "query-ha-mode",			1, 0, 1, get_ha_mode, "sg5" },
 	{ "set-ha-mode",			2, 0, 2, __set_ha_mode, "sg5 [Normal | JBOD]" },
-	{ "set-ioa-asymmetric-access",		2, 0, 2, set_ioa_asymmetric_access, "sg5 [Enabled | Disabled]" },
-	{ "set-array-asymmetric-access",	2, 0, 2, set_array_asymmetric_access, "sda [Optimized | Non-Optimized]" },
+	{ "set-ioa-asymmetric-access-mode",	2, 0, 2, set_ioa_asymmetric_access, "sg5 [Enabled | Disabled]" },
+	{ "set-array-asymmetric-access-mode",	2, 0, 2, set_array_asymmetric_access, "sda [Optimized | Non-Optimized]" },
 	{ "raid-create",			1, 1, 0, raid_create, "-r 5 -s 64 sda sdb sg6 sg7" },
 	{ "raid-delete",			1, 0, 1, raid_delete, "sdb" },
 	{ "raid-include",			2, 0, 17, raid_include_cmd, "sda sg6 sg7" },

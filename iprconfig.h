@@ -111,6 +111,7 @@ int hot_spare_complete(int action);
 
 int raid_migrate(i_container * i_con);
 int asym_access(i_container *i_con);
+int asym_access_menu(i_container * i_con);
 
 int raid_rebuild(i_container * i_con);
 int confirm_raid_rebuild(i_container * i_con);
@@ -278,7 +279,7 @@ struct screen_opts hot_spare_opt[] = {
 
 s_node n_asym_access = {
 	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
-	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG ),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG | TOGGLE_FLAG | FWD_FLAG),
 	.num_opts = NUM_OPTS(null_opt),
 	.options  = &null_opt[0],
 	.title    = __("Array Asymmetric Access"),
@@ -307,6 +308,25 @@ s_node n_asym_access_fail = {
 		   "changing asymmetric access attributes.\n"),
 		__("o An IOA needs updated microcode in order to support "
 		   "active/active configurations.\n"),
+		"" }
+};
+
+struct screen_opts change_array_asym_access_opt[] = {
+	{asym_access_menu, "c"},
+	{NULL, "\n"}
+};
+
+s_node n_change_array_asym_access = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG | FWD_FLAG | MENU_FLAG),
+	.num_opts = NUM_OPTS(change_array_asym_access_opt),
+	.options  = &change_array_asym_access_opt[0],
+	.title    = __("Change Asymmetric Access Configuration of Array"),
+	.header   = {
+		__("Current array asymmetric access configuration is shown. To "
+		   "change setting hit 'c' for options menu. Highlight "
+		   "desired option then hit Enter.\n"),
+		__("  c=Change Setting\n\n"),
 		"" }
 };
 
