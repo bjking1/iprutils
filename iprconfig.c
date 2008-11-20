@@ -3551,7 +3551,7 @@ int confirm_raid_start(i_container *i_con)
 		rc = is_array_in_use(ioa, cur_raid_cmd->array_id);
 		if (rc != 0) {
 			/* "Start Parity Protection failed." */
-			rc = 19;  
+			rc = RC_19_Create_Fail;
 			syslog(LOG_ERR, _("Devices may have changed state. Command cancelled,"
 					  " please issue commands again if RAID still desired %s.\n"),
 			       ioa->ioa.gen_name);
@@ -3675,12 +3675,12 @@ int raid_start_complete()
 
 			if (done_bad)
 				/* Start Parity Protection failed. */
-				return 19; 
+				return RC_19_Create_Fail;
 
 			check_current_config(false);
 
 			/* Start Parity Protection completed successfully */
-			return 18; 
+			return RC_18_Array_Created;
 		}
 		not_done = 0;
 		sleep(1);
@@ -5068,7 +5068,7 @@ int asym_access_menu(i_container *i_con)
 
 	start_row = i_con->y + 2;
 
-	num_menu_items = ipr_debug ? 3 : 2;
+	num_menu_items = 3;
 
 	menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 	userptr = malloc(sizeof(int) * num_menu_items);
@@ -5084,13 +5084,11 @@ int asym_access_menu(i_container *i_con)
 	set_item_userptr(menu_item[menu_index],
 			 (char *)&userptr[menu_index]);
 
-	if (ipr_debug) {
-		menu_index++;
-		menu_item[menu_index] = new_item("Not Set","");
-		userptr[menu_index] = 2;
-		set_item_userptr(menu_item[menu_index],
-				 (char *)&userptr[menu_index]);
-	}
+	menu_index++;
+	menu_item[menu_index] = new_item("Not Set","");
+	userptr[menu_index] = 2;
+	set_item_userptr(menu_item[menu_index],
+			 (char *)&userptr[menu_index]);
 
 	menu_index++;
 	menu_item[menu_index] = NULL;
@@ -5102,7 +5100,7 @@ int asym_access_menu(i_container *i_con)
 			sprintf(i_con->field_data, "Optimized");
 		else if (*new_state == IPR_ACTIVE_NON_OPTIMIZED)
 			sprintf(i_con->field_data, "Non-Optimized");
-		else if (ipr_debug && *new_state == IPR_ACTIVE_STANDBY)
+		else if (*new_state == IPR_ACTIVE_STANDBY)
 			sprintf(i_con->field_data, "Not Set");
 		/* only issue the command if the state selection changed */
 		if (acd->dev->array_rcd->saved_asym_access_state != *new_state)
@@ -5136,9 +5134,8 @@ int asym_access_menu(i_container *i_con)
  * Returns:
  *   0 if success / non-zero on failure
  **/
-int configure_asym_access(i_container *i_con)
+int configure_asym_access(struct array_cmd_data *acd)
 {
-	struct array_cmd_data *acd;
 	i_container *new_i_con, *i_con_head_saved;
 	int header_lines = 0;
 	char pref_str[20];
@@ -5149,8 +5146,6 @@ int configure_asym_access(i_container *i_con)
 
 	i_con_head_saved = i_con_head;
 	i_con_head = new_i_con = NULL;
-
-	acd = i_con->data;
 
 	body = body_init(n_change_array_asym_access.header, &header_lines);
 	sprintf(buffer, "Array: %s", acd->dev->dev_name);
@@ -5195,11 +5190,8 @@ int configure_asym_access(i_container *i_con)
 				state = IPR_ACTIVE_OPTIMIZED;
 			else if (!strncmp(new_i_con->field_data, "Non-Optimized", 8))
 				state = IPR_ACTIVE_NON_OPTIMIZED;
-			else if (ipr_debug)
-				state = IPR_ACTIVE_STANDBY;
 			else
-				/* We should never get here. */
-				break;
+				state = IPR_ACTIVE_STANDBY;
 
 			acd->dev->array_rcd->issue_cmd = 1;
 			acd->dev->array_rcd->saved_asym_access_state = state;
@@ -5229,7 +5221,7 @@ int process_asym_access(char *buffer[], int header_lines)
 	struct screen_output *s_out;
 	int found = 0;
 	int toggle = 1;
-	i_container *i_con, *temp_i_con;
+	i_container *i_con;
 	char *input;
 	int rc;
 	struct array_cmd_data *acd;
@@ -5240,7 +5232,7 @@ int process_asym_access(char *buffer[], int header_lines)
 		do {
 			n_asym_access.body = buffer[toggle&1];
 			/* display array selection screen */
-			s_out = screen_driver(&n_asym_access, header_lines, i_con);
+			s_out = screen_driver(&n_asym_access, header_lines, NULL);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -5251,9 +5243,9 @@ int process_asym_access(char *buffer[], int header_lines)
 
 		found = 0;
 		 /* do one at a time */
-		for_each_icon(temp_i_con) {
-			acd = temp_i_con->data;
-			input = temp_i_con->field_data;
+		for_each_icon(i_con) {
+			acd = i_con->data;
+			input = i_con->field_data;
 
 			if (acd && strcmp(input, "1") == 0) {
 				found++;
@@ -5263,7 +5255,7 @@ int process_asym_access(char *buffer[], int header_lines)
 
 		if (found) {
 			/* Go to asymmetric access selection screen */
-			rc = configure_asym_access(temp_i_con);
+			rc = configure_asym_access(acd);
 
 			/* Done on success or exit */
 			if (rc == RC_SUCCESS || rc & EXIT_FLAG)
@@ -5275,7 +5267,6 @@ int process_asym_access(char *buffer[], int header_lines)
 			s_status.index = INVALID_OPTION_STATUS;
 	}
 
-	check_current_config(false);
 	return rc;
 }
 
@@ -5301,11 +5292,13 @@ int asym_access(i_container *i_con)
 	/* make sure the i_con list is empty */
 	i_con = free_i_con(i_con);
 
+	check_current_config(false);
+
 	rc = RC_SUCCESS;
 
 	body_init_status(buffer, n_asym_access.header, &header_lines);
 
-	for_each_ioa(ioa) {
+	for_each_primary_ioa(ioa) {
 		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
 			continue;
 		for_each_vset(ioa, vset) {
@@ -12196,7 +12189,11 @@ static int raid_create(char **args, int num_args)
 	if (rc)
 		return rc;
 
-	return raid_start_complete();
+	rc = raid_start_complete();
+	if (rc == RC_18_Array_Created)
+		return 0;
+	else
+		return -EIO;
 }
 
 /**
@@ -15349,6 +15346,13 @@ static int set_array_asymmetric_access(char **args, int num_args)
 
 	if (!ipr_is_volume_set(vset)) {
 		scsi_err(vset,  "Given device is not an array.");
+		return -EINVAL;
+	}
+
+	/* Check that the adapter is a primary adapter. */
+	if (vset->ioa->is_secondary) {
+		ioa_err(vset->ioa, "Asymmetric access commands must be issued "
+				   "for arrays on the primary IOA");
 		return -EINVAL;
 	}
 

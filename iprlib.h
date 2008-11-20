@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.104 2008/10/23 17:11:20 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.105 2008/11/20 01:20:20 wboyer Exp $
  */
 
 #include <stdarg.h>
@@ -185,7 +185,7 @@
 #define IPR_ACTIVE_NON_OPTIMIZED             0x1
 #define IPR_ACTIVE_STANDBY                   0x2
 #define IPR_CLEAR_ASYMMETRIC_STATE           0x0
-#define IPR_PRESERVE_ASYMMETRIC_STATE        0x1
+#define IPR_PRESERVE_ASYMMETRIC_STATE        0x80
 
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))

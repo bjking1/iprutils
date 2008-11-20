@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.121 2008/10/23 17:11:20 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.122 2008/11/20 01:20:20 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -5087,6 +5087,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 				if (page24->dual_adapter_af == ENABLE_DUAL_IOA_ACTIVE_ACTIVE) {
 					ioa->dual_raid_support = 1;
 					ioa->asymmetric_access_enabled = 1;
+				} else {
+					ioa->asymmetric_access_enabled = 0;
 				}
 			}
 		}
@@ -6148,6 +6150,7 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	/* FIXME - preferred_primary and active_active may change at the same
 	 * time.  This code may need to change.
  	 */
+
 	if (attr->preferred_primary != old_attr.preferred_primary)
 		if (ipr_change_multi_adapter_assignment(ioa, attr->preferred_primary, IPR_PRESERVE_ASYMMETRIC_STATE))
 			return -EIO;
@@ -6171,15 +6174,17 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 		if (attr->active_active) {
 			if (ipr_set_active_active_mode(ioa))
 				return -EIO;
+			if (save)
+				ipr_save_ioa_attr(ioa, IPR_DUAL_ADAPTER_ACTIVE_ACTIVE, temp, 1);
 		} else {
+			if (save)
+				ipr_save_ioa_attr(ioa, IPR_DUAL_ADAPTER_ACTIVE_ACTIVE, temp, 1);
 			ipr_reset_adapter(ioa);
 		       	if (ipr_change_multi_adapter_assignment(ioa,
 							       attr->preferred_primary,
 							       attr->active_active))
 				return -EIO;
 		}
-		if (save)
-			ipr_save_ioa_attr(ioa, IPR_DUAL_ADAPTER_ACTIVE_ACTIVE, temp, 1);
 	}
 
 	get_dual_ioa_state(ioa);	/* for preferred_primary */
@@ -8122,7 +8127,7 @@ void scsi_dev_kevent(char *buf, struct ipr_dev *(*find_device)(char *),
 }
 
 /**
- * scsi_host_kevent - Start array protection for an array
+ * scsi_host_kevent -
  * @buf:		data buffer
  * @func:		funtion pointer
  *

@@ -4,7 +4,7 @@
 # materials are made available under the terms of the
 # Common Public License v1.0 which accompanies this distribution.
 
-INCLUDEDIR = -I.
+INCLUDEDIR = -I. -I/usr/include/ncurses
 CC = gcc
 
 include version.mk

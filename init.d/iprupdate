@@ -30,7 +30,7 @@ start() {
 	if [ ! -d /sys/class/scsi_generic ] ; then
 	    modprobe sg
 	fi
-	$IPRUPDATE --daemon
+	start_daemon $IPRUPDATE --daemon
 
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ]; then

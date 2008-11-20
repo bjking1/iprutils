@@ -296,6 +296,11 @@ s_node n_asym_access_fail = {
 	.header   = {
 		__("There are no arrays eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
+		__("o Active/Active mode is not enabled on the IOAs.\n"),
+		__("o An IOA needs updated microcode in order to support "
+		   "active/active configurations.\n"),
+		__("o None of the disk arrays in the system are capable of "
+		   "changing asymmetric access attributes.\n"),
 		__("o There are no disk arrays in the system.\n"),
 		__("o An IOA is in a condition that makes the disks attached to "
 		   "it read/write protected. Examine the kernel messages log "
@@ -304,10 +309,6 @@ s_node n_asym_access_fail = {
 		   "code to correct the problem, if necessary.\n"),
 		__("o Not all disks attached to an advanced function IOA have "
 		   "reported to the system. Retry the operation.\n"),
-		__("o None of the disk arrays in the system are capable of "
-		   "changing asymmetric access attributes.\n"),
-		__("o An IOA needs updated microcode in order to support "
-		   "active/active configurations.\n"),
 		"" }
 };
 

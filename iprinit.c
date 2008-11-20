@@ -1,7 +1,7 @@
 /**
   * IBM IPR adapter initialization utility
   *
-  * (C) Copyright 2004
+  * (C) Copyright 2004, 2008
   * International Business Machines Corporation and others.
   * All Rights Reserved. This program and the accompanying
   * materials are made available under the terms of the
@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.21 2005/03/07 17:20:16 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprinit.c,v 1.22 2008/11/20 01:20:20 wboyer Exp $
  */
 
 #include <unistd.h>
@@ -41,9 +41,11 @@ static void kevent_handler(char *buf)
 {
 	polling_mode = 0;
 
-	if (!strncmp(buf, "change@/class/scsi_host", 23))
+	if (!strncmp(buf, "change@/class/scsi_host", 23) ||
+	    (!strncmp(buf, "change@/devices/pci", 19) && strstr(buf, "scsi_host")))
 		scsi_host_kevent(buf, ipr_init_ioa);
-	else if (!strncmp(buf, "add@/class/scsi_generic", 23))
+	else if (!strncmp(buf, "add@/class/scsi_generic", 23) ||
+		 (!strncmp(buf, "add@/devices/pci", 16) && strstr(buf, "scsi_generic")))
 		scsi_dev_kevent(buf, find_gen_dev, ipr_init_dev);
 	else if (!strncmp(buf, "add@/block/sd", 13))
 		scsi_dev_kevent(buf, find_blk_dev, ipr_init_dev);

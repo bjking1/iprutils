@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.18 2006/09/08 16:26:01 brking Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprdump.c,v 1.19 2008/11/20 01:20:20 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -53,6 +53,13 @@ static char usr_dir[100];
 static char *enable = "1\n";
 static char *disable = "0\n";
 
+/**
+ * enable_dump -
+ * @ioa:		ipr_ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void enable_dump(struct ipr_ioa *ioa)
 {
 	struct sysfs_class_device *class_device;
@@ -92,6 +99,13 @@ static void enable_dump(struct ipr_ioa *ioa)
 	sysfs_close_class_device(class_device);
 }
 
+/**
+ * disable_dump -
+ * @ioa:		ipr_ioa struct
+ *
+ * Returns:
+ *   nothing
+ **/
 static void disable_dump(struct ipr_ioa *ioa)
 {
 	struct sysfs_class_device *class_device;
@@ -128,6 +142,13 @@ static void disable_dump(struct ipr_ioa *ioa)
 	sysfs_close_class_device(class_device);
 }
 
+/**
+ * read_dump -
+ * @ioa:		ipr_ioa struct
+ *
+ * Returns:
+ *   number of items read
+ **/
 static int read_dump(struct ipr_ioa *ioa)
 {
 	struct sysfs_class_device *class_device;
@@ -162,6 +183,13 @@ static int read_dump(struct ipr_ioa *ioa)
 	return count;
 }
 
+/**
+ * select_dump_file -
+ * @dirent:		dirent struct
+ *
+ * Returns:
+ *   1 if the string is found, else 0
+ **/
 static int select_dump_file(const struct dirent *dirent)
 {
 	if (strstr(dirent->d_name, DUMP_PREFIX))
@@ -169,6 +197,14 @@ static int select_dump_file(const struct dirent *dirent)
 	return 0;
 }
 
+/**
+ * dump_sort -
+ * @a:		void buffer
+ * @b:		void buffer
+ *
+ * Returns:
+ *
+ **/
 static int dump_sort(const void *a, const void *b)
 {
 	const struct dirent **dumpa = (const struct dirent **)a;
@@ -185,6 +221,12 @@ static int dump_sort(const void *a, const void *b)
 	return alphasort(dumpa, dumpb);
 }
 
+/**
+ * cleanup_old_dumps -
+ *
+ * Returns:
+ *   Nothing
+ **/
 static void cleanup_old_dumps()
 {
 	struct dirent **dirent;
@@ -205,6 +247,13 @@ static void cleanup_old_dumps()
 	}
 }
 
+/**
+ * get_dump_fname -
+ * @fname:		file name
+ *
+ * Returns:
+ *   -EIO on error, else 0
+ **/
 static int get_dump_fname(char *fname)
 {
 	struct dirent **dirent;
@@ -235,6 +284,14 @@ static int get_dump_fname(char *fname)
 	return 0;
 }
 
+/**
+ * write_dump -
+ * @ioa:		ipr_ioa struct
+ * @count:		size to write
+ *
+ * Returns:
+ *   Nothing
+ **/
 static void write_dump(struct ipr_ioa *ioa, int count)
 {
 	int f_dump;
@@ -256,6 +313,13 @@ static void write_dump(struct ipr_ioa *ioa, int count)
 	ioa_err(ioa, "Dump of ipr IOA has completed to file: %s\n", dump_path);
 }
 
+/**
+ * handle_signal -
+ * @signal:		signal value
+ *
+ * Returns:
+ *   Nothing
+ **/
 static void handle_signal(int signal)
 {
 	struct ipr_ioa *ioa;
@@ -266,6 +330,13 @@ static void handle_signal(int signal)
 	exit(0);
 }
 
+/**
+ * select_dump_file -
+ * @ioa:		ipr_ioa struct
+ *
+ * Returns:
+ *   Nothing
+ **/
 static void dump_ioa(struct ipr_ioa *ioa)
 {
 	int count;
@@ -278,6 +349,12 @@ static void dump_ioa(struct ipr_ioa *ioa)
 	enable_dump(ioa);
 }
 
+/**
+ * poll_for_dump -
+ *
+ * Returns:
+ *   Nothing
+ **/
 static void poll_for_dump()
 {
 	struct ipr_ioa *ioa;
@@ -290,15 +367,26 @@ static void poll_for_dump()
 		dump_ioa(ioa);
 }
 
+/**
+ * kevent_handler -
+ * @buf:		character buffer
+ *
+ * Returns:
+ *   Nothing
+ **/
 static void kevent_handler(char *buf)
 {
 	struct ipr_ioa *ioa;
 	int host, i;
+	char *index;
 
-	if (strncmp(buf, "change@/class/scsi_host", 23))
+	if (!strncmp(buf, "change@/class/scsi_host", 23)) {
+		host = strtoul(&buf[28], NULL, 10);
+	} else if (!strncmp(buf, "change@/devices/pci", 19) && strstr(buf, "scsi_host")) {
+		index = strrchr(buf, '/');
+		host = strtoul(index + 5, NULL, 10);
+	} else
 		return;
-
-	host = strtoul(&buf[28], NULL, 10);
 
 	for (i = 0; i < 10; i++) {
 		tool_init(0);
@@ -317,6 +405,14 @@ static void kevent_handler(char *buf)
 	dump_ioa(ioa);
 }
 
+/**
+ * main -
+ * @argc:		argument count
+ * @argv:		argument string
+ *
+ * Returns:
+ *   return value of handle_events() call
+ **/
 int main(int argc, char *argv[])
 {
 	struct ipr_ioa *ioa;
@@ -338,13 +434,15 @@ int main(int argc, char *argv[])
 		} else {
 			printf("Usage: "TOOL_NAME" [options]\n");
 			printf("  Options: --version    Print iprdump version\n");
+			printf("           --daemon     Run as a daemon\n");
 			printf("           --debug      Print extra debugging information\n");
 			printf("           -d <usr_dir>\n");
 			exit(1);
 		}
 	}
 
-	ipr_daemonize();
+	if (daemonize)
+		ipr_daemonize();
 
 	signal(SIGINT, handle_signal);
 	signal(SIGQUIT, handle_signal);
@@ -356,5 +454,3 @@ int main(int argc, char *argv[])
 
 	return handle_events(poll_for_dump, 60, kevent_handler);
 }
-
-

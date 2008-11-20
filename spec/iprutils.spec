@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.12
+Version: 2.2.13
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Mon Nov 17 2008 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.13
+- Release 2.2.13
+- Additional fixes for the active-active functionality.
+- Fixes for iprdump to recognize a /sys/devices path.
 * Thu Oct 23 2008 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.12
 - Release 2.2.12
 - Additional GUI support and fixes for the active-active functionality.
