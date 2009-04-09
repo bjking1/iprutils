@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.13
+Version: 2.2.14
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Apr 07 2009 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.14
+- Release 2.2.14
+- Add support for disabling IOA caching.
+- Remove #include of <linux/byteorder/swab.h> as it is not used.
+- Allow giving a relative path for a microcode image file when doing an upgrade
+  from the command line.
+- Add support for SSD drives.
 * Mon Nov 17 2008 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.13
 - Release 2.2.13
 - Additional fixes for the active-active functionality.

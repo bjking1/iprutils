@@ -2022,6 +2022,13 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 			body = add_line_to_body(body,_("Current Asymmetric Access State"), _("Disabled"));
 	}
 
+	if (dev->ioa->has_cache) {
+		if (get_ioa_caching(dev->ioa) == IPR_IOA_REQUESTED_CACHING_DISABLED)
+			body = add_line_to_body(body,_("Current Requested Caching Mode"), _("Disabled"));
+		else
+			body = add_line_to_body(body,_("Current Requested Caching Mode"), _("Default"));
+	}
+
 	return body;
 }
 
@@ -3652,10 +3659,18 @@ int raid_start_complete()
 					not_done = 1;
 				} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL) {
 					done_bad = 1;
-					syslog(LOG_ERR, _("Start parity protect to %s failed.  "
-							  "Check device configuration for proper format.\n"),
-					       ioa->ioa.gen_name);
-					rc = RC_FAILED;
+					if (status_record->status == IPR_CMD_STATUS_MIXED_BLK_DEV_CLASESS) {
+						syslog(LOG_ERR, _("Start parity protect to %s failed.  "
+								  "SSDs and HDDs can not be mixed in an array.\n"),
+						       ioa->ioa.gen_name);
+						rc = RC_22_Mixed_Block_Dev_Classes;
+					} else {
+
+						syslog(LOG_ERR, _("Start parity protect to %s failed.  "
+								  "Check device configuration for proper format.\n"),
+						       ioa->ioa.gen_name);
+						rc = RC_FAILED;
+					}
 				} else if (!(device_available)) {
 					wait_device++;
 
@@ -3673,9 +3688,12 @@ int raid_start_complete()
 		if (!not_done) {
 			flush_stdscr();
 
-			if (done_bad)
+			if (done_bad) {
+				if (status_record->status == IPR_CMD_STATUS_MIXED_BLK_DEV_CLASESS)
+					return RC_22_Mixed_Block_Dev_Classes;
 				/* Start Parity Protection failed. */
 				return RC_19_Create_Fail;
+			}
 
 			check_current_config(false);
 
@@ -5535,8 +5553,7 @@ int configure_raid_include(i_container *i_con)
 	if ((rc = s_out->rc) > 0)
 		goto leave;
 
-	/* first, count devices select to be sure min multiple
-	 is satisfied */
+	/* first, count devices selected to be sure min multiple is satisfied */
 	found = 0;
 
 	for_each_icon(temp_i_con) {
@@ -5546,9 +5563,9 @@ int configure_raid_include(i_container *i_con)
 	}
 
 	if (found % min_mult_array_devices != 0)  {
-		/* "Error:  number of devices selected must be a multiple of %d" */ 
+		/* "Error:  number of devices selected must be a multiple of %d" */
 		s_status.num = min_mult_array_devices;
-		return 25 | REFRESH_FLAG; 
+		return 25 | REFRESH_FLAG;
 	}
 
 	for_each_icon(temp_i_con) {
@@ -5897,7 +5914,7 @@ int dev_include_complete(u8 num_devs)
 						not_done = 1;
 					} else if (status_record->status != IPR_CMD_STATUS_SUCCESSFUL)
 						/* "Include failed" */
-						rc = 26;
+						rc = RC_26_Include_Fail;
 					break;
 				}
 			}
@@ -5920,11 +5937,11 @@ int dev_include_complete(u8 num_devs)
 
 			if (done_bad)
 				/* "Include failed" */
-				return 26 | EXIT_FLAG; 
+				return RC_26_Include_Fail | EXIT_FLAG;
 
 			/*  "Include Unit completed successfully" */
 			complete_screen_driver(&n_dev_include_complete, percent_cmplt,1);
-			return 27 | EXIT_FLAG;
+			return RC_27_Include_Success | EXIT_FLAG;
 		}
 		not_done = 0;
 		sleep(1);
@@ -8220,7 +8237,7 @@ static void print_reclaim_results(struct ipr_reclaim_query_data *buf)
 {
 	char *body = get_reclaim_results(buf);
 
-	printf(body);
+	printf("%s", body);
 	free(body);
 }
 
@@ -10070,6 +10087,7 @@ struct ioa_config_attr {
 	int preferred_primary;
 	int gscsi_only_ha;
 	int active_active;
+	int caching;
 };
 
 /**
@@ -10098,8 +10116,8 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 	start_row += 2; /* for title */  /* FIXME */
 
 	if (ioa_config_attr->option == 1 || ioa_config_attr->option == 2
-	    || ioa_config_attr->option == 3) {
-		num_menu_items = 3;
+	    || ioa_config_attr->option == 3 || ioa_config_attr->option == 4) {
+		num_menu_items = 4;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
 
@@ -10108,8 +10126,10 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 			menu_item[menu_index] = new_item("None","");
 		else if (ioa_config_attr->option == 2)
 			menu_item[menu_index] = new_item("RAID","");
-		else
+		else if (ioa_config_attr->option == 3)
 			menu_item[menu_index] = new_item("Disabled","");
+		else
+			menu_item[menu_index] = new_item("Default","");
 
 		userptr[menu_index] = 0;
 		set_item_userptr(menu_item[menu_index],
@@ -10121,8 +10141,10 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 			menu_item[menu_index] = new_item("Primary","");
 		else if (ioa_config_attr->option == 2)
 			menu_item[menu_index] = new_item("JBOD","");
-		else
+		else if (ioa_config_attr->option == 3)
 			menu_item[menu_index] = new_item("Enabled","");
+		else
+			menu_item[menu_index] = new_item("Disabled","");
 
 		userptr[menu_index] = 1;
 		set_item_userptr(menu_item[menu_index],
@@ -10136,8 +10158,10 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 				ioa_config_attr->preferred_primary = *retptr;
 			else if (ioa_config_attr->option == 2)
 				ioa_config_attr->gscsi_only_ha = *retptr;
-			else
+			else if (ioa_config_attr->option == 3)
 				ioa_config_attr->active_active = *retptr;
+			else
+				ioa_config_attr->caching = *retptr;
 		}
 
 		i = 0;
@@ -10237,6 +10261,17 @@ int change_ioa_config(i_container * i_con)
 			sprintf(pref_str, "Disabled");
 		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
 	}
+	if (dev->ioa->has_cache) {
+		body = add_line_to_body(body,_("IOA Caching Mode"), "%13");
+		ioa_config_attr[index].option = 4;
+		ioa_config_attr[index].caching = ioa_attr.caching;
+		if (ioa_attr.caching == IPR_IOA_REQUESTED_CACHING_DEFAULT)
+			sprintf(pref_str, "Default");
+		else
+			sprintf(pref_str, "Disabled");
+		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
+	}
+
 
 	n_change_ioa_config.body = body;
 	while (1) {
@@ -10270,6 +10305,12 @@ int change_ioa_config(i_container * i_con)
 					else
 						sprintf(temp_i_con->field_data, "Disabled");
 					ioa_attr.active_active = config_attr->active_active;
+				} else if (config_attr->option == 4) {
+					if (config_attr->caching == IPR_IOA_REQUESTED_CACHING_DEFAULT)
+						sprintf(temp_i_con->field_data, "Default");
+					else
+						sprintf(temp_i_con->field_data, "Disabled");
+					ioa_attr.caching = config_attr->caching;
 				}
 				found++;
 				break;
@@ -11781,22 +11822,40 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				       vendor_id, product_id);
 		} else {
 			if (ipr_is_hot_spare(dev))
-				len += sprintf(body + len, "%-25s ", "Hot Spare");
+				if (dev->dev_rcd->block_dev_class == IPR_SSD)
+					len += sprintf(body + len, "%-25s ", "SSD Hot Spare");
+				else
+					len += sprintf(body + len, "%-25s ", "Hot Spare");
 			else if (ipr_is_volume_set(dev)) {
-				sprintf(buf, "RAID %s Disk Array",
-					dev->prot_level_str);
+				if (dev->dev_rcd->block_dev_class == IPR_SSD)
+					sprintf(buf, "RAID %s SSD Disk Array",
+						dev->prot_level_str);
+				else
+					sprintf(buf, "RAID %s Disk Array",
+						dev->prot_level_str);
 				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
-					sprintf(raid_str,"  RAID %s Array Member",
-						dev->prot_level_str);
+					if (dev->dev_rcd->block_dev_class == IPR_SSD)
+						sprintf(raid_str,"  RAID %s SSD Member",
+							dev->prot_level_str);
+					else
+						sprintf(raid_str,"  RAID %s Array Member",
+							dev->prot_level_str);
 				else
-					sprintf(raid_str,"RAID %s Array Member",
-						dev->prot_level_str);
+					if (dev->dev_rcd->block_dev_class == IPR_SSD)
+						sprintf(raid_str,"RAID %s SSD Member",
+							dev->prot_level_str);
+					else
+						sprintf(raid_str,"RAID %s Array Member",
+							dev->prot_level_str);
 
 				len += sprintf(body + len, "%-25s ", raid_str);
 			} else if (ipr_is_af_dasd_device(dev))
-				len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
+				if (dev->dev_rcd->block_dev_class == IPR_SSD)
+					len += sprintf(body + len, "%-25s ", "Advanced Function SSD");
+				else
+					len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE)
 				len += sprintf(body + len, "%-25s ", "Enclosure");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
@@ -12077,6 +12136,7 @@ static int format_for_raid(char **args, int num_args)
 static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
+	int hdd_count = 0, ssd_count = 0;
 	int next_raid_level, next_stripe_size, next_qdepth;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
 	int stripe_size, qdepth;
@@ -12127,7 +12187,16 @@ static int raid_create(char **args, int num_args)
 			syslog(LOG_ERR, _("All devices must be attached to the same adapter.\n"));
 			return -EINVAL;
 		}
+
+		if (dev->dev_rcd->block_dev_class == IPR_SSD)
+			ssd_count++;
+		else
+			hdd_count++;
 	}
+
+	if (hdd_count > 0 && ssd_count > 0)
+		syslog(LOG_ERR, _("SSDs and HDDs can not be mixed in an array.\n"));
+		return -EINVAL;
 
 	if (!ioa) {
 		syslog(LOG_ERR, _("No valid devices specified.\n"));
@@ -12253,6 +12322,7 @@ static int raid_include_cmd(char **args, int num_args)
 	int i, rc, zeroed = 0;
 	struct ipr_dev *dev, *vset = NULL;
 	struct ipr_ioa *ioa;
+	struct devs_to_init_t *dev_init;
 
 	for (i = 0; i < num_args; i++) {
 		if (!strcmp(args[i], "-z"))
@@ -12269,8 +12339,8 @@ static int raid_include_cmd(char **args, int num_args)
 
 		if (ipr_is_volume_set(dev)) {
 			if (vset) {
-				fprintf(stderr, "Invalid parameters. Only one disk array can "
-					"specified at once\n");
+				fprintf(stderr, "Invalid parameters. Only one "
+					"disk array can be specified at a time.\n");
 				return -EINVAL;
 			}
 
@@ -12280,8 +12350,8 @@ static int raid_include_cmd(char **args, int num_args)
 		}
 
 		if (!ipr_is_af_dasd_device(dev)) {
-			fprintf(stderr, "Invalid device specified. Device must be formatted "
-				"to Advanced Function Format\n");
+			fprintf(stderr, "Invalid device specified. Device must "
+				"be formatted to Advanced Function Format.\n");
 			return -EINVAL;
 		}
 
@@ -12298,9 +12368,15 @@ static int raid_include_cmd(char **args, int num_args)
 	}
 
 	if (!vset) {
-		fprintf(stderr, "Invalid parameters. A disk array must be specified\n");
+		fprintf(stderr, "Invalid parameters. A disk array must be specified.\n");
 		return -EINVAL;
 	}
+
+	for_each_dev_to_init(dev_init)
+		if (vset->array_rcd->block_dev_class != dev_init->dev->dev_rcd->block_dev_class) {
+			fprintf(stderr, "Invalid parameter. Can not mix SSDs and HDDs.\n");
+			return -EINVAL;
+		}
 
 	if (!zeroed) {
 		rc = send_dev_inits(NULL);
@@ -13470,7 +13546,7 @@ static int raid_rebuild_cmd(char **args, int num_args)
 }
 
 /**
- * ipr_start_array_protection - Start array protection for an array
+ * __reclaim - Reclaim the specified IOA's write cache.
  * @args:		argument vector
  * @num_args:		number of arguments
  * @action:		
@@ -13509,7 +13585,7 @@ static int __reclaim(char **args, int num_args, int action)
 }
 
 /**
- * reclaim -
+ * reclaim - Reclaim the specified IOA's write cache.
  * @args:		argument vector
  * @num_args:		number of arguments
  *
@@ -13522,7 +13598,8 @@ static int reclaim(char **args, int num_args)
 }
 
 /**
- * reclaim_unknown -
+ * reclaim_unknown - Reclaim the specified IOA's write cache and allow
+ * 		     unknown data loss.
  * @args:		argument vector
  * @num_args:		number of arguments
  *
@@ -14631,8 +14708,9 @@ int query_devices_min_max_raid_migrate(char **args, int num_args)
 	}
 
 	if (cap->format_overlay_type == IPR_FORMAT_REMOVE_DEVICES)
-		fprintf(stderr, "%d devices will be removed from the array\n",
-				cap->min_num_array_devices);
+		fprintf(stderr, "%d %s will be removed from the array\n",
+			cap->min_num_array_devices,
+			cap->min_num_array_devices == 1 ? "device" : "devices");
 	else if (cap->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
 		fprintf(stderr, "Minimum number of devices required = %d\n",
 				cap->min_num_array_devices);
@@ -15396,6 +15474,86 @@ static int set_array_asymmetric_access(char **args, int num_args)
 	return ipr_set_array_asym_access(vset->ioa);
 }
 
+/**
+ * query_ioa_caching - Show whether or not user requested caching mode is set
+ * 		       to default or disabled.
+ * @args:	       argument vector
+ * @num_args:	       number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_ioa_caching(char **args, int num_args)
+{
+	int mode;
+	struct ipr_dev *dev;
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev != &dev->ioa->ioa || dev->ioa->is_aux_cache) {
+		fprintf(stderr, "%s is not an IOA.\n", args[0]);
+		return -EINVAL;
+	}
+	if (!dev->ioa->has_cache) {
+		printf("none\n");
+		return 0;
+	}
+
+	mode = get_ioa_caching(dev->ioa);
+
+	if (mode == IPR_IOA_REQUESTED_CACHING_DISABLED)
+		printf("disabled\n");
+	else
+		printf("default\n");
+
+	return 0;
+}
+
+/**
+ * set_ioa_caching - Set the requested IOA caching mode to default or disabled.
+ * @args:	     argument vector
+ * @num_args:	     number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int set_ioa_caching(char **args, int num_args)
+{
+	int mode, rc;
+	struct ipr_dev *dev;
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev != &dev->ioa->ioa || dev->ioa->is_aux_cache) {
+		fprintf(stderr, "%s is not an IOA.\n", args[0]);
+		return -EINVAL;
+	}
+	if (!dev->ioa->has_cache) {
+		fprintf(stderr, "%s does not have cache.\n", args[0]);
+		return -EINVAL;
+	}
+
+	/* Default or Disabled? */
+	if (!strncasecmp(args[1], "Default", 3))
+		mode = IPR_IOA_SET_CACHING_DEFAULT;
+	else if (!strncasecmp(args[1], "Disabled", 3))
+		mode = IPR_IOA_SET_CACHING_DISABLED;
+	else {
+		scsi_err(dev, "Unrecognized mode given for IOA caching.");
+		return -EINVAL;
+	}
+
+	rc = ipr_change_cache_parameters(dev->ioa , mode);
+
+	return rc;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -15456,6 +15614,8 @@ static const struct {
 	{ "query-recommended-stripe-size",	2, 0, 2, query_recommended_stripe_size, "sg5 5" },
 	{ "query-path-status",			0, 0, 1, query_path_status, "sg5" },
 	{ "query-path-details",			1, 0, 1, query_path_details, "sda" },
+	{ "query-ioa-caching",			1, 0, 1, query_ioa_caching, "sg5" },
+	{ "set-ioa-caching",			2, 0, 2, set_ioa_caching, "sg5 [Default | Disabled]" },
 	{ "primary",				1, 0, 1, set_primary, "sg5" },
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
 	{ "set-all-primary",			0, 0, 0, set_all_primary, "" },

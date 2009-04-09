@@ -983,7 +983,7 @@ s_node n_confirm_reclaim_warning = {
 		__("ATTENTION!!!   ATTENTION!!!   ATTENTION!!!   ATTENTION!!!\n"),
 		__("ATTENTION: Proceed with this function only if directed to from a "
 		   "service procedure. Data in the IOA cache will be discarded. "
-		   "This data loss may or may not be detected by the host operating."
+		   "This data loss may or may not be detected by the host operating "
 		   "system. Filesystem corruption may result on the system.\n\n"),
 		__("Press 's' to continue.\n\n"),
 		"" }
@@ -1018,7 +1018,7 @@ s_node n_raid_rebuild_fail = {
 		__("There are no disks eligible for the selected operation "
 		   "due to one or more of the following reasons:\n\n"),
 		__("o There are no disks that need to be rebuilt.\n"),
-		__("o The disk that needs to be rebuild is not at the right "
+		__("o The disk that needs to be rebuilt is not at the right "
 		   "location. Examine the 'message log' for the exposed unit "
 		   "and make sure that the replacement unit is at the correct "
 		   "location.\n"),
@@ -1518,7 +1518,7 @@ const char *screen_status[] = {
 	/* 19 */ __("Create disk array failed."),
 	/* 20 */ __("Delete disk array failed."),
 	/* 21 */ __("Disk array successfully deleted."),
-	/* 22 */ "",
+	/* 22 */ __("Create disk array failed - can not mix SSDs and HDDs."),
 	/* 23 */ "",
 	/* 24 */ "",
 	/* 25 */ __("Error:  number of devices selected must be a multiple of %d"),
@@ -1605,12 +1605,12 @@ enum {
 	RC_19_Create_Fail,
 	RC_20_Delete_Fail,
 	RC_21_Delete_Success,
-	RC_22_Blank,
+	RC_22_Mixed_Block_Dev_Classes,
 	RC_23_Blank,
 	RC_24_Blank,
 	RC_25_Devices_Multiple,
-	RC_26_Add_Fail,
-	RC_27_Add_Success,
+	RC_26_Include_Fail,
+	RC_27_Include_Success,
 	RC_28_Rebuild_Started,
 	RC_29_Rebuild_Fail,
 	RC_30_Maint_Fail,

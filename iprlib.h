@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.105 2008/11/20 01:20:20 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.106 2009/04/09 00:25:11 wboyer Exp $
  */
 
 #include <stdarg.h>
@@ -43,7 +43,6 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <sysfs/libsysfs.h>
-#include <linux/byteorder/swab.h>
 #include <asm/byteorder.h>
 #include <sys/mman.h>
 #include <paths.h>
@@ -147,6 +146,8 @@
 #define IPR_DISRUPT_DEVICE                   0x11
 #define IPR_QUERY_SAS_EXPANDER_INFO          0x12
 #define IPR_QUERY_RES_REDUNDANCY_INFO        0x13
+#define IPR_CHANGE_CACHE_PARAMETERS          0x14
+#define IPR_QUERY_CACHE_PARAMETERS           0x16
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ                            0xE8
 #define SKIP_WRITE                           0xEA
@@ -186,6 +187,14 @@
 #define IPR_ACTIVE_STANDBY                   0x2
 #define IPR_CLEAR_ASYMMETRIC_STATE           0x0
 #define IPR_PRESERVE_ASYMMETRIC_STATE        0x80
+
+#define IPR_IOA_REQUESTED_CACHING_DEFAULT    0x0
+#define IPR_IOA_REQUESTED_CACHING_DISABLED   0x1
+#define IPR_IOA_SET_CACHING_DEFAULT          0x0
+#define IPR_IOA_SET_CACHING_DISABLED         0x10
+
+#define IPR_HDD                              0x0
+#define IPR_SSD                              0x1
 
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
@@ -686,7 +695,6 @@ struct ipr_array_record {
 	u8  issue_cmd:1;
 #endif
 
-	//u8  reserved2;
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8  saved_asym_access_state:4;
 	u8  current_asym_access_state:4;
@@ -734,7 +742,16 @@ struct ipr_array_record {
 	u8  vendor_id[IPR_VENDOR_ID_LEN];
 	u8  product_id[IPR_PROD_ID_LEN];
 	u8  serial_number[8];
-	u32 reserved;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8  block_dev_class:3;
+	u8  reserved5:5;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8  reserved5:5;
+	u8  block_dev_class:3;
+#endif
+	u8  reserved6;
+	u8  reserved7;
+	u8  reserved8;
 };
 
 struct ipr_dev_record {
@@ -805,7 +822,16 @@ struct ipr_dev_record {
 	u8 vendor_id[IPR_VENDOR_ID_LEN];
 	u8 product_id[IPR_PROD_ID_LEN];
 	u8 serial_num[IPR_SERIAL_NUM_LEN];
-	u32 reserved5;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8  block_dev_class:3;
+	u8  reserved5:5;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8  reserved5:5;
+	u8  block_dev_class:3;
+#endif
+	u8  reserved6;
+	u8  reserved7;
+	u8  reserved8;
 };
 
 #define __for_each_qac_entry(rcd, qac, type) \
@@ -1125,6 +1151,7 @@ struct ipr_ioa_attr {
 	int preferred_primary;
 	int gscsi_only_ha;
 	int active_active;
+	int caching;
 };
 
 #define IPR_DEV_MAX_PATHS	2
@@ -1182,6 +1209,7 @@ struct ipr_ioa {
 	u8 in_gscsi_only_ha:1;
 	u8 asymmetric_access:1;
 	u8 asymmetric_access_enabled:1;
+	u8 has_cache:1;
 	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
@@ -1459,6 +1487,7 @@ struct ipr_cmd_status_record {
 #define IPR_CMD_STATUS_ATTRIB_CHANGE         3
 #define IPR_CMD_STATUS_FAILED                4
 #define IPR_CMD_STATUS_INSUFF_DATA_MOVED     5
+#define IPR_CMD_STATUS_MIXED_BLK_DEV_CLASESS 6
 
 	u8 percent_complete;
 	struct ipr_res_addr failing_dev_res_addr;
@@ -1768,6 +1797,37 @@ struct ipr_query_sas_expander_info {
 	struct ipr_sas_expander_info exp[1];
 };
 
+/* define space for the header and 512 term ID records */
+#define IPR_CACHE_QUERY_SIZE 2049
+
+struct ipr_global_cache_params_term {
+#define IPR_CACHE_PARAM_TERM_ID	0x10
+	u8 term_id;
+	u8 len;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 disable_caching_dual_ioa_failure:1;
+	u8 disable_caching_requested:1;
+	u8 reserved1:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved1:6;
+	u8 disable_caching_requested:1;
+	u8 disable_caching_dual_ioa_failure:1;
+#endif
+	u8 reserved2;
+};
+
+#define for_each_cache_term(info, term) \
+      for (term = (info)->term; \
+           ((unsigned long)term) < ((unsigned long)((unsigned long)(info) + ntohs((info)->len))) && \
+           ((unsigned long)term) < ((unsigned long)((unsigned long)((info)->term + sizeof((info)->term)))); \
+           term = term + term->len)
+
+struct ipr_query_ioa_caching_info {
+	u16 len;
+	u8 reserved[2];
+	struct ipr_global_cache_params_term term[1];
+};
+
 struct ipr_log_page18 {
 	u8 page_code;
 	u8 reserved;
@@ -2055,6 +2115,7 @@ int ipr_query_res_redundancy_info(struct ipr_dev *,
 				  struct ipr_res_redundancy_info *);
 int ipr_query_sas_expander_info(struct ipr_ioa *,
 				struct ipr_query_sas_expander_info *);
+int ipr_query_cache_parameters(struct ipr_ioa *, void *, int);
 int ipr_disrupt_device(struct ipr_dev *);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 int ipr_query_res_addr_aliases(struct ipr_ioa *, struct ipr_res_addr *,
@@ -2080,7 +2141,8 @@ int ipr_set_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *, int);
 int ipr_modify_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int set_active_active_mode(struct ipr_ioa *, int);
-
+int get_ioa_caching(struct ipr_ioa *);
+int ipr_change_cache_parameters(struct ipr_ioa *, int);
 int ipr_query_dasd_timeouts(struct ipr_dev *, struct ipr_query_dasd_timeouts *);
 int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);

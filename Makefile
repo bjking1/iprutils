@@ -81,9 +81,7 @@ install: all
 rpm: *.c *.h *.8
 	-make clean
 	cd ..
-	cp -f spec/iprutils.spec .
 	$(TAR)
 	mv ../iprutils-$(UTILS_VER)-src.tgz .
-	rm -f iprutils.spec
 	rpmbuild --nodeps -ts iprutils-$(UTILS_VER)-src.tgz
-	cp /home/$(USER)/rpm/SRPMS/iprutils-$(UTILS_VER)-$(IPR_RELEASE).src.rpm .
+	cp `rpm --eval '%{_srcrpmdir}'`/iprutils-$(UTILS_VER)-$(IPR_RELEASE).src.rpm .

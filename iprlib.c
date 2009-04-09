@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.122 2008/11/20 01:20:20 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.123 2009/04/09 00:25:11 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -3562,6 +3562,92 @@ int ipr_query_sas_expander_info(struct ipr_ioa *ioa,
 }
 
 /**
+ * ipr_change_cache_parameters
+ * @ioa:		ipr ioa struct
+ * @mode:		caching mode to set
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_change_cache_parameters(struct ipr_ioa *ioa, int mode)
+{
+	char *name = ioa->ioa.gen_name;
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	int fd, rc;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_CHANGE_CACHE_PARAMETERS;
+	cdb[2] = mode;
+
+	rc = sg_ioctl(fd, cdb, NULL, 0, SG_DXFER_NONE,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && (sense_data.sense_key != ILLEGAL_REQUEST || ipr_debug))
+		ioa_cmd_err(ioa, &sense_data, "change cache params failed", rc);
+
+	close(fd);
+	return rc;
+}
+
+/**
+ * ipr_query_cache_parameters -
+ * @ioa:		ipr ioa struct
+ * @buf:		buffer for returned cache data
+ * @len:		length of buffer
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_query_cache_parameters(struct ipr_ioa *ioa, void *buf, int len)
+{
+	char *name = ioa->ioa.gen_name;
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	int fd, rc;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_QUERY_CACHE_PARAMETERS;
+	cdb[10] = len >> 24;
+	cdb[11] = len >> 16 & 0xff;
+	cdb[12] = len >> 8 & 0xff;
+	cdb[13] = len & 0xff;
+
+	rc = sg_ioctl(fd, cdb, buf, len, SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc != 0 && (sense_data.sense_key != ILLEGAL_REQUEST || ipr_debug))
+		ioa_cmd_err(ioa, &sense_data, "Query Cache Parameters", rc);
+
+	close(fd);
+	return rc;
+}
+
+/**
  * ipr_query_res_redundancy_info - 
  * @dev:		ipr dev struct
  * @info:		ipr_res_redundancy_info struct
@@ -4706,8 +4792,8 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 		       &scsi_dev_data->id,
 		       &scsi_dev_data->lun);
 
-		sprintf(scsi_dev_data->sysfs_device_name,
-			sysfs_device_device->name);
+		strcpy(scsi_dev_data->sysfs_device_name,
+		       sysfs_device_device->name);
 
 		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "type");
 		if (sysfs_attr)
@@ -5031,6 +5117,7 @@ static u16 get_af_block_size(struct ipr_inquiry_ioa_cap *ioa_cap)
 
 /**
  * get_ioa_cap - get the capability information for the ioa (inquiry page D0)
+ *               Also, if page 01 is supported, then there is cache on the card.
  * @ioa:		ipr ioa struct
  *
  * Returns:
@@ -5055,6 +5142,10 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 	}
 
 	for (j = 0; j < page0_inq.page_length; j++) {
+		if (page0_inq.supported_page_codes[j] == 0x01) {
+			ioa->has_cache = 1;
+			continue;
+		}
 		if (page0_inq.supported_page_codes[j] != 0xD0)
 			continue;
 		rc = ipr_inquiry(&ioa->ioa, 0xD0, &ioa_cap, sizeof(ioa_cap));
@@ -5999,6 +6090,39 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 }
 
 /**
+ * get_ioa_caching -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0
+ **/
+int get_ioa_caching(struct ipr_ioa *ioa)
+{
+	int rc;
+	int found = 0;
+	struct ipr_query_ioa_caching_info *info;
+	struct ipr_global_cache_params_term *term;
+
+	info = malloc(IPR_CACHE_QUERY_SIZE);
+	memset(info, 0, IPR_CACHE_QUERY_SIZE);
+
+	rc = ipr_query_cache_parameters(ioa, info, IPR_CACHE_QUERY_SIZE);
+	if (rc)
+		return IPR_IOA_REQUESTED_CACHING_DEFAULT;
+
+	for_each_cache_term(info, term)
+		if (term && term->term_id == IPR_CACHE_PARAM_TERM_ID) {
+			found = 1;
+			break;
+		}
+
+	if (found == 1 && term->disable_caching_requested == IPR_IOA_REQUESTED_CACHING_DISABLED)
+		return IPR_IOA_REQUESTED_CACHING_DISABLED;
+	else
+		return IPR_IOA_REQUESTED_CACHING_DEFAULT;
+}
+
+/**
  * ipr_get_ioa_attr - 
  * @ioa:		ipr ioa struct
  * @attr:		ipr_ioa_attr struct
@@ -6013,6 +6137,7 @@ int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	attr->preferred_primary = 0;
 	attr->gscsi_only_ha = ioa->in_gscsi_only_ha;
 	attr->active_active = ioa->asymmetric_access_enabled;
+	attr->caching = get_ioa_caching(ioa);
 
 	if (!ioa->dual_raid_support)
 		return 0;
@@ -6143,6 +6268,7 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 {
 	struct ipr_ioa_attr old_attr;
 	char temp[100];
+	int mode;
 
 	if (ipr_get_ioa_attr(ioa, &old_attr))
 		return -EIO;
@@ -6185,6 +6311,14 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 							       attr->active_active))
 				return -EIO;
 		}
+	}
+
+	if (attr->caching != old_attr.caching) {
+		if (attr->caching == IPR_IOA_REQUESTED_CACHING_DEFAULT)
+			mode = IPR_IOA_SET_CACHING_DEFAULT;
+		else
+			mode = IPR_IOA_SET_CACHING_DISABLED;
+		ipr_change_cache_parameters(ioa, mode);
 	}
 
 	get_dual_ioa_state(ioa);	/* for preferred_primary */
@@ -6977,7 +7111,7 @@ static void get_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
 	const struct ioa_parms *ioa_parms = get_ioa_fw(ioa);
 
 	if (ioa_parms)
-		sprintf(buf, ioa_parms->fw_name);
+		strcpy(buf, ioa_parms->fw_name);
 	else
 		sprintf(buf, "534953%02X", get_ioa_image_type(ioa));
 }
@@ -7348,6 +7482,8 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	char *tmp;
 	char ucode_file[200];
 	DIR *dir;
+	char *img_file;
+	char cwd[200];
 
 	fw_version = get_ioa_fw_version(ioa);
 
@@ -7384,8 +7520,23 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		ioa_info(ioa, "Updating adapter microcode from %08X to %08X.\n",
 			 fw_version, ntohl(image_hdr->rev_level));
 
-		tmp = strrchr(image->file, '/');
-		tmp++;
+		/* Give the file name an absolute path if needed. */
+		if (image->file[0] != '/') {
+			getcwd(cwd, sizeof(cwd));
+			strcat(cwd, "/");
+			img_file = strcat(cwd, image->file);
+		} else
+			img_file = image->file;
+
+		tmp = strrchr(img_file, '/');
+		if (tmp)
+			tmp++;
+		else {
+			syslog(LOG_ERR, "Failed to find image name in %s\n",
+			img_file);
+			return -EIO;
+		}
+
 		dir = opendir(hotplug_dir);
 		if (!dir)
 			mkdir(hotplug_dir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
@@ -7399,7 +7550,7 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		}
 		closedir(dir);
 		sprintf(ucode_file, "%s/.%s", hotplug_dir, tmp);
-		symlink(image->file, ucode_file);
+		symlink(img_file, ucode_file);
 		sprintf(ucode_file, ".%s\n", tmp);
 		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 		attr = sysfs_get_classdev_attr(class_device, "update_fw");
