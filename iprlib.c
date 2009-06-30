@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.123 2009/04/09 00:25:11 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.124 2009/06/30 23:32:40 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -3022,7 +3022,7 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 	int fd;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
-	int rc;
+	int timeout, rc;
 	int length = sizeof(struct ipr_reclaim_query_data);
 
 	if (strlen(file) == 0)
@@ -3042,9 +3042,14 @@ int ipr_reclaim_cache_store(struct ipr_ioa *ioa, int action, void *buff)
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
+	if ((action & IPR_RECLAIM_ACTION) == IPR_RECLAIM_PERFORM)
+		timeout = IPR_CACHE_RECLAIM_TIMEOUT;
+	else
+		timeout = IPR_INTERNAL_DEV_TIMEOUT;
+
 	rc = sg_ioctl(fd, cdb, buff,
 		      length, SG_DXFER_FROM_DEV,
-		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+		      &sense_data, timeout);
 
 	if (rc != 0) {
 		if (sense_data.sense_key != ILLEGAL_REQUEST)
@@ -6100,17 +6105,17 @@ int get_ioa_caching(struct ipr_ioa *ioa)
 {
 	int rc;
 	int found = 0;
-	struct ipr_query_ioa_caching_info *info;
+	struct ipr_query_ioa_caching_info info;
 	struct ipr_global_cache_params_term *term;
+	int term_size = sizeof(struct ipr_query_ioa_caching_info);
 
-	info = malloc(IPR_CACHE_QUERY_SIZE);
-	memset(info, 0, IPR_CACHE_QUERY_SIZE);
+	memset(&info, 0, term_size);
 
-	rc = ipr_query_cache_parameters(ioa, info, IPR_CACHE_QUERY_SIZE);
+	rc = ipr_query_cache_parameters(ioa, &info, term_size);
 	if (rc)
 		return IPR_IOA_REQUESTED_CACHING_DEFAULT;
 
-	for_each_cache_term(info, term)
+	for_each_cache_term(term, &info)
 		if (term && term->term_id == IPR_CACHE_PARAM_TERM_ID) {
 			found = 1;
 			break;

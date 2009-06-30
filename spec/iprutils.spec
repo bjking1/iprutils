@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.14
+Version: 2.2.15
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Jun 30 2009 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.15
+- Release 2.2.15
+- Fixes a bug where cache reclaim can time out too soon.
+- Fixes some problems with the disable caching support.
 * Tue Apr 07 2009 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.14
 - Release 2.2.14
 - Add support for disabling IOA caching.

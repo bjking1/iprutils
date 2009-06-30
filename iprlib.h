@@ -12,7 +12,7 @@
  */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.106 2009/04/09 00:25:11 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.h,v 1.107 2009/06/30 23:32:40 wboyer Exp $
  */
 
 #include <stdarg.h>
@@ -97,6 +97,7 @@
 #define IPR_SUSPEND_DEV_BUS_TIMEOUT          (35)          /* 35 seconds */
 #define IPR_EVALUATE_DEVICE_TIMEOUT          (2 * 60)      /* 2 minutes */
 #define IPR_WRITE_BUFFER_TIMEOUT             (8 * 60)      /* 8 minutes */
+#define IPR_CACHE_RECLAIM_TIMEOUT            (10 * 60)     /* 10 minutes */
 #define SET_DASD_TIMEOUTS_TIMEOUT            (2 * 60)
 #define IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES    50
 #define IPR_DRIVE_ELEM_STATUS_EMPTY          5
@@ -1797,9 +1798,6 @@ struct ipr_query_sas_expander_info {
 	struct ipr_sas_expander_info exp[1];
 };
 
-/* define space for the header and 512 term ID records */
-#define IPR_CACHE_QUERY_SIZE 2049
-
 struct ipr_global_cache_params_term {
 #define IPR_CACHE_PARAM_TERM_ID	0x10
 	u8 term_id;
@@ -1816,17 +1814,18 @@ struct ipr_global_cache_params_term {
 	u8 reserved2;
 };
 
-#define for_each_cache_term(info, term) \
-      for (term = (info)->term; \
-           ((unsigned long)term) < ((unsigned long)((unsigned long)(info) + ntohs((info)->len))) && \
-           ((unsigned long)term) < ((unsigned long)((unsigned long)((info)->term + sizeof((info)->term)))); \
-           term = term + term->len)
-
 struct ipr_query_ioa_caching_info {
 	u16 len;
 	u8 reserved[2];
-	struct ipr_global_cache_params_term term[1];
+#define IPR_MAX_TERMS           512
+	struct ipr_global_cache_params_term term[IPR_MAX_TERMS];
 };
+
+#define for_each_cache_term(term, info) \
+        for (term = (info)->term; \
+             ((unsigned long)term) < ((unsigned long)((unsigned long)(info) + ntohs((info)->len)) + 2) && \
+             ((unsigned long)term + term->len + 2 - (unsigned long)(info)->term) < sizeof((info)->term); \
+             term = (struct ipr_global_cache_params_term *)(((unsigned long)term) + term->len + 2))
 
 struct ipr_log_page18 {
 	u8 page_code;

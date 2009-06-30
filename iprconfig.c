@@ -15493,7 +15493,7 @@ static int query_ioa_caching(char **args, int num_args)
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
-	if (dev != &dev->ioa->ioa || dev->ioa->is_aux_cache) {
+	if (dev != &dev->ioa->ioa) {
 		fprintf(stderr, "%s is not an IOA.\n", args[0]);
 		return -EINVAL;
 	}
@@ -15530,8 +15530,11 @@ static int set_ioa_caching(char **args, int num_args)
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
-	if (dev != &dev->ioa->ioa || dev->ioa->is_aux_cache) {
+	if (dev != &dev->ioa->ioa) {
 		fprintf(stderr, "%s is not an IOA.\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev->ioa->is_aux_cache) {
 		return -EINVAL;
 	}
 	if (!dev->ioa->has_cache) {
