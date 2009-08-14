@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.124 2009/06/30 23:32:40 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.125 2009/08/14 17:36:32 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -6137,8 +6137,6 @@ int get_ioa_caching(struct ipr_ioa *ioa)
  **/
 int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 {
-	struct ipr_dual_ioa_entry *ioa_entry;
-
 	attr->preferred_primary = 0;
 	attr->gscsi_only_ha = ioa->in_gscsi_only_ha;
 	attr->active_active = ioa->asymmetric_access_enabled;
@@ -6146,9 +6144,6 @@ int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 
 	if (!ioa->dual_raid_support)
 		return 0;
-
-	ioa_entry = (struct ipr_dual_ioa_entry *)
-		(((unsigned long)&ioa->ioa_status.cap) + ntohl(ioa->ioa_status.cap.length));
 
 	if (ioa->ioa_status.cap.preferred_role == IPR_IOA_STATE_PRIMARY)
 		attr->preferred_primary = 1;

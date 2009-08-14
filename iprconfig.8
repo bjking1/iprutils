@@ -1,9 +1,9 @@
-.\" (C) Copyright 2000, 2008
+.\" (C) Copyright 2000, 2009
 .\" International Business Machines Corporation and others.
 .\" All Rights Reserved. This program and the accompanying
 .\" materials are made available under the terms of the
 .\" Common Public License v1.0 which accompanies this distribution.
-.TH IPRCONFIG 8 "December 2005"
+.TH IPRCONFIG 8 "August 2009"
 .SH NAME
 iprconfig \- IBM Power RAID storage adapter configuration/recovery utility
 .SH SYNOPSIS
@@ -424,6 +424,11 @@ Show the current asymmetric access mode for the given IOA.
 .br
 Show the current asymmetric access mode for the given disk array.
 .TP
+.B query-ioa-caching [IOA]
+.br
+Show whether or not the user requested caching mode for the given IOA is set to
+default or disabled.
+.TP
 .B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
@@ -681,9 +686,18 @@ Used to set the asymmetric access mode of the disk array.  Example:
 .B iprconfig -c set-array-asymmetric-access-mode sda Optimized
 .TP
 .B set-ioa-asymmetric-access-mode [IOA] [Enabled | Disabled]
-Used to set the asymmetric access mode of the IOA.  Example:
+Used to set the asymmetric access mode of the IOA.
+.br
+Example:
 .br
 .B iprconfig -c set-ioa-asymmetric-access-mode sg5 Enabled
+.TP
+.B set-ioa-caching [IOA] [Default | Disabled]
+Used to set the requested caching mode of the IOA.
+.br
+Example:
+.br
+.B iprconfig -c set-ioa-caching sg5 Disabled
 .RE
 .TP
 .B \-\-version

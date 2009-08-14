@@ -1841,8 +1841,10 @@ int disk_status(i_container *i_con)
 	do {
 		n_disk_status.body = buffer[toggle&1];
 		s_out = screen_driver(&n_disk_status,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -1851,8 +1853,6 @@ int disk_status(i_container *i_con)
 
 	n_disk_status.body = NULL;
 
-	rc = s_out->rc;
-	free(s_out);
 	return rc;
 }
 
@@ -2543,8 +2543,10 @@ int raid_status(i_container *i_con)
 	do {
 		n_raid_status.body = buffer[toggle&1];
 		s_out = screen_driver(&n_raid_status,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -2553,8 +2555,6 @@ int raid_status(i_container *i_con)
 
 	n_raid_status.body = NULL;
 
-	rc = s_out->rc;
-	free(s_out);
 	return rc;
 }
 
@@ -2565,12 +2565,20 @@ int raid_status(i_container *i_con)
  *
  * Returns:
  *   1 if the array is in use / 0 otherwise
+ *
+ * TODO: This routine no longer works.  It was originally designed to work
+ *       with the 2.4 kernels.  For now, the routine will just return 0.
+ *       The rest of the code is being left in place in case this kind of
+ *       test becomes possible in the future.
+ *       JWB - August 11, 2009
  **/
 static int is_array_in_use(struct ipr_ioa *ioa,
 			   u8 array_id)
 {
 	int opens;
 	struct ipr_dev *vset;
+
+	return 0;
 
 	for_each_vset(ioa, vset) {
 		if (array_id == vset->array_rcd->array_id) {
@@ -2640,18 +2648,20 @@ int raid_stop(i_container *i_con)
 
 		free(n_raid_stop_fail.body);
 		n_raid_stop_fail.body = NULL;
+
+		rc = s_out->rc;
+		free(s_out);
 	} else {
 		toggle_field = 0;
 
 		do {
 			n_raid_stop.body = buffer[toggle&1];
 			s_out = screen_driver(&n_raid_stop,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
+		} while (rc == TOGGLE_SCREEN);
 	}
-
-	rc = s_out->rc;
-	free(s_out);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -2730,11 +2740,10 @@ int confirm_raid_stop(i_container *i_con)
 	do {
 		n_confirm_raid_stop.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_raid_stop,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -2917,11 +2926,10 @@ int raid_start(i_container *i_con)
 		do {
 			n_raid_start.body = buffer[toggle&1];
 			s_out = screen_driver(&n_raid_start,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
-
-		rc = s_out->rc;
-		free(s_out);
+		} while (rc == TOGGLE_SCREEN);
 
 		free_raid_cmds();
 	}
@@ -2998,6 +3006,7 @@ int configure_raid_start(i_container *i_con)
 	i_container *i_con2 = NULL;
 	i_container *i_con_head_saved;
 	i_container *temp_i_con = NULL;
+	i_container *temp_i_con2;
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
@@ -3028,16 +3037,16 @@ int configure_raid_start(i_container *i_con)
 		do {
 			n_configure_raid_start.body = buffer[toggle&1];
 			s_out = screen_driver(&n_configure_raid_start,header_lines,i_con2);
+			temp_i_con2 = s_out->i_con;
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
-
-		rc = s_out->rc;
+		} while (rc == TOGGLE_SCREEN);
 
 		if (rc > 0)
 			goto leave;
 
-		i_con2 = s_out->i_con;
-		free(s_out);
+		i_con2 = temp_i_con2;
 
 		found = 0;
 
@@ -3534,11 +3543,10 @@ int confirm_raid_start(i_container *i_con)
 	do {
 		n_confirm_raid_start.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_raid_start,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -3763,11 +3771,10 @@ int raid_rebuild(i_container *i_con)
 		do {
 			n_raid_rebuild.body = buffer[toggle&1];
 			s_out = screen_driver(&n_raid_rebuild,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
-
-		rc = s_out->rc;
-		free(s_out);
+		} while (rc == TOGGLE_SCREEN);
 
 		free_raid_cmds();
 	}
@@ -3838,11 +3845,10 @@ int confirm_raid_rebuild(i_container *i_con)
 	do {
 		n_confirm_raid_rebuild.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_raid_rebuild,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -3995,11 +4001,11 @@ int raid_resync(i_container *i_con)
 		do {
 			n_raid_resync.body = buffer[toggle&1];
 			s_out = screen_driver(&n_raid_resync,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
+		} while (rc == TOGGLE_SCREEN);
 
-		rc = s_out->rc;
-		free(s_out);
 		free_raid_cmds();
 	}
 
@@ -4070,11 +4076,10 @@ int confirm_raid_resync(i_container *i_con)
 	do {
 		n_confirm_raid_resync.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_raid_resync,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -5195,8 +5200,8 @@ int configure_asym_access(struct array_cmd_data *acd)
 
 	while (rc & REFRESH_FLAG) {
 		s_out = screen_driver(&n_change_array_asym_access, header_lines, NULL);
-
 		rc = s_out->rc;
+		free(s_out);
 
 		if (rc == RC_SUCCESS) {
 			if (!acd->do_cmd) {
@@ -5222,7 +5227,6 @@ int configure_asym_access(struct array_cmd_data *acd)
 	n_change_array_asym_access.body = NULL;
 	free_i_con(new_i_con);
 	i_con_head = i_con_head_saved;
-	free(s_out);
 	return rc;
 }
 
@@ -5415,11 +5419,11 @@ int raid_include(i_container *i_con)
 		do {
 			n_raid_include.body = buffer[toggle&1];
 			s_out = screen_driver(&n_raid_include,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
+		} while (rc == TOGGLE_SCREEN);
 
-		rc = s_out->rc;
-		free(s_out);
 		free_raid_cmds();
 	}
 
@@ -5538,8 +5542,11 @@ int configure_raid_include(i_container *i_con)
 	do {
 		n_configure_raid_include.body = buffer[toggle&1];
 		s_out = screen_driver(&n_configure_raid_include,header_lines,i_con);
+		temp_i_con = s_out->i_con;
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -5548,9 +5555,9 @@ int configure_raid_include(i_container *i_con)
 
 	n_configure_raid_include.body = NULL;
 
-	i_con = s_out->i_con;
+	i_con = temp_i_con;
 
-	if ((rc = s_out->rc) > 0)
+	if (rc > 0)
 		goto leave;
 
 	/* first, count devices selected to be sure min multiple is satisfied */
@@ -5589,7 +5596,6 @@ int configure_raid_include(i_container *i_con)
 	rc = confirm_raid_include(i_con);
 
 leave:
-	free(s_out);
 	return rc;
 }
 
@@ -5636,11 +5642,10 @@ int confirm_raid_include(i_container *i_con)
 	do {
 		n_confirm_raid_include.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_raid_include, header_lines, NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -6110,20 +6115,22 @@ static int configure_af_device(i_container *i_con, int action_code)
 			free(n_af_remove_fail.body);
 			n_af_remove_fail.body = NULL;
 		}
+
+		rc = s_out->rc;
+		free(s_out);
 	} else {
 		toggle_field = 0;
 
 		do {
 			n_screen->body = buffer[toggle&1];
 			s_out = screen_driver(n_screen,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
+		} while (rc == TOGGLE_SCREEN);
 
 		free_devs_to_init();
 	}
-
-	rc = s_out->rc;
-	free(s_out);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -6266,6 +6273,7 @@ int hot_spare(i_container *i_con, int action)
 			n_remove_hot_spare_fail.body = NULL;
 		}
 
+		free(s_out);
 		rc = EXIT_FLAG;
 		goto leave;
 	}
@@ -6273,13 +6281,13 @@ int hot_spare(i_container *i_con, int action)
 	do {
 		n_screen->body = buffer[toggle&1];
 		s_out = screen_driver(n_screen,header_lines,i_con);
+		temp_i_con = s_out->i_con;
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
-	rc = s_out->rc;
-	free(s_out);
-
-	i_con = s_out->i_con;
+	i_con = temp_i_con;
 
 	if (rc > 0) {
 		rc = EXIT_FLAG;
@@ -6356,6 +6364,7 @@ int select_hot_spare(i_container *i_con, int action)
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev_record *dev_rcd;
 	i_container *temp_i_con,*i_con2 = NULL;
+	i_container *temp_i_con2;
 	struct screen_output *s_out = NULL;
 	int header_lines;
 	s_node *n_screen;
@@ -6396,8 +6405,11 @@ int select_hot_spare(i_container *i_con, int action)
 		do {
 			n_screen->body = buffer[toggle&1];
 			s_out = screen_driver(n_screen,header_lines,i_con2);
+			temp_i_con2 = s_out->i_con;
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
+		} while (rc == TOGGLE_SCREEN);
 
 		for (k = 0; k < 2; k++) {
 			free(buffer[k]);
@@ -6406,8 +6418,7 @@ int select_hot_spare(i_container *i_con, int action)
 
 		n_screen->body = NULL;
 
-		rc = s_out->rc;
-		i_con2 = s_out->i_con;
+		i_con2 = temp_i_con2;
 
 		if (rc > 0)
 			goto leave;
@@ -6438,7 +6449,6 @@ int select_hot_spare(i_container *i_con, int action)
 leave:
 	i_con2 = free_i_con(i_con2);
 	i_con_head = i_con_head_saved;
-	free(s_out);
 	return rc;
 }
 
@@ -6486,8 +6496,10 @@ int confirm_hot_spare(int action)
 	do {
 		n_screen->body = buffer[toggle&1];
 		s_out = screen_driver(n_screen,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -6495,9 +6507,6 @@ int confirm_hot_spare(int action)
 	}
 
 	n_screen->body = NULL;
-
-	rc = s_out->rc;
-	free(s_out);
 
 	if(rc > 0)
 		goto leave;
@@ -6776,9 +6785,10 @@ int process_conc_maint(i_container *i_con, int action)
 	do {
 		n_screen->body = buffer[toggle&1];
 		s_out = screen_driver(n_screen,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-	rc = s_out->rc;
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -7239,7 +7249,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
  **/
 int start_conc_maint(i_container *i_con, int action)
 {
-	int rc, i, k;
+	int rc, s_rc, i, k;
 	char *buffer[2];
 	int num_lines = 0;
 	struct screen_output *s_out;
@@ -7281,8 +7291,10 @@ int start_conc_maint(i_container *i_con, int action)
 	do {
 		n_screen->body = buffer[toggle&1];
 		s_out = screen_driver(n_screen,header_lines,i_con);
+		s_rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (s_rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -7291,7 +7303,7 @@ int start_conc_maint(i_container *i_con, int action)
 
 	n_screen->body = NULL;
 
-	if (!s_out->rc) {
+	if (!s_rc) {
 		if (action == IPR_CONC_REMOVE)
 			rc = process_conc_maint(i_con, IPR_VERIFY_CONC_REMOVE);
 		else
@@ -7305,7 +7317,6 @@ int start_conc_maint(i_container *i_con, int action)
 
 	free_empty_slots(devs, num_devs);
 	free(devs);
-	free(s_out);
 	return rc;  
 }
 
@@ -7425,11 +7436,10 @@ int path_status(i_container * i_con)
 	do {
 		n_path_status.body = buffer[toggle&1];
 		s_out = screen_driver(&n_path_status, header_lines, i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -7538,11 +7548,10 @@ int init_device(i_container *i_con)
 	do {
 		n_init_device.body = buffer[toggle&1];
 		s_out = screen_driver(&n_init_device,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -7622,11 +7631,10 @@ int confirm_init_device(i_container *i_con)
 	do {
 		n_confirm_init_device.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_init_device,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -8034,11 +8042,10 @@ int reclaim_cache(i_container* i_con)
 	do {
 		n_reclaim_cache.body = buffer[toggle&1];
 		s_out = screen_driver(&n_reclaim_cache,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 leave:
 
@@ -8124,11 +8131,10 @@ int confirm_reclaim(i_container *i_con)
 	do {
 		n_confirm_reclaim.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_reclaim,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -8169,11 +8175,10 @@ int reclaim_warning(i_container *i_con)
 	do {
 		n_confirm_reclaim_warning.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_reclaim_warning,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -8356,11 +8361,11 @@ int battery_maint(i_container *i_con)
 	do {
 		n_battery_maint.body = buffer[toggle&1];
 		s_out = screen_driver(&n_battery_maint,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
-	rc = s_out->rc;
-	free(s_out);
 
 leave:
 	for (k = 0; k < 2; k++) {
@@ -8519,11 +8524,10 @@ int confirm_force_battery_error(void)
 	do {
 		n_confirm_force_battery_error.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_force_battery_error,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -8600,11 +8604,10 @@ int confirm_enable_battery(void)
 	do {
 		n_confirm_start_cache.body = buffer[toggle&1];
 		s_out = screen_driver(&n_confirm_start_cache,header_lines,NULL);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -8758,11 +8761,10 @@ int bus_config(i_container *i_con)
 		do {
 			n_bus_config.body = buffer[toggle&1];
 			s_out = screen_driver(&n_bus_config,header_lines,i_con);
+			rc = s_out->rc;
+			free(s_out);
 			toggle++;
-		} while (s_out->rc == TOGGLE_SCREEN);
-
-		rc = s_out->rc;
-		free(s_out);
+		} while (rc == TOGGLE_SCREEN);
 	}
 
 	for (k = 0; k < 2; k++) {
@@ -9019,6 +9021,7 @@ int change_bus_attr(i_container *i_con)
 	while (1) {
 		s_out = screen_driver(&n_change_bus_attr,header_lines,i_con);
 		rc = s_out->rc;
+		free(s_out);
 
 		for_each_icon(temp_i_con) {
 			if (!temp_i_con->field_data[0]) {
@@ -9061,7 +9064,6 @@ leave:
 	free(n_change_bus_attr.body);
 	n_change_bus_attr.body = NULL;
 	free_i_con(i_con);
-	free(s_out);
 	return rc;
 }
 
@@ -9587,11 +9589,10 @@ int driver_config(i_container *i_con)
 	do {
 		n_driver_config.body = buffer[toggle&1];
 		s_out = screen_driver(&n_driver_config,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
-
-	rc = s_out->rc;
-	free(s_out);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -9778,8 +9779,10 @@ int disk_config(i_container * i_con)
 	do {
 		n_disk_config.body = buffer[toggle&1];
 		s_out = screen_driver(&n_disk_config,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -9787,8 +9790,6 @@ int disk_config(i_container * i_con)
 	}
 	n_disk_config.body = NULL;
 
-	rc = s_out->rc;
-	free(s_out);
 	return rc;
 }
 
@@ -10033,6 +10034,7 @@ int change_disk_config(i_container * i_con)
 	while (1) {
 		s_out = screen_driver(&n_change_disk_config, header_lines, i_con);
 		rc = s_out->rc;
+		free(s_out);
 
 		found = 0;
 
@@ -10078,7 +10080,6 @@ leave:
 	n_change_disk_config.body = NULL;
 	free_i_con(i_con);
 	i_con_head = i_con_head_saved;
-	free(s_out);
 	return rc;
 }
 
@@ -10277,6 +10278,7 @@ int change_ioa_config(i_container * i_con)
 	while (1) {
 		s_out = screen_driver(&n_change_ioa_config, header_lines, i_con);
 		rc = s_out->rc;
+		free(s_out);
 
 		found = 0;
 		for_each_icon(temp_i_con) {
@@ -10333,7 +10335,6 @@ leave:
 	n_change_ioa_config.body = NULL;
 	free_i_con(i_con);
 	i_con_head = i_con_head_saved;
-	free(s_out);
 	return rc;
 }
 
@@ -10385,8 +10386,10 @@ int ioa_config(i_container * i_con)
 	do {
 		n_ioa_config.body = buffer[toggle&1];
 		s_out = screen_driver(&n_ioa_config, header_lines, i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -10394,8 +10397,6 @@ int ioa_config(i_container * i_con)
 	}
 	n_ioa_config.body = NULL;
 
-	rc = s_out->rc;
-	free(s_out);
 	return rc;
 }
 
@@ -10466,8 +10467,10 @@ int download_ucode(i_container * i_con)
 	do {
 		n_download_ucode.body = buffer[toggle&1];
 		s_out = screen_driver(&n_download_ucode,header_lines,i_con);
+		rc = s_out->rc;
+		free(s_out);
 		toggle++;
-	} while (s_out->rc == TOGGLE_SCREEN);
+	} while (rc == TOGGLE_SCREEN);
 
 	for (k = 0; k < 2; k++) {
 		free(buffer[k]);
@@ -10475,8 +10478,6 @@ int download_ucode(i_container * i_con)
 	}
 	n_download_ucode.body = NULL;
 
-	rc = s_out->rc;
-	free(s_out);
 	return rc;
 }
 
@@ -10635,6 +10636,7 @@ int process_choose_ucode(struct ipr_dev *dev)
 
 	n_choose_ucode.body = body;
 	s_out = screen_driver(&n_choose_ucode, header_lines, i_con);
+	free(s_out);
 
 	free(n_choose_ucode.body);
 	n_choose_ucode.body = NULL;
@@ -10681,11 +10683,12 @@ int process_choose_ucode(struct ipr_dev *dev)
 	if (!s_out->rc)
 		rc = update_ucode(dev, fw_image);
 
+	free(s_out);
+
 leave:
 	free(list);
 	i_con = free_i_con(i_con);
 	i_con_head = i_con_head_saved;
-	free(s_out);
 	return rc;
 }
 
@@ -12194,9 +12197,10 @@ static int raid_create(char **args, int num_args)
 			hdd_count++;
 	}
 
-	if (hdd_count > 0 && ssd_count > 0)
+	if (hdd_count > 0 && ssd_count > 0) {
 		syslog(LOG_ERR, _("SSDs and HDDs can not be mixed in an array.\n"));
 		return -EINVAL;
+	}
 
 	if (!ioa) {
 		syslog(LOG_ERR, _("No valid devices specified.\n"));
