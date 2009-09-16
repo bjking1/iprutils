@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.16
+Version: 2.2.17
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Wed Sep 16 2009 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.17
+- Release 2.2.17
+- Fixes a NULL pointer dereference which caused the daemons to silently fail.
 * Fri Aug 14 2009 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.16
 - Release 2.2.16
 - Fixes a bug where CLI raid create is broken.

@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.125 2009/08/14 17:36:32 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.126 2009/09/16 23:38:05 wboyer Exp $
  */
 
 #ifndef iprlib_h
@@ -1906,6 +1906,9 @@ void tool_init(int save_state)
 			class_devices = sysfs_get_class_devices(sysfs_host_class);
 			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 				sysfs_host_device = sysfs_get_classdev_device(class_device);
+				if (!sysfs_host_device)
+					continue;
+
 				sysfs_pci_device = sysfs_get_device_parent(sysfs_host_device);
 
 				if (strcmp(pci_address, sysfs_pci_device->name) == 0) {
@@ -1924,6 +1927,9 @@ void tool_init(int save_state)
 			class_devices = sysfs_get_class_devices(sysfs_device_class);
 			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 				sysfs_device_device = sysfs_get_classdev_device(class_device);
+				if (!sysfs_device_device)
+					continue;
+
 				sprintf(buf, "%d:255:255:255", ipr_ioa->host_num);
 
 				if (!strcmp(buf, sysfs_device_device->name)) {
