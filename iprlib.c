@@ -10,7 +10,7 @@
   */
 
 /*
- * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.126 2009/09/16 23:38:05 wboyer Exp $
+ * $Header: /cvsroot/iprdd/iprutils/iprlib.c,v 1.127 2009/10/30 18:46:39 klebers Exp $
  */
 
 #ifndef iprlib_h
@@ -32,7 +32,7 @@ int ipr_force = 0;
 int ipr_sg_required = 0;
 int polling_mode = 0;
 int ipr_fast = 0;
-static int ipr_mode5_write_buffer = 1;
+static int ipr_mode5_write_buffer = 0;
 
 struct sysfs_dev *head_zdev = NULL;
 struct sysfs_dev *tail_zdev = NULL;
@@ -1699,15 +1699,22 @@ static int ipr_select_phy_location(const struct dirent *dirent)
 	return 0;
 }
 
+static int ipr_select_pci_address(const struct dirent *dirent)
+{
+	if (strstr(dirent->d_name, "address"))
+		return 1;
+	return 0;
+}
+
 /**
- * read_slot_attr -
+ * read_attr_file -
  * @path:       	path name of device/file to open
  * @out:		character array
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int read_slot_attr(char *path, char out[SYSFS_PATH_MAX])
+static int read_attr_file(char *path, char *out, int size)
 {
 	int fd, len;
 
@@ -1716,7 +1723,7 @@ static int read_slot_attr(char *path, char out[SYSFS_PATH_MAX])
 		return -EIO;
 	}
 
-	len = read(fd, out, SYSFS_PATH_MAX);
+	len = read(fd, out, size);
 	if (len < 0) {
 		syslog_dbg("Failed to read %s\n", path);
 		close(fd);
@@ -1731,14 +1738,14 @@ static int read_slot_attr(char *path, char out[SYSFS_PATH_MAX])
 }
 
 /**
- * ipr_add_slot -
+ * ipr_add_slot_location -
  * @path:		path of device/file to open
  * @name:       	name of device/file to open
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int ipr_add_slot(char *path, char *name)
+static int ipr_add_slot_location(char *path, char *name)
 {
 	struct ipr_pci_slot *slot;
 	char fpath[SYSFS_PATH_MAX];
@@ -1751,12 +1758,49 @@ static int ipr_add_slot(char *path, char *name)
 	memset(slot, 0, sizeof(*slot));
 
 	strcpy(slot->slot_name, name);
-	rc = read_slot_attr(fpath, slot->physical_name);
+	rc = read_attr_file(fpath, slot->physical_name,
+			    sizeof(slot->physical_name));
 
 	if (rc) {
 		pci_slot = realloc(pci_slot, sizeof(*pci_slot) * num_pci_slots);
 		return rc;
 	}
+
+	num_pci_slots++;
+	return 0;
+}
+
+/**
+ * ipr_add_slot_address -
+ * @path:		path of device/file to open
+ * @name:       	name of device/file to open
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int ipr_add_slot_address(char *path, char *name)
+{
+	struct ipr_pci_slot *slot;
+	char fpath[SYSFS_PATH_MAX];
+	int rc;
+
+	sprintf(fpath, "%s%s/address", path, name);
+
+	pci_slot = realloc(pci_slot, sizeof(*pci_slot) * (num_pci_slots + 1));
+	slot = &pci_slot[num_pci_slots];
+	memset(slot, 0, sizeof(*slot));
+
+	strcpy(slot->slot_name, name);
+	strcpy(slot->physical_name, name);
+	rc = read_attr_file(fpath, slot->pci_device,
+			    sizeof(slot->pci_device));
+
+	if (rc) {
+		pci_slot = realloc(pci_slot, sizeof(*pci_slot) * num_pci_slots);
+		return rc;
+	}
+
+	strcat(slot->pci_device, ".0");
 
 	num_pci_slots++;
 	return 0;
@@ -1772,7 +1816,10 @@ static void ipr_get_pci_slots()
 {
 	char rootslot[SYSFS_PATH_MAX], slot[SYSFS_PATH_MAX];
 	char slotpath[SYSFS_PATH_MAX], attr[SYSFS_PATH_MAX];
+	char devspec[PATH_MAX], locpath[PATH_MAX];
+	char loc_code[1024], *last_hyphen, *prev_hyphen;
 	int num_slots, i, j, rc, num_attrs;
+	int slot_found = 0;
 	struct dirent **slotdir, **dirent;
 	struct stat statbuf;
 	struct ipr_ioa *ioa;
@@ -1792,13 +1839,23 @@ static void ipr_get_pci_slots()
 	for (i = 0; i < num_slots; i++) {
 		sprintf(slot, "%s%s", rootslot, slotdir[i]->d_name);
 		rc = scandir(slot, &dirent, ipr_select_phy_location, alphasort);
-		if (rc <= 0)
-			continue;
+		if (rc > 0) {
+			ipr_add_slot_location(rootslot, slotdir[i]->d_name);
+			while (rc--)
+				free(dirent[rc]);
+			free(dirent);
+		} else {
+			rc = scandir(slot, &dirent, ipr_select_pci_address,
+				     alphasort);
 
-		ipr_add_slot(rootslot, slotdir[i]->d_name);
-		while (rc--)
-			free(dirent[rc]);
-		free(dirent);
+			if (rc <= 0)
+				continue;
+
+			ipr_add_slot_address(rootslot, slotdir[i]->d_name);
+			while (rc--)
+				free(dirent[rc]);
+			free(dirent);
+		}
 	}
 
 	while (num_slots--)
@@ -1806,6 +1863,10 @@ static void ipr_get_pci_slots()
 	free(slotdir);
 
 	for (i = 0; i < num_pci_slots; i++) {
+
+		if (!pci_slot[i].pci_device)
+			continue;
+
 		sprintf(slotpath, "%s/"SYSFS_DEVICES_NAME"/%s/",
 			sysfs_bus->path, pci_slot[i].slot_name);
 
@@ -1837,11 +1898,41 @@ static void ipr_get_pci_slots()
 		ioa->physical_location[0] = '\0';
 
 	for_each_ioa(ioa) {
+		slot_found = 0;
 		for (i = 0; i < num_pci_slots; i++) {
-			if (strcmp(pci_slot[i].pci_device, ioa->pci_address))
+			if (strcmp(pci_slot[i].pci_device, ioa->pci_address) &&
+			    strcmp(pci_slot[i].slot_name, ioa->pci_address))
 				continue;
-			strcpy(ioa->physical_location, pci_slot[i].physical_name);
+			strcpy(ioa->physical_location,
+			       pci_slot[i].physical_name);
+			slot_found = 1;
 			break;
+		}
+		if (!slot_found) {
+			sprintf(attr, "%s/"SYSFS_DEVICES_NAME"/%s/devspec",
+				sysfs_bus->path, ioa->pci_address);
+			rc = read_attr_file(attr, devspec, PATH_MAX);
+
+			if (rc)
+				continue;
+
+			sprintf(locpath, "/proc/device-tree%s/ibm,loc-code",
+				devspec);
+			rc = read_attr_file(locpath, loc_code,
+					    sizeof(loc_code));
+
+			if (rc)
+				continue;
+
+			last_hyphen = strrchr(loc_code, '-');
+			if (last_hyphen && last_hyphen[1] == 'T') {
+				*last_hyphen = '\0';
+				prev_hyphen = strrchr(loc_code, '-');
+				if (prev_hyphen && prev_hyphen[1] != 'C')
+					*last_hyphen = '-';
+			}
+
+			strcpy(ioa->physical_location, loc_code);
 		}
 	}
 
@@ -3770,6 +3861,7 @@ int ipr_set_array_asym_access(struct ipr_ioa *ioa)
  * Returns:
  *   device generic name for now - see FIXME below
  **/
+#if 0
 static char *get_write_buffer_dev(struct ipr_dev *dev)
 {
 	struct sysfs_class_device *class_device;
@@ -3819,6 +3911,7 @@ fail:
 	sysfs_close_class_device(class_device);
 	return dev->gen_name;
 }
+#endif
 
 /**
  * ipr_resume_device_bus - 

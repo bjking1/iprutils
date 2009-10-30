@@ -11747,6 +11747,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	char *gen_name = dev->gen_name;
 	char node_name[7], buf[100], raid_str[48];
 	int tab_stop = 0;
+	int loc_len = 0;
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
 	struct ipr_ioa *ioa = dev->ioa;
@@ -11769,35 +11770,42 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	if (option)
 		len += sprintf(body + len, " %s  ", option);
 
-	len += sprintf(body + len, "%-6s %s/%d:",
-		       node_name,
-		       ioa->pci_address,
-		       ioa->host_num);
+	len += sprintf(body + len, "%-6s ", node_name);
+	loc_len = sprintf(body + len, "%s/%d:",
+			 ioa->pci_address,
+			 ioa->host_num);
+	len += loc_len;
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
+
+		for (i = 0; i < 27-loc_len; i++)
+			body[len+i] = ' ';
+
+		len += 27-loc_len;
+
 		if (!vpd) {
-			len += sprintf(body + len,"            %s %-19s ", get_bus_desc(ioa),
+			len += sprintf(body + len,"%s %-19s ", get_bus_desc(ioa),
 				       get_ioa_desc(dev->ioa));
 		} else
-			len += sprintf(body + len,"            %-8s %-16s ",
+			len += sprintf(body + len,"%-8s %-16s ",
 				       scsi_dev_data->vendor_id,
 				       scsi_dev_data->product_id);
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 
-		tab_stop  = sprintf(body + len,"%d:%d: ",
-				    dev->res_addr[ra].bus,
-				    dev->res_addr[ra].target);
+		loc_len += sprintf(body + len,"%d:%d: ",
+				   dev->res_addr[ra].bus,
+				   dev->res_addr[ra].target);
 
-		len += tab_stop;
+		len += loc_len;
 
-		for (i = 0; i < 12-tab_stop; i++)
+		for (i = 0; i < 27-loc_len; i++)
 			body[len+i] = ' ';
 
-		len += 12-tab_stop;
-		len += sprintf(body + len, "%-8s %-16s "," ", " ");
+		len += 27-loc_len;
+		len += sprintf(body + len, "%-8s %-16s ", " ", " ");
 	} else {
-		tab_stop  = sprintf(body + len,"%d:%d:%d ", dev->res_addr[ra].bus,
-				    dev->res_addr[ra].target, dev->res_addr[ra].lun);
+		tab_stop = sprintf(body + len,"%d:%d:%d ", dev->res_addr[ra].bus,
+				   dev->res_addr[ra].target, dev->res_addr[ra].lun);
 
 		if (scsi_dev_data) {
 			ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
@@ -11813,12 +11821,13 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			}
 		}
 
+		loc_len += tab_stop;
 		len += tab_stop;
 
-		for (i = 0; i < 12-tab_stop; i++)
+		for (i = 0; i < 27-loc_len; i++)
 			body[len+i] = ' ';
 
-		len += 12-tab_stop;
+		len += 27-loc_len;
 
 		if (vpd) {
 			len += sprintf(body + len, "%-8s %-16s ",
@@ -14902,6 +14911,8 @@ static void show_dev_details(struct ipr_dev *dev)
 		body = ioa_details(body, dev);
 	else if (ipr_is_volume_set(dev))
 		body = vset_details(body, dev);
+	else if (ipr_is_ses(dev))
+		body = ses_details(body, dev);
 	else
 		body = disk_details(body, dev);
 

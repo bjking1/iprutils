@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.17
+Version: 2.2.18
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,16 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Oct 30 2009 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.18
+- Release 2.2.18
+- Changes the default write buffer mode for writing to SES devices.
+- Fixes the CLI show-details command for SES devices.
+- Comments out the get_write_buffer_dev() routine to suppress compilation
+  warnings as it is not being used at the moment.
+- Fixes the Platform Location Information display for hotplug adapters and
+  displays the information for non-hotplug adapters.
+- Fixes the indentation problem when IOA host number is equal to or greater
+  than 10.
 * Wed Sep 16 2009 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.2.17
 - Release 2.2.17
 - Fixes a NULL pointer dereference which caused the daemons to silently fail.
