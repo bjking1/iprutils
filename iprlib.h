@@ -238,11 +238,11 @@ struct sysfs_dev {
 
 struct ipr_phy {
 #if defined (__BIG_ENDIAN_BITFIELD)
-	u8 box:2;
-	u8 phy:6;
+	u8 box:3;
+	u8 phy:5;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 phy:6;
-	u8 box:2;
+	u8 phy:5;
+	u8 box:3;
 #endif
 };
 

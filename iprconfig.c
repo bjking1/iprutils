@@ -6974,7 +6974,7 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 		scsi_dev_data->id = 0;
 	} else {
 		scsi_dev_data->channel = bus;
-		scsi_dev_data->id = slot | (box << 6);
+		scsi_dev_data->id = slot | (box << 5);
 	}
 
 	dev->res_addr[0].bus = scsi_dev_data->channel;
