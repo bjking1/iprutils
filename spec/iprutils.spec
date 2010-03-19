@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.18
+Version: 2.2.19
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Mar 19 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.19
+- Release 2.2.19
+- Fixes platform location display on blades.
 * Fri Oct 30 2009 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.18
 - Release 2.2.18
 - Changes the default write buffer mode for writing to SES devices.
