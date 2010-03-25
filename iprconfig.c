@@ -10891,14 +10891,10 @@ static int select_log_file(const struct dirent *dir_entry)
  * Returns:
  *   0 if success / non-zero on failure FIXME
  **/
-static int compare_log_file(const void *log_file1, const void *log_file2)
+static int compare_log_file(const struct dirent **first_dir, const struct dirent **second_dir)
 {
-	struct dirent **first_dir, **second_dir;
 	char name1[MAX_CMD_LENGTH], name2[MAX_CMD_LENGTH];
 	struct stat stat1, stat2;
-
-	first_dir = (struct dirent **)log_file1;
-	second_dir = (struct dirent **)log_file2;
 
 	if (strcmp((*first_dir)->d_name, "messages") == 0)
 		return 1;

@@ -205,10 +205,8 @@ static int select_dump_file(const struct dirent *dirent)
  * Returns:
  *
  **/
-static int dump_sort(const void *a, const void *b)
+static int dump_sort(const struct dirent **dumpa, const struct dirent **dumpb)
 {
-	const struct dirent **dumpa = (const struct dirent **)a;
-	const struct dirent **dumpb = (const struct dirent **)b;
 	int numa, numb;
 
 	sscanf((*dumpa)->d_name, DUMP_PREFIX"%d", &numa);
