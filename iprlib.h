@@ -246,12 +246,23 @@ struct ipr_phy {
 #endif
 };
 
+struct ipr_phy_2bit_hop {
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 box:2;
+	u8 phy:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 phy:6;
+	u8 box:2;
+#endif
+};
+
 struct ipr_res_addr {
 	u8 host;
 	u8 bus;
 	union {
 		u8 target;
 		struct ipr_phy phy;
+		struct ipr_phy_2bit_hop phy_2bit_hop;
 	};
 	u8 lun;
 #define IPR_GET_PHYSICAL_LOCATOR(res_addr) \
@@ -1048,6 +1059,7 @@ struct scsi_dev_data {
 	union {
 		u8 id;
 		struct ipr_phy phy;
+		struct ipr_phy_2bit_hop phy_2bit_hop;
 	};
 	int lun;
 	int type;
@@ -1216,6 +1228,10 @@ struct ipr_ioa {
 	u16 pci_device;
 	u16 subsystem_vendor;
 	u16 subsystem_device;
+	u16 hop_count;
+#define IPR_NOHOP            0x00
+#define IPR_2BIT_HOP         0x02
+#define IPR_3BIT_HOP         0x03
 	char dual_state[16];
 	char preferred_dual_state[16];
 	int host_num;
@@ -1550,7 +1566,11 @@ struct ipr_inquiry_ioa_cap {
 	u8 gscsi_only_ha:1;
 	u8 reserved3:4;
 
-	u8 reserved4[2];
+	u8 reserved4;
+
+	u8 reserved5:3;
+	u8 ra_id_encoding:3;
+	u8 reserved6:2;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 reserved:5;
 	u8 dual_ioa_asymmetric_access:1;
@@ -1563,7 +1583,11 @@ struct ipr_inquiry_ioa_cap {
 	u8 is_aux_cache:1;
 	u8 can_attach_to_aux_cache:1;
 
-	u8 reserved4[2];
+	u8 reserved4;
+
+	u8 reserved6:2;
+	u8 ra_id_encoding:3;
+	u8 reserved5:3;
 #endif
 	u16 af_block_size;
 	u16 af_ext_cap;

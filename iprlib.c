@@ -5264,6 +5264,11 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 		if (ioa_cap.gscsi_only_ha)
 			ioa->gscsi_only_ha = 1;
 
+		if (ioa_cap.ra_id_encoding == IPR_2BIT_HOP)
+			ioa->hop_count = IPR_2BIT_HOP;
+		else
+			ioa->hop_count = IPR_3BIT_HOP;
+
 		if (ioa_cap.dual_ioa_raid || ioa_cap.dual_ioa_asymmetric_access) {
 			memset(&mode_pages, 0, sizeof(mode_pages));
 			rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);

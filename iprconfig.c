@@ -6609,11 +6609,16 @@ static struct ipr_drive_elem_status *
 get_elem_status(struct ipr_dev *dev, struct ipr_dev *ses,
 		struct ipr_encl_status_ctl_pg *ses_data, struct ipr_ses_config_pg *ses_cfg)
 {
+	struct ipr_ioa *ioa = dev->ioa;
 	struct ipr_res_addr *ra;
 	struct ipr_drive_elem_status *elem_status, *overall;
 	int bus = ses->scsi_dev_data->channel;
-	int box = ses->scsi_dev_data->phy.box;
-	int slot, is_vses;
+	int box, slot, is_vses;
+
+	if (ioa->hop_count == IPR_2BIT_HOP)
+		box = ses->scsi_dev_data->phy_2bit_hop.box;
+	else
+		box = ses->scsi_dev_data->phy.box;
 
 	if (ipr_receive_diagnostics(ses, 2, ses_data, sizeof(*ses_data)))
 		return NULL;
@@ -6632,8 +6637,17 @@ get_elem_status(struct ipr_dev *dev, struct ipr_dev *ses,
 		for_each_ra(ra, dev) {
 			if (is_vses && (ra->bus != slot || ra->target != 0))
 				continue;
-			if (!is_vses && (ra->bus != bus || ra->phy.box != box || ra->phy.phy != slot))
-				continue;
+			if (ioa->hop_count == IPR_2BIT_HOP) {
+				if (!is_vses && (ra->bus != bus ||
+						 ra->phy_2bit_hop.box != box ||
+						 ra->phy_2bit_hop.phy != slot))
+					continue;
+			} else {
+				if (!is_vses && (ra->bus != bus ||
+						 ra->phy.box != box ||
+						 ra->phy.phy != slot))
+					continue;
+			}
 			return elem_status;
 		}
 	}
@@ -6960,8 +6974,13 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	struct ipr_ioa *ioa = ses->ioa;
 	struct ipr_dev *dev;
 	struct scsi_dev_data *scsi_dev_data;
-	int box = ses->scsi_dev_data->phy.box;
 	int bus = ses->scsi_dev_data->channel;
+	int box;
+
+	if (ioa->hop_count == IPR_2BIT_HOP)
+		box = ses->scsi_dev_data->phy_2bit_hop.box;
+	else
+		box = ses->scsi_dev_data->phy.box;
 
 	dev = calloc(1, sizeof(*dev));
 	scsi_dev_data = calloc(1, sizeof(*scsi_dev_data));
@@ -6974,7 +6993,10 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 		scsi_dev_data->id = 0;
 	} else {
 		scsi_dev_data->channel = bus;
-		scsi_dev_data->id = slot | (box << 5);
+		if (ioa->hop_count == IPR_2BIT_HOP)
+			scsi_dev_data->id = slot | (box << 6);
+		else
+			scsi_dev_data->id = slot | (box << 5);
 	}
 
 	dev->res_addr[0].bus = scsi_dev_data->channel;
@@ -7020,11 +7042,16 @@ static int can_perform_conc_action(struct ipr_dev *dev, int action)
  **/
 static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vses)
 {
+	struct ipr_ioa *ioa = ses->ioa;
 	struct ipr_dev *dev;
 	struct ipr_res_addr *ra;
 	int bus = ses->scsi_dev_data->channel;
-	int box = ses->scsi_dev_data->phy.box;
-	int i;
+	int box, i;
+
+	if (ioa->hop_count == IPR_2BIT_HOP)
+		box = ses->scsi_dev_data->phy_2bit_hop.box;
+	else
+		box = ses->scsi_dev_data->phy.box;
 
 	for_each_dev(ses->ioa, dev) {
 		if (ipr_is_ses(dev))
@@ -7033,8 +7060,17 @@ static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vs
 		for_each_ra(ra, dev) {
 			if (is_vses && (ra->bus != slot || ra->target != 0))
 				continue;
-			if (!is_vses && (ra->bus != bus || ra->phy.box != box || ra->phy.phy != slot))
-				continue;
+			if (ioa->hop_count == IPR_2BIT_HOP) {
+				if (!is_vses && (ra->bus != bus ||
+						 ra->phy_2bit_hop.box != box ||
+						 ra->phy_2bit_hop.phy != slot))
+					continue;
+			} else {
+				if (!is_vses && (ra->bus != bus ||
+						 ra->phy.box != box ||
+						 ra->phy.phy != slot))
+					continue;
+			}
 			for (i = 0; i < IPR_DEV_MAX_PATHS; i++) {
 				if (dev->ses[i])
 					continue;
