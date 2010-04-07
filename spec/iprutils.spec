@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.19
+Version: 2.2.20
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Apr 07 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.20
+- Release 2.2.20
+- Adds resource address parsing based on encoding format flag.
 * Fri Mar 19 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.19
 - Release 2.2.19
 - Fixes platform location display on blades.
