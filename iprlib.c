@@ -7078,12 +7078,12 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 	char *tmp;
 	u32 rc;
 
-	fd = open(ucode_file, O_RDONLY);
-
-	if (fd == -1)
-		return 0;
-
 	if (has_hdr) {
+		fd = open(ucode_file, O_RDONLY);
+
+		if (fd == -1)
+			return 0;
+
 		rc = fstat(fd, &ucode_stats);
 
 		if (rc != 0) {
@@ -7112,6 +7112,9 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
 			munmap(hdr, ucode_stats.st_size);
 			close(fd);
 			return rc;
+		} else {
+			munmap(hdr, ucode_stats.st_size);
+			close(fd);		
 		}
 	}
 
