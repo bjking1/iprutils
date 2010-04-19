@@ -1937,7 +1937,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	struct ipr_dual_ioa_entry *ioa_entry;
 	int rc, i;
 	char buffer[200];
-	int cache_size;
+	int cache_size, dram_size;
 	u32 fw_level;
 
 	memset(&ioa_vpd, 0, sizeof(ioa_vpd));
@@ -1979,8 +1979,9 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 			body = add_line_to_body(body,_("Cache Size"), buffer);
 		}
 
-		memcpy(buffer, dram_vpd.dram_size, IPR_VPD_DRAM_SIZE_LEN);
-		sprintf(buffer + IPR_VPD_DRAM_SIZE_LEN, " MB");
+		ipr_strncpy_0(buffer, (char *)dram_vpd.dram_size, IPR_VPD_DRAM_SIZE_LEN);
+		dram_size = strtoul(buffer, NULL, 16);
+		sprintf(buffer, "%d MB", dram_size);
 		body = add_line_to_body(body,_("DRAM Size"), buffer);
 	}
 	body = add_line_to_body(body,_("Resource Name"), dev->gen_name);
