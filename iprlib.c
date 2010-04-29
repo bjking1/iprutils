@@ -3995,7 +3995,7 @@ static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int leng
 		      sense_data, IPR_WRITE_BUFFER_TIMEOUT);
 
 	if (rc != 0) {
-		if ((rc == -ENOENT) || (rc == -EIO)) {
+		if ((rc == -ENOENT) || (rc == -EIO) || (rc == -EINVAL)) {
 			syslog_dbg("Write buffer failed on sd device %s. %m\n", dev->dev_name);
 			rc = sg_ioctl_by_name(dev->gen_name, cdb, buff,
 					      length, direction,
@@ -4540,6 +4540,9 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 		io_hdr_t.dxferp = dxferp;
 
 		rc = ioctl(fd, SG_IO, &io_hdr_t);
+
+		if (rc == -1 && errno == EINVAL)
+			return -EINVAL;
 
 		if (rc == 0 && io_hdr_t.masked_status == CHECK_CONDITION)
 			rc = CHECK_CONDITION;
