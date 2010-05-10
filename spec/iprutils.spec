@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.2.20
+Version: 2.2.21
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Mon May 10 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.21
+- Release 2.2.21
+- Fixes firmware image files left open after getting firmware level.
+- Changes IOA DRAM size display from hex to decimal base.
+- Handles SG_IO ioctl error with older distros which caused disk microcode
+  download to fail with JBOD's.
 * Tue Apr 07 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.20
 - Release 2.2.20
 - Adds resource address parsing based on encoding format flag.
