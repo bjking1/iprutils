@@ -1223,6 +1223,9 @@ struct ipr_ioa {
 	u8 asymmetric_access:1;
 	u8 asymmetric_access_enabled:1;
 	u8 has_cache:1;
+	u8 sis64:1;
+#define IPR_SIS32		0x00
+#define IPR_SIS64		0x01
 	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
@@ -1570,7 +1573,7 @@ struct ipr_inquiry_ioa_cap {
 
 	u8 reserved5:3;
 	u8 ra_id_encoding:3;
-	u8 reserved6:2;
+	u8 sis_format:2;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 reserved:5;
 	u8 dual_ioa_asymmetric_access:1;
@@ -1585,7 +1588,7 @@ struct ipr_inquiry_ioa_cap {
 
 	u8 reserved4;
 
-	u8 reserved6:2;
+	u8 sis_format:2;
 	u8 ra_id_encoding:3;
 	u8 reserved5:3;
 #endif
