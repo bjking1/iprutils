@@ -1535,7 +1535,7 @@ static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *seco
 }
 
 /**
- * same_dev_rcd - compares two devices to determin if they are the same
+ * same_dev_rcd - compares two device records to determine if they are the same
  * @first:		ipr_dev_record struct
  * @second:		ipr_dev_record struct
  *
@@ -1557,7 +1557,7 @@ static int same_dev_rcd(struct ipr_dev_record *first, struct ipr_dev_record *sec
 }
 
 /**
- * same_dev_rcd - compares two devices to determin if they are the same
+ * same_dev - compares two devices to determine if they are the same
  * @first:		ipr_dev struct
  * @second:		ipr_dev struct
  *
@@ -2736,7 +2736,7 @@ int ipr_mode_sense(struct ipr_dev *dev, u8 page, void *buff)
 }
 
 /**
- * ipr_log-sense - issue a log sense command
+ * ipr_log_sense - issue a log sense command
  * @dev:		ipr dev struct
  * @page:       	mode page
  * @buff:		data buffer
@@ -4613,7 +4613,7 @@ int sg_ioctl_noretry(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 };
 
 /**
- * sg_ioctl_noretry - 
+ * sg_ioctl_by_name - 
  * @name: 		file name
  * @cdb:        	cdb
  * @data:		data pointer
