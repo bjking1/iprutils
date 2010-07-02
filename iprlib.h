@@ -232,7 +232,7 @@ extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
 
 struct sysfs_dev {
-	char sysfs_device_name[16];
+	char sysfs_device_name[SYSFS_NAME_LEN];
 	struct sysfs_dev *next, *prev;
 };
 
@@ -1070,7 +1070,7 @@ struct scsi_dev_data {
 	u32 handle;
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
-	char sysfs_device_name[16];
+	char sysfs_device_name[SYSFS_NAME_LEN];
 	char dev_name[64];
 	char gen_name[64];
 };
