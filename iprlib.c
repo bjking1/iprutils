@@ -4541,8 +4541,10 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 
 		rc = ioctl(fd, SG_IO, &io_hdr_t);
 
-		if (rc == -1 && errno == EINVAL)
-			return -EINVAL;
+		if (rc == -1 && errno == EINVAL) {
+			rc = -EINVAL;
+			goto out;
+		}
 
 		if (rc == 0 && io_hdr_t.masked_status == CHECK_CONDITION)
 			rc = CHECK_CONDITION;
@@ -4553,6 +4555,7 @@ static int _sg_ioctl(int fd, u8 cdb[IPR_CCB_CDB_LEN],
 			break;
 	}
 
+out:
 	if (iovec_count) {
 		for (i = 0, buf = (u8 *)data; i < iovec_count; i++) {
 			if (data_direction == SG_DXFER_FROM_DEV)
