@@ -2030,9 +2030,10 @@ void tool_init(int save_state)
 				if (!sysfs_device_device)
 					continue;
 
-				if (fw_type == IPR_SIS64)
+				if (fw_type == IPR_SIS64) {
 					sprintf(buf, "%d:%d:0:0", ipr_ioa->host_num, IPR_IOAFP_VIRTUAL_BUS);
-				else
+					ipr_ioa->sis64 = 1;
+				} else
 					sprintf(buf, "%d:255:255:255", ipr_ioa->host_num);
 
 				if (!strcmp(buf, sysfs_device_device->name)) {
