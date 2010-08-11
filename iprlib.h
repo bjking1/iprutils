@@ -852,8 +852,8 @@ struct ipr_dev_record {
 
 #define __for_each_qac_entry(rcd, qac, type) \
       for (rcd = (type *)(qac)->data; \
-           ((unsigned long)rcd) < ((unsigned long)((unsigned long)(qac) + ntohs((qac)->resp_len))) && \
-           ((unsigned long)rcd) < ((unsigned long)((qac)->data + sizeof((qac)->data))); \
+           ((unsigned long)rcd) < ((unsigned long)((qac)->u.buf + (qac)->resp_len)) && \
+           ((unsigned long)rcd) < ((unsigned long)((qac)->u.buf + IPR_QAC_BUFFER_SIZE)); \
            rcd = (type *)((unsigned long)rcd + ntohs(((struct ipr_common_record *)rcd)->record_len)))
 
 #define for_each_supported_arrays_rcd(rcd, qac) \
@@ -1334,11 +1334,29 @@ struct ipr_dasd_inquiry_page3 {
 	u8 patch_number[4];
 };
 
-struct ipr_array_query_data {
+struct ipr_array_query32_data {
 	u16 resp_len;
 	u8 reserved;
 	u8 num_records;
-	u8 data[IPR_QAC_BUFFER_SIZE];
+	u8 data[0];
+};
+
+struct ipr_array_query64_data {
+	u32 resp_len;
+	u32 num_records;
+	u8 data[0];
+};
+
+struct ipr_array_query_data {
+	u32 resp_len;
+	u32 num_records;
+	u32 hdr_len;
+	u8 *data;
+	union {
+		u8 buf[IPR_QAC_BUFFER_SIZE];
+		struct ipr_array_query32_data buf32;
+		struct ipr_array_query64_data buf64;
+	} u;
 };
 
 struct ipr_block_desc {
@@ -2113,8 +2131,8 @@ int open_and_lock(char *);
 void tool_init(int);
 void exit_on_error(char *, ...);
 bool is_af_blocked(struct ipr_dev *, int);
-int ipr_query_array_config(struct ipr_ioa *, bool, bool, bool, int, void *);
-int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, bool, int, void *);
+int ipr_query_array_config(struct ipr_ioa *, bool, bool, bool, int, struct ipr_array_query_data *);
+int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, bool, int, struct ipr_array_query_data *);
 int ipr_query_command_status(struct ipr_dev *, void *);
 int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);

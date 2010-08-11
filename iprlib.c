@@ -2176,9 +2176,10 @@ void ipr_scan(struct ipr_ioa *ioa, int bus, int id, int lun)
  **/
 int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 			     bool allow_rebuild_refresh, bool set_array_id,
-			     bool vset_migrate_query, int array_id, void *buff)
+			     bool vset_migrate_query, int array_id,
+			     struct ipr_array_query_data *buff)
 {
-	int length = sizeof(struct ipr_array_query_data);
+	int length = IPR_QAC_BUFFER_SIZE;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
@@ -2203,17 +2204,34 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, buff,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+
+	rc = sg_ioctl(fd, cdb, buff->u.buf,
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
 	if (rc != 0) {
-		if (sense_data.sense_key != ILLEGAL_REQUEST)
+		if (sense_data.sense_key != ILLEGAL_REQUEST || ipr_debug)
 			ioa_cmd_err(ioa, &sense_data, "Query Array Config", rc);
 		else if (sense_data.sense_key == NOT_READY &&
 			 sense_data.add_sense_code == 0x40 &&
 			 sense_data.add_sense_code_qual == 0x85)
 			ioa->nr_ioa_microcode = 1;
+	}
+
+	if (ioa->sis64) {
+		buff->resp_len = ntohl(buff->u.buf64.resp_len);
+		buff->num_records = ntohl(buff->u.buf64.num_records);
+		buff->data = buff->u.buf64.data;
+		buff->hdr_len = 8;
+	} else {
+		buff->resp_len = ntohs(buff->u.buf32.resp_len);
+		buff->num_records = ntohs(buff->u.buf32.num_records);
+		buff->data = buff->u.buf32.data;
+		buff->hdr_len = 4;
 	}
 
 	return rc;
@@ -2232,7 +2250,8 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
  **/
 int ipr_query_array_config(struct ipr_ioa *ioa,
 			   bool allow_rebuild_refresh, bool set_array_id,
-			   bool vset_migrate_query, int array_id, void *buff)
+			   bool vset_migrate_query, int array_id,
+			   struct ipr_array_query_data *buff)
 {
 	int fd, rc;
 
@@ -2334,7 +2353,7 @@ static int ipr_start_array(struct ipr_ioa *ioa, char *cmd,
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
-	int length = ntohs(ioa->qac_data->resp_len);
+	int length = ioa->qac_data->resp_len;
 
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
@@ -2406,7 +2425,7 @@ int ipr_migrate_array_protection(struct ipr_ioa *ioa,
 	char *cmd = "migrate array protection";
 	struct sense_data_t sense_data;
 	int rc;
-	int length = ntohs(qac_data->resp_len);
+	int length = qac_data->resp_len;
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
@@ -2455,7 +2474,7 @@ static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
-	int length = ntohs(ioa->qac_data->resp_len);
+	int length = ioa->qac_data->resp_len;
 
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
@@ -2524,7 +2543,7 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
-	int length = ntohs(ioa->qac_data->resp_len);
+	int length = ioa->qac_data->resp_len;
 
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
@@ -2565,7 +2584,7 @@ int ipr_resync_array(struct ipr_ioa *ioa)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
-	int length = ntohs(ioa->qac_data->resp_len);
+	int length = ioa->qac_data->resp_len;
 
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
@@ -2608,7 +2627,7 @@ int ipr_add_array_device(struct ipr_ioa *ioa, int fd,
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int rc;
-	int length = ntohs(qac_data->resp_len);
+	int length = qac_data->resp_len;
 
 	ipr_update_qac_with_zeroed_devs(ioa);
 
@@ -3839,7 +3858,7 @@ int ipr_set_array_asym_access(struct ipr_ioa *ioa)
 	struct sense_data_t sense_data;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	int fd, rc;
-	int length = ntohs(ioa->qac_data->resp_len);
+	int length = ioa->qac_data->resp_len;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -5506,7 +5525,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 		if (rc != 0) {
 			qac_data->num_records = 0;
-			qac_data->resp_len = htons(4);
+			qac_data->resp_len = qac_data->hdr_len;
 		}
 
 		ioa->qac_data = qac_data;
