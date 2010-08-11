@@ -5272,7 +5272,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 
 		if (ioa_cap.sis_format == IPR_SIS64)
 			ioa->sis64 = 1;
-		else if (ioa_cap.ra_id_encoding == IPR_2BIT_HOP) {
+		else {
+			if (ioa_cap.ra_id_encoding == IPR_2BIT_HOP)
 				ioa->hop_count = IPR_2BIT_HOP;
 			else
 				ioa->hop_count = IPR_3BIT_HOP;
