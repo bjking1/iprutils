@@ -197,6 +197,10 @@
 #define IPR_HDD                              0x0
 #define IPR_SSD                              0x1
 
+#define IPR_ARRAY_VIRTUAL_BUS			0x1
+#define IPR_VSET_VIRTUAL_BUS			0x2
+#define IPR_IOAFP_VIRTUAL_BUS			0x3
+
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
 

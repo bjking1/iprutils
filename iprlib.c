@@ -1950,7 +1950,7 @@ static void ipr_get_pci_slots()
  **/
 void tool_init(int save_state)
 {
-	int temp;
+	int temp, fw_type;
 	struct ipr_ioa *ipr_ioa;
 	struct sysfs_driver *sysfs_ipr_driver;
 	struct dlist *ipr_devs;
@@ -2006,6 +2006,15 @@ void tool_init(int save_state)
 					strcpy(ipr_ioa->host_name, sysfs_host_device->name);
 					sscanf(ipr_ioa->host_name, "host%d", &ipr_ioa->host_num);
 					get_pci_attrs(ipr_ioa, sysfs_pci_device);
+
+					sysfs_attr = sysfs_get_classdev_attr(class_device, "fw_type");
+					if (!sysfs_attr)
+						fw_type = 0;
+					else
+						sscanf(sysfs_attr->value, "%d", &fw_type);
+
+					if (ipr_debug)
+						syslog(LOG_INFO, "tool_init: fw_type attr = %d.\n", fw_type);
 					break;
 				}
 			}
@@ -2021,7 +2030,10 @@ void tool_init(int save_state)
 				if (!sysfs_device_device)
 					continue;
 
-				sprintf(buf, "%d:255:255:255", ipr_ioa->host_num);
+				if (fw_type == IPR_SIS64)
+					sprintf(buf, "%d:%d:0:0", ipr_ioa->host_num, IPR_IOAFP_VIRTUAL_BUS);
+				else
+					sprintf(buf, "%d:255:255:255", ipr_ioa->host_num);
 
 				if (!strcmp(buf, sysfs_device_device->name)) {
 					sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "model");
@@ -5084,14 +5096,20 @@ static void get_ioa_name(struct ipr_ioa *ioa,
 {
 	int i;
 	int host_no;
+	int channel = IPR_IOAFP_VIRTUAL_BUS;
+	int id = 0;
+	int lun = 0;
 
 	sscanf(ioa->host_name, "host%d", &host_no);
 
+	if (!ioa->sis64)
+		channel = id = lun = 255;
+
 	for (i = 0; i < num_sg_devices; i++) {
 		if (scsi_dev_table[i].host == host_no &&
-		    scsi_dev_table[i].channel == 255 &&
-		    scsi_dev_table[i].id == 255 &&
-		    scsi_dev_table[i].lun == 255 &&
+		    scsi_dev_table[i].channel == channel &&
+		    scsi_dev_table[i].id == id &&
+		    scsi_dev_table[i].lun == lun &&
 		    scsi_dev_table[i].type == IPR_TYPE_ADAPTER) {
 			strcpy(ioa->ioa.dev_name, scsi_dev_table[i].dev_name);
 			strcpy(ioa->ioa.gen_name, scsi_dev_table[i].gen_name);
