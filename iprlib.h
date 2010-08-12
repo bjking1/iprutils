@@ -71,6 +71,7 @@
 #define IPR_VENDOR_ID_LEN                    8
 #define IPR_PROD_ID_LEN                      16
 #define IPR_SERIAL_NUM_LEN                   8
+#define IPR_DESCRIPTION_LEN                  16
 #define IPR_VPD_PLANT_CODE_LEN               4
 #define IPR_VPD_CACHE_SIZE_LEN               3
 #define IPR_VPD_DRAM_SIZE_LEN                3
@@ -218,6 +219,9 @@ cur_val = new_val;                                      \
 #define IPR_RECORD_ID_COMP_RECORD            __constant_be16_to_cpu((u16)3)
 #define IPR_RECORD_ID_ARRAY_RECORD           __constant_be16_to_cpu((u16)4)
 #define IPR_RECORD_ID_DEVICE_RECORD          __constant_be16_to_cpu((u16)5)
+#define IPR_RECORD_ID_ARRAY_RECORD_3         __constant_be16_to_cpu((u16)6)
+#define IPR_RECORD_ID_VSET_RECORD_3          __constant_be16_to_cpu((u16)7)
+#define IPR_RECORD_ID_DEVICE_RECORD_3        __constant_be16_to_cpu((u16)8)
 
 extern struct ipr_array_query_data *ipr_array_query_data;
 extern int num_ioas;
@@ -748,27 +752,68 @@ struct ipr_array_record {
 	u8  stop_cand:1;
 	u8  start_cand:1;
 #endif
-	u16 stripe_size;
+	union {
+		struct {
+			u16 stripe_size;
 
-	u8  raid_level;
-	u8  array_id;
-	u32 resource_handle;
-	struct ipr_res_addr resource_addr;
-	struct ipr_res_addr last_resource_addr;
-	u8  vendor_id[IPR_VENDOR_ID_LEN];
-	u8  product_id[IPR_PROD_ID_LEN];
-	u8  serial_number[8];
+			u8  raid_level;
+			u8  array_id;
+			u32 resource_handle;
+			struct ipr_res_addr resource_addr;
+			struct ipr_res_addr last_resource_addr;
+			u8  vendor_id[IPR_VENDOR_ID_LEN];
+			u8  product_id[IPR_PROD_ID_LEN];
+			u8  serial_number[8];
 #if defined (__BIG_ENDIAN_BITFIELD)
-	u8  block_dev_class:3;
-	u8  reserved5:5;
+			u8  block_dev_class:3;
+			u8  reserved5:5;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8  reserved5:5;
-	u8  block_dev_class:3;
+			u8  reserved5:5;
+			u8  block_dev_class:3;
 #endif
-	u8  reserved6;
-	u8  reserved7;
-	u8  reserved8;
-};
+			u8  reserved6;
+			u8  reserved7;
+			u8  reserved8;
+		}__attribute__((packed, aligned (4))) type2;
+
+		struct {
+			u8  reserved5;
+			u8  raid_level;
+			u16 stripe_size;
+			u8  reserved6[4];
+			u8  reserved7[16];
+
+			u8  last_func_res_path[8];
+
+			u8  reserved8[2];
+
+			u8  array_id;
+#if defined (__BIG_ENDIAN_BITFIELD)
+			u8  block_dev_class:3;
+			u8  reserved9:5;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+			u8  reserved9:5;
+			u8  block_dev_class:3;
+#endif
+			u32 resource_handle;
+			u8  dev_id[8];
+			u8  lun[8];
+			u8  wwn[16];
+			u8  res_path[8];
+			u8  vendor_id[IPR_VENDOR_ID_LEN];
+			u8  product_id[IPR_PROD_ID_LEN];
+			u8  serial_number[IPR_SERIAL_NUM_LEN];
+			u8  desc[IPR_DESCRIPTION_LEN];
+
+			u8  total_arr_size[8];
+			u8  total_size_inuse[8];
+			u8  max_size_to_use[8];
+			u8  total_size_enc[8];
+			u8  total_inuse_enc[8];
+			u8  max_size_enc[8];
+		}__attribute__((packed, aligned (4))) type3;
+	};
+}__attribute__((packed, aligned (4)));
 
 struct ipr_dev_record {
 	struct ipr_common_record common;
@@ -828,27 +873,60 @@ struct ipr_dev_record {
 	u8  rmv_hot_spare_cand:1;
 	u8  add_hot_spare_cand:1;
 #endif
+	union {
+		struct {
+			u8  reserved4[2];
+			u8  array_id;
+			u32 resource_handle;
+			struct ipr_res_addr resource_addr;
+			struct ipr_res_addr last_resource_addr;
 
-	u8  reserved4[2];
-	u8  array_id;
-	u32 resource_handle;
-	struct ipr_res_addr resource_addr;
-	struct ipr_res_addr last_resource_addr;
+			u8  vendor_id[IPR_VENDOR_ID_LEN];
+			u8  product_id[IPR_PROD_ID_LEN];
+			u8  serial_number[IPR_SERIAL_NUM_LEN];
 
-	u8 vendor_id[IPR_VENDOR_ID_LEN];
-	u8 product_id[IPR_PROD_ID_LEN];
-	u8 serial_num[IPR_SERIAL_NUM_LEN];
 #if defined (__BIG_ENDIAN_BITFIELD)
-	u8  block_dev_class:3;
-	u8  reserved5:5;
+			u8  block_dev_class:3;
+			u8  reserved5:5;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8  reserved5:5;
-	u8  block_dev_class:3;
+			u8  reserved5:5;
+			u8  block_dev_class:3;
 #endif
-	u8  reserved6;
-	u8  reserved7;
-	u8  reserved8;
-};
+			u8  reserved6;
+			u8  reserved7;
+			u8  reserved8;
+		}__attribute__((packed, aligned (4))) type2;
+		struct {
+			u8  reserved4[3];
+			u8  reserved5[4];
+			u8  reserved6[16];
+			u8  last_func_res_path[8];
+			u8  reserved7[2];
+			u8  array_id;
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+			u8  block_dev_class:3;
+			u8  reserved8:5;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+			u8  reserved8:5;
+			u8  block_dev_class:3;
+#endif
+			u32 resource_handle;
+			u8  dev_id[8];
+			u8  lun[8];
+			u8  wwn[16];
+			u8  res_path[8];
+			u8  vendor_id[IPR_VENDOR_ID_LEN];
+			u8  product_id[IPR_PROD_ID_LEN];
+			u8  serial_number[IPR_SERIAL_NUM_LEN];
+			u8  desc[IPR_DESCRIPTION_LEN];
+			u8  reserved9[8];
+			u8  reserved10[2];
+			u8  reserved11[6];
+			u8  reserved12[8];
+		}__attribute__((packed, aligned (4))) type3;
+	};
+}__attribute__((packed, aligned (4)));
 
 #define __for_each_qac_entry(rcd, qac, type) \
       for (rcd = (type *)(qac)->data; \
@@ -865,11 +943,11 @@ struct ipr_dev_record {
 
 #define for_each_dev_rcd(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_dev_record) \
-              if (rcd->common.record_id == IPR_RECORD_ID_DEVICE_RECORD)
+              if (ipr_is_device_record(rcd->common.record_id))
 
 #define for_each_array_rcd(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_array_record) \
-              if (rcd->common.record_id == IPR_RECORD_ID_ARRAY_RECORD)
+              if (ipr_is_array_record(rcd->common.record_id))
 
 struct ipr_std_inq_data {
 #if defined (__BIG_ENDIAN_BITFIELD)
@@ -1077,6 +1155,8 @@ struct scsi_dev_data {
 	char sysfs_device_name[SYSFS_NAME_LEN];
 	char dev_name[64];
 	char gen_name[64];
+#define IPR_MAX_RES_PATH_LEN		24
+	char res_path[IPR_MAX_RES_PATH_LEN];
 };
 
 struct ipr_path_entry {
@@ -1176,6 +1256,14 @@ struct ipr_dev {
 	char dev_name[64];
 	char gen_name[64];
 	char prot_level_str[8];
+	u8  *vendor_id;
+	u8  *product_id;
+	u8  *serial_number;
+	u8  array_id;
+	u8  raid_level;
+	u16 stripe_size;
+	u32 resource_handle;
+	u8  block_dev_class;
 	u32 is_reclaim_cand:1;
 	u32 should_init:1;
 	u32 init_not_allowed:1;
@@ -1281,7 +1369,7 @@ struct ipr_ioa {
 
 #define for_each_dev_in_vset(v, d) \
       for_each_af_dasd((v)->ioa, d) \
-           if (ipr_is_array_member(d) && d->dev_rcd->array_id == (v)->array_rcd->array_id)
+           if (ipr_is_array_member(d) && d->array_id == (v)->array_id)
 
 #define for_each_vset(i, d) \
       for_each_dev(i, d) \
@@ -2245,10 +2333,44 @@ u32 get_ioa_ucode_version(char *);
 int ipr_improper_device_type(struct ipr_dev *);
 int ipr_get_fw_version(struct ipr_dev *, u8 release_level[4]);
 
+static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
+{
+	if (ioa->sis64)
+		return dev_rcd->type3.resource_handle;
+	else
+		return dev_rcd->type2.resource_handle;
+}
+
+static inline u32 ipr_get_arr_res_handle(struct ipr_ioa *ioa, struct ipr_array_record *array_rcd)
+{
+	if (ioa->sis64)
+		return array_rcd->type3.resource_handle;
+	else
+		return array_rcd->type2.resource_handle;
+}
+
+static inline int ipr_is_device_record(int record_id)
+{
+	if ((record_id == IPR_RECORD_ID_DEVICE_RECORD) ||
+	    (record_id == IPR_RECORD_ID_DEVICE_RECORD_3))
+		return 1;
+	else
+		return 0;
+}
+
+static inline int ipr_is_array_record(int record_id)
+{
+	if ((record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
+	    (record_id == IPR_RECORD_ID_VSET_RECORD_3))
+		return 1;
+	else
+		return 0;
+}
+
 static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
-	    (device->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD))
+	    (ipr_is_device_record(device->qac_entry->record_id)))
 		return 1;
 	else
 		return 0;
@@ -2257,7 +2379,7 @@ static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 static inline int ipr_is_volume_set(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
-	    (device->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD))
+	    (ipr_is_array_record(device->qac_entry->record_id)))
 		return 1;
 	else
 		return 0;

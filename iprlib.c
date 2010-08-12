@@ -1536,22 +1536,22 @@ static int same_scsi_dev(struct scsi_dev_data *first, struct scsi_dev_data *seco
 
 /**
  * same_dev_rcd - compares two device records to determine if they are the same
- * @first:		ipr_dev_record struct
- * @second:		ipr_dev_record struct
+ * @first:		ipr_dev struct
+ * @second:		ipr_dev struct
  *
  * Returns:
  *   0 if devices are not the same / 1 if devices are the same
  **/
-static int same_dev_rcd(struct ipr_dev_record *first, struct ipr_dev_record *second)
+static int same_dev_rcd(struct ipr_dev *first, struct ipr_dev *second)
 {
-	if (memcmp(&first->resource_addr, &second->resource_addr,
-		   sizeof(first->resource_addr)))
+	if (memcmp(&first->res_addr, &second->res_addr,
+		   sizeof(first->res_addr)))
 		return 0;
 	if (memcmp(first->vendor_id, second->vendor_id, IPR_VENDOR_ID_LEN))
 		return 0;
 	if (memcmp(first->product_id, second->product_id, IPR_PROD_ID_LEN))
 		return 0;
-	if (memcmp(first->serial_num, second->serial_num, IPR_SERIAL_NUM_LEN))
+	if (memcmp(first->serial_number, second->serial_number, IPR_SERIAL_NUM_LEN))
 		return 0;
 	return 1;
 }
@@ -1573,7 +1573,7 @@ static int same_dev(struct ipr_dev *first, struct ipr_dev *second)
 	if (!first->scsi_dev_data && !second->scsi_dev_data) {
 		if (!ipr_is_af_dasd_device(first) || !ipr_is_af_dasd_device(second))
 			return 0;
-		if (!same_dev_rcd(first->dev_rcd, second->dev_rcd))
+		if (!same_dev_rcd(first, second))
 			return 0;
 	} else if (!same_scsi_dev(first->scsi_dev_data, second->scsi_dev_data))
 		return 0;
@@ -2379,7 +2379,12 @@ static int ipr_start_array(struct ipr_ioa *ioa, char *cmd,
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, ioa->qac_data,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+
+	rc = sg_ioctl(fd, cdb, ioa->qac_data->u.buf,
 		      length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -2437,7 +2442,11 @@ int ipr_migrate_array_protection(struct ipr_ioa *ioa,
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, qac_data,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+	rc = sg_ioctl(fd, cdb, qac_data->u.buf,
 		      length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -2495,7 +2504,11 @@ static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, ioa->qac_data,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+	rc = sg_ioctl(fd, cdb, ioa->qac_data->u.buf,
 		      length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -2561,7 +2574,11 @@ int ipr_rebuild_device_data(struct ipr_ioa *ioa)
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, ioa->qac_data, length,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+	rc = sg_ioctl(fd, cdb, ioa->qac_data->u.buf, length,
 		      SG_DXFER_TO_DEV, &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
 	if (rc != 0)
@@ -2602,7 +2619,11 @@ int ipr_resync_array(struct ipr_ioa *ioa)
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, ioa->qac_data, length,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+	rc = sg_ioctl(fd, cdb, ioa->qac_data->u.buf, length,
 		      SG_DXFER_TO_DEV, &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
 	if (rc != 0)
@@ -2637,7 +2658,11 @@ int ipr_add_array_device(struct ipr_ioa *ioa, int fd,
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, qac_data,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+	rc = sg_ioctl(fd, cdb, qac_data->u.buf,
 		      length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
@@ -2686,7 +2711,7 @@ int ipr_query_command_status(struct ipr_dev *dev, void *buff)
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
-	if ((rc != 0) && (errno != EINVAL))
+	if ((rc != 0) && (errno != EINVAL || ipr_debug))
 		scsi_cmd_err(dev, &sense_data, "Query Command Status", rc);
 
 	close(fd);
@@ -3455,7 +3480,7 @@ int ipr_disrupt_device(struct ipr_dev *dev)
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
-	res_handle = ntohl(dev->dev_rcd->resource_handle);
+	res_handle = ntohl(dev->resource_handle);
 
 	cdb[0] = IPR_IOA_SERVICE_ACTION;
 	cdb[1] = IPR_DISRUPT_DEVICE;
@@ -3807,7 +3832,7 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 		if (dev_record->no_cfgte_dev) 
 			return -EINVAL;
 
-		res_handle = ntohl(dev_record->resource_handle);
+		res_handle = ntohl(dev->resource_handle);
 	} else
 		return -EINVAL;
 
@@ -3876,7 +3901,11 @@ int ipr_set_array_asym_access(struct ipr_ioa *ioa)
 	cdb[7] = (length >> 8) & 0xff;
 	cdb[8] = length & 0xff;
 
-	rc = sg_ioctl(fd, cdb, ioa->qac_data, length, SG_DXFER_TO_DEV,
+	if (ioa->sis64) {
+		cdb[10] = (length & 0xff000000) >> 24;
+		cdb[11] = (length & 0xff0000) >> 16;
+	}
+	rc = sg_ioctl(fd, cdb, ioa->qac_data->u.buf, length, SG_DXFER_TO_DEV,
 		      &sense_data, IPR_ARRAY_CMD_TIMEOUT);
 
 	if (rc != 0 && (sense_data.sense_key != ILLEGAL_REQUEST || ipr_debug))
@@ -4974,6 +5003,10 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 		if (sysfs_attr)
 			ipr_strncpy_0n(scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
 
+		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "resource_path");
+		if (sysfs_attr)
+			ipr_strncpy_0n(scsi_dev_data->res_path, sysfs_attr->value, IPR_MAX_RES_PATH_LEN);
+
 		strcpy(scsi_dev_data->dev_name,"");
 		strcpy(scsi_dev_data->gen_name,"");
 		num_devs++;
@@ -5358,7 +5391,7 @@ static void get_prot_levels(struct ipr_ioa *ioa)
 
 	for_each_vset(ioa, vset) {
 		prot_level_str = get_prot_level_str(ioa->supported_arrays,
-						    vset->array_rcd->raid_level);
+						    vset->raid_level);
 		strncpy(vset->prot_level_str, prot_level_str, 8);
 		for_each_dev_in_vset(vset, dev)
 			strncpy(dev->prot_level_str, prot_level_str, 8);
@@ -5386,27 +5419,27 @@ static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 	} else if (ipr_is_af_dasd_device(dev)) {
 		if (dev_record && dev_record->no_cfgte_dev) {
 			res_addr->host = dev->ioa->host_num;
-			res_addr->bus = dev_record->last_resource_addr.bus;
-			res_addr->target = dev_record->last_resource_addr.target;
-			res_addr->lun = dev_record->last_resource_addr.lun;
+			res_addr->bus = dev_record->type2.last_resource_addr.bus;
+			res_addr->target = dev_record->type2.last_resource_addr.target;
+			res_addr->lun = dev_record->type2.last_resource_addr.lun;
 		} else if (dev_record) {
 			res_addr->host = dev->ioa->host_num;
-			res_addr->bus = dev_record->resource_addr.bus;
-			res_addr->target = dev_record->resource_addr.target;
-			res_addr->lun = dev_record->resource_addr.lun;
+			res_addr->bus = dev_record->type2.resource_addr.bus;
+			res_addr->target = dev_record->type2.resource_addr.target;
+			res_addr->lun = dev_record->type2.resource_addr.lun;
 		} else
 			return -1;
 	} else if (ipr_is_volume_set(dev)) {
 		if (array_record && array_record->no_config_entry) {
 			res_addr->host = dev->ioa->host_num;
-			res_addr->bus = array_record->last_resource_addr.bus;
-			res_addr->target = array_record->last_resource_addr.target;
-			res_addr->lun = array_record->last_resource_addr.lun;
+			res_addr->bus = array_record->type2.last_resource_addr.bus;
+			res_addr->target = array_record->type2.last_resource_addr.target;
+			res_addr->lun = array_record->type2.last_resource_addr.lun;
 		} else if (array_record) {
 			res_addr->host = dev->ioa->host_num;
-			res_addr->bus = array_record->resource_addr.bus;
-			res_addr->target = array_record->resource_addr.target;
-			res_addr->lun = array_record->resource_addr.lun;
+			res_addr->bus = array_record->type2.resource_addr.bus;
+			res_addr->target = array_record->type2.resource_addr.target;
+			res_addr->lun = array_record->type2.resource_addr.lun;
 		} else
 			return -1;
 	} else
@@ -5430,17 +5463,17 @@ static struct ipr_dev *find_multipath_vset(struct ipr_dev *vset1)
 		if (ioa == vset1->ioa)
 			continue;
 		for_each_vset(ioa, vset2) {
-			if (memcmp(vset1->array_rcd->vendor_id,
-				   vset2->array_rcd->vendor_id,
+			if (memcmp(vset1->vendor_id,
+				   vset2->vendor_id,
 				   IPR_VENDOR_ID_LEN))
 				continue;
-			if (memcmp(vset1->array_rcd->product_id,
-				   vset2->array_rcd->product_id,
+			if (memcmp(vset1->product_id,
+				   vset2->product_id,
 				   IPR_PROD_ID_LEN))
 				continue;
-			if (memcmp(vset1->array_rcd->serial_number,
-				   vset2->array_rcd->serial_number,
-				   ARRAY_SIZE(vset2->array_rcd->serial_number)))
+			if (memcmp(vset1->serial_number,
+				   vset2->serial_number,
+				   ARRAY_SIZE(vset2->serial_number)))
 				continue;
 			return vset2;
 		}
@@ -5470,6 +5503,67 @@ static void link_multipath_vsets()
 		}
 	}
 }
+
+/**
+ * ipr_format_res_path - Format the resource path into a string.
+ * @res_path:	resource path
+ * @buf:	buffer
+ * @len:	buffer length
+ *
+ * Return value:
+ *	none
+ **/
+void ipr_format_res_path(u8 *res_path, char *buffer, int len)
+{
+	int i;
+	char *p = buffer;
+
+	*p = '\0';
+	p += snprintf(p, buffer + len - p, "%02X", res_path[0]);
+	for (i = 1; res_path[i] != 0xff && ((i * 3) < len); i++)
+		p += snprintf(p, buffer + len - p, "-%02X", res_path[i]);
+}
+
+/**
+ * ipr_res_path_cmp - compare two resource paths
+ * @dev_res_path
+ * @scsi_res_path
+ *
+ * Returns:
+ *   1 if the paths are the same, 0 otherwise
+ **/
+int ipr_res_path_cmp(u8 *dev_res_path, char *scsi_res_path)
+{
+	char buffer[IPR_MAX_RES_PATH_LEN];
+
+	ipr_format_res_path(dev_res_path, buffer, IPR_MAX_RES_PATH_LEN);
+	return !strncmp(buffer, scsi_res_path, IPR_MAX_RES_PATH_LEN);
+}
+
+/**
+ * ipr_debug_dump_rcd - dump out a device record
+ * @rcd:		record structure
+ *
+ * Returns:
+ *   nothing
+ */
+void ipr_debug_dump_rcd(struct ipr_common_record *rcd)
+{
+	int i;
+	u8 *rcd_ptr = (u8 *)rcd;
+
+	dprintf("===========\n");
+	dprintf("Record ID = %d, Length = %d\n", rcd->record_id, rcd->record_len);
+	for (i=0; i<rcd->record_len; i++) {
+		dprintf("%02x", rcd_ptr[i]);
+		if ((i+1)%8 == 0)
+			dprintf(" ");
+		if ((i+1)%32 == 0)
+			dprintf("\n");
+	}
+	dprintf("\n");
+}
+
 
 /**
  * check_current_config - populates the ioa configuration data
@@ -5558,23 +5652,37 @@ void check_current_config(bool allow_rebuild_refresh)
 				for_each_qac_entry(common_record, qac_data) {
 					if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 						device_record = (struct ipr_dev_record *)common_record;
-						if (device_record->resource_addr.bus == scsi_dev_data->channel &&
-						    device_record->resource_addr.target == scsi_dev_data->id &&
-						    device_record->resource_addr.lun == scsi_dev_data->lun) {
+						if (device_record->type2.resource_addr.bus == scsi_dev_data->channel &&
+						    device_record->type2.resource_addr.target == scsi_dev_data->id &&
+						    device_record->type2.resource_addr.lun == scsi_dev_data->lun) {
 							ioa->dev[device_count].qac_entry = common_record;
 							qac_entry_ref[k]++;
 							break;
 						}
 					} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
 						array_record = (struct ipr_array_record *)common_record;
-						if (array_record->resource_addr.bus == scsi_dev_data->channel &&
-						    array_record->resource_addr.target == scsi_dev_data->id &&
-						    array_record->resource_addr.lun == scsi_dev_data->lun) {
+						if (array_record->type2.resource_addr.bus == scsi_dev_data->channel &&
+						    array_record->type2.resource_addr.target == scsi_dev_data->id &&
+						    array_record->type2.resource_addr.lun == scsi_dev_data->lun) {
 							ioa->dev[device_count].qac_entry = common_record;
 							qac_entry_ref[k]++;
 							break;
 						}
-					}                    
+					} else if (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD_3) {
+						device_record = (struct ipr_dev_record *)common_record;
+						if (ipr_res_path_cmp(device_record->type3.res_path, scsi_dev_data->res_path)) {
+							ioa->dev[device_count].qac_entry = common_record;
+							qac_entry_ref[k]++;
+							break;
+						}
+					} else if (common_record->record_id == IPR_RECORD_ID_VSET_RECORD_3) {
+						array_record = (struct ipr_array_record *)common_record;
+						if (ipr_res_path_cmp(array_record->type3.res_path, scsi_dev_data->res_path)) {
+							ioa->dev[device_count].qac_entry = common_record;
+							qac_entry_ref[k]++;
+							break;
+						}
+					}
 					k++;
 				}
 
@@ -5601,11 +5709,10 @@ void check_current_config(bool allow_rebuild_refresh)
 			if (common_record->record_id == IPR_RECORD_ID_SUPPORTED_ARRAYS) {
 				ioa->supported_arrays = (struct ipr_supported_arrays *)common_record;
 			} else if (!qac_entry_ref[k] &&
-				   (common_record->record_id == IPR_RECORD_ID_DEVICE_RECORD ||
-				    common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD)) {
-
+				   (ipr_is_device_record(common_record->record_id) ||
+				    ipr_is_array_record(common_record->record_id))) {
 				array_record = (struct ipr_array_record *)common_record;
-				if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD &&
+				if (ipr_is_array_record(common_record->record_id) &&
 				    array_record->start_cand) {
 					ioa->start_array_qac_entry = array_record;
 				} else {
@@ -5622,7 +5729,6 @@ void check_current_config(bool allow_rebuild_refresh)
 		}
 
 		ioa->num_devices = device_count;
-		get_prot_levels(ioa);
 		free(qac_entry_ref);
 	}
 
@@ -5631,7 +5737,44 @@ void check_current_config(bool allow_rebuild_refresh)
 			get_res_addr(dev, &res_addr);
 			for_each_ra(ra, dev)
 				memcpy(ra, &res_addr, sizeof(*ra));
+
+			if (!dev || !dev->qac_entry)
+				continue;
+			if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
+				dev->vendor_id = dev->dev_rcd->type2.vendor_id;
+				dev->product_id = dev->dev_rcd->type2.product_id;
+				dev->serial_number = dev->dev_rcd->type2.serial_number;
+				dev->array_id = dev->dev_rcd->type2.array_id;
+				dev->resource_handle = dev->dev_rcd->type2.resource_handle;
+				dev->block_dev_class = dev->dev_rcd->type2.block_dev_class;
+			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD_3) {
+				dev->vendor_id = dev->dev_rcd->type3.vendor_id;
+				dev->product_id = dev->dev_rcd->type3.product_id;
+				dev->serial_number = dev->dev_rcd->type3.serial_number;
+				dev->array_id = dev->dev_rcd->type3.array_id;
+				dev->resource_handle = dev->dev_rcd->type3.resource_handle;
+				dev->block_dev_class = dev->dev_rcd->type3.block_dev_class;
+			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+				dev->vendor_id = dev->array_rcd->type2.vendor_id;
+				dev->product_id = dev->array_rcd->type2.product_id;
+				dev->serial_number = dev->array_rcd->type2.serial_number;
+				dev->array_id = dev->array_rcd->type2.array_id;
+				dev->raid_level = dev->array_rcd->type2.raid_level;
+				dev->stripe_size = dev->array_rcd->type2.stripe_size;
+				dev->resource_handle = dev->array_rcd->type2.resource_handle;
+				dev->block_dev_class = dev->array_rcd->type2.block_dev_class;
+			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_VSET_RECORD_3) {
+				dev->vendor_id = dev->array_rcd->type3.vendor_id;
+				dev->product_id = dev->array_rcd->type3.product_id;
+				dev->serial_number = dev->array_rcd->type3.serial_number;
+				dev->array_id = dev->array_rcd->type3.array_id;
+				dev->raid_level = dev->array_rcd->type3.raid_level;
+				dev->stripe_size = dev->array_rcd->type3.stripe_size;
+				dev->resource_handle = dev->array_rcd->type3.resource_handle;
+				dev->block_dev_class = dev->array_rcd->type3.block_dev_class;
+			}
 		}
+		get_prot_levels(ioa);
 	}
 
 	link_multipath_vsets();
@@ -8523,12 +8666,12 @@ struct ipr_dev *get_dev_from_handle(u32 res_handle)
 			if (!ioa->dev[j].qac_entry)
 				continue;
 
-			if (ioa->dev[j].qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD &&
-			    ioa->dev[j].dev_rcd->resource_handle == res_handle)
+			if (ipr_is_device_record(ioa->dev[j].qac_entry->record_id) &&
+			     ioa->dev[j].resource_handle == res_handle)
 				return &ioa->dev[j];
 
-			if (ioa->dev[j].qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD &&
-			    ioa->dev[j].array_rcd->resource_handle == res_handle)
+			if (ipr_is_array_record(ioa->dev[j].qac_entry->record_id) &&
+			    ioa->dev[j].resource_handle == res_handle)
 				return &ioa->dev[j];
 		}
 	}
