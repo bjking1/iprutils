@@ -1516,10 +1516,10 @@ static void evaluate_device(struct ipr_dev *dev, struct ipr_ioa *ioa,
 		if (dev_record->no_cfgte_dev) 
 			return;
 
-		res_handle = ntohl(dev_record->resource_handle);
-		res_addr.bus = dev_record->resource_addr.bus;
-		res_addr.target = dev_record->resource_addr.target;
-		res_addr.lun = dev_record->resource_addr.lun;
+		res_handle = ntohl(dev->resource_handle);
+		res_addr.bus = dev_record->type2.resource_addr.bus;
+		res_addr.target = dev_record->type2.resource_addr.target;
+		res_addr.lun = dev_record->type2.resource_addr.lun;
 	} else
 		return;
 
@@ -2057,23 +2057,23 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 		scsi_id = dev->scsi_dev_data->id;
 		scsi_lun = dev->scsi_dev_data->lun;
 	} else {
-		scsi_channel = array_rcd->last_resource_addr.bus;
-		scsi_id = array_rcd->last_resource_addr.target;
-		scsi_lun = array_rcd->last_resource_addr.lun;
+		scsi_channel = array_rcd->type2.last_resource_addr.bus;
+		scsi_id = array_rcd->type2.last_resource_addr.target;
+		scsi_lun = array_rcd->type2.last_resource_addr.lun;
 	}
 
 	body = add_line_to_body(body,"", NULL);
 
-	ipr_strncpy_0(buffer, (char *)array_rcd->vendor_id, IPR_VENDOR_ID_LEN);
+	ipr_strncpy_0(buffer, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
 	body = add_line_to_body(body,_("Manufacturer"), buffer);
 
 	sprintf(buffer,"RAID %s", dev->prot_level_str);
 	body = add_line_to_body(body,_("RAID Level"), buffer);
 
-	if (ntohs(array_rcd->stripe_size) > 1024)
-		sprintf(buffer,"%d M", ntohs(array_rcd->stripe_size)/1024);
+	if (ntohs(dev->stripe_size) > 1024)
+		sprintf(buffer,"%d M", ntohs(dev->stripe_size)/1024);
 	else
-		sprintf(buffer,"%d k", ntohs(array_rcd->stripe_size));
+		sprintf(buffer,"%d k", ntohs(dev->stripe_size));
 
 	body = add_line_to_body(body,_("Stripe Size"), buffer);
 
@@ -2214,9 +2214,9 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 		scsi_id = dev->scsi_dev_data->id;
 		scsi_lun = dev->scsi_dev_data->lun;
 	} else if (device_record) {
-		scsi_channel = device_record->last_resource_addr.bus;
-		scsi_id = device_record->last_resource_addr.target;
-		scsi_lun = device_record->last_resource_addr.lun;
+		scsi_channel = device_record->type2.last_resource_addr.bus;
+		scsi_id = device_record->type2.last_resource_addr.target;
+		scsi_lun = device_record->type2.last_resource_addr.lun;
 	}
 
 	read_cap.max_user_lba = 0;
@@ -2232,9 +2232,9 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 		ipr_strncpy_0(serial_num, (char *)std_inq.std_inq_data.serial_num,
 			      IPR_SERIAL_NUM_LEN);
 	} else if (device_record) {
-		ipr_strncpy_0(vendor_id, (char *)device_record->vendor_id, IPR_VENDOR_ID_LEN);
-		ipr_strncpy_0(product_id, (char *)device_record->product_id, IPR_PROD_ID_LEN);
-		ipr_strncpy_0(serial_num, (char *)device_record->serial_num, IPR_SERIAL_NUM_LEN);
+		ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
+		ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
+		ipr_strncpy_0(serial_num, (char *)dev->serial_number, IPR_SERIAL_NUM_LEN);
 	} else {
 		ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 		ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
@@ -2582,7 +2582,7 @@ static int is_array_in_use(struct ipr_ioa *ioa,
 	return 0;
 
 	for_each_vset(ioa, vset) {
-		if (array_id == vset->array_rcd->array_id) {
+		if (array_id == vset->array_id) {
 			if (!vset->scsi_dev_data)
 				continue;
 
@@ -2631,10 +2631,10 @@ int raid_stop(i_container *i_con)
 		for_each_vset(ioa, dev) {
 			if (!dev->array_rcd->stop_cand)
 				continue;
-			if ((rc = is_array_in_use(ioa, dev->array_rcd->array_id)))
+			if ((rc = is_array_in_use(ioa, dev->array_id)))
 				continue;
 
-			add_raid_cmd_tail(ioa, dev, dev->array_rcd->array_id);
+			add_raid_cmd_tail(ioa, dev, dev->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
 
 			print_dev(k, dev, buffer, "%1", 2+k);
@@ -2890,6 +2890,7 @@ int raid_start(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	int toggle = 0;
+	u8 array_id;
 
 	processing();
 
@@ -2905,7 +2906,12 @@ int raid_start(i_container *i_con)
 		if (!ioa->start_array_qac_entry)
 			continue;
 
-		add_raid_cmd_tail(ioa, &ioa->ioa, ioa->start_array_qac_entry->array_id);
+		if (ioa->sis64)
+		       array_id = ioa->start_array_qac_entry->type3.array_id;
+		else
+		       array_id = ioa->start_array_qac_entry->type2.array_id;
+
+		add_raid_cmd_tail(ioa, &ioa->ioa, array_id);
 
 		i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 
@@ -3980,7 +3986,7 @@ int raid_resync(i_container *i_con)
 			if (!dev->array_rcd->resync_cand)
 				continue;
 
-			add_raid_cmd_tail(ioa, dev, dev->array_rcd->array_id);
+			add_raid_cmd_tail(ioa, dev, dev->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
 			print_dev(k, dev, buffer, "%1", k);
 			found++;
@@ -4146,7 +4152,7 @@ int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
 
 	/* loop through returned records - looking at array records */
 	for_each_array_rcd(array_rcd, qac_data) {
-		if (vset->array_rcd->resource_handle == array_rcd->resource_handle ) {
+		if (vset->resource_handle == ipr_get_arr_res_handle(ioa, array_rcd)) {
 			if (array_rcd->migrate_cand) {
 				array_rcd->issue_cmd = 1;
 				found = 1;
@@ -4172,7 +4178,10 @@ int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
 		}
 	} else
 		/* get current stripe size */
-		stripe_size = array_rcd->stripe_size;
+		if (ioa->sis64)
+			stripe_size = array_rcd->type3.stripe_size;
+		else
+			stripe_size = array_rcd->type2.stripe_size;
 
 	/* if adding devices, check that there are a valid number of them */
 	if (cap->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
@@ -4196,7 +4205,7 @@ int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
 		/* check the given devices for migrate candidate status */
 		for (sdev = head_sdev; sdev; sdev = sdev->next) {
 			dev = ipr_sysfs_dev_to_dev(sdev);
-			if (dev_rcd->resource_handle == dev->dev_rcd->resource_handle) {
+			if (ipr_get_dev_res_handle(ioa, dev_rcd) == dev->resource_handle) {
 				if (dev_rcd->migrate_array_prot_cand)
 					dev_rcd->issue_cmd = 1;
 				else {
@@ -4298,7 +4307,7 @@ static int raid_migrate_cmd(char **args, int num_args)
 		return -EIO;
 
 	/* query array configuration for volume set migrate status */
-	rc = __ipr_query_array_config(ioa, fd, 0, 0, 1, vset->array_rcd->array_id, &qac_data);
+	rc = __ipr_query_array_config(ioa, fd, 0, 0, 1, vset->array_id, &qac_data);
 
 	if (rc != 0) {
 		fprintf(stderr, "Array query failed.  rc = %d\n", rc);
@@ -4455,13 +4464,14 @@ int confirm_raid_migrate()
 
 /**
  * choose_migrate_disks - Choose the additional disks required for migration.
+ * @ioa:
  * @qac:		i_query_array_data struct
  * @cap_entry:
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-int choose_migrate_disks(struct ipr_array_query_data *qac,
+int choose_migrate_disks(struct ipr_ioa *ioa, struct ipr_array_query_data *qac,
 			 struct ipr_array_cap_entry *cap_entry)
 {
 	struct array_cmd_data *tmp_raid_cmd;
@@ -4505,7 +4515,7 @@ int choose_migrate_disks(struct ipr_array_query_data *qac,
 		if (!dev_rcd->migrate_array_prot_cand)
 			continue;
 
-		dev = get_dev_from_handle(dev_rcd->resource_handle);
+		dev = get_dev_from_handle(ipr_get_dev_res_handle(ioa, dev_rcd));
 		if (dev) {
 			print_dev(k, dev, buffer, "%1", 2);
 
@@ -4623,14 +4633,14 @@ int do_ipr_migrate_array_protection(i_container *array_i_con, struct ipr_ioa *io
 
 		if (acd && strcmp(input, "1") == 0)
 			for_each_dev_rcd(dev_rcd, &new_qac)
-				if (acd->dev->dev_rcd->resource_handle == dev_rcd->resource_handle)
+				if (acd->dev->resource_handle == ipr_get_dev_res_handle(ioa, dev_rcd))
 					dev_rcd->issue_cmd = 1;
 	}
 
 	/* Set the "do it" bit for the selected array. */
 	acd = array_i_con->data;
 	for_each_array_rcd(array_rcd, &new_qac)
-		if (acd->dev->array_rcd->resource_handle == array_rcd->resource_handle)
+		if (acd->dev->resource_handle == ipr_get_arr_res_handle(ioa, array_rcd))
 			array_rcd->issue_cmd = 1;
 
 	rc =ipr_migrate_array_protection(ioa, &new_qac, fd, stripe_size, prot_level);
@@ -4855,7 +4865,7 @@ int configure_raid_migrate(i_container *array_i_con)
 
 			/* are additional devices needed? */
 			if (cap_entry->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
-				rc = choose_migrate_disks(&qac, cap_entry);
+				rc = choose_migrate_disks(ioa, &qac, cap_entry);
 				if (rc)
 					break;
 
@@ -4873,7 +4883,7 @@ int configure_raid_migrate(i_container *array_i_con)
 
 			/* set up qac and send command to adapter */
 			rc = do_ipr_migrate_array_protection(array_i_con, ioa, &qac,
-				       			     dev->array_rcd->stripe_size,
+				       			     dev->stripe_size,
 							     cur_raid_cmd->prot_level,
 							     cur_raid_cmd->array_id);
 
@@ -5033,7 +5043,7 @@ int raid_migrate(i_container *i_con)
 		for_each_vset(ioa, vset) {
 			if (!vset->array_rcd->migrate_cand)
 				continue;
-			add_raid_cmd_tail(ioa, vset, vset->array_rcd->array_id);
+			add_raid_cmd_tail(ioa, vset, vset->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
 
 			print_dev(k, vset, buffer, "%1", k);
@@ -5327,7 +5337,7 @@ int asym_access(i_container *i_con)
 		for_each_vset(ioa, vset) {
 			if (!vset->array_rcd->asym_access_cand)
 				continue;
-			add_raid_cmd_tail(ioa, vset, vset->array_rcd->array_id);
+			add_raid_cmd_tail(ioa, vset, vset->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
 
 			print_dev(k, vset, buffer, "%1", k);
@@ -5391,12 +5401,12 @@ int raid_include(i_container *i_con)
 		for_each_vset(ioa, dev) {
 			array_rcd = dev->array_rcd;
 			cap_entry = get_raid_cap_entry(ioa->supported_arrays,
-						       array_rcd->raid_level);
+						       dev->raid_level);
 
 			if (!cap_entry || !cap_entry->include_allowed || !array_rcd->established)
 				continue;
 
-			add_raid_cmd_tail(ioa, dev, array_rcd->array_id);
+			add_raid_cmd_tail(ioa, dev, dev->array_id);
 
 			i_con = add_i_con(i_con,"\0",raid_cmd_tail);
 			print_dev(k, dev, buffer, "%1", k);
@@ -5500,8 +5510,7 @@ int configure_raid_include(i_container *i_con)
 	else  {
 		cur_raid_cmd->qac = qac_data;
 		cap_entry = get_raid_cap_entry(ioa->supported_arrays,
-					       vset->array_rcd->raid_level);
-
+					       vset->raid_level);
 		if (cap_entry)
 			min_mult_array_devices = cap_entry->min_mult_array_devices;
 
@@ -5511,7 +5520,7 @@ int configure_raid_include(i_container *i_con)
 				if (!scsi_dev_data)
 					continue;
 
-				if (scsi_dev_data->handle == dev_rcd->resource_handle &&
+				if (scsi_dev_data->handle == ipr_get_dev_res_handle(ioa, dev_rcd) &&
 				    scsi_dev_data->opens == 0 &&
 				    dev_rcd->include_cand && device_supported(dev)) {
 					dev->dev_rcd = dev_rcd;
@@ -5733,13 +5742,15 @@ int format_include_cand()
 
 /**
  * update_include_qac_data - 
+ * @ioa:		ipr ioa struct
  * @old_qac:		ipr_array_query_data struct
  * @new_qac:		ipr_array_query_data struct
  *
  * Returns:
  *   0 if success / 26 on failure
  **/
-static int update_include_qac_data(struct ipr_array_query_data *old_qac,
+static int update_include_qac_data(struct ipr_ioa *ioa,
+				   struct ipr_array_query_data *old_qac,
 				   struct ipr_array_query_data *new_qac)
 {
 	struct ipr_dev_record *old_dev_rcd, *new_dev_rcd;
@@ -5751,7 +5762,8 @@ static int update_include_qac_data(struct ipr_array_query_data *old_qac,
 
 		found = 0;
 		for_each_dev_rcd(new_dev_rcd, new_qac) {
-			if (new_dev_rcd->resource_handle != old_dev_rcd->resource_handle)
+			if (ipr_get_dev_res_handle(ioa, new_dev_rcd) !=
+			    ipr_get_dev_res_handle(ioa, old_dev_rcd))
 				continue;
 
 			new_dev_rcd->issue_cmd = 1;
@@ -5797,7 +5809,7 @@ static int do_array_include(struct ipr_ioa *ioa, int array_id,
 	if (rc)
 		goto out;
 
-	rc = update_include_qac_data(qac, &qac_data);
+	rc = update_include_qac_data(ioa, qac, &qac_data);
 	if (rc)
 		goto out;
 
@@ -10048,7 +10060,7 @@ int change_disk_config(i_container * i_con)
 	array_record = dev->array_rcd;
 
 	if (array_record &&
-	    array_record->common.record_id == IPR_RECORD_ID_ARRAY_RECORD) {
+	    ipr_is_array_record(array_record->common.record_id)) {
 		/* VSET, no further fields */
 	} else if (ipr_is_af_dasd_device(dev)) {
 		disk_config_attr[1].option = 2;
@@ -11423,7 +11435,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 
 			if (!rc) {
 				for_each_cmd_status(status_record, &cmd_status) {
-					if (dev->array_rcd->array_id != status_record->array_id)
+					if (dev->array_id != status_record->array_id)
 						continue;
 					if (status_record->status != IPR_CMD_STATUS_IN_PROGRESS)
 						continue;
@@ -11844,13 +11856,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 			ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
 		} else if (dev->qac_entry) {
-			if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
-				ipr_strncpy_0(vendor_id, (char *)dev->dev_rcd->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , (char *)dev->dev_rcd->product_id, IPR_PROD_ID_LEN);
-			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
-				ipr_strncpy_0(vendor_id, (char *)dev->array_rcd->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id , (char *)dev->array_rcd->product_id,
-					      IPR_PROD_ID_LEN);
+			if (ipr_is_device_record(dev->qac_entry->record_id)) {
+					ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
+					ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
+			} else if (ipr_is_array_record(dev->qac_entry->record_id)) {
+				ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
 			}
 		}
 
@@ -11867,12 +11878,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				       vendor_id, product_id);
 		} else {
 			if (ipr_is_hot_spare(dev))
-				if (dev->dev_rcd->block_dev_class == IPR_SSD)
+				if (dev->block_dev_class == IPR_SSD)
 					len += sprintf(body + len, "%-25s ", "SSD Hot Spare");
 				else
 					len += sprintf(body + len, "%-25s ", "Hot Spare");
 			else if (ipr_is_volume_set(dev)) {
-				if (dev->dev_rcd->block_dev_class == IPR_SSD)
+				if (dev->block_dev_class == IPR_SSD)
 					sprintf(buf, "RAID %s SSD Disk Array",
 						dev->prot_level_str);
 				else
@@ -11881,14 +11892,14 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
-					if (dev->dev_rcd->block_dev_class == IPR_SSD)
+					if (dev->block_dev_class == IPR_SSD)
 						sprintf(raid_str,"  RAID %s SSD Member",
 							dev->prot_level_str);
 					else
 						sprintf(raid_str,"  RAID %s Array Member",
 							dev->prot_level_str);
 				else
-					if (dev->dev_rcd->block_dev_class == IPR_SSD)
+					if (dev->block_dev_class == IPR_SSD)
 						sprintf(raid_str,"RAID %s SSD Member",
 							dev->prot_level_str);
 					else
@@ -11897,7 +11908,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 				len += sprintf(body + len, "%-25s ", raid_str);
 			} else if (ipr_is_af_dasd_device(dev))
-				if (dev->dev_rcd->block_dev_class == IPR_SSD)
+				if (dev->block_dev_class == IPR_SSD)
 					len += sprintf(body + len, "%-25s ", "Advanced Function SSD");
 				else
 					len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
@@ -12189,6 +12200,7 @@ static int raid_create(char **args, int num_args)
 	struct sysfs_dev *sdev;
 	struct ipr_ioa *ioa = NULL;
 	struct ipr_array_cap_entry *cap;
+	u8 array_id;
 
 	next_raid_level = 0;
 	next_stripe_size = 0;
@@ -12233,7 +12245,7 @@ static int raid_create(char **args, int num_args)
 			return -EINVAL;
 		}
 
-		if (dev->dev_rcd->block_dev_class == IPR_SSD)
+		if (dev->block_dev_class == IPR_SSD)
 			ssd_count++;
 		else
 			hdd_count++;
@@ -12295,7 +12307,12 @@ static int raid_create(char **args, int num_args)
 		dev->dev_rcd->issue_cmd = 1;
 	}
 
-	add_raid_cmd_tail(ioa, &ioa->ioa, ioa->start_array_qac_entry->array_id);
+	if (ioa->sis64)
+		array_id = ioa->start_array_qac_entry->type3.array_id;
+	else
+		array_id = ioa->start_array_qac_entry->type2.array_id;
+
+	add_raid_cmd_tail(ioa, &ioa->ioa, array_id);
 	raid_cmd_tail->qdepth = qdepth;
 	raid_cmd_tail->do_cmd = 1;
 
@@ -12419,7 +12436,7 @@ static int raid_include_cmd(char **args, int num_args)
 	}
 
 	for_each_dev_to_init(dev_init)
-		if (vset->array_rcd->block_dev_class != dev_init->dev->dev_rcd->block_dev_class) {
+		if (vset->block_dev_class != dev_init->dev->block_dev_class) {
 			fprintf(stderr, "Invalid parameter. Can not mix SSDs and HDDs.\n");
 			return -EINVAL;
 		}
@@ -12431,7 +12448,7 @@ static int raid_include_cmd(char **args, int num_args)
 			return rc;
 	}
 
-	return do_array_include(vset->ioa, vset->array_rcd->array_id,
+	return do_array_include(vset->ioa, vset->array_id,
 				vset->ioa->qac_data);
 }
 
@@ -12663,7 +12680,7 @@ static int query_raid_delete(char **args, int num_args)
 	for_each_vset(ioa, dev) {
 		if (!dev->array_rcd->stop_cand)
 			continue;
-		if (is_array_in_use(ioa, dev->array_rcd->array_id))
+		if (is_array_in_use(ioa, dev->array_id))
 			continue;
 		if (!num)
 			printf("%s\n%s\n", status_hdr[3], status_sep[3]);
@@ -14435,14 +14452,14 @@ static int query_devices_include(char **args, int num_args)
 	ioa = vset->ioa;
 	memset(&qac_data, 0, sizeof(qac_data));
 
-	rc = ipr_query_array_config(ioa, 0, 1, 0, vset->array_rcd->array_id, &qac_data);
+	rc = ipr_query_array_config(ioa, 0, 1, 0, vset->array_id, &qac_data);
 
 	if (rc)
 		return rc;
 
 	for_each_dev_rcd(dev_rcd, &qac_data) {
 		for_each_disk(ioa, dev) {
-			if (dev->scsi_dev_data->handle == dev_rcd->resource_handle &&
+			if (dev->scsi_dev_data->handle == ipr_get_dev_res_handle(ioa, dev_rcd) &&
 			    dev_rcd->include_cand && device_supported(dev)) {
 				if (!hdr) {
 					hdr = 1;
@@ -14478,7 +14495,7 @@ static int query_arrays_include(char **args, int num_args)
 		for_each_vset(ioa, vset) {
 			array_rcd = vset->array_rcd;
 			cap_entry = get_raid_cap_entry(ioa->supported_arrays,
-						       array_rcd->raid_level);
+						       vset->raid_level);
 
 			if (!cap_entry || !cap_entry->include_allowed || !array_rcd->established)
 				continue;
@@ -14589,7 +14606,7 @@ static int query_devices_raid_migrate(char **args, int num_args)
 	}
 
 	/* query array config for volume set migrate status */
-	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_id, &qac_data);
 	if (rc != 0)
 		return rc;
 
@@ -14601,7 +14618,7 @@ static int query_devices_raid_migrate(char **args, int num_args)
 			printf("%s\n%s\n", status_hdr[2], status_sep[2]);
 		}
 
-		dev = get_dev_from_handle(dev_rcd->resource_handle);
+		dev = get_dev_from_handle(ipr_get_dev_res_handle(dev->ioa, dev_rcd));
 		if (dev)
 			printf_device(dev, 2);
 	}
@@ -14639,7 +14656,7 @@ static int query_raid_levels_raid_migrate(char **args, int num_args)
 	}
 
 	/* query array config for volume set migrate status */
-	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_id, &qac_data);
 	if (rc)
 		return rc;
 
@@ -14684,7 +14701,7 @@ static int query_stripe_sizes_raid_migrate(char **args, int num_args)
 	}
 
 	/* query array config for volume set migrate status */
-	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_id, &qac_data);
 	if (rc)
 		return rc;
 
@@ -14737,7 +14754,7 @@ int query_devices_min_max_raid_migrate(char **args, int num_args)
 	}
 
 	/* query array config for volume set migrate status */
-	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_rcd->array_id, &qac_data);
+	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_id, &qac_data);
 	if (rc)
 		return rc;
 
