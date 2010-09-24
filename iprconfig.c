@@ -1988,6 +1988,8 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body,"", NULL);
 	body = add_line_to_body(body,_("Physical location"), NULL);
 	body = add_line_to_body(body,_("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), scsi_dev_data->res_path);
 	sprintf(buffer,"%d", dev->ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
 
@@ -2101,6 +2103,8 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body, _("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -2307,6 +2311,8 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body ,_("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -2369,6 +2375,8 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body ,_("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -8459,6 +8467,8 @@ static char *get_battery_info(struct ipr_ioa *ioa)
 	body = add_line_to_body(body,_("Serial Number"), serial_num);
 	body = add_line_to_body(body,_("Type"), product_id);
 	body = add_line_to_body(body,_("PCI Address"), ioa->pci_address);
+	if (ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), ioa->ioa.scsi_dev_data->res_path);
 	sprintf(buffer,"%d", ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
 
