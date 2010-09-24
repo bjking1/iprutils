@@ -11837,11 +11837,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				       scsi_dev_data->product_id);
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 
-		loc_len += sprintf(body + len,"%d:%d: ",
+		tab_stop = sprintf(body + len,"%d:%d: ",
 				   dev->res_addr[ra].bus,
 				   dev->res_addr[ra].target);
 
-		len += loc_len;
+		loc_len += tab_stop;
+		len += tab_stop;
 
 		for (i = 0; i < 27-loc_len; i++)
 			body[len+i] = ' ';
