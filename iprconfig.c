@@ -11829,8 +11829,15 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		len += 27-loc_len;
 
 		if (!vpd) {
-			len += sprintf(body + len,"%s %-19s ", get_bus_desc(ioa),
-				       get_ioa_desc(dev->ioa));
+			tab_stop += sprintf(body + len,"%s %s", get_bus_desc(ioa),
+					   get_ioa_desc(dev->ioa));
+
+			len += tab_stop;
+
+			for (i = 0; i < 26-tab_stop; i++)
+				body[len+i] = ' ';
+
+			len += 26-tab_stop;
 		} else
 			len += sprintf(body + len,"%-8s %-16s ",
 				       scsi_dev_data->vendor_id,
