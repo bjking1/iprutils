@@ -1489,9 +1489,9 @@ struct ipr_mode_page24 {
 	struct ipr_mode_page_hdr hdr;
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 dual_adapter_af:2;
-	u8 reserved:7;
+	u8 reserved:6;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 reserved:7;
+	u8 reserved:6;
 	u8 dual_adapter_af:2;
 #endif
 
