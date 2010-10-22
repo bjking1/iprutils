@@ -8496,16 +8496,16 @@ static char *get_battery_info(struct ipr_ioa *ioa)
 
 	body = add_line_to_body(body,_("Battery state"), buffer);
 
-	sprintf(buffer,"%d",reclaim_data->raw_power_on_time);
+	sprintf(buffer,"%d",htons(reclaim_data->raw_power_on_time));
 	body = add_line_to_body(body,_("Power on time (days)"), buffer);
 
-	sprintf(buffer,"%d",reclaim_data->adjusted_power_on_time);
+	sprintf(buffer,"%d",htons(reclaim_data->adjusted_power_on_time));
 	body = add_line_to_body(body,_("Adjusted power on time (days)"), buffer);
 
-	sprintf(buffer,"%d",reclaim_data->estimated_time_to_battery_warning);
+	sprintf(buffer,"%d",htons(reclaim_data->estimated_time_to_battery_warning));
 	body = add_line_to_body(body,_("Estimated time to warning (days)"), buffer);
 
-	sprintf(buffer,"%d",reclaim_data->estimated_time_to_battery_failure);
+	sprintf(buffer,"%d",htons(reclaim_data->estimated_time_to_battery_failure));
 	body = add_line_to_body(body,_("Estimated time to error (days)"), buffer);
 
 	if (reclaim_data->conc_maint_battery)
