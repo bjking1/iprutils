@@ -20,7 +20,6 @@
 #include <sys/mman.h>
 
 #define IPRDUMP_SIZE (8 * 1024 * 1024)
-#define IPRDUMP_DIR "/var/log/"
 #define MAX_DUMP_FILES 4
 #define TOOL_NAME "iprdump"
 #define DUMP_PREFIX TOOL_NAME"."
