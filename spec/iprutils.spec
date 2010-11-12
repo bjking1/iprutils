@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.0
+Version: 2.3.1
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Nov 12 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.1
+- Release 2.3.1
+- Fixes display of empty slots.
+- Fixes IOA description indentation.
+- Adds Resource Path display for SIS64 devices.
+- Adds support for the new live dump functionality.
+- Fixes mode sense page24 for little endian architectures.
+- Fixes battery info for little endian architectures.
 * Fri Aug 12 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.0
 - Release 2.3.0
 - Fixes type of pointers provided to scandir.
@@ -89,7 +97,7 @@ rm -rf $RPM_BUILD_ROOT
 - Fixes memory leak when ioctl() returns EINVAL.
 - Adds support to identify sis64 capability.
 - Adds support for new sysfs attributes.
-- Addd support for type 3 QAC command.
+- Adds support for type 3 QAC command.
 - Adds support for type 3 records.
 * Mon May 10 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.21
 - Release 2.2.21
