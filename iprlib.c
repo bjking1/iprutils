@@ -3870,6 +3870,159 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 }
 
 /**
+ * get_livedump_fname - 
+ * @ioa:		ipr_ioa struct
+ * @fname:		string to return the filename
+ * @max:		max size of fname
+ *
+ * Returns:
+ *   negative on failure / otherwise length of the file name
+ *
+ **/
+static int get_livedump_fname(struct ipr_ioa *ioa, char *fname, int max)
+{
+	time_t cur_time, rc;
+	struct tm *cur_tm;
+	char time_str[100];
+	int len;
+
+	fname[0] = '\0';
+	rc = time(&cur_time);
+	if (rc == ((time_t)-1))
+		return -EIO;
+
+	cur_tm = localtime(&cur_time);
+	if (!cur_tm)
+		return -EIO;
+	strftime(time_str, sizeof(time_str), "%Y%m%d.%H%M", cur_tm);
+
+	len = snprintf(fname, max, "ipr-%04X-%s-dump-%s", ioa->ccin,
+		       ioa->pci_address, time_str);
+
+	return len;
+}
+
+#define IPR_MAX_LIVE_DUMP_SIZE (16 * 1024 * 1024)
+
+/**
+ * get_scsi_max_xfer_len - 
+ * @fd:			IOA sg file descriptor
+ *
+ * Returns:
+ *   0 on failure / otherwise max scatter-gather transfer length
+ *
+ **/
+static int get_scsi_max_xfer_len(int fd)
+{
+	int rc, max_tablesize, max_scsi_len;
+	struct sysfs_module *sysfs_module;
+	struct sysfs_attribute *sysfs_attr;
+
+	sysfs_module = sysfs_open_module("sg");
+	if (!sysfs_module) {
+		syslog_dbg("Failed to open sg module. %m\n");
+		return 0;
+	}
+
+	sysfs_attr = sysfs_get_module_parm(sysfs_module, "scatter_elem_sz");
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open scatter_elem_sz parameter from sg module. %m\n");
+		return 0;
+	}
+
+	rc = ioctl(fd, SG_GET_SG_TABLESIZE, &max_tablesize);
+	if (rc) {
+		syslog_dbg("Unable to get device scatter-gather table size. %m\n");
+		return 0;
+	}
+
+	max_scsi_len = max_tablesize * atoi(sysfs_attr->value);
+
+	if (max_scsi_len < IPR_MAX_LIVE_DUMP_SIZE)
+		return max_scsi_len;
+	else
+		return IPR_MAX_LIVE_DUMP_SIZE;
+}
+
+/**
+ * ipr_get_live_dump - 
+ * @dev:		ipr dev struct
+ * @info:		ipr_res_redundancy_info struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ *
+ **/
+int ipr_get_live_dump(struct ipr_ioa *ioa)
+{
+	char *name = ioa->ioa.gen_name;
+	struct sense_data_t sense_data;
+	u8 cdb[IPR_CCB_CDB_LEN], *buf;
+	char dump_file[100], dump_path[100];
+	int rc, fd, fd_dump, buff_len;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	buff_len = get_scsi_max_xfer_len(fd);
+	if (buff_len == 0) {
+		rc = -EPERM;
+		goto out;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_LIVE_DUMP;
+	cdb[10] = buff_len >> 24;
+	cdb[11] = (buff_len >> 16) & 0xff;
+	cdb[12] = (buff_len >> 8) & 0xff;
+	cdb[13] = buff_len & 0xff;
+
+	buf = (u8*) malloc(buff_len);
+
+	rc = sg_ioctl(fd, cdb, buf, buff_len, SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc) {
+		ioa_cmd_err(ioa, &sense_data, "Live Dump", rc);
+		goto out_free;
+	}
+
+	rc = get_livedump_fname(ioa, dump_file, sizeof(dump_file));
+	if (rc < 0) {
+		syslog_dbg("Failed to create a live dump file name.\n");
+		goto out_free;
+	}
+
+	snprintf(dump_path, sizeof(dump_path), "%s%s", IPRDUMP_DIR, dump_file);
+	fd_dump = creat(dump_path, S_IRUSR);
+	if (fd_dump < 0) {
+		syslog(LOG_ERR, "Could not open %s. %m\n", dump_path);
+		rc = fd_dump;
+		goto out_free;
+	}
+
+	rc = write(fd_dump, buf, buff_len);
+	if (rc != buff_len)
+		syslog(LOG_ERR, "Could not write dump on file %s. %m\n", dump_path);
+
+	close(fd_dump);
+
+out_free:
+	free(buf);
+out:
+	close(fd);
+	return rc;
+}
+
+/**
  * ipr_set_array_asym_access -
  * @dev:		ipr_dev struct
  * @qac:		ipr_array_query_data struct

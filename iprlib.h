@@ -64,6 +64,8 @@
 #define FIRMWARE_HOTPLUG_CONFIG_FILE         "/etc/hotplug/firmware.agent"
 #define FIRMWARE_HOTPLUG_DEFAULT_DIR         LINUX_UCODE_BASE_DIR
 
+#define IPRDUMP_DIR "/var/log/"
+
 #define IPR_JBOD_BLOCK_SIZE                  512
 #define IPR_DEFAULT_AF_BLOCK_SIZE            522
 #define IOCTL_BUFFER_SIZE                    512
@@ -150,6 +152,7 @@
 #define IPR_QUERY_RES_REDUNDANCY_INFO        0x13
 #define IPR_CHANGE_CACHE_PARAMETERS          0x14
 #define IPR_QUERY_CACHE_PARAMETERS           0x16
+#define IPR_LIVE_DUMP                        0x31
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ                            0xE8
 #define SKIP_WRITE                           0xEA
@@ -2332,6 +2335,7 @@ int ipr_get_blk_size(struct ipr_dev *);
 u32 get_ioa_ucode_version(char *);
 int ipr_improper_device_type(struct ipr_dev *);
 int ipr_get_fw_version(struct ipr_dev *, u8 release_level[4]);
+int ipr_get_live_dump(struct ipr_ioa *);
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {

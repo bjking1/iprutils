@@ -698,6 +698,15 @@ Used to set the requested caching mode of the IOA.
 Example:
 .br
 .B iprconfig -c set-ioa-caching sg5 Disabled
+.TP
+.B get-live-dump [IOA]
+Dump the IOA's implementation unique critical information. The dump data
+will be saved in the /var/log/ directory with the pattern
+ipr-CCIN-PCI_ADDRESS-dump-TIMESTAMP.
+.br
+Example:
+.br
+.B iprconfig -c get-live-dump sg5
 .RE
 .TP
 .B \-\-version

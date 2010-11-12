@@ -15658,6 +15658,23 @@ static int set_ioa_caching(char **args, int num_args)
 	return rc;
 }
 
+/**
+ * get_live_dump - 
+ * @args:	     argument vector
+ * @num_args:	     number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int get_live_dump (char **args, int num_args)
+{
+	struct ipr_dev *dev = find_gen_dev(args[0]);
+
+	if (dev)
+		return ipr_get_live_dump(dev->ioa);
+	return -ENXIO;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -15757,6 +15774,7 @@ static const struct {
 	{ "set-bus-speed",			3, 0, 3, set_bus_speed, "sg5 0 320" },
 	{ "set-bus-width",			3, 0, 3, set_bus_width, "sg5 0 16" },
 	{ "raid-migrate",			3, 1, 0, raid_migrate_cmd, "-r 10 [-s 256] sda sg6 sg7" },
+	{ "get-live-dump",			1, 0, 1, get_live_dump, "sg5" },
 };
 
 /**
