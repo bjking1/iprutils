@@ -123,7 +123,7 @@ struct special_status {
 
 char *print_device(struct ipr_dev *, char *, char *, int);
 int display_menu(ITEM **, int, int, int **);
-char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int);
+char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int);
 static char *print_path_details(struct ipr_dev *, char *);
 
 #define print_dev(i, dev, buf, fmt, type) \
@@ -1095,9 +1095,9 @@ leave:
 static char *status_hdr[] = {
 		/*   .        .                  .            .                           .          */
 		/*012345678901234567890123456789012345678901234567890123456789012345678901234567890 */
-		"OPT Name   PCI/SCSI Location          Vendor   Product ID       Status",
+		"OPT Name   Resource Path/Address      Vendor   Product ID       Status",
 		"OPT Name   PCI/SCSI Location          Description               Status",
-		"Name   PCI/SCSI Location          Vendor   Product ID       Status",
+		"Name   Resource Path/Address      Vendor   Product ID       Status",
 		"Name   PCI/SCSI Location          Description               Status",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
@@ -1988,6 +1988,8 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body,"", NULL);
 	body = add_line_to_body(body,_("Physical location"), NULL);
 	body = add_line_to_body(body,_("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), scsi_dev_data->res_path);
 	sprintf(buffer,"%d", dev->ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
 
@@ -2101,6 +2103,8 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body, _("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -2307,6 +2311,8 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body ,_("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -2369,6 +2375,8 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body ,_("PCI Address"), dev->ioa->pci_address);
+	if (dev->ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -7471,8 +7479,8 @@ int path_status(i_container * i_con)
 			continue;
 
 		for_each_disk(ioa, dev) {
-			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 0, 1);
-			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 1);
+			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1);
+			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1);
 			i_con = add_i_con(i_con, "\0", dev);
 			num_devs++;
 		}
@@ -8459,6 +8467,8 @@ static char *get_battery_info(struct ipr_ioa *ioa)
 	body = add_line_to_body(body,_("Serial Number"), serial_num);
 	body = add_line_to_body(body,_("Type"), product_id);
 	body = add_line_to_body(body,_("PCI Address"), ioa->pci_address);
+	if (ioa->sis64)
+		body = add_line_to_body(body,_("Resource Path"), ioa->ioa.scsi_dev_data->res_path);
 	sprintf(buffer,"%d", ioa->host_num);
 	body = add_line_to_body(body,_("SCSI Host Number"), buffer);
 
@@ -11776,6 +11786,7 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
  * @vpd:		
  * @percent:		
  * @indent:		
+ * @res_path:		
  * @ra:			
  * @path_status:	
  *
@@ -11783,7 +11794,8 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
  *   char * buffer
  **/
 char *__print_device(struct ipr_dev *dev, char *body, char *option,
-		     int sd, int sg, int vpd, int percent, int indent, int ra, int path_status)
+		     int sd, int sg, int vpd, int percent, int indent,
+		     int res_path, int ra, int path_status)
 {
 	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -11816,64 +11828,86 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		len += sprintf(body + len, " %s  ", option);
 
 	len += sprintf(body + len, "%-6s ", node_name);
-	loc_len = sprintf(body + len, "%s/%d:",
-			 ioa->pci_address,
-			 ioa->host_num);
-	len += loc_len;
+
+	if (res_path) {
+		if (ioa->sis64)
+			loc_len = sprintf(body + len, "%-26s ", scsi_dev_data->res_path);
+		else
+			loc_len = sprintf(body + len, "%d:", ioa->host_num);
+		len += loc_len;
+	}
+	else {
+		loc_len = sprintf(body + len, "%s/%d:",
+				 ioa->pci_address,
+				 ioa->host_num);
+		len += loc_len;
+	}
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
+		if (!res_path || !ioa->sis64) {
+			for (i = 0; i < 27-loc_len; i++)
+				body[len+i] = ' ';
 
-		for (i = 0; i < 27-loc_len; i++)
-			body[len+i] = ' ';
-
-		len += 27-loc_len;
+			len += 27-loc_len;
+		}
 
 		if (!vpd) {
-			len += sprintf(body + len,"%s %-19s ", get_bus_desc(ioa),
-				       get_ioa_desc(dev->ioa));
+			tab_stop = sprintf(body + len,"%s %s", get_bus_desc(ioa),
+					   get_ioa_desc(dev->ioa));
+
+			len += tab_stop;
+
+			for (i = 0; i < 26-tab_stop; i++)
+				body[len+i] = ' ';
+
+			len += 26-tab_stop;
 		} else
 			len += sprintf(body + len,"%-8s %-16s ",
 				       scsi_dev_data->vendor_id,
 				       scsi_dev_data->product_id);
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
+		if (!res_path || !ioa->sis64) {
+			tab_stop = sprintf(body + len,"%d:%d: ",
+					   dev->res_addr[ra].bus,
+					   dev->res_addr[ra].target);
 
-		loc_len += sprintf(body + len,"%d:%d: ",
-				   dev->res_addr[ra].bus,
-				   dev->res_addr[ra].target);
+			loc_len += tab_stop;
+			len += tab_stop;
+			
+			for (i = 0; i < 27-loc_len; i++)
+				body[len+i] = ' ';
 
-		len += loc_len;
-
-		for (i = 0; i < 27-loc_len; i++)
-			body[len+i] = ' ';
-
-		len += 27-loc_len;
+			len += 27-loc_len;
+		}
 		len += sprintf(body + len, "%-8s %-16s ", " ", " ");
 	} else {
-		tab_stop = sprintf(body + len,"%d:%d:%d ", dev->res_addr[ra].bus,
-				   dev->res_addr[ra].target, dev->res_addr[ra].lun);
+		if (!res_path || !ioa->sis64) {
+			tab_stop = sprintf(body + len,"%d:%d:%d ", dev->res_addr[ra].bus,
+					   dev->res_addr[ra].target, dev->res_addr[ra].lun);
 
-		if (scsi_dev_data) {
-			ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
-			ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
-		} else if (dev->qac_entry) {
-			if (ipr_is_device_record(dev->qac_entry->record_id)) {
-					ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
-					ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
-			} else if (ipr_is_array_record(dev->qac_entry->record_id)) {
-				ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
-				ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
-			}
+			loc_len += tab_stop;
+			len += tab_stop;
+
+			for (i = 0; i < 27-loc_len; i++)
+				body[len+i] = ' ';
+
+			len += 27-loc_len;
 		}
 
-		loc_len += tab_stop;
-		len += tab_stop;
-
-		for (i = 0; i < 27-loc_len; i++)
-			body[len+i] = ' ';
-
-		len += 27-loc_len;
-
 		if (vpd) {
+			if (scsi_dev_data) {
+				ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
+				ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+			} else if (dev->qac_entry) {
+				if (ipr_is_device_record(dev->qac_entry->record_id)) {
+						ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
+						ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
+				} else if (ipr_is_array_record(dev->qac_entry->record_id)) {
+					ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
+					ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
+				}
+			}
+
 			len += sprintf(body + len, "%-8s %-16s ",
 				       vendor_id, product_id);
 		} else {
@@ -11942,17 +11976,16 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
  * Print the given device to a buffer. The type parameter is defined as
  * a bitfield which has the following behavior:
  *
- * 0: print sd, device VPD
- * 1: print sd, device description, print % complete
- * 2: print sg, device VPD
- * 3: print sd, device description, indent array members, print % complete
- *
+ * 0: print sd, resource address (sis32)/resource path (sis64), device VPD
+ * 1: print sd, pci/scsi location, device description, print % complete
+ * 2: print sg, resource address (sis32)/resource path (sis64), device VPD
+ * 3: print sd, pci/scsi location, device description, indent array members, print % complete
  */
 char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 {
-	int sd, sg, vpd, percent, indent;
+	int sd, sg, vpd, percent, indent, res_path;
 
-	sd = sg = vpd = percent = indent = 0;
+	sd = sg = vpd = percent = indent = res_path = 0;
 
 	if (type == 2)
 		sg = 1;
@@ -11961,13 +11994,15 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 
 	if (type & 1)
 		percent = 1;
-	else
+	else {
 		vpd = 1;
+		res_path = 1;
+	}
 
 	if (type == 3)
 		indent = 1;
 
-	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, type&1, 0);
+	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0);
 }
 
 /**
@@ -12508,14 +12543,15 @@ static void printf_device(struct ipr_dev *dev, int type)
  * @vpd:		
  * @percent:		
  * @indent:		
+ * @res_path:		
  *
  * Returns:
  *   nothing
  **/
 static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
-			    int percent, int indent)
+			    int percent, int indent, int res_path)
 {
-	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, 0, 0);
+	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -12645,7 +12681,7 @@ static int query_raid_create(char **args, int num_args)
 
 		if (!num)
 			printf("%s\n%s\n", status_hdr[2], status_sep[2]);
-		__printf_device(dev, 1, 1, 1, 0, 0);
+		__printf_device(dev, 1, 1, 1, 0, 0, 0);
 		num++;
 	}
 
@@ -13713,7 +13749,7 @@ static int query_path_details(char **args, int num_args)
  **/
 static void printf_path_status(struct ipr_dev *dev)
 {
-	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 1);
+	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);

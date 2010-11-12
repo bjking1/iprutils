@@ -36,6 +36,7 @@ $set 104 device_details
 12 "Physical location"
 13 "PCI Address"
 14 "SCSI Host Number"
+15 "Resource Path"
 
 101 "Disk Array Information Details"
 102 "RAID Level"
@@ -442,6 +443,7 @@ $set 332 show_battery_info
 10 "Adjusted power on time (days)"
 11 "Estimated time to warning (days)"
 12 "Estimated time to error (days)"
+13 "Resource Path"
 
 21 "Nickel Cadmium (NiCd)"
 22 "Nickel Metal Hydride (NiMH)"
