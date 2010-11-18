@@ -3909,7 +3909,7 @@ static int get_livedump_fname(struct ipr_ioa *ioa, char *fname, int max)
  * @fd:			IOA sg file descriptor
  *
  * Returns:
- *   0 on failure / otherwise max scatter-gather transfer length
+ *   -1 on failure / otherwise max scatter-gather transfer length
  *
  **/
 static int get_scsi_max_xfer_len(int fd)
@@ -3920,19 +3920,19 @@ static int get_scsi_max_xfer_len(int fd)
 	sysfs_attr = sysfs_open_attribute("/sys/module/sg/parameters/scatter_elem_sz");
 	if (!sysfs_attr) {
 		syslog_dbg("Failed to open scatter_elem_sz parameter from sg module. %m\n");
-		return 0;
+		return -1;
 	}
 
 	rc = sysfs_read_attribute(sysfs_attr);
 	if (rc == -1) {
 		syslog_dbg("Failed to read scatter_elem_sz parameter from sg module. %m\n");
-		return 0;
+		return -1;
 	}
 
 	rc = ioctl(fd, SG_GET_SG_TABLESIZE, &max_tablesize);
 	if (rc) {
 		syslog_dbg("Unable to get device scatter-gather table size. %m\n");
-		return 0;
+		return -1;
 	}
 
 	max_scsi_len = max_tablesize * atoi(sysfs_attr->value);
@@ -3973,7 +3973,7 @@ int ipr_get_live_dump(struct ipr_ioa *ioa)
 	}
 
 	buff_len = get_scsi_max_xfer_len(fd);
-	if (buff_len == 0) {
+	if (buff_len <= 0) {
 		rc = -EPERM;
 		goto out;
 	}
