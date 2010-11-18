@@ -3915,18 +3915,17 @@ static int get_livedump_fname(struct ipr_ioa *ioa, char *fname, int max)
 static int get_scsi_max_xfer_len(int fd)
 {
 	int rc, max_tablesize, max_scsi_len;
-	struct sysfs_module *sysfs_module;
 	struct sysfs_attribute *sysfs_attr;
 
-	sysfs_module = sysfs_open_module("sg");
-	if (!sysfs_module) {
-		syslog_dbg("Failed to open sg module. %m\n");
+	sysfs_attr = sysfs_open_attribute("/sys/module/sg/parameters/scatter_elem_sz");
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open scatter_elem_sz parameter from sg module. %m\n");
 		return 0;
 	}
 
-	sysfs_attr = sysfs_get_module_parm(sysfs_module, "scatter_elem_sz");
-	if (!sysfs_attr) {
-		syslog_dbg("Failed to open scatter_elem_sz parameter from sg module. %m\n");
+	rc = sysfs_read_attribute(sysfs_attr);
+	if (rc == -1) {
+		syslog_dbg("Failed to read scatter_elem_sz parameter from sg module. %m\n");
 		return 0;
 	}
 
@@ -3937,6 +3936,8 @@ static int get_scsi_max_xfer_len(int fd)
 	}
 
 	max_scsi_len = max_tablesize * atoi(sysfs_attr->value);
+
+	sysfs_close_attribute(sysfs_attr);
 
 	if (max_scsi_len < IPR_MAX_LIVE_DUMP_SIZE)
 		return max_scsi_len;
