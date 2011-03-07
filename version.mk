@@ -1,4 +1,4 @@
-# (C) Copyright 2000, 2010
+# (C) Copyright 2000, 2011
 # International Business Machines Corporation and others.
 # All Rights Reserved. This program and the accompanying
 # materials are made available under the terms of the
@@ -6,9 +6,9 @@
 
 IPR_MAJOR_RELEASE=2
 IPR_MINOR_RELEASE=3
-IPR_FIX_LEVEL=2
+IPR_FIX_LEVEL=3
 IPR_RELEASE=1
-IPR_FIX_DATE=(Nov 18, 2010)
+IPR_FIX_DATE=(Mar 07, 2011)
 
 IPR_VERSION_STR=$(IPR_MAJOR_RELEASE).$(IPR_MINOR_RELEASE).$(IPR_FIX_LEVEL) $(IPR_FIX_DATE)
 
