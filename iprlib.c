@@ -1892,8 +1892,6 @@ static void ipr_get_pci_slots()
 		free(slotdir);
 	}
 
-	sysfs_close_bus(sysfs_bus);
-
 	for_each_ioa(ioa)
 		ioa->physical_location[0] = '\0';
 
@@ -1936,6 +1934,7 @@ static void ipr_get_pci_slots()
 		}
 	}
 
+	sysfs_close_bus(sysfs_bus);
 	free(pci_slot);
 	pci_slot = NULL;
 	num_pci_slots = 0;
