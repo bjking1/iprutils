@@ -1943,13 +1943,13 @@ struct ipr_global_cache_params_term {
 	u8 term_id;
 	u8 len;
 #if defined (__BIG_ENDIAN_BITFIELD)
-	u8 disable_caching_dual_ioa_failure:1;
+	u8 enable_caching_dual_ioa_failure:1;
 	u8 disable_caching_requested:1;
 	u8 reserved1:6;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 reserved1:6;
 	u8 disable_caching_requested:1;
-	u8 disable_caching_dual_ioa_failure:1;
+	u8 enable_caching_dual_ioa_failure:1;
 #endif
 	u8 reserved2;
 };
