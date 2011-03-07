@@ -12623,9 +12623,6 @@ static void printf_ses_devices(struct ipr_ioa *ioa, int type)
 {
 	struct ipr_dev *dev;
 
-	/* xxx */
-	return;
-
 	for_each_ses(ioa, dev)
 		printf_device(dev, type);
 }
@@ -15693,6 +15690,76 @@ static int get_live_dump (char **args, int num_args)
 	return -ENXIO;
 }
 
+/**
+ * query_ses_mode - 
+ * @args:	     argument vector
+ * @num_args:	     number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_ses_mode (char **args, int num_args)
+{
+	struct ipr_dev *dev = find_gen_dev(args[0]);
+	struct ipr_ses_inquiry_pageC3 pageC3_inq;
+	int rc;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_ses(dev)) {
+		fprintf(stderr, "Invalid device type\n");
+		return -EINVAL;
+	}
+
+	memset(&pageC3_inq, 0, sizeof(pageC3_inq));
+	rc = ipr_inquiry(dev, 0xc3, &pageC3_inq, sizeof(pageC3_inq));
+
+	if (rc != 0) {
+		scsi_dbg(dev, "Inquiry failed\n");
+		return -EIO;
+	}
+
+	printf("%c%c%c%c\n", pageC3_inq.mode[0], pageC3_inq.mode[1], 
+	       pageC3_inq.mode[2], pageC3_inq.mode[3]);
+
+	return 0;
+}
+
+/**
+ * set_ses_mode - 
+ * @args:	     argument vector
+ * @num_args:	     number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int set_ses_mode (char **args, int num_args)
+{
+	struct ipr_dev *dev = find_gen_dev(args[0]);
+	int mode = atoi(args[1]);
+	int rc;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_ses(dev)) {
+		fprintf(stderr, "Invalid device type\n");
+		return -EINVAL;
+	}
+
+	rc = ipr_set_ses_mode(dev, mode);
+	if (rc != 0) {
+		scsi_dbg(dev, "Change SES mode command failed");
+		return -EIO;
+	}
+	return 0;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -15793,6 +15860,8 @@ static const struct {
 	{ "set-bus-width",			3, 0, 3, set_bus_width, "sg5 0 16" },
 	{ "raid-migrate",			3, 1, 0, raid_migrate_cmd, "-r 10 [-s 256] sda sg6 sg7" },
 	{ "get-live-dump",			1, 0, 1, get_live_dump, "sg5" },
+	{ "query-ses-mode",                     1, 0, 1, query_ses_mode, "sg8"},
+	{ "set-ses-mode",                       2, 0, 2, set_ses_mode, "sg8 2"},
 };
 
 /**

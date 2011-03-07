@@ -2136,6 +2136,17 @@ struct ipr_ses_config_pg {
 	u8 buf[2048];
 };
 
+struct ipr_ses_inquiry_pageC3 {
+	u8 perif_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length;
+	u8 ascii_length;
+	u8 mode_keyword[3];
+	u8 mode[4];
+	u8 reserved2;
+};
+
 static inline int ipr_elem_offset(struct ipr_ses_config_pg *ses_cfg, u8 type)
 {
 	int i, off;

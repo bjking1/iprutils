@@ -5072,6 +5072,17 @@ int set_active_active_mode(struct ipr_ioa *ioa, int mode)
 	return ipr_set_ioa_attr(ioa, &attr, 1);
 }
 
+
+int ipr_set_ses_mode(struct ipr_dev *dev, int mode) {
+	int rc;
+	struct sense_data_t sense_data;
+	u8 buff = (u8)mode;
+
+	rc = __ipr_write_buffer(dev, 0x1f, &buff, sizeof(buff), &sense_data);
+	return rc;
+}
+
+
 /**
  * get_scsi_dev_data - get scsi device data
  * @scsi_dev_ref:	scsi_dev_data struct
