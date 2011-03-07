@@ -11833,7 +11833,8 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 	if (res_path) {
 		if (ioa->sis64)
-			loc_len = sprintf(body + len, "%-26s ", scsi_dev_data->res_path);
+			loc_len = sprintf(body + len, "%-26s ", scsi_dev_data ?
+					  scsi_dev_data->res_path : "<unknown>");
 		else
 			loc_len = sprintf(body + len, "%d:", ioa->host_num);
 		len += loc_len;
