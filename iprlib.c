@@ -6570,8 +6570,17 @@ int get_ioa_caching(struct ipr_ioa *ioa)
 			break;
 		}
 
-	if (found == 1 && term->disable_caching_requested == IPR_IOA_REQUESTED_CACHING_DISABLED)
-		return IPR_IOA_REQUESTED_CACHING_DISABLED;
+	if (found == 1)
+		if (term->enable_caching_dual_ioa_failure == IPR_IOA_CACHING_DUAL_FAILURE_ENABLED)
+			if (term->disable_caching_requested == IPR_IOA_REQUESTED_CACHING_DISABLED)
+				return IPR_IOA_CACHING_DISABLED_DUAL_ENABLED;
+			else
+				return IPR_IOA_CACHING_DEFAULT_DUAL_ENABLED;
+		else 
+			if (term->disable_caching_requested == IPR_IOA_REQUESTED_CACHING_DISABLED)
+				return IPR_IOA_REQUESTED_CACHING_DISABLED;
+			else
+				return IPR_IOA_REQUESTED_CACHING_DEFAULT;
 	else
 		return IPR_IOA_REQUESTED_CACHING_DEFAULT;
 }

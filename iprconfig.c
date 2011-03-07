@@ -15605,10 +15605,20 @@ static int query_ioa_caching(char **args, int num_args)
 
 	mode = get_ioa_caching(dev->ioa);
 
-	if (mode == IPR_IOA_REQUESTED_CACHING_DISABLED)
+	switch (mode) {
+	case IPR_IOA_REQUESTED_CACHING_DISABLED:
 		printf("disabled\n");
-	else
+		break;
+	case IPR_IOA_CACHING_DISABLED_DUAL_ENABLED:
+		printf("disabled, 0x3\n");
+		break;
+	case IPR_IOA_CACHING_DEFAULT_DUAL_ENABLED:
+		printf("default, 0x3\n");
+		break;
+	default:
 		printf("default\n");
+		break;
+	}
 
 	return 0;
 }
@@ -15643,11 +15653,14 @@ static int set_ioa_caching(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	/* Default or Disabled? */
 	if (!strncasecmp(args[1], "Default", 3))
 		mode = IPR_IOA_SET_CACHING_DEFAULT;
 	else if (!strncasecmp(args[1], "Disabled", 3))
 		mode = IPR_IOA_SET_CACHING_DISABLED;
+	else if (!strncasecmp(args[1], "Dual-Disabled", 8))
+		mode = IPR_IOA_SET_CACHING_DUAL_DISABLED;
+	else if (!strncasecmp(args[1], "Dual-Enabled", 8))
+		mode = IPR_IOA_SET_CACHING_DUAL_ENABLED;
 	else {
 		scsi_err(dev, "Unrecognized mode given for IOA caching.");
 		return -EINVAL;
