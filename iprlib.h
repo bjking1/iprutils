@@ -2316,6 +2316,7 @@ int ipr_set_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *, int);
 int ipr_modify_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int set_active_active_mode(struct ipr_ioa *, int);
+int ipr_set_ses_mode(struct ipr_dev *, int);
 int get_ioa_caching(struct ipr_ioa *);
 int ipr_change_cache_parameters(struct ipr_ioa *, int);
 int ipr_query_dasd_timeouts(struct ipr_dev *, struct ipr_query_dasd_timeouts *);
