@@ -1386,6 +1386,10 @@ struct ipr_ioa {
       for_each_dev(i, d) \
            if (ipr_is_volume_set(d) && !d->array_rcd->start_cand)
 
+#define for_each_asym_array(i, d) \
+      for_each_dev(i, d) \
+           if (ipr_is_asym_array(d) && !d->array_rcd->start_cand)
+
 #define for_each_ses(i, d) \
       for_each_dev(i, d) \
            if (d->scsi_dev_data && d->scsi_dev_data->type == TYPE_ENCLOSURE)
@@ -2379,6 +2383,15 @@ static inline int ipr_is_array_record(int record_id)
 		return 0;
 }
 
+static inline int ipr_is_asym_array_record(int record_id)
+{
+	if ((record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
+	    (record_id == IPR_RECORD_ID_ARRAY_RECORD_3))
+		return 1;
+	else
+		return 0;
+}
+
 static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
@@ -2392,6 +2405,15 @@ static inline int ipr_is_volume_set(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
 	    (ipr_is_array_record(device->qac_entry->record_id)))
+		return 1;
+	else
+		return 0;
+}
+
+static inline int ipr_is_asym_array(struct ipr_dev *device)
+{
+	if ((device->qac_entry != NULL) &&
+	    (ipr_is_asym_array_record(device->qac_entry->record_id)))
 		return 1;
 	else
 		return 0;

@@ -2200,6 +2200,9 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 	else
 		cdb[1] = 0x80; /* Prohibit Rebuild Candidate Refresh */
 
+	if (ioa->sis64)
+		cdb[3] = 0x80;
+
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
 
@@ -5790,6 +5793,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 			if (scsi_dev_data->type == TYPE_DISK ||
 			    scsi_dev_data->type == IPR_TYPE_AF_DISK ||
+			    scsi_dev_data->type == IPR_TYPE_ADAPTER ||
 			    scsi_dev_data->type == TYPE_ENCLOSURE ||
 			    scsi_dev_data->type == TYPE_PROCESSOR) {
 				ioa->dev[device_count].ioa = ioa;
@@ -5835,6 +5839,13 @@ void check_current_config(bool allow_rebuild_refresh)
 							qac_entry_ref[k]++;
 							break;
 						}
+					} else if (common_record->record_id == IPR_RECORD_ID_ARRAY_RECORD_3) {
+						array_record = (struct ipr_array_record *)common_record;
+						if (ipr_res_path_cmp(array_record->type3.res_path, scsi_dev_data->res_path)) {
+							ioa->dev[device_count].qac_entry = common_record;
+							qac_entry_ref[k]++;
+							break;
+						}
 					}
 					k++;
 				}
@@ -5864,6 +5875,7 @@ void check_current_config(bool allow_rebuild_refresh)
 			} else if (!qac_entry_ref[k] &&
 				   (ipr_is_device_record(common_record->record_id) ||
 				    ipr_is_array_record(common_record->record_id))) {
+				// TODO - type 3 array records????
 				array_record = (struct ipr_array_record *)common_record;
 				if (ipr_is_array_record(common_record->record_id) &&
 				    array_record->start_cand) {
@@ -5917,6 +5929,15 @@ void check_current_config(bool allow_rebuild_refresh)
 				dev->resource_handle = dev->array_rcd->type2.resource_handle;
 				dev->block_dev_class = dev->array_rcd->type2.block_dev_class;
 			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_VSET_RECORD_3) {
+				dev->vendor_id = dev->array_rcd->type3.vendor_id;
+				dev->product_id = dev->array_rcd->type3.product_id;
+				dev->serial_number = dev->array_rcd->type3.serial_number;
+				dev->array_id = dev->array_rcd->type3.array_id;
+				dev->raid_level = dev->array_rcd->type3.raid_level;
+				dev->stripe_size = dev->array_rcd->type3.stripe_size;
+				dev->resource_handle = dev->array_rcd->type3.resource_handle;
+				dev->block_dev_class = dev->array_rcd->type3.block_dev_class;
+			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD_3) {
 				dev->vendor_id = dev->array_rcd->type3.vendor_id;
 				dev->product_id = dev->array_rcd->type3.product_id;
 				dev->serial_number = dev->array_rcd->type3.serial_number;

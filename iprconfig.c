@@ -5326,7 +5326,7 @@ int asym_access(i_container *i_con)
 	struct screen_output *s_out;
 	int header_lines;
 	struct ipr_ioa *ioa;
-	struct ipr_dev *vset;
+	struct ipr_dev *array;
 
 	processing();
 
@@ -5342,13 +5342,15 @@ int asym_access(i_container *i_con)
 	for_each_primary_ioa(ioa) {
 		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
 			continue;
-		for_each_vset(ioa, vset) {
-			if (!vset->array_rcd->asym_access_cand)
+		for_each_asym_array(ioa, array) {
+			if (!array->array_rcd->asym_access_cand) {
+				syslog_dbg("candidate not set\n");
 				continue;
-			add_raid_cmd_tail(ioa, vset, vset->array_id);
+			}
+			add_raid_cmd_tail(ioa, array, array->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
 
-			print_dev(k, vset, buffer, "%1", k);
+			print_dev(k, array, buffer, "%1", k+2);
 			found++;
 		}
 	}
@@ -11428,7 +11430,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 	int resync_in_progress = 0;
 	struct ipr_res_redundancy_info info;
 
-	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
+	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER && dev == &ioa->ioa) {
 		if (!scsi_dev_data->online)
 			sprintf(buf, "Offline");
 		else if (ioa->ioa_dead)
@@ -11440,7 +11442,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 		sprintf(buf, "Empty");
 	} else {
-		if (ipr_is_volume_set(dev)) {
+		if (ipr_is_volume_set(dev) || ipr_is_asym_array(dev)) {
 			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
 
 			if (!rc) {
@@ -11546,7 +11548,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 			sprintf(buf, "R/W Protected");
 		else if (res_state.prot_dev_failed)
 			sprintf(buf, "Failed");
-		else if (ipr_is_volume_set(dev)) {
+		else if (ipr_is_volume_set(dev) || ipr_is_asym_array(dev)) {
 			if (res_state.prot_resuming) {
 				if (!percent || (percent_cmplt == 0))
 					sprintf(buf, "Rebuilding");
@@ -11843,7 +11845,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		len += loc_len;
 	}
 
-	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER) {
+	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER && dev == &ioa->ioa) {
 		if (!res_path || !ioa->sis64) {
 			for (i = 0; i < 27-loc_len; i++)
 				body[len+i] = ' ';
@@ -11916,13 +11918,13 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 					len += sprintf(body + len, "%-25s ", "SSD Hot Spare");
 				else
 					len += sprintf(body + len, "%-25s ", "Hot Spare");
-			else if (ipr_is_volume_set(dev)) {
+			else if (ipr_is_volume_set(dev) || ipr_is_asym_array(dev)) {
 				if (dev->block_dev_class == IPR_SSD)
 					sprintf(buf, "RAID %s SSD Disk Array",
-						dev->prot_level_str);
+						get_prot_level_str(ioa->supported_arrays, dev->raid_level));
 				else
 					sprintf(buf, "RAID %s Disk Array",
-						dev->prot_level_str);
+						get_prot_level_str(ioa->supported_arrays, dev->raid_level));
 				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
@@ -11980,6 +11982,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
  * 1: print sd, pci/scsi location, device description, print % complete
  * 2: print sg, resource address (sis32)/resource path (sis64), device VPD
  * 3: print sd, pci/scsi location, device description, indent array members, print % complete
+ * 4: print sg, pci/scsi location, device description, print % complete
  */
 char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 {
@@ -11987,17 +11990,16 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 
 	sd = sg = vpd = percent = indent = res_path = 0;
 
-	if (type == 2)
+	if (type == 2 || type == 4)
 		sg = 1;
 	else
 		sd = 1;
 
-	if (type & 1)
-		percent = 1;
-	else {
+	if (type == 0 || type == 2) {
 		vpd = 1;
 		res_path = 1;
-	}
+	} else
+		percent = 1;
 
 	if (type == 3)
 		indent = 1;
@@ -14862,19 +14864,22 @@ static int query_arrays_asym_access(char **args, int num_args)
 {
 	int hdr = 0;
 	struct ipr_ioa *ioa;
-	struct ipr_dev *vset;
+	struct ipr_dev *array;
 
 	for_each_ioa(ioa) {
 		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
 			continue;
-		for_each_vset(ioa, vset) {
-			if (!vset->array_rcd->asym_access_cand)
+		for_each_asym_array(ioa, array) {
+			if (!array->array_rcd->asym_access_cand)
 				continue;
 			if (!hdr) {
 				hdr = 1;
 				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
 			}
-			printf_device(vset, 1);
+			if (ioa->sis64)
+				printf_device(array, 4);
+			else
+				printf_device(array, 1);
 		}
 	}
 	return 0;
@@ -14924,27 +14929,27 @@ static int query_ioa_asym_access_mode(char **args, int num_args)
  **/
 static int query_array_asym_access_mode(char **args, int num_args)
 {
-	struct ipr_dev *vset;
+	struct ipr_dev *array;
 
-	vset = find_dev(args[0]);
-	if (!vset) {
+	array = find_dev(args[0]);
+	if (!array) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
-	if (!ipr_is_volume_set(vset)) {
-		fprintf(stderr, "%s is not an array.\n", vset->gen_name);
+	if (!ipr_is_asym_array(array)) {
+		fprintf(stderr, "%s is not an array.\n", array->gen_name);
 		return -EINVAL;
 	}
 
-	if (!vset->array_rcd->asym_access_cand)
+	if (!array->array_rcd->asym_access_cand)
 		printf("Unsupported\n");
-	else if (vset->array_rcd->current_asym_access_state == IPR_ACTIVE_OPTIMIZED)
+	else if (array->array_rcd->current_asym_access_state == IPR_ACTIVE_OPTIMIZED)
 		printf("Optimized\n");
-	else if (vset->array_rcd->current_asym_access_state == IPR_ACTIVE_NON_OPTIMIZED)
+	else if (array->array_rcd->current_asym_access_state == IPR_ACTIVE_NON_OPTIMIZED)
 		printf("Not Optimized\n");
 	else
-		scsi_dbg(vset, "Unrecognized state - %d.", vset->array_rcd->current_asym_access_state);
+		scsi_dbg(array, "Unrecognized state - %d.", array->array_rcd->current_asym_access_state);
 
 	return 0;
 }
@@ -15515,35 +15520,35 @@ static int set_ioa_asymmetric_access(char **args, int num_args)
 static int set_array_asymmetric_access(char **args, int num_args)
 {
 	int state;
-	struct ipr_dev *vset = NULL;
+	struct ipr_dev *array = NULL;
 
-	vset = find_dev(args[0]);
-	if (!vset) {
+	array = find_dev(args[0]);
+	if (!array) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
-	if (!ipr_is_volume_set(vset)) {
-		scsi_err(vset,  "Given device is not an array.");
+	if (!ipr_is_asym_array(array)) {
+		scsi_err(array,  "Given device is not an array.");
 		return -EINVAL;
 	}
 
 	/* Check that the adapter is a primary adapter. */
-	if (vset->ioa->is_secondary) {
-		ioa_err(vset->ioa, "Asymmetric access commands must be issued "
+	if (array->ioa->is_secondary) {
+		ioa_err(array->ioa, "Asymmetric access commands must be issued "
 				   "for arrays on the primary IOA");
 		return -EINVAL;
 	}
 
 	/* Check that asymmetric access is supported by the adapter. */
-	if (!vset->ioa->asymmetric_access) {
-		ioa_err(vset->ioa, "Asymmetric access is not supported.");
+	if (!array->ioa->asymmetric_access) {
+		ioa_err(array->ioa, "Asymmetric access is not supported.");
 		return -EINVAL;
 	}
 
 	/* Check that asymmetric access is enabled on the adapter. */
-	if (!vset->ioa->asymmetric_access_enabled) {
-		ioa_err(vset->ioa, "Asymmetric access is not enabled.");
+	if (!array->ioa->asymmetric_access_enabled) {
+		ioa_err(array->ioa, "Asymmetric access is not enabled.");
 		return -EINVAL;
 	}
 
@@ -15553,26 +15558,26 @@ static int set_array_asymmetric_access(char **args, int num_args)
 	else if (!strncasecmp(args[1], "Non-Optimized", 3))
 		state = IPR_ACTIVE_NON_OPTIMIZED;
 	else {
-		scsi_err(vset, "Unrecognized state given for asymmetric access.");
+		scsi_err(array, "Unrecognized state given for asymmetric access.");
 		return -EINVAL;
 	}
 
-	if (vset->array_rcd->saved_asym_access_state == state) {
-		scsi_dbg(vset, "Array is already set to requested state.");
+	if (array->array_rcd->saved_asym_access_state == state) {
+		scsi_dbg(array, "Array is already set to requested state.");
 		return 0;
 	}
 
-	if (vset->array_rcd->asym_access_cand)
-		vset->array_rcd->issue_cmd = 1;
+	if (array->array_rcd->asym_access_cand)
+		array->array_rcd->issue_cmd = 1;
 	else {
-		scsi_err(vset, "%s is not a candidate for asymmetric access.",
-			 vset->dev_name);
+		scsi_err(array, "%s is not a candidate for asymmetric access.",
+			 array->dev_name);
 		return -EINVAL;
 	}
 
-	vset->array_rcd->saved_asym_access_state = state;
+	array->array_rcd->saved_asym_access_state = state;
 
-	return ipr_set_array_asym_access(vset->ioa);
+	return ipr_set_array_asym_access(array->ioa);
 }
 
 /**
