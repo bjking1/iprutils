@@ -5494,6 +5494,10 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 			ioa->has_cache = 1;
 			continue;
 		}
+		if (page0_inq.supported_page_codes[j] == 0xC4) {
+			ioa->has_cache = 1;
+			continue;
+		}
 		if (page0_inq.supported_page_codes[j] != 0xD0)
 			continue;
 		rc = ipr_inquiry(&ioa->ioa, 0xD0, &ioa_cap, sizeof(ioa_cap));

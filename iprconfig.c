@@ -1931,6 +1931,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 {
 	struct ipr_ioa_vpd ioa_vpd;
 	struct ipr_cfc_vpd cfc_vpd;
+	struct ipr_cache_cap_vpd cc_vpd;
 	struct ipr_dram_vpd dram_vpd;
 	struct ipr_inquiry_page0 page0_inq;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -1942,6 +1943,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 
 	memset(&ioa_vpd, 0, sizeof(ioa_vpd));
 	memset(&cfc_vpd, 0, sizeof(cfc_vpd));
+	memset(&cc_vpd, 0, sizeof(cc_vpd));
 	memset(&dram_vpd, 0, sizeof(dram_vpd));
 
 	ipr_inquiry(dev, IPR_STD_INQUIRY, &ioa_vpd, sizeof(ioa_vpd));
@@ -1950,6 +1952,10 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	for (i = 0; !rc && i < page0_inq.page_length; i++) {
 		if (page0_inq.supported_page_codes[i] == 1) {
 			ipr_inquiry(dev, 1, &cfc_vpd, sizeof(cfc_vpd));
+			break;
+		}
+		if (page0_inq.supported_page_codes[i] == 0xC4) {
+			ipr_inquiry(dev, 0xC4, &cc_vpd, sizeof(cc_vpd));
 			break;
 		}
 	}
@@ -1973,10 +1979,16 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 		ipr_strncpy_0(buffer, (char *)ioa_vpd.ascii_plant_code, IPR_VPD_PLANT_CODE_LEN);
 		body = add_line_to_body(body,_("Plant of Manufacturer"), buffer);
 		if (cfc_vpd.cache_size[0]) {
-			ipr_strncpy_0(buffer, (char  *)cfc_vpd.cache_size, IPR_VPD_CACHE_SIZE_LEN);
+			ipr_strncpy_0(buffer, (char *)cfc_vpd.cache_size, IPR_VPD_CACHE_SIZE_LEN);
 			cache_size = strtoul(buffer, NULL, 16);
 			sprintf(buffer,"%d MB", cache_size);
 			body = add_line_to_body(body,_("Cache Size"), buffer);
+		}
+		if (cc_vpd.write_cache_size[0]) {
+			ipr_strncpy_0(buffer, (char *)cc_vpd.write_cache_size, 4);
+			cache_size = strtoul(buffer, NULL, 16);
+			sprintf(buffer,"%d MB", cache_size);
+			body = add_line_to_body(body,_("Write Cache Size"), buffer);
 		}
 
 		ipr_strncpy_0(buffer, (char *)dram_vpd.dram_size, IPR_VPD_DRAM_SIZE_LEN);

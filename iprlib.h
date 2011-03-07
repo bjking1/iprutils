@@ -1779,6 +1779,19 @@ struct ipr_dram_vpd {
 	u8 dram_size[IPR_VPD_DRAM_SIZE_LEN];
 };
 
+struct ipr_cache_cap_vpd {
+	u8 peri_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 add_page_len;
+	u8 cache_cap[4];
+	u8 data_store_size[4];
+	u8 write_cache_size[4];
+	u8 comp_write_cache_size[4];
+	u8 read_cache_size[4];
+	u8 comp_read_cache_size[4];
+};
+
 #define IPR_IOA_MAX_SUPP_LOG_PAGES		16
 struct ipr_supp_log_pages {
 	u8 page_code;
