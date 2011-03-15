@@ -1984,10 +1984,8 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 			sprintf(buffer,"%d MB", cache_size);
 			body = add_line_to_body(body,_("Cache Size"), buffer);
 		}
-		if (cc_vpd.write_cache_size[0]) {
-			ipr_strncpy_0(buffer, (char *)cc_vpd.write_cache_size, 4);
-			cache_size = strtoul(buffer, NULL, 16);
-			sprintf(buffer,"%d MB", cache_size);
+		if (ntohl(cc_vpd.write_cache_size)) {
+			sprintf(buffer,"%d MB", ntohl(cc_vpd.write_cache_size));
 			body = add_line_to_body(body,_("Write Cache Size"), buffer);
 		}
 
