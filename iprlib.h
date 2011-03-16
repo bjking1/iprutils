@@ -958,7 +958,7 @@ struct ipr_dev_record {
 
 #define for_each_array_rcd(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_array_record) \
-              if (ipr_is_array_record(rcd->common.record_id))
+              if (ipr_is_vset_record(rcd->common.record_id))
 
 struct ipr_std_inq_data {
 #if defined (__BIG_ENDIAN_BITFIELD)
@@ -2399,7 +2399,7 @@ static inline int ipr_is_device_record(int record_id)
 		return 0;
 }
 
-static inline int ipr_is_array_record(int record_id)
+static inline int ipr_is_vset_record(int record_id)
 {
 	if ((record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
 	    (record_id == IPR_RECORD_ID_VSET_RECORD_3))
@@ -2429,7 +2429,7 @@ static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 static inline int ipr_is_volume_set(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
-	    (ipr_is_array_record(device->qac_entry->record_id)))
+	    (ipr_is_vset_record(device->qac_entry->record_id)))
 		return 1;
 	else
 		return 0;

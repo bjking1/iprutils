@@ -10082,7 +10082,7 @@ int change_disk_config(i_container * i_con)
 	array_record = dev->array_rcd;
 
 	if (array_record &&
-	    ipr_is_array_record(array_record->common.record_id)) {
+	    ipr_is_vset_record(array_record->common.record_id)) {
 		/* VSET, no further fields */
 	} else if (ipr_is_af_dasd_device(dev)) {
 		disk_config_attr[1].option = 2;
@@ -11915,7 +11915,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				if (ipr_is_device_record(dev->qac_entry->record_id)) {
 						ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
 						ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
-				} else if (ipr_is_array_record(dev->qac_entry->record_id)) {
+				} else if (ipr_is_vset_record(dev->qac_entry->record_id)) {
 					ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
 					ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
 				}

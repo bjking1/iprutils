@@ -2192,16 +2192,17 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 	if (vset_migrate_query) {
 		cdb[1] = 0x08;
 		cdb[2] = array_id;
+		if (ioa->sis64)
+			cdb[3] = 0x80;
 	} else if (set_array_id) {
 		cdb[1] = 0x01;
 		cdb[2] = array_id;
+		if (ioa->sis64)
+			cdb[3] = 0x80;
 	} else if (allow_rebuild_refresh)
 		cdb[1] = 0;
 	else
 		cdb[1] = 0x80; /* Prohibit Rebuild Candidate Refresh */
-
-	if (ioa->sis64)
-		cdb[3] = 0x80;
 
 	cdb[7] = (length & 0xff00) >> 8;
 	cdb[8] = length & 0xff;
@@ -5889,10 +5890,10 @@ void check_current_config(bool allow_rebuild_refresh)
 				ioa->supported_arrays = (struct ipr_supported_arrays *)common_record;
 			} else if (!qac_entry_ref[k] &&
 				   (ipr_is_device_record(common_record->record_id) ||
-				    ipr_is_array_record(common_record->record_id))) {
+				    ipr_is_vset_record(common_record->record_id))) {
 				// TODO - type 3 array records????
 				array_record = (struct ipr_array_record *)common_record;
-				if (ipr_is_array_record(common_record->record_id) &&
+				if (ipr_is_vset_record(common_record->record_id) &&
 				    array_record->start_cand) {
 					ioa->start_array_qac_entry = array_record;
 				} else {
@@ -8868,7 +8869,7 @@ struct ipr_dev *get_dev_from_handle(u32 res_handle)
 			     ioa->dev[j].resource_handle == res_handle)
 				return &ioa->dev[j];
 
-			if (ipr_is_array_record(ioa->dev[j].qac_entry->record_id) &&
+			if (ipr_is_vset_record(ioa->dev[j].qac_entry->record_id) &&
 			    ioa->dev[j].resource_handle == res_handle)
 				return &ioa->dev[j];
 		}
