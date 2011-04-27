@@ -3638,7 +3638,7 @@ int raid_start_complete()
 	struct ipr_disk_attr attr;
 
 	while (1) {
-		rc = complete_screen_driver(&n_raid_start_complete,percent_cmplt,1);
+		rc = complete_screen_driver(&n_raid_start_complete, percent_cmplt, 1);
 
 		if ((rc & EXIT_FLAG) || exit_now) {
 			exit_now = 1;
@@ -3916,7 +3916,7 @@ static int raid_resync_complete()
 	struct array_cmd_data *cur_raid_cmd;
 
 	while (1) {
-		rc = complete_screen_driver(&n_raid_resync_complete,percent_cmplt,1);
+		rc = complete_screen_driver(&n_raid_resync_complete, percent_cmplt, 1);
 
 		if (rc & EXIT_FLAG)
 			return EXIT_FLAG;
@@ -4168,6 +4168,9 @@ int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
 	}
 	enc_raid_level = cap->prot_level;
 
+	if (ioa->sis64)
+		vset = get_array_from_vset(vset);
+
 	/* loop through returned records - looking at array records */
 	for_each_array_rcd(array_rcd, qac_data) {
 		if (vset->resource_handle == ipr_get_arr_res_handle(ioa, array_rcd)) {
@@ -4361,8 +4364,9 @@ int raid_migrate_complete()
 	struct array_cmd_data *cur_raid_cmd;
 	struct ipr_dev *dev;
 
+	ENTER;
 	while (1) {
-		rc = complete_screen_driver(&n_raid_migrate_complete,percent_cmplt,1);
+		rc = complete_screen_driver(&n_raid_migrate_complete, percent_cmplt, 1);
 
 		if (rc & EXIT_FLAG || exit_now) {
 			exit_now = 1;
@@ -4378,6 +4382,7 @@ int raid_migrate_complete()
 		for_each_raid_cmd(cur_raid_cmd) {
 			if (cur_raid_cmd->do_cmd == 0)
 				continue;
+
 			ioa = cur_raid_cmd->ioa;
 			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
 
@@ -4425,6 +4430,7 @@ int raid_migrate_complete()
 			check_current_config(false);
 
 			/* Migrate Array Protection completed successfully */
+			LEAVE;
 			return RC_79_Migrate_Prot_Success;
 		}
 		not_done = 0;
@@ -4448,6 +4454,7 @@ int confirm_raid_migrate()
 	int toggle = 1;
 	int header_lines;
 
+	ENTER;
 	body_init_status(buffer, n_confirm_raid_migrate.header, &header_lines);
 
 	/* Display the array being migrated.  Also display any disks if
@@ -4477,6 +4484,7 @@ int confirm_raid_migrate()
 
 	n_confirm_raid_migrate.body = NULL;
 
+	LEAVE;
 	return rc;
 }
 
@@ -4506,6 +4514,7 @@ int choose_migrate_disks(struct ipr_ioa *ioa, struct ipr_array_query_data *qac,
 	int found = 0;
 	char *input;
 
+	ENTER;
 	min = cap_entry->min_num_array_devices;
 	max = cap_entry->max_num_array_devices;
 	mult = cap_entry->min_mult_array_devices;
@@ -4603,6 +4612,7 @@ int choose_migrate_disks(struct ipr_ioa *ioa, struct ipr_array_query_data *qac,
 
 	} while (rc & REFRESH_FLAG);
 
+	LEAVE;
 	return rc;
 }
 
@@ -4630,6 +4640,7 @@ int do_ipr_migrate_array_protection(i_container *array_i_con, struct ipr_ioa *io
 	struct ipr_array_query_data new_qac;
 	char *input;
 
+	ENTER;
 	/* Now that we have the selected array, lock the ioa
 	 * device, then issue another query to make sure that
 	 * the adapter's version of the QAC data matches what
@@ -4655,15 +4666,19 @@ int do_ipr_migrate_array_protection(i_container *array_i_con, struct ipr_ioa *io
 					dev_rcd->issue_cmd = 1;
 	}
 
-	/* Set the "do it" bit for the selected array. */
+	/* get the array command data and associated data from the data field
+	   of the passed in array info container. */
 	acd = array_i_con->data;
+
+	/* Set the "do it" bit for the selected array. */
 	for_each_array_rcd(array_rcd, &new_qac)
 		if (acd->dev->resource_handle == ipr_get_arr_res_handle(ioa, array_rcd))
 			array_rcd->issue_cmd = 1;
 
-	rc =ipr_migrate_array_protection(ioa, &new_qac, fd, stripe_size, prot_level);
+	rc = ipr_migrate_array_protection(ioa, &new_qac, fd, stripe_size, prot_level);
 
 	close(fd);
+	LEAVE;
 	return rc;
 }
 
@@ -4705,6 +4720,7 @@ int configure_raid_migrate(i_container *array_i_con)
 	int max_x,max_y,start_y,start_x;
 	i_container *saved_i_con_head;
 
+	ENTER;
 	getmaxyx(stdscr,max_y,max_x);
 	getbegyx(stdscr,start_y,start_x);
 
@@ -4945,6 +4961,7 @@ int configure_raid_migrate(i_container *array_i_con)
 	free_screen(NULL, NULL, input_fields);
 
 	flush_stdscr();
+	LEAVE;
 	return rc;
 }
 
@@ -4968,6 +4985,7 @@ int process_raid_migrate(char *buffer[], int header_lines)
 	char *input;
 	int rc = REFRESH_FLAG;
 
+	ENTER;
 	while (rc & REFRESH_FLAG) {
 		toggle_field = 0;
 
@@ -5024,8 +5042,9 @@ int process_raid_migrate(char *buffer[], int header_lines)
 			s_status.index = INVALID_OPTION_STATUS;
 			rc = REFRESH_FLAG;
 		}
-
+		toggle++;
 	}
+	LEAVE;
 	return rc;
 }
 
@@ -5040,12 +5059,13 @@ int raid_migrate(i_container *i_con)
 {
 	int rc, k;
 	int found = 0;
-	struct ipr_dev *vset;
+	struct ipr_dev *array, *dev;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
 	struct screen_output *s_out;
 	int header_lines;
 
+	ENTER;
 	processing();
 
 	/* make sure the i_con list is empty */
@@ -5058,13 +5078,18 @@ int raid_migrate(i_container *i_con)
 	body_init_status(buffer, n_raid_migrate.header, &header_lines);
 
 	for_each_primary_ioa(ioa) {
-		for_each_vset(ioa, vset) {
-			if (!vset->array_rcd->migrate_cand)
+		for_each_array(ioa, array) {
+			dev = array;
+			if (!dev->array_rcd->migrate_cand)
 				continue;
-			add_raid_cmd_tail(ioa, vset, vset->array_id);
+
+			if (ioa->sis64)
+				dev = get_vset_from_array(ioa, dev);
+
+			add_raid_cmd_tail(ioa, dev, dev->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
 
-			print_dev(k, vset, buffer, "%1", k);
+			print_dev(k, dev, buffer, "%1", 2+k);
 			found++;
 		}
 	}
@@ -5095,6 +5120,7 @@ int raid_migrate(i_container *i_con)
 
 	n_raid_migrate.body = NULL;
 
+	LEAVE;
 	return rc;
 }
 
@@ -5352,7 +5378,7 @@ int asym_access(i_container *i_con)
 	for_each_primary_ioa(ioa) {
 		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
 			continue;
-		for_each_asym_array(ioa, array) {
+		for_each_array(ioa, array) {
 			if (!array->array_rcd->asym_access_cand) {
 				syslog_dbg("candidate not set\n");
 				continue;
@@ -5863,7 +5889,7 @@ int dev_include_complete(u8 num_devs)
 	n_dev_include_complete.body = n_dev_include_complete.header[0];
 
 	while(1) {
-		complete_screen_driver(&n_dev_include_complete, percent_cmplt,0);
+		complete_screen_driver(&n_dev_include_complete, percent_cmplt, 0);
 
 		percent_cmplt = 100;
 		done_bad = 0;
@@ -5978,7 +6004,7 @@ int dev_include_complete(u8 num_devs)
 				return RC_26_Include_Fail | EXIT_FLAG;
 
 			/*  "Include Unit completed successfully" */
-			complete_screen_driver(&n_dev_include_complete, percent_cmplt,1);
+			complete_screen_driver(&n_dev_include_complete, percent_cmplt, 1);
 			return RC_27_Include_Success | EXIT_FLAG;
 		}
 		not_done = 0;
@@ -7739,7 +7765,7 @@ static int dev_init_complete(u8 num_devs)
 
 	while(1) {
 		if (pid)
-			rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt,0);
+			rc = complete_screen_driver(&n_dev_init_complete, percent_cmplt, 0);
 
 		if (rc & EXIT_FLAG) {
 			pid = fork();
@@ -11452,7 +11478,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 		sprintf(buf, "Empty");
 	} else {
-		if (ipr_is_volume_set(dev) || ipr_is_asym_array(dev)) {
+		if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
 			rc = ipr_query_command_status(&ioa->ioa, &cmd_status);
 
 			if (!rc) {
@@ -11558,7 +11584,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 			sprintf(buf, "R/W Protected");
 		else if (res_state.prot_dev_failed)
 			sprintf(buf, "Failed");
-		else if (ipr_is_volume_set(dev) || ipr_is_asym_array(dev)) {
+		else if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
 			if (res_state.prot_resuming) {
 				if (!percent || (percent_cmplt == 0))
 					sprintf(buf, "Rebuilding");
@@ -11929,7 +11955,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 					len += sprintf(body + len, "%-25s ", "SSD Hot Spare");
 				else
 					len += sprintf(body + len, "%-25s ", "Hot Spare");
-			else if (ipr_is_volume_set(dev) || ipr_is_asym_array(dev)) {
+			else if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
 				if (dev->block_dev_class == IPR_SSD)
 					sprintf(buf, "RAID %s SSD Disk Array",
 						get_prot_level_str(ioa->supported_arrays, dev->raid_level));
@@ -14604,18 +14630,23 @@ static int query_reclaim(char **args, int num_args)
 static int query_arrays_raid_migrate(char **args, int num_args)
 {
 	int hdr = 0;
-	struct ipr_dev *vset;
+	struct ipr_dev *array, *vset;
 	struct ipr_ioa *ioa;
 
-	for_each_ioa(ioa) {
-		for_each_vset(ioa, vset) {
-			if (!vset->array_rcd->migrate_cand)
+	for_each_primary_ioa(ioa) {
+		for_each_array(ioa, array) {
+			if (!array->array_rcd->migrate_cand)
 				continue;
 			if (!hdr) {
 				hdr = 1;
 				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
 			}
-			printf_device(vset, 1);
+
+			if (ioa->sis64) {
+				vset = get_vset_from_array(ioa, array);
+				printf_device(vset, 1);
+			} else
+				printf_device(array, 1);
 		}
 	}
 	return 0;
@@ -14646,7 +14677,10 @@ static int query_devices_raid_migrate(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_volume_set(dev)) {
+	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
+		dev = get_array_from_vset(dev);
+
+	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
 		return -EINVAL;
 	}
@@ -14696,7 +14730,10 @@ static int query_raid_levels_raid_migrate(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_volume_set(dev)) {
+	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
+		dev = get_array_from_vset(dev);
+
+	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
 		return -EINVAL;
 	}
@@ -14741,7 +14778,10 @@ static int query_stripe_sizes_raid_migrate(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_volume_set(dev)) {
+	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
+		dev = get_array_from_vset(dev);
+
+	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
 		return -EINVAL;
 	}
@@ -14794,7 +14834,10 @@ int query_devices_min_max_raid_migrate(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_volume_set(dev)) {
+	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
+		dev = get_array_from_vset(dev);
+
+	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
 		return -EINVAL;
 	}
@@ -14877,7 +14920,7 @@ static int query_arrays_asym_access(char **args, int num_args)
 	for_each_ioa(ioa) {
 		if (!ioa->asymmetric_access || !ioa->asymmetric_access_enabled)
 			continue;
-		for_each_asym_array(ioa, array) {
+		for_each_array(ioa, array) {
 			if (!array->array_rcd->asym_access_cand)
 				continue;
 			if (!hdr) {
@@ -14945,7 +14988,7 @@ static int query_array_asym_access_mode(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_asym_array(array)) {
+	if (!ipr_is_array(array)) {
 		fprintf(stderr, "%s is not an array.\n", array->gen_name);
 		return -EINVAL;
 	}
@@ -15536,7 +15579,7 @@ static int set_array_asymmetric_access(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_asym_array(array)) {
+	if (!ipr_is_array(array)) {
 		scsi_err(array,  "Given device is not an array.");
 		return -EINVAL;
 	}

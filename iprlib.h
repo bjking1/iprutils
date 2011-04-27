@@ -958,7 +958,7 @@ struct ipr_dev_record {
 
 #define for_each_array_rcd(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_array_record) \
-              if (ipr_is_vset_record(rcd->common.record_id))
+              if (ipr_is_array_record(rcd->common.record_id))
 
 struct ipr_std_inq_data {
 #if defined (__BIG_ENDIAN_BITFIELD)
@@ -1386,9 +1386,9 @@ struct ipr_ioa {
       for_each_dev(i, d) \
            if (ipr_is_volume_set(d) && !d->array_rcd->start_cand)
 
-#define for_each_asym_array(i, d) \
+#define for_each_array(i, d) \
       for_each_dev(i, d) \
-           if (ipr_is_asym_array(d) && !d->array_rcd->start_cand)
+           if (ipr_is_array(d) && !d->array_rcd->start_cand)
 
 #define for_each_ses(i, d) \
       for_each_dev(i, d) \
@@ -2363,6 +2363,8 @@ int ipr_cmds_per_lun(struct ipr_ioa *);
 void scsi_host_kevent(char *, int (*)(struct ipr_ioa *));
 void scsi_dev_kevent(char *, struct ipr_dev *(*)(char *), int (*)(struct ipr_dev *));
 int format_req(struct ipr_dev *);
+struct ipr_dev *get_vset_from_array(struct ipr_ioa *, struct ipr_dev *);
+struct ipr_dev *get_array_from_vset(struct ipr_dev *);
 struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *, struct sysfs_dev *);
 void ipr_add_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
 void ipr_del_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
@@ -2408,7 +2410,7 @@ static inline int ipr_is_vset_record(int record_id)
 		return 0;
 }
 
-static inline int ipr_is_asym_array_record(int record_id)
+static inline int ipr_is_array_record(int record_id)
 {
 	if ((record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
 	    (record_id == IPR_RECORD_ID_ARRAY_RECORD_3))
@@ -2435,10 +2437,10 @@ static inline int ipr_is_volume_set(struct ipr_dev *device)
 		return 0;
 }
 
-static inline int ipr_is_asym_array(struct ipr_dev *device)
+static inline int ipr_is_array(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
-	    (ipr_is_asym_array_record(device->qac_entry->record_id)))
+	    (ipr_is_array_record(device->qac_entry->record_id)))
 		return 1;
 	else
 		return 0;
@@ -2526,6 +2528,9 @@ do { \
 if (ipr_debug) \
 fprintf(stderr, __VA_ARGS__);\
 } while(0)
+
+#define ENTER dprintf("Entering %s\n", __FUNCTION__);
+#define LEAVE dprintf("Leaving %s\n", __FUNCTION__);
 
 #define syslog_dbg(...) \
 do { \

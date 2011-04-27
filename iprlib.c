@@ -469,6 +469,47 @@ char *get_prot_level_str(struct ipr_supported_arrays *supported_arrays,
 }
 
 /**
+ * get_vset_from_array - Given an array, return the corresponding
+ *			 volume set device.
+ * @ioa:		ipr ioa struct
+ * @array:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+struct ipr_dev *get_vset_from_array(struct ipr_ioa *ioa, struct ipr_dev *array)
+{
+	struct ipr_dev *vset;
+
+		for_each_vset(ioa, vset)
+			if (vset->array_id == array->array_id)
+				return vset;
+
+	return array;
+}
+
+/**
+ * get_array_from_vset - Given a volume set, return the corresponding
+ *			 array device.
+ * @vset:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+struct ipr_dev *get_array_from_vset(struct ipr_dev *vset)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *array;
+
+	for_each_ioa(ioa)
+		for_each_array(ioa, array)
+			if (array->array_id == vset->array_id)
+				return array;
+
+	return vset;
+}
+
+/**
  * ipr_find_sysfs_dev - 
  * @dev:		ipr dev struct
  * @head:		sysfs dev struct
@@ -8869,7 +8910,7 @@ struct ipr_dev *get_dev_from_handle(u32 res_handle)
 			     ioa->dev[j].resource_handle == res_handle)
 				return &ioa->dev[j];
 
-			if (ipr_is_vset_record(ioa->dev[j].qac_entry->record_id) &&
+			if (ipr_is_array_record(ioa->dev[j].qac_entry->record_id) &&
 			    ioa->dev[j].resource_handle == res_handle)
 				return &ioa->dev[j];
 		}
