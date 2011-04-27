@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.3
+Version: 2.3.4
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Wed Apr 27 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.4
+- Release 2.3.4
+- Fixes data types for C4 page definition.
+- Fixes setting qac cdb[3] and rename ipr_is_array_record.
+- Fixes array migration funcionality.
+- Increases maximum dump size.
 * Mon Mar 07 2011 Wayne Boyer <wayneb@linux.vnet.ibm.com> 2.3.3
 - Release 2.3.3
 - Adds initial support for sis64 asymmetric access changes.
