@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.4
+Version: 2.3.5
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Thu Jun 16 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.5
+- Release 2.3.5
+- Fixes suspend and resume device bus commands.
 * Wed Apr 27 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.4
 - Release 2.3.4
 - Fixes data types for C4 page definition.
