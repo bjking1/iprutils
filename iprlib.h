@@ -2299,7 +2299,7 @@ void ipr_reset_adapter(struct ipr_ioa *);
 void ipr_scan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
-int ipr_suspend_device_bus(struct ipr_ioa *, struct ipr_res_addr *, u8);
+int ipr_suspend_device_bus(struct ipr_dev *, struct ipr_res_addr *, u8);
 int ipr_can_remove_device(struct ipr_dev *);
 int ipr_receive_diagnostics(struct ipr_dev *, u8, void *, int);
 int ipr_send_diagnostics(struct ipr_dev *, void *, int);

@@ -4180,13 +4180,15 @@ fail:
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int ipr_resume_device_bus(struct ipr_ioa *ioa,
+static int ipr_resume_device_bus(struct ipr_dev *dev,
 				 struct ipr_res_addr *res_addr)
 {
-	int fd, rc;
+	int fd, rc, cdb_num;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int length = 0;
+	struct ipr_ioa *ioa = dev->ioa;
+	char *rp, *endptr;
 
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
@@ -4202,9 +4204,19 @@ static int ipr_resume_device_bus(struct ipr_ioa *ioa,
 
 	cdb[0] = IPR_RESUME_DEV_BUS;
 	cdb[1] = IPR_RDB_UNQUIESCE_AND_REBALANCE;
-	cdb[3] = res_addr->bus;
-	cdb[4] = res_addr->target;
-	cdb[5] = res_addr->lun;
+	if (ioa->sis64) {
+		/* convert res path string to bytes */
+		cdb_num = 2;
+		rp = dev->scsi_dev_data->res_path;
+		do {
+			cdb[cdb_num++] = (u8)strtol(rp, &endptr, 16);
+			rp = endptr+1;
+		} while (*endptr != '\0' && cdb_num < 10);
+	} else {
+		cdb[3] = res_addr->bus;
+		cdb[4] = res_addr->target;
+		cdb[5] = res_addr->lun;
+	}
 
 	rc = sg_ioctl(fd, cdb, NULL,
 		      length, SG_DXFER_FROM_DEV,
@@ -4238,6 +4250,7 @@ static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int leng
 	u8 cdb[IPR_CCB_CDB_LEN];
 	int rc;
 
+	ENTER;
 	if ((strlen(dev->dev_name) == 0) && (strlen(dev->gen_name) == 0))
 		return -ENOENT;
 
@@ -4296,6 +4309,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	int sas_ses = 0;
 	int mode5 = 1;
 
+	ENTER;
 	if ((rc = ipr_get_dev_attr(dev, &attr))) {
 		scsi_dbg(dev, "Failed to get device attributes. rc=%d\n", rc);
 		return rc;
@@ -4326,7 +4340,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 				goto out;
 		}
 
-		rc = ipr_suspend_device_bus(dev->ioa, &dev->res_addr[0], 
+		rc = ipr_suspend_device_bus(dev, &dev->res_addr[0],
 					    IPR_SDB_CHECK_AND_QUIESCE_ENC);
 
 		if (rc) {
@@ -4348,7 +4362,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 			goto out;
 	}
 
-	scsi_dbg(dev, "Waiting for device to come ready after download\n");
+	scsi_dbg(dev, "Waiting for device to come ready after download.\n");
 	sleep(sas_ses ? 120 : 5);
 
 	for (i = 0, rc = -1; rc && (i < 60); i++, sleep(1))
@@ -4356,11 +4370,12 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 
 out_resume:
 	if (sas_ses)
-		ipr_resume_device_bus(dev->ioa, &dev->res_addr[0]);
+		ipr_resume_device_bus(dev, &dev->res_addr[0]);
 
 out:
 	attr.queue_depth = old_qdepth;
 	ipr_set_dev_attr(dev, &attr, 0);
+	LEAVE;
 	return rc;
 }
 
@@ -4373,14 +4388,17 @@ out:
  * Returns:
  *   0 if success / non-zero on failure
  **/
-int ipr_suspend_device_bus(struct ipr_ioa *ioa,
+int ipr_suspend_device_bus(struct ipr_dev *dev,
 			   struct ipr_res_addr *res_addr, u8 option)
 {
-	int fd, rc;
+	int fd, rc, cdb_num;
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	int length = 0;
+	struct ipr_ioa *ioa = dev->ioa;
+	char *rp, *endptr;
 
+	ENTER;
 	if (strlen(ioa->ioa.gen_name) == 0)
 		return -ENOENT;
 
@@ -4395,15 +4413,26 @@ int ipr_suspend_device_bus(struct ipr_ioa *ioa,
 
 	cdb[0] = IPR_SUSPEND_DEV_BUS;
 	cdb[1] = option;
-	cdb[3] = res_addr->bus;
-	cdb[4] = res_addr->target;
-	cdb[5] = res_addr->lun;
+	if (ioa->sis64) {
+		/* convert res path string to bytes */
+		cdb_num = 2;
+		rp = dev->scsi_dev_data->res_path;
+		do {
+			cdb[cdb_num++] = (u8)strtol(rp, &endptr, 16);
+			rp = endptr+1;
+		} while (*endptr != '\0' && cdb_num < 10);
+	} else {
+		cdb[3] = res_addr->bus;
+		cdb[4] = res_addr->target;
+		cdb[5] = res_addr->lun;
+	}
 
 	rc = sg_ioctl(fd, cdb, NULL,
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_SUSPEND_DEV_BUS_TIMEOUT);
 
 	close(fd);
+	LEAVE;
 	return rc;
 }
 
@@ -4419,7 +4448,7 @@ int ipr_can_remove_device(struct ipr_dev *dev)
 	struct ipr_res_addr *ra;
 
 	for_each_ra(ra, dev) {
-		if (ipr_suspend_device_bus(dev->ioa, ra, IPR_SDB_CHECK_ONLY))
+		if (ipr_suspend_device_bus(dev, ra, IPR_SDB_CHECK_ONLY))
 			return 0;
 	}
 
