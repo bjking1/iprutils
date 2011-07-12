@@ -15212,7 +15212,6 @@ static int show_details(char **args, int num_args)
 {
 	struct ipr_dev *dev = find_dev(args[0]);
 
-	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Missing device: %s\n", args[0]);
 		return -EINVAL;
