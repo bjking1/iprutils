@@ -5715,7 +5715,7 @@ static struct ipr_dev *find_multipath_vset(struct ipr_dev *vset1)
 				continue;
 			if (memcmp(vset1->serial_number,
 				   vset2->serial_number,
-				   ARRAY_SIZE(vset2->serial_number)))
+				   IPR_SERIAL_NUM_LEN))
 				continue;
 			return vset2;
 		}

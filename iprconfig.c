@@ -2109,6 +2109,9 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 		body = add_line_to_body(body, _("Capacity"), buffer);
 	}
 	body = add_line_to_body(body, _("Resource Name"), dev->dev_name);
+	ipr_strncpy_0(buffer, (char *)dev->serial_number, IPR_SERIAL_NUM_LEN);
+	body = add_line_to_body(body,_("Serial Number"), buffer);
+
 
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
