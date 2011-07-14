@@ -940,10 +940,11 @@ struct ipr_dev_record {
 }__attribute__((packed, aligned (4)));
 
 #define __for_each_qac_entry(rcd, qac, type) \
-      for (rcd = (type *)(qac)->data; \
-           ((unsigned long)rcd) < ((unsigned long)((qac)->u.buf + (qac)->resp_len)) && \
-           ((unsigned long)rcd) < ((unsigned long)((qac)->u.buf + IPR_QAC_BUFFER_SIZE)); \
-           rcd = (type *)((unsigned long)rcd + ntohs(((struct ipr_common_record *)rcd)->record_len)))
+      if ((qac)->num_records) \
+          for (rcd = (type *)(qac)->data; \
+               ((unsigned long)rcd) < ((unsigned long)((qac)->u.buf + (qac)->resp_len)) && \
+               ((unsigned long)rcd) < ((unsigned long)((qac)->u.buf + IPR_QAC_BUFFER_SIZE)); \
+               rcd = (type *)((unsigned long)rcd + ntohs(((struct ipr_common_record *)rcd)->record_len)))
 
 #define for_each_supported_arrays_rcd(rcd, qac) \
       __for_each_qac_entry(rcd, qac, struct ipr_supported_arrays) \
