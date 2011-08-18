@@ -8685,13 +8685,15 @@ int ipr_init_dev(struct ipr_dev *dev)
  * Returns:
  *   nothing
  **/
-void ipr_init_new_dev(struct ipr_dev *dev)
+int ipr_init_new_dev(struct ipr_dev *dev)
 {
 	if (!dev->scsi_dev_data)
-		return;
+		return 0;
 
 	switch (dev->scsi_dev_data->type) {
 	case TYPE_DISK:
+		if (!strlen(dev->dev_name))
+			return 1;
 		wait_for_dev(dev->dev_name);
 		break;
 	case IPR_TYPE_ADAPTER:
@@ -8705,6 +8707,7 @@ void ipr_init_new_dev(struct ipr_dev *dev)
 	};
 
 	ipr_init_dev(dev);
+	return 0;
 }
 
 /**
@@ -8929,28 +8932,30 @@ struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr)
 /**
  * get_dev_from_handle - 
  * @res_handle:		
+ * @ioa:		struct ipr_ioa
  *
  * Returns:
  *   ipr_dev struct if success / NULL otherwise
  **/
-struct ipr_dev *get_dev_from_handle(u32 res_handle)
+struct ipr_dev *get_dev_from_handle(struct ipr_ioa *ioa, u32 res_handle)
 {
-	struct ipr_ioa *ioa;
 	int j;
 
-	for_each_ioa(ioa) {
-		for (j = 0; j < ioa->num_devices; j++) {
-			if (!ioa->dev[j].qac_entry)
-				continue;
+	for (j = 0; j < ioa->num_devices; j++) {
+		if (!ioa->dev[j].qac_entry)
+			continue;
 
-			if (ipr_is_device_record(ioa->dev[j].qac_entry->record_id) &&
-			     ioa->dev[j].resource_handle == res_handle)
-				return &ioa->dev[j];
+		if (ipr_is_device_record(ioa->dev[j].qac_entry->record_id) &&
+		     ioa->dev[j].resource_handle == res_handle)
+			return &ioa->dev[j];
 
-			if (ipr_is_array_record(ioa->dev[j].qac_entry->record_id) &&
-			    ioa->dev[j].resource_handle == res_handle)
-				return &ioa->dev[j];
-		}
+		if (ipr_is_array_record(ioa->dev[j].qac_entry->record_id) &&
+		    ioa->dev[j].resource_handle == res_handle)
+			return &ioa->dev[j];
+
+		if (ipr_is_vset_record(ioa->dev[j].qac_entry->record_id) &&
+		    ioa->dev[j].resource_handle == res_handle)
+			return &ioa->dev[j];
 	}
 
 	return NULL;

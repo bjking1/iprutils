@@ -3636,6 +3636,8 @@ int raid_start_complete()
 	struct ipr_cmd_status_record *status_record;
 	int done_bad;
 	int not_done = 0;
+	int retry = 1;
+	int timeout;
 	int rc;
 	u32 percent_cmplt = 0;
 	int device_available = 0;
@@ -3680,18 +3682,27 @@ int raid_start_complete()
 				if (!device_available &&
 				    (status_record->resource_handle != IPR_IOA_RESOURCE_HANDLE)) {
 
-					check_current_config(false);
-					dev = get_dev_from_handle(status_record->resource_handle);
-					if (dev && dev->scsi_dev_data) {
-						device_available = 1;
-						ipr_init_new_dev(dev);
-						if (ipr_get_dev_attr(dev, &attr)) {
-							syslog(LOG_ERR, _("Unable to read queue_depth"));
-						} else {
-							attr.queue_depth = cur_raid_cmd->qdepth;
-							if (ipr_set_dev_attr(dev, &attr, 1))
-								syslog(LOG_ERR, _("Unable to set queue_depth"));
-						}
+					timeout = 30;
+					while (retry && timeout) {
+						check_current_config(false);
+						dev = get_dev_from_handle(ioa, status_record->resource_handle);
+						if (dev && dev->scsi_dev_data) {
+							device_available = 1;
+							if (ipr_init_new_dev(dev)) {
+								sleep(1);
+								timeout--;
+								continue;
+							} else
+								retry = 0;
+							if (ipr_get_dev_attr(dev, &attr)) {
+								syslog(LOG_ERR, _("Unable to read queue_depth"));
+							} else {
+								attr.queue_depth = cur_raid_cmd->qdepth;
+								if (ipr_set_dev_attr(dev, &attr, 1))
+									syslog(LOG_ERR, _("Unable to set queue_depth"));
+							}
+						} else
+							break;
 					}
 				}
 
@@ -4409,7 +4420,7 @@ int raid_migrate_complete()
 				    (status_record->resource_handle != IPR_IOA_RESOURCE_HANDLE)) {
 
 					check_current_config(false);
-					dev = get_dev_from_handle(status_record->resource_handle);
+					dev = get_dev_from_handle(ioa, status_record->resource_handle);
 					if (dev && dev->scsi_dev_data)
 						device_available = 1;
 				}
@@ -4551,7 +4562,7 @@ int choose_migrate_disks(struct ipr_ioa *ioa, struct ipr_array_query_data *qac,
 		if (!dev_rcd->migrate_array_prot_cand)
 			continue;
 
-		dev = get_dev_from_handle(ipr_get_dev_res_handle(ioa, dev_rcd));
+		dev = get_dev_from_handle(ioa, ipr_get_dev_res_handle(ioa, dev_rcd));
 		if (dev) {
 			print_dev(k, dev, buffer, "%1", 2);
 
@@ -14707,7 +14718,7 @@ static int query_devices_raid_migrate(char **args, int num_args)
 			printf("%s\n%s\n", status_hdr[2], status_sep[2]);
 		}
 
-		dev = get_dev_from_handle(ipr_get_dev_res_handle(dev->ioa, dev_rcd));
+		dev = get_dev_from_handle(dev->ioa, ipr_get_dev_res_handle(dev->ioa, dev_rcd));
 		if (dev)
 			printf_device(dev, 2);
 	}

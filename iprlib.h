@@ -1642,6 +1642,10 @@ struct ipr_cmd_status_record {
 	u32 failing_dev_ioasc;
 	u32 ilid;
 	u32 resource_handle;
+	u8 vset_id;
+	u8 flags;
+	u16 reserved;
+	u8 failing_dev_res_path[8];
 };
 
 struct ipr_cmd_status {
@@ -1651,7 +1655,7 @@ struct ipr_cmd_status {
 	struct ipr_cmd_status_record record[100];
 };
 
-#define for_each_cmd_status(r, s) for (r = (s)->record; (r - (s)->record) < (s)->num_records; r++)
+#define for_each_cmd_status(r, s) for (r = (s)->record; (unsigned long)(r) < ((unsigned long)((s)->record) + ntohs((s)->resp_len) - 4); r = (void *)(r) + ntohs((r)->length))
 
 struct ipr_inquiry_page0 {
 	u8 peri_qual_dev_type;
@@ -2328,11 +2332,11 @@ int get_ses_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 int ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
 int ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 int ipr_init_dev(struct ipr_dev *);
-void ipr_init_new_dev(struct ipr_dev *);
+int ipr_init_new_dev(struct ipr_dev *);
 int ipr_init_ioa(struct ipr_ioa *);
 int device_supported(struct ipr_dev *);
 struct ipr_dev *get_dev_from_addr(struct ipr_res_addr *res_addr);
-struct ipr_dev *get_dev_from_handle(u32 res_handle);
+struct ipr_dev *get_dev_from_handle(struct ipr_ioa *ioa, u32 res_handle);
 void ipr_daemonize();
 struct unsupported_af_dasd *get_unsupp_af(struct ipr_std_inq_data *,
 					  struct ipr_dasd_inquiry_page3 *);
