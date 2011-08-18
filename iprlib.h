@@ -79,7 +79,8 @@
 #define IPR_VPD_DRAM_SIZE_LEN                3
 #define IPR_VPD_PART_NUM_LEN                 12
 #define IPR_CCB_CDB_LEN                      16
-#define IPR_QAC_BUFFER_SIZE                  16000
+#define IPR_QAC_BUFFER_SIZE                  200000
+#define IPR_SIS32_QAC_BUFFER_SIZE            16000
 #define IPR_INVALID_ARRAY_ID                 0xFF
 #define IPR_IOA_RESOURCE_HANDLE              0xffffffff
 #define IPR_RECLAIM_NUM_BLOCKS_MULTIPLIER    256
@@ -1305,7 +1306,7 @@ enum ipr_tcq_mode {
 	IPR_TCQ_NACA = 2
 };
 
-#define IPR_MAX_IOA_DEVICES        (IPR_MAX_NUM_BUSES * 15 * 2 + 1)
+#define IPR_MAX_IOA_DEVICES        (IPR_MAX_NUM_BUSES * 45 * 2 + 1)
 struct ipr_ioa {
 	struct ipr_dev ioa;
 	u16 ccin;

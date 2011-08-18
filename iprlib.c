@@ -2223,6 +2223,9 @@ int __ipr_query_array_config(struct ipr_ioa *ioa, int fd,
 	struct sense_data_t sense_data;
 	int rc;
 
+	if (!ioa->sis64)
+		length = IPR_SIS32_QAC_BUFFER_SIZE;
+
 	ioa->nr_ioa_microcode = 0;
 
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
