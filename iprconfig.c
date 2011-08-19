@@ -4172,7 +4172,7 @@ int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
 	enc_raid_level = cap->prot_level;
 
 	if (ioa->sis64)
-		vset = get_array_from_vset(vset);
+		vset = get_array_from_vset(ioa, vset);
 
 	/* loop through returned records - looking at array records */
 	for_each_array_rcd(array_rcd, qac_data) {
@@ -14681,7 +14681,7 @@ static int query_devices_raid_migrate(char **args, int num_args)
 	}
 
 	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
-		dev = get_array_from_vset(dev);
+		dev = get_array_from_vset(dev->ioa, dev);
 
 	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
@@ -14734,7 +14734,7 @@ static int query_raid_levels_raid_migrate(char **args, int num_args)
 	}
 
 	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
-		dev = get_array_from_vset(dev);
+		dev = get_array_from_vset(dev->ioa, dev);
 
 	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
@@ -14782,7 +14782,7 @@ static int query_stripe_sizes_raid_migrate(char **args, int num_args)
 	}
 
 	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
-		dev = get_array_from_vset(dev);
+		dev = get_array_from_vset(dev->ioa, dev);
 
 	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
@@ -14838,7 +14838,7 @@ int query_devices_min_max_raid_migrate(char **args, int num_args)
 	}
 
 	if (dev->ioa->sis64 && ipr_is_volume_set(dev))
-		dev = get_array_from_vset(dev);
+		dev = get_array_from_vset(dev->ioa, dev);
 
 	if (!ipr_is_array(dev)) {
 		fprintf(stderr, "%s is not an array.\n", args[0]);
@@ -14992,8 +14992,12 @@ static int query_array_asym_access_mode(char **args, int num_args)
 	}
 
 	if (!ipr_is_array(array)) {
-		fprintf(stderr, "%s is not an array.\n", array->gen_name);
-		return -EINVAL;
+		if (array->ioa->sis64 && ipr_is_volume_set(array))
+			array = get_array_from_vset(array->ioa, array);
+		else {
+			fprintf(stderr, "%s is not an array.\n", array->gen_name);
+			return -EINVAL;
+		}
 	}
 
 	if (!array->array_rcd->asym_access_cand)
@@ -15583,8 +15587,12 @@ static int set_array_asymmetric_access(char **args, int num_args)
 	}
 
 	if (!ipr_is_array(array)) {
-		scsi_err(array,  "Given device is not an array.");
-		return -EINVAL;
+		if (array->ioa->sis64 && ipr_is_volume_set(array))
+			array = get_array_from_vset(array->ioa, array);
+		else {
+			scsi_err(array,  "Given device is not an array.");
+			return -EINVAL;
+		}
 	}
 
 	/* Check that the adapter is a primary adapter. */

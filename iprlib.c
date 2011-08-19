@@ -481,9 +481,9 @@ struct ipr_dev *get_vset_from_array(struct ipr_ioa *ioa, struct ipr_dev *array)
 {
 	struct ipr_dev *vset;
 
-		for_each_vset(ioa, vset)
-			if (vset->array_id == array->array_id)
-				return vset;
+	for_each_vset(ioa, vset)
+		if (vset->array_id == array->array_id)
+			return vset;
 
 	return array;
 }
@@ -491,20 +491,19 @@ struct ipr_dev *get_vset_from_array(struct ipr_ioa *ioa, struct ipr_dev *array)
 /**
  * get_array_from_vset - Given a volume set, return the corresponding
  *			 array device.
+ * @ioa:		ipr ioa struct
  * @vset:		ipr dev struct
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-struct ipr_dev *get_array_from_vset(struct ipr_dev *vset)
+struct ipr_dev *get_array_from_vset(struct ipr_ioa *ioa, struct ipr_dev *vset)
 {
-	struct ipr_ioa *ioa;
 	struct ipr_dev *array;
 
-	for_each_ioa(ioa)
-		for_each_array(ioa, array)
-			if (array->array_id == vset->array_id)
-				return array;
+	for_each_array(ioa, array)
+		if (array->array_id == vset->array_id)
+			return array;
 
 	return vset;
 }

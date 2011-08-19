@@ -2365,7 +2365,7 @@ void scsi_host_kevent(char *, int (*)(struct ipr_ioa *));
 void scsi_dev_kevent(char *, struct ipr_dev *(*)(char *), int (*)(struct ipr_dev *));
 int format_req(struct ipr_dev *);
 struct ipr_dev *get_vset_from_array(struct ipr_ioa *, struct ipr_dev *);
-struct ipr_dev *get_array_from_vset(struct ipr_dev *);
+struct ipr_dev *get_array_from_vset(struct ipr_ioa *, struct ipr_dev *);
 struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *, struct sysfs_dev *);
 void ipr_add_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
 void ipr_del_sysfs_dev(struct ipr_dev *, struct sysfs_dev **, struct sysfs_dev **);
