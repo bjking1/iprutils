@@ -5618,8 +5618,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 }
 
 /**
- * get_prot_levels - populate the prot_level_str field for each vset and each
- *                   device in the vset
+ * get_prot_levels - populate the prot_level_str field for each array, for each
+ *                   vset and each device in the vset
  * @ioa:		ipr ioa struct
  *
  * Returns:
@@ -5627,8 +5627,14 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
  **/
 static void get_prot_levels(struct ipr_ioa *ioa)
 {
-	struct ipr_dev *vset, *dev;
+	struct ipr_dev *array, *vset, *dev;
 	char *prot_level_str;
+
+	for_each_array(ioa, array) {
+		prot_level_str = get_prot_level_str(ioa->supported_arrays,
+						    array->raid_level);
+		strncpy(array->prot_level_str, prot_level_str, 8);
+	}
 
 	for_each_vset(ioa, vset) {
 		prot_level_str = get_prot_level_str(ioa->supported_arrays,

@@ -2046,14 +2046,14 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 }
 
 /**
- * vset_details - get vset details
+ * vset_array_details - get vset/array details
  * @body:		data buffer
  * @dev:		ipr dev struct
  *
  * Returns:
  *   body
  **/
-static char *vset_details(char *body, struct ipr_dev *dev)
+static char *vset_array_details(char *body, struct ipr_dev *dev)
 {
 	struct ipr_read_cap16 read_cap16;
 	unsigned long long max_user_lba_int;
@@ -2068,7 +2068,7 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 		scsi_channel = dev->scsi_dev_data->channel;
 		scsi_id = dev->scsi_dev_data->id;
 		scsi_lun = dev->scsi_dev_data->lun;
-	} else {
+	} else if (!dev->ioa->sis64) {
 		scsi_channel = array_rcd->type2.last_resource_addr.bus;
 		scsi_id = array_rcd->type2.last_resource_addr.target;
 		scsi_lun = array_rcd->type2.last_resource_addr.lun;
@@ -2108,7 +2108,10 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 		sprintf(buffer, "%.2Lf GB", device_capacity / lba_divisor);
 		body = add_line_to_body(body, _("Capacity"), buffer);
 	}
-	body = add_line_to_body(body, _("Resource Name"), dev->dev_name);
+
+	if (ipr_is_volume_set(dev))
+		body = add_line_to_body(body, _("Resource Name"), dev->dev_name);
+
 	ipr_strncpy_0(buffer, (char *)dev->serial_number, IPR_SERIAL_NUM_LEN);
 	body = add_line_to_body(body,_("Serial Number"), buffer);
 
@@ -2119,17 +2122,20 @@ static char *vset_details(char *body, struct ipr_dev *dev)
 	if (dev->ioa->sis64)
 		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
 
-	sprintf(buffer, "%d", dev->ioa->host_num);
-	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
+	if (dev->scsi_dev_data || !dev->ioa->sis64) {
+		sprintf(buffer, "%d", dev->ioa->host_num);
+		body = add_line_to_body(body, _("SCSI Host Number"), buffer);
 
-	sprintf(buffer, "%d", scsi_channel);
-	body = add_line_to_body(body, _("SCSI Channel"), buffer);
+		sprintf(buffer, "%d", scsi_channel);
+		body = add_line_to_body(body, _("SCSI Channel"), buffer);
 
-	sprintf(buffer, "%d", scsi_id);
-	body = add_line_to_body(body, _("SCSI Id"), buffer);
+		sprintf(buffer, "%d", scsi_id);
+		body = add_line_to_body(body, _("SCSI Id"), buffer);
 
-	sprintf(buffer, "%d", scsi_lun);
-	body = add_line_to_body(body, _("SCSI Lun"), buffer);
+		sprintf(buffer, "%d", scsi_lun);
+		body = add_line_to_body(body, _("SCSI Lun"), buffer);
+	}
+
 	return body;
 }
 
@@ -2430,7 +2436,7 @@ int device_details(i_container *i_con)
 		body = ioa_details(body, dev);
 	} else if (ipr_is_volume_set(dev)) {
 		n_screen = &n_vset_details;
-		body = vset_details(body, dev);
+		body = vset_array_details(body, dev);
 	} else if (ipr_is_ses(dev)) {
 		n_screen = &n_ses_details;
 		body = ses_details(body, dev);
@@ -15056,10 +15062,12 @@ static void show_dev_details(struct ipr_dev *dev)
 {
 	char *body = NULL;
 
-	if (dev->scsi_dev_data && dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+	if (dev->scsi_dev_data &&
+	    dev->scsi_dev_data->type == IPR_TYPE_ADAPTER &&
+	    dev == &dev->ioa->ioa)
 		body = ioa_details(body, dev);
-	else if (ipr_is_volume_set(dev))
-		body = vset_details(body, dev);
+	else if (ipr_is_volume_set(dev) || ipr_is_array(dev))
+		body = vset_array_details(body, dev);
 	else if (ipr_is_ses(dev))
 		body = ses_details(body, dev);
 	else
