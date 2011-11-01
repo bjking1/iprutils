@@ -2487,6 +2487,7 @@ static inline int ipr_is_hot_spare(struct ipr_dev *device)
 		(struct ipr_dev_record *)device->qac_entry;
 
 	if ((dev_record != NULL) &&
+	    (ipr_is_device_record(dev_record->common.record_id)) &&
 	    (dev_record->is_hot_spare))
 		return 1;
 	else
