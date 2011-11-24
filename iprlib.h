@@ -1650,9 +1650,8 @@ struct ipr_cmd_status_record {
 
 struct ipr_cmd_status {
 	u16 resp_len;
-	u8  reserved;
-	u8  num_records;
-	struct ipr_cmd_status_record record[100];
+	u16 num_records;
+	struct ipr_cmd_status_record record[250];
 };
 
 #define for_each_cmd_status(r, s) for (r = (s)->record; (unsigned long)(r) < ((unsigned long)((s)->record) + ntohs((s)->resp_len) - 4); r = (void *)(r) + ntohs((r)->length))
