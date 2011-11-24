@@ -3593,7 +3593,7 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
-	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+	if (rc != 0 && (ipr_debug || sense_data.sense_key != ILLEGAL_REQUEST))
 		scsi_cmd_err(dev, &sense_data, "Inquiry", rc);
 
 	close(fd);
@@ -8050,9 +8050,12 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	struct sysfs_class_device *class_device;
 	struct sysfs_attribute *attr;
 	struct ipr_ioa_ucode_header *image_hdr;
+	struct ipr_ioa_ucode_ext_header *ext_hdr;
+	struct ipr_ioa_ucode_img_desc *img_desc;
 	struct stat ucode_stats;
 	u32 fw_version;
 	int fd, rc;
+	int ioafw = 1;
 	int host_num = ioa->host_num;
 	char *tmp;
 	char ucode_file[200];
@@ -8091,9 +8094,18 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		return -EIO;
 	}
 
+	ext_hdr = (void *)image_hdr + ntohl(image_hdr->header_length);
+	img_desc = (void *)ext_hdr + ntohl(ext_hdr->img_desc_offset);
+	if (strncmp(img_desc->fw_type, IPR_IOAF_STR, 4))
+		ioafw = 0;
+
 	if (ntohl(image_hdr->rev_level) > fw_version || force) {
-		ioa_info(ioa, "Updating adapter microcode from %08X to %08X.\n",
-			 fw_version, ntohl(image_hdr->rev_level));
+		if (ioafw)
+			ioa_info(ioa, "Updating microcode from %08X to %08X.\n",
+				 fw_version, ntohl(image_hdr->rev_level));
+		else
+			ioa_info(ioa, "Updating microcode to %08X.\n",
+				 ntohl(image_hdr->rev_level));
 
 		/* Give the file name an absolute path if needed. */
 		if (image->file[0] != '/') {

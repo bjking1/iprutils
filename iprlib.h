@@ -1737,14 +1737,34 @@ struct ipr_dasd_ucode_header {
 	u8 patch_number[4];
 };
 
+struct ipr_ioa_ucode_img_desc {
+#define IPR_IOAF_STR   "IOAF"
+#define IPR_FPGA_STR   "FPGA"
+#define IPR_DRAM_STR   "AGIG"
+	char fw_type[4];
+#define IPR_IOAF       0
+#define IPR_FPGA       1
+#define IPR_DRAM       2
+	u8 reserved[16];
+};
+
+struct ipr_ioa_ucode_ext_header {
+       char eyecatcher[8];        /* EXTDLIMG */
+       u32 image_length;
+       u32 flags;
+       char fw_level[8];
+       u8 reserved[12];
+       u32 img_desc_offset;
+};
+
 struct ipr_ioa_ucode_header {
-    u32 header_length;
-    u32 lid_table_offset;
-    u32 rev_level;
+	u32 header_length;
+	u32 lid_table_offset;
+	u32 rev_level;
 #define LINUX_HEADER_RESERVED_BYTES 20
-    u8 reserved[LINUX_HEADER_RESERVED_BYTES];
-    char eyecatcher[16];        /* IBMAS400 CCIN */
-    u32 num_lids;
+	u8 reserved[LINUX_HEADER_RESERVED_BYTES];
+	char eyecatcher[16];        /* IBMAS400 CCIN */
+	u32 num_lids;
 };
 
 struct ipr_fw_images {
