@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.7
+Version: 2.3.8
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Thu Nov 24 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.8
+- Release 2.3.8
+- Adds support for FPGA updates.
+- Bumps up number of command status records.
+- Only uses primary adapter for initialize and format disk task.
+- Fixes check for hotspare devices.
+- Removes unnecessary call to find_dev().
 * Thu Aug 18 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.7
 - Release 2.3.7
 - Adds support for vset device asymmetric config.
