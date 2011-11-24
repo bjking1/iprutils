@@ -7597,7 +7597,7 @@ int init_device(i_container *i_con)
 
 	body_init_status(buffer, n_init_device.header, &header_lines);
 
-	for_each_ioa(ioa) {
+	for_each_primary_ioa(ioa) {
 		if (ioa->ioa_dead)
 			continue;
 
@@ -14495,7 +14495,7 @@ static int query_recovery_format(char **args, int num_args)
 	struct ipr_dev *dev;
 	int hdr = 0;
 
-	for_each_ioa(ioa) {
+	for_each_primary_ioa(ioa) {
 		for_each_disk(ioa, dev) {
 			if (ipr_is_hot_spare(dev) || !device_supported(dev))
 				continue;
