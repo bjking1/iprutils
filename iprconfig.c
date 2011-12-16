@@ -1988,11 +1988,18 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 			sprintf(buffer,"%d MB", ntohl(cc_vpd.write_cache_size));
 			body = add_line_to_body(body,_("Write Cache Size"), buffer);
 		}
+		if (ntohl(cc_vpd.data_store_size)) {
+			sprintf(buffer,"%d MB", ntohl(cc_vpd.data_store_size));
+			body = add_line_to_body(body,_("DRAM Size"), buffer);
+		} else {
 
-		ipr_strncpy_0(buffer, (char *)dram_vpd.dram_size, IPR_VPD_DRAM_SIZE_LEN);
-		dram_size = strtoul(buffer, NULL, 16);
-		sprintf(buffer, "%d MB", dram_size);
-		body = add_line_to_body(body,_("DRAM Size"), buffer);
+
+			ipr_strncpy_0(buffer, (char *)dram_vpd.dram_size,
+				      IPR_VPD_DRAM_SIZE_LEN);
+			dram_size = strtoul(buffer, NULL, 16);
+			sprintf(buffer, "%d MB", dram_size);
+			body = add_line_to_body(body,_("DRAM Size"), buffer);
+		}
 	}
 	body = add_line_to_body(body,_("Resource Name"), dev->gen_name);
 	body = add_line_to_body(body,"", NULL);
