@@ -4023,7 +4023,7 @@ int raid_resync(i_container *i_con)
 {
 	int rc, k;
 	int found = 0;
-	struct ipr_dev *dev;
+	struct ipr_dev *dev, *array;
 	char *buffer[2];
 	struct ipr_ioa *ioa;
 	struct screen_output *s_out;
@@ -4041,13 +4041,17 @@ int raid_resync(i_container *i_con)
 
 	for_each_ioa(ioa) {
 		ioa->num_raid_cmds = 0;
-		for_each_vset(ioa, dev) {
-			if (!dev->array_rcd->resync_cand)
+		for_each_array(ioa, array) {
+			if (!array->array_rcd->resync_cand)
 				continue;
+
+			dev = array;
+			if (ioa->sis64)
+				dev = get_vset_from_array(ioa, dev);
 
 			add_raid_cmd_tail(ioa, dev, dev->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
-			print_dev(k, dev, buffer, "%1", k);
+			print_dev(k, dev, buffer, "%1", 2+k);
 			found++;
 			ioa->num_raid_cmds++;
 		}
@@ -12901,20 +12905,25 @@ static int query_hot_spare_delete(char **args, int num_args)
  **/
 static int query_raid_consistency_check(char **args, int num_args)
 {
-	struct ipr_dev *vset;
+	struct ipr_dev *dev, *array;
 	struct ipr_ioa *ioa;
 	int hdr = 0;
 
 	for_each_ioa(ioa) {
-		for_each_vset(ioa, vset) {
-			if (!vset->array_rcd->resync_cand)
+		for_each_array(ioa, array) {
+			if (!array->array_rcd->resync_cand)
 				continue;
+
+			dev = array;
+			if (ioa->sis64)
+				dev = get_vset_from_array(ioa, dev);
+
 			if (!hdr) {
 				hdr = 1;
 				printf("%s\n%s\n", status_hdr[3], status_sep[3]);
 			}
 
-			printf_device(vset, 1);
+			printf_device(dev, 1);
 		}
 	}
 
@@ -12931,15 +12940,23 @@ static int query_raid_consistency_check(char **args, int num_args)
  **/
 static int raid_consistency_check(char **args, int num_args)
 {
-	struct ipr_dev *vset = find_dev(args[0]);
+	struct ipr_dev *dev = find_dev(args[0]);
 
-	if (!vset) {
+	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
 
-	vset->array_rcd->issue_cmd = 1;
-	return ipr_resync_array(vset->ioa);
+	if (dev->ioa->sis64)
+		dev = get_array_from_vset(dev->ioa, dev);
+
+	if (!dev->array_rcd->resync_cand) {
+		fprintf(stderr, "%s is not a candidate for checking.\n", args[0]);
+		return -EINVAL;
+	}
+
+	dev->array_rcd->issue_cmd = 1;
+	return ipr_resync_array(dev->ioa);
 }
 
 /**
