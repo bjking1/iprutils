@@ -838,7 +838,13 @@ struct ipr_dev_record {
 	u8  known_zeroed:1;
 	u8  issue_cmd:1;
 #endif
-	u8  reserved1;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8  saved_asym_access_state:4;
+	u8  current_asym_access_state:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8  current_asym_access_state:4;
+	u8  saved_asym_access_state:4;
+#endif
 
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8  array_member:1;
@@ -2448,6 +2454,16 @@ static inline int ipr_is_af_dasd_device(struct ipr_dev *device)
 {
 	if ((device->qac_entry != NULL) &&
 	    (ipr_is_device_record(device->qac_entry->record_id)))
+		return 1;
+	else
+		return 0;
+}
+
+static inline int ipr_is_remote_af_dasd_device(struct ipr_dev *device)
+{
+	if ((device->qac_entry != NULL) &&
+	    (ipr_is_device_record(device->qac_entry->record_id) &&
+		device->dev_rcd->current_asym_access_state == IPR_ACTIVE_NON_OPTIMIZED))
 		return 1;
 	else
 		return 0;

@@ -11592,7 +11592,8 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 				sprintf(buf, "No Paths");
 		} else if (format_in_progress)
 			sprintf(buf, "%d%% Formatted", percent_cmplt);
-		else if (!scsi_dev_data && dev->ioa->is_secondary)
+		else if ((!ioa->sis64 && ioa->is_secondary && !scsi_dev_data) ||
+			 (ioa->sis64 && ipr_is_remote_af_dasd_device(dev)))
 			sprintf(buf, "Remote");
 		else if (!scsi_dev_data)
 			sprintf(buf, "Missing");
@@ -11624,7 +11625,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 				 || (!dev->ioa->is_secondary && !dev->ioa->asymmetric_access))
 				sprintf(buf, "Optimized");
 			else
-				sprintf(buf, "Active");
+				sprintf(buf, "Non-Optimized");
 		} else if (format_req)
 			sprintf(buf, "Format Required");
 		else if (ipr_device_is_zeroed(dev))
