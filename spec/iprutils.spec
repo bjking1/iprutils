@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.8
+Version: 2.3.9
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Dec 16 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.9
+- Release 2.3.9
+- Fixes disks and arrays status.
+- Uses C4 inquiry page for DRAM size.
+- Sets allow_restart to zero before raid delete.
+- Fixes raid consistency check for 64 bit adapters.
+- Fixes compile warning.
+- Updates queue depth values.
 * Thu Nov 24 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.8
 - Release 2.3.8
 - Adds support for FPGA updates.
