@@ -2884,13 +2884,22 @@ int do_confirm_raid_stop(i_container *i_con)
 		printw(_("Operation in progress - please wait"));
 		refresh();
 
-		if (vset->scsi_dev_data)
+		if (vset->scsi_dev_data) {
+			ipr_allow_restart(vset, 0);
 			rc = ipr_start_stop_stop(vset);
-		if (vset->alt_path && vset->alt_path->scsi_dev_data)
+		}
+		if (vset->alt_path && vset->alt_path->scsi_dev_data) {
+			ipr_allow_restart(vset->alt_path, 0);
 			rc = ipr_start_stop_stop(vset->alt_path);
+		}
 
-		if (rc != 0)
+		if (rc != 0) {
+			if (vset->scsi_dev_data)
+				ipr_allow_restart(vset, 1);
+			if (vset->alt_path && vset->alt_path->scsi_dev_data)
+				ipr_allow_restart(vset->alt_path, 1);
 			return (20 | EXIT_FLAG);
+		}
 		ioa->num_raid_cmds++;
 	}
 
@@ -2900,8 +2909,13 @@ int do_confirm_raid_stop(i_container *i_con)
 		ioa->num_raid_cmds = 0;
 
 		rc = ipr_stop_array_protection(ioa);
-		if (rc != 0)
+		if (rc != 0) {
+			if (vset->scsi_dev_data)
+				ipr_allow_restart(vset, 1);
+			if (vset->alt_path && vset->alt_path->scsi_dev_data)
+				ipr_allow_restart(vset->alt_path, 1);
 			return (20 | EXIT_FLAG);
+		}
 	}
 
 	rc = raid_stop_complete();
@@ -12569,18 +12583,30 @@ static int raid_delete(char **args, int num_args)
 
 	dev = find_and_add_dev(args[0]);
 
-	if (!dev || !ipr_is_volume_set(dev)) {
+	if (!dev || !ipr_is_volume_set(dev) || dev->ioa->is_secondary) {
 		syslog(LOG_ERR, _("Invalid device specified: %s\n"), args[0]);
 		return -EINVAL;
 	}
 
 	dev->array_rcd->issue_cmd = 1;
-	if (dev->scsi_dev_data)
+	if (dev->scsi_dev_data) {
+		ipr_allow_restart(dev, 0);
 		rc = ipr_start_stop_stop(dev);
-	if (dev->alt_path && dev->alt_path->scsi_dev_data)
+	}
+	if (dev->alt_path && dev->alt_path->scsi_dev_data) {
+		ipr_allow_restart(dev->alt_path, 0);
 		rc = ipr_start_stop_stop(dev->alt_path);
-	if ((rc = ipr_stop_array_protection(dev->ioa)))
-		return rc;
+	}
+
+	if (rc == 0)
+		rc = ipr_stop_array_protection(dev->ioa);
+
+	if (rc != 0) {
+		if (dev->scsi_dev_data)
+			ipr_allow_restart(dev, 1);
+		if (dev->alt_path && dev->alt_path->scsi_dev_data)
+			ipr_allow_restart(dev->alt_path, 1);
+	}
 
 	return rc;
 }

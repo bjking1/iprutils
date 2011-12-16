@@ -3320,6 +3320,46 @@ int ipr_start_stop_start(struct ipr_dev *dev)
 }
 
 /**
+ * ipr_allow_restart - set or clear the allow_restart flag for a device
+ * @dev:		ipr dev struct
+ * @allow:		value to set
+ *
+ * Return value:
+ *   none
+ **/
+void ipr_allow_restart(struct ipr_dev *dev, int allow)
+{
+	struct sysfs_attribute *sysfs_attr;
+	char path[SYSFS_PATH_MAX];
+	char value_str[2];
+	int value;
+
+	sprintf(path, "%s/%s/%s", "/sys/class/scsi_disk",
+		dev->scsi_dev_data->sysfs_device_name, "allow_restart");
+
+	sysfs_attr = sysfs_open_attribute(path);
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open allow_restart parameter.\n");
+		return;
+	}
+
+	sysfs_read_attribute(sysfs_attr);
+	value = atoi(sysfs_attr->value);
+
+	if (value == allow) {
+		sysfs_close_attribute(sysfs_attr);
+		return;
+	}
+
+	snprintf(value_str, sysfs_attr->len, "%d", allow);
+
+	if (sysfs_write_attribute(sysfs_attr, value_str, 1))
+		syslog_dbg("Failed to write allow_restart parameter.\n");
+
+	sysfs_close_attribute(sysfs_attr);
+}
+
+/**
  * ipr_start_stop_stop - 
  * @dev:		ipr dev struct
  *
