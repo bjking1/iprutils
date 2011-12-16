@@ -3275,7 +3275,10 @@ int configure_raid_parameters(i_container *i_con)
 			selected_count++;
 	}
 
-	qdepth = selected_count * 4;
+	if (ioa->sis64)
+		qdepth = selected_count * 16;
+	else
+		qdepth = selected_count * 4;
 	cur_raid_cmd->qdepth = qdepth;
 
 	/* set up raid lists */
@@ -12399,8 +12402,13 @@ static int raid_create(char **args, int num_args)
 
 	if (!stripe_size)
 		stripe_size = cap->recommended_stripe_size;
-	if (!qdepth)
-		qdepth = num_devs * 4;
+
+	if (!qdepth) {
+		if (ioa->sis64)
+			qdepth = num_devs * 16;
+		else
+			qdepth = num_devs * 4;
+	}
 
 	if (dev_init_head) {
 		rc = send_dev_inits(NULL);

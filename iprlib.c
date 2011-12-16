@@ -946,11 +946,12 @@ static enum ipr_tcq_mode ioa_get_tcq_mode(struct ipr_ioa *ioa)
 }
 
 /**
- * __ioa_is_spi -
+ * __ioa_is_spi - Determine if the IOA is a SCSI Parallel Interface (SPI)
+ *		  adapter.
  * @ioa:		ipr ioa struct
  *
  * Returns:
- *   1 if success / 0 on failure
+ *   1 if the IOA is an SPI adapter / 0 otherwise
  **/
 int __ioa_is_spi(struct ipr_ioa *ioa)
 {
@@ -966,11 +967,11 @@ int __ioa_is_spi(struct ipr_ioa *ioa)
 }
 
 /**
- * ioa_is_spi -
+ * ioa_is_spi - Determine if the IOA is a SCSI Parallel Interface (SPI) adapter.
  * @ioa:		ipr ioa struct
  *
  * Returns:
- *   FIXME
+ *   1 if the IOA is an SPI adapter / 0 otherwise
  **/
 int ioa_is_spi(struct ipr_ioa *ioa)
 {
@@ -1005,7 +1006,7 @@ const char *get_bus_desc(struct ipr_ioa *ioa)
 }
 
 /**
- * iget_ioa_desc
+ * get_ioa_desc -
  * @ioa:		ipr ioa struct
  *
  * Returns:
@@ -1019,7 +1020,7 @@ const char *get_ioa_desc(struct ipr_ioa *ioa)
 		return details->ioa_desc;
 	else if (ioa->is_aux_cache)
 		return aux_cache_desc;
-	else if (!ioa_is_spi(ioa)){
+	else if (!ioa_is_spi(ioa)) {
 		if (ioa->qac_data->num_records)
 			return sas_raid_desc;
 		return sas_jbod_desc;
@@ -6463,21 +6464,26 @@ static int ipr_get_saved_ioa_attr(struct ipr_ioa *ioa,
 	return ipr_get_saved_attr(ioa, category, field, value);
 }
 
-#define GSCSI_TCQ_DEPTH	3
+#define GSCSI_TCQ_DEPTH 3
+#define GSCSI_SAS_TCQ_DEPTH 16
 #define AS400_TCQ_DEPTH 16
 #define DEFAULT_TCQ_DEPTH 64
 
 /**
- * get_tcq_depth - 
+ * get_tcq_depth - return the proper queue depth for the given device
  * @dev:		ipr dev struct
  *
  * Returns:
- *   GSCSI_TCQ_DEPTH, AS400_TCQ_DEPTH or DEFAULT_TCQ_DEPTH
+ *   GSCSI_TCQ_DEPTH, GSCSI_SAS_TCQ_DEPTH, AS400_TCQ_DEPTH or DEFAULT_TCQ_DEPTH
  **/
 static int get_tcq_depth(struct ipr_dev *dev)
 {
-	if (ipr_is_gscsi(dev))
-		return GSCSI_TCQ_DEPTH;
+	if (ipr_is_gscsi(dev)) {
+		if (ioa_is_spi(dev->ioa))
+			return GSCSI_TCQ_DEPTH;
+		else
+			return GSCSI_SAS_TCQ_DEPTH;
+	}
 	if (!dev->scsi_dev_data)
 		return AS400_TCQ_DEPTH;
 	if (!strncmp(dev->scsi_dev_data->vendor_id, "IBMAS400", 8))
