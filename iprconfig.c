@@ -1634,7 +1634,7 @@ int main_menu(i_container *i_con)
 
 	n_main_menu.body = ipr_end_list(n_main_menu.body);
 
-	s_out = screen_driver(&n_main_menu,0,NULL);
+	s_out = screen_driver(&n_main_menu, 0, NULL);
 	free(n_main_menu.body);
 	n_main_menu.body = NULL;
 	rc = s_out->rc;
@@ -1840,7 +1840,7 @@ int disk_status(i_container *i_con)
 
 	do {
 		n_disk_status.body = buffer[toggle&1];
-		s_out = screen_driver(&n_disk_status,header_lines,i_con);
+		s_out = screen_driver(&n_disk_status, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -2490,7 +2490,7 @@ int hot_spare_screen(i_container *i_con)
 
 	n_hot_spare_screen.body = ipr_end_list(n_hot_spare_screen.body);
 
-	s_out = screen_driver(&n_hot_spare_screen,0,NULL);
+	s_out = screen_driver(&n_hot_spare_screen, 0, NULL);
 	free(n_hot_spare_screen.body);
 	n_hot_spare_screen.body = NULL;
 	rc = s_out->rc;
@@ -2522,7 +2522,7 @@ int raid_screen(i_container *i_con)
 
 	n_raid_screen.body = ipr_end_list(n_raid_screen.body);
 
-	s_out = screen_driver(&n_raid_screen,0,NULL);
+	s_out = screen_driver(&n_raid_screen, 0, NULL);
 	free(n_raid_screen.body);
 	n_raid_screen.body = NULL;
 	rc = s_out->rc;
@@ -2577,7 +2577,7 @@ int raid_status(i_container *i_con)
 
 	do {
 		n_raid_status.body = buffer[toggle&1];
-		s_out = screen_driver(&n_raid_status,header_lines,i_con);
+		s_out = screen_driver(&n_raid_status, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -2679,7 +2679,7 @@ int raid_stop(i_container *i_con)
 	if (!found) {
 		/* Stop Device Parity Protection Failed */
 		n_raid_stop_fail.body = body_init(n_raid_stop_fail.header, NULL);
-		s_out = screen_driver(&n_raid_stop_fail,0,i_con);
+		s_out = screen_driver(&n_raid_stop_fail, 0, i_con);
 
 		free(n_raid_stop_fail.body);
 		n_raid_stop_fail.body = NULL;
@@ -2691,7 +2691,7 @@ int raid_stop(i_container *i_con)
 
 		do {
 			n_raid_stop.body = buffer[toggle&1];
-			s_out = screen_driver(&n_raid_stop,header_lines,i_con);
+			s_out = screen_driver(&n_raid_stop, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -2774,7 +2774,7 @@ int confirm_raid_stop(i_container *i_con)
 
 	do {
 		n_confirm_raid_stop.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_raid_stop,header_lines,i_con);
+		s_out = screen_driver(&n_confirm_raid_stop, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -2970,7 +2970,7 @@ int raid_start(i_container *i_con)
 	if (!found) {
 		/* Start Device Parity Protection Failed */
 		n_raid_start_fail.body = body_init(n_raid_start_fail.header, NULL);
-		s_out = screen_driver(&n_raid_start_fail,0,i_con);
+		s_out = screen_driver(&n_raid_start_fail, 0, i_con);
 
 		free(n_raid_start_fail.body);
 		n_raid_start_fail.body = NULL;
@@ -2980,7 +2980,7 @@ int raid_start(i_container *i_con)
 	} else {
 		do {
 			n_raid_start.body = buffer[toggle&1];
-			s_out = screen_driver(&n_raid_start,header_lines,i_con);
+			s_out = screen_driver(&n_raid_start, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -3091,7 +3091,7 @@ int configure_raid_start(i_container *i_con)
 
 		do {
 			n_configure_raid_start.body = buffer[toggle&1];
-			s_out = screen_driver(&n_configure_raid_start,header_lines,i_con2);
+			s_out = screen_driver(&n_configure_raid_start, header_lines, i_con2);
 			temp_i_con2 = s_out->i_con;
 			rc = s_out->rc;
 			free(s_out);
@@ -3597,7 +3597,7 @@ int confirm_raid_start(i_container *i_con)
 
 	do {
 		n_confirm_raid_start.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_raid_start,header_lines,NULL);
+		s_out = screen_driver(&n_confirm_raid_start, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -3826,7 +3826,7 @@ int raid_rebuild(i_container *i_con)
 	if (!found) {
 		/* Start Device Parity Protection Failed */
 		n_raid_rebuild_fail.body = body_init(n_raid_rebuild_fail.header, NULL);
-		s_out = screen_driver(&n_raid_rebuild_fail,0,NULL);
+		s_out = screen_driver(&n_raid_rebuild_fail, 0, NULL);
 
 		free(n_raid_rebuild_fail.body);
 		n_raid_rebuild_fail.body = NULL;
@@ -3836,7 +3836,7 @@ int raid_rebuild(i_container *i_con)
 	} else {
 		do {
 			n_raid_rebuild.body = buffer[toggle&1];
-			s_out = screen_driver(&n_raid_rebuild,header_lines,i_con);
+			s_out = screen_driver(&n_raid_rebuild, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -3910,7 +3910,7 @@ int confirm_raid_rebuild(i_container *i_con)
 
 	do {
 		n_confirm_raid_rebuild.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_raid_rebuild,header_lines,NULL);
+		s_out = screen_driver(&n_confirm_raid_rebuild, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -4060,7 +4060,7 @@ int raid_resync(i_container *i_con)
 	if (!found) {
 		/* Start Device Parity Protection Failed */
 		n_raid_resync_fail.body = body_init(n_raid_resync_fail.header, NULL);
-		s_out = screen_driver(&n_raid_resync_fail,0,NULL);
+		s_out = screen_driver(&n_raid_resync_fail, 0, NULL);
 
 		free(n_raid_resync_fail.body);
 		n_raid_resync_fail.body = NULL;
@@ -4070,7 +4070,7 @@ int raid_resync(i_container *i_con)
 	} else {
 		do {
 			n_raid_resync.body = buffer[toggle&1];
-			s_out = screen_driver(&n_raid_resync,header_lines,i_con);
+			s_out = screen_driver(&n_raid_resync, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -4145,7 +4145,7 @@ int confirm_raid_resync(i_container *i_con)
 
 	do {
 		n_confirm_raid_resync.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_raid_resync,header_lines,NULL);
+		s_out = screen_driver(&n_confirm_raid_resync, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -5026,7 +5026,7 @@ int process_raid_migrate(char *buffer[], int header_lines)
 	struct screen_output *s_out;
 	int found = 0;
 	int toggle = 1;
-	i_container *i_con, *temp_i_con;
+	i_container *temp_i_con;
 	char *input;
 	int rc = REFRESH_FLAG;
 
@@ -5037,7 +5037,7 @@ int process_raid_migrate(char *buffer[], int header_lines)
 		do {
 			n_raid_migrate.body = buffer[toggle&1];
 			/* display disk array selection screen */
-			s_out = screen_driver(&n_raid_migrate, header_lines, i_con);
+			s_out = screen_driver(&n_raid_migrate, header_lines, NULL);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -5508,7 +5508,7 @@ int raid_include(i_container *i_con)
 	if (!found) {
 		/* Include Device Parity Protection Failed */
 		n_raid_include_fail.body = body_init(n_raid_include_fail.header, NULL);
-		s_out = screen_driver(&n_raid_include_fail,0,i_con);
+		s_out = screen_driver(&n_raid_include_fail, 0, i_con);
 
 		free(n_raid_include_fail.body);
 		n_raid_include_fail.body = NULL;
@@ -5520,7 +5520,7 @@ int raid_include(i_container *i_con)
 
 		do {
 			n_raid_include.body = buffer[toggle&1];
-			s_out = screen_driver(&n_raid_include,header_lines,i_con);
+			s_out = screen_driver(&n_raid_include, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -5627,7 +5627,7 @@ int configure_raid_include(i_container *i_con)
 	if (found < min_mult_array_devices) {
 		/* Include Device Parity Protection Failed */
 		n_configure_raid_include_fail.body = body_init(n_configure_raid_include_fail.header, NULL);
-		s_out = screen_driver(&n_configure_raid_include_fail,0,i_con);
+		s_out = screen_driver(&n_configure_raid_include_fail, 0, i_con);
 
 		free(n_configure_raid_include_fail.body);
 		n_configure_raid_include_fail.body = NULL;
@@ -5642,7 +5642,7 @@ int configure_raid_include(i_container *i_con)
 
 	do {
 		n_configure_raid_include.body = buffer[toggle&1];
-		s_out = screen_driver(&n_configure_raid_include,header_lines,i_con);
+		s_out = screen_driver(&n_configure_raid_include, header_lines, i_con);
 		temp_i_con = s_out->i_con;
 		rc = s_out->rc;
 		free(s_out);
@@ -6208,13 +6208,13 @@ static int configure_af_device(i_container *i_con, int action_code)
 	if (!num_devs) {
 		if (action_code == IPR_INCLUDE) {
 			n_af_include_fail.body = body_init(n_af_include_fail.header, NULL);
-			s_out = screen_driver(&n_af_include_fail,0,i_con);
+			s_out = screen_driver(&n_af_include_fail, 0, i_con);
 
 			free(n_af_include_fail.body);
 			n_af_include_fail.body = NULL;
 		} else {
 			n_af_remove_fail.body = body_init(n_af_remove_fail.header, NULL);
-			s_out = screen_driver(&n_af_remove_fail,0,i_con);
+			s_out = screen_driver(&n_af_remove_fail, 0, i_con);
 
 			free(n_af_remove_fail.body);
 			n_af_remove_fail.body = NULL;
@@ -6227,7 +6227,7 @@ static int configure_af_device(i_container *i_con, int action_code)
 
 		do {
 			n_screen->body = buffer[toggle&1];
-			s_out = screen_driver(n_screen,header_lines,i_con);
+			s_out = screen_driver(n_screen, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -6365,13 +6365,13 @@ int hot_spare(i_container *i_con, int action)
 	if (!found) {
 		if (action == IPR_ADD_HOT_SPARE) {
 			n_add_hot_spare_fail.body = body_init(n_add_hot_spare_fail.header, NULL);
-			s_out = screen_driver(&n_add_hot_spare_fail,0,i_con);
+			s_out = screen_driver(&n_add_hot_spare_fail, 0, i_con);
 
 			free(n_add_hot_spare_fail.body);
 			n_add_hot_spare_fail.body = NULL;
 		} else {
 			n_remove_hot_spare_fail.body = body_init(n_remove_hot_spare_fail.header, NULL);
-			s_out = screen_driver(&n_remove_hot_spare_fail,0,i_con);
+			s_out = screen_driver(&n_remove_hot_spare_fail, 0, i_con);
 
 			free(n_remove_hot_spare_fail.body);
 			n_remove_hot_spare_fail.body = NULL;
@@ -6384,7 +6384,7 @@ int hot_spare(i_container *i_con, int action)
 
 	do {
 		n_screen->body = buffer[toggle&1];
-		s_out = screen_driver(n_screen,header_lines,i_con);
+		s_out = screen_driver(n_screen, header_lines, i_con);
 		temp_i_con = s_out->i_con;
 		rc = s_out->rc;
 		free(s_out);
@@ -6508,7 +6508,7 @@ int select_hot_spare(i_container *i_con, int action)
 	if (num_devs) {
 		do {
 			n_screen->body = buffer[toggle&1];
-			s_out = screen_driver(n_screen,header_lines,i_con2);
+			s_out = screen_driver(n_screen, header_lines, i_con2);
 			temp_i_con2 = s_out->i_con;
 			rc = s_out->rc;
 			free(s_out);
@@ -6599,7 +6599,7 @@ int confirm_hot_spare(int action)
 
 	do {
 		n_screen->body = buffer[toggle&1];
-		s_out = screen_driver(n_screen,header_lines,NULL);
+		s_out = screen_driver(n_screen, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -6690,7 +6690,7 @@ int disk_unit_recovery(i_container *i_con)
 
 	n_disk_unit_recovery.body = ipr_end_list(n_disk_unit_recovery.body);
 
-	s_out = screen_driver(&n_disk_unit_recovery,0,NULL);
+	s_out = screen_driver(&n_disk_unit_recovery, 0, NULL);
 	free(n_disk_unit_recovery.body);
 	n_disk_unit_recovery.body = NULL;
 
@@ -6902,7 +6902,7 @@ int process_conc_maint(i_container *i_con, int action)
 	/* call screen driver */
 	do {
 		n_screen->body = buffer[toggle&1];
-		s_out = screen_driver(n_screen,header_lines,i_con);
+		s_out = screen_driver(n_screen, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -7430,7 +7430,7 @@ int start_conc_maint(i_container *i_con, int action)
 
 	do {
 		n_screen->body = buffer[toggle&1];
-		s_out = screen_driver(n_screen,header_lines,i_con);
+		s_out = screen_driver(n_screen, header_lines, i_con);
 		s_rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -7687,7 +7687,7 @@ int init_device(i_container *i_con)
 
 	do {
 		n_init_device.body = buffer[toggle&1];
-		s_out = screen_driver(&n_init_device,header_lines,i_con);
+		s_out = screen_driver(&n_init_device, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -7770,7 +7770,7 @@ int confirm_init_device(i_container *i_con)
 
 	do {
 		n_confirm_init_device.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_init_device,header_lines,NULL);
+		s_out = screen_driver(&n_confirm_init_device, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8181,7 +8181,7 @@ int reclaim_cache(i_container* i_con)
 
 	do {
 		n_reclaim_cache.body = buffer[toggle&1];
-		s_out = screen_driver(&n_reclaim_cache,header_lines,i_con);
+		s_out = screen_driver(&n_reclaim_cache, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8270,7 +8270,7 @@ int confirm_reclaim(i_container *i_con)
 
 	do {
 		n_confirm_reclaim.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_reclaim,header_lines,i_con);
+		s_out = screen_driver(&n_confirm_reclaim, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8314,7 +8314,7 @@ int reclaim_warning(i_container *i_con)
 
 	do {
 		n_confirm_reclaim_warning.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_reclaim_warning,header_lines,i_con);
+		s_out = screen_driver(&n_confirm_reclaim_warning, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8432,7 +8432,7 @@ int reclaim_result(i_container *i_con)
 		return (EXIT_FLAG | 37); 
 
 	n_reclaim_result.body = get_reclaim_results(reclaim_ioa->reclaim_data);
-	s_out = screen_driver(&n_reclaim_result,0,NULL);
+	s_out = screen_driver(&n_reclaim_result, 0, NULL);
 	free(s_out);
 
 	free(n_reclaim_result.body);
@@ -8500,7 +8500,7 @@ int battery_maint(i_container *i_con)
 
 	do {
 		n_battery_maint.body = buffer[toggle&1];
-		s_out = screen_driver(&n_battery_maint,header_lines,i_con);
+		s_out = screen_driver(&n_battery_maint, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8629,7 +8629,7 @@ int show_battery_info(struct ipr_ioa *ioa)
 	int rc;
 
 	n_show_battery_info.body = get_battery_info(ioa);
-	s_out = screen_driver(&n_show_battery_info,0,NULL);
+	s_out = screen_driver(&n_show_battery_info, 0, NULL);
 
 	free(n_show_battery_info.body);
 	n_show_battery_info.body = NULL;
@@ -8665,7 +8665,7 @@ int confirm_force_battery_error(void)
 
 	do {
 		n_confirm_force_battery_error.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_force_battery_error,header_lines,NULL);
+		s_out = screen_driver(&n_confirm_force_battery_error, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8745,7 +8745,7 @@ int confirm_enable_battery(void)
 
 	do {
 		n_confirm_start_cache.body = buffer[toggle&1];
-		s_out = screen_driver(&n_confirm_start_cache,header_lines,NULL);
+		s_out = screen_driver(&n_confirm_start_cache, header_lines, NULL);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -8892,7 +8892,7 @@ int bus_config(i_container *i_con)
 
 	if (!found)	{
 		n_bus_config_fail.body = body_init(n_bus_config_fail.header, NULL);
-		s_out = screen_driver(&n_bus_config_fail,0,NULL);
+		s_out = screen_driver(&n_bus_config_fail, 0, NULL);
 
 		free(n_bus_config_fail.body);
 		n_bus_config_fail.body = NULL;
@@ -8902,7 +8902,7 @@ int bus_config(i_container *i_con)
 	} else {
 		do {
 			n_bus_config.body = buffer[toggle&1];
-			s_out = screen_driver(&n_bus_config,header_lines,i_con);
+			s_out = screen_driver(&n_bus_config, header_lines, i_con);
 			rc = s_out->rc;
 			free(s_out);
 			toggle++;
@@ -9161,7 +9161,7 @@ int change_bus_attr(i_container *i_con)
 
 	n_change_bus_attr.body = body;
 	while (1) {
-		s_out = screen_driver(&n_change_bus_attr,header_lines,i_con);
+		s_out = screen_driver(&n_change_bus_attr, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 
@@ -9730,7 +9730,7 @@ int driver_config(i_container *i_con)
 
 	do {
 		n_driver_config.body = buffer[toggle&1];
-		s_out = screen_driver(&n_driver_config,header_lines,i_con);
+		s_out = screen_driver(&n_driver_config, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -9920,7 +9920,7 @@ int disk_config(i_container * i_con)
 
 	do {
 		n_disk_config.body = buffer[toggle&1];
-		s_out = screen_driver(&n_disk_config,header_lines,i_con);
+		s_out = screen_driver(&n_disk_config, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -10608,7 +10608,7 @@ int download_ucode(i_container * i_con)
 
 	do {
 		n_download_ucode.body = buffer[toggle&1];
-		s_out = screen_driver(&n_download_ucode,header_lines,i_con);
+		s_out = screen_driver(&n_download_ucode, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
@@ -10817,7 +10817,7 @@ int process_choose_ucode(struct ipr_dev *dev)
 	body = add_line_to_body(body, buffer, NULL);
 
 	n_confirm_download_ucode.body = body;
-	s_out = screen_driver(&n_confirm_download_ucode,header_lines,i_con);
+	s_out = screen_driver(&n_confirm_download_ucode, header_lines, i_con);
 
 	free(n_confirm_download_ucode.body);
 	n_confirm_download_ucode.body = NULL;
@@ -10907,7 +10907,7 @@ int log_menu(i_container *i_con)
 	}
 	n_log_menu.body = ipr_end_list(n_log_menu.body);
 
-	s_out = screen_driver(&n_log_menu,0,NULL);
+	s_out = screen_driver(&n_log_menu, 0, NULL);
 	free(n_log_menu.body);
 	n_log_menu.body = NULL;
 	rc = s_out->rc;
@@ -11274,7 +11274,7 @@ int kernel_root(i_container *i_con)
 	body = add_line_to_body(body,_("New root directory"), "%39");
 
 	n_kernel_root.body = body;
-	s_out = screen_driver(&n_kernel_root,0,i_con);
+	s_out = screen_driver(&n_kernel_root, 0, i_con);
 
 	free(n_kernel_root.body);
 	n_kernel_root.body = NULL;
@@ -11319,7 +11319,7 @@ int confirm_kernel_root(i_container *i_con)
 	body = add_line_to_body(body,_("New root directory"), input);
 
 	n_confirm_kernel_root.body = body;
-	s_out = screen_driver(&n_confirm_kernel_root,0,i_con);
+	s_out = screen_driver(&n_confirm_kernel_root, 0, i_con);
 
 	free(n_confirm_kernel_root.body);
 	n_confirm_kernel_root.body = NULL;
@@ -11361,7 +11361,7 @@ int set_default_editor(i_container *i_con)
 	body = add_line_to_body(body, _("New editor"), "%39");
 
 	n_set_default_editor.body = body;
-	s_out = screen_driver(&n_set_default_editor,0,i_con);
+	s_out = screen_driver(&n_set_default_editor, 0, i_con);
 
 	free(n_set_default_editor.body);
 	n_set_default_editor.body = NULL;
@@ -11398,7 +11398,7 @@ int confirm_set_default_editor(i_container *i_con)
 	body = add_line_to_body(body,_("New editor"), input);
 
 	n_confirm_set_default_editor.body = body;
-	s_out = screen_driver(&n_confirm_set_default_editor,0,i_con);
+	s_out = screen_driver(&n_confirm_set_default_editor, 0, i_con);
 
 	free(n_confirm_set_default_editor.body);
 	n_confirm_set_default_editor.body = NULL;
@@ -16143,7 +16143,7 @@ int main(int argc, char *argv[])
 
 		n_exit_confirm.body = ipr_end_list(n_exit_confirm.body);
 
-		s_out = screen_driver(&n_exit_confirm,0,NULL);
+		s_out = screen_driver(&n_exit_confirm, 0, NULL);
 		free(n_exit_confirm.body);
 		n_exit_confirm.body = NULL;
 		rc = s_out->rc;
