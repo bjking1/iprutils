@@ -4430,6 +4430,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	struct ipr_disk_attr attr;
 	int old_qdepth;
 	int sas_ses = 0;
+	int sas_ses_retries = 5;
 	int mode5 = 1;
 
 	ENTER;
@@ -4456,11 +4457,21 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 
 	if (sas_ses) {
 		if (!mode5) {
-			rc = __ipr_write_buffer(dev, 0x0e, buff, length, &sense_data);
-			if (rc && sense_data.sense_key == ILLEGAL_REQUEST)
-				mode5 = 1;
-			else if (rc)
-				goto out;
+			for (i = 0; i < (sas_ses_retries + 1); i++) {
+				rc = __ipr_write_buffer(dev, 0x0e, buff, length, &sense_data);
+				if (!rc) {
+					break;
+				} else if (rc && sense_data.sense_key == UNIT_ATTENTION &&
+					   sense_data.add_sense_code == 0x29 &&
+					   sense_data.add_sense_code_qual == 0x00) {
+					continue;
+				} else if (rc && sense_data.sense_key == ILLEGAL_REQUEST) {
+					mode5 = 1;
+					break;
+				} else if (rc) {
+					goto out;
+				}
+			}
 		}
 
 		rc = ipr_suspend_device_bus(dev, &dev->res_addr[0],
@@ -4471,10 +4482,20 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 			goto out;
 		}
 
-		if (mode5)
-			rc = __ipr_write_buffer(dev, 5, buff, length, &sense_data);
-		else
-			rc = __ipr_write_buffer(dev, 0x0f, NULL, 0, &sense_data);
+		for (i = 0; i < (sas_ses_retries + 1); i++) {
+			if (mode5)
+				rc = __ipr_write_buffer(dev, 5, buff, length, &sense_data);
+			else
+				rc = __ipr_write_buffer(dev, 0x0f, NULL, 0, &sense_data);
+
+			if (rc && sense_data.sense_key == UNIT_ATTENTION &&
+				   sense_data.add_sense_code == 0x29 &&
+				   sense_data.add_sense_code_qual == 0x00) {
+				continue;
+			} else {
+				break;
+			}
+		}
 
 		if (rc) {
 			scsi_dbg(dev, "Write buffer %sfailed.\n", mode5 ? "" : "activate ");
