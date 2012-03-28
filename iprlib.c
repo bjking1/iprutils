@@ -7799,7 +7799,7 @@ u32 get_dasd_ucode_version(char *ucode_file, int has_hdr)
  * Returns:
  *   ses microcode version / 0 if failure
  **/
-static u32 get_ses_ucode_version(char *ucode_file)
+u32 get_ses_ucode_version(char *ucode_file)
 {
 	char *tmp = strrchr(ucode_file, '.');
 

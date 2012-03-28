@@ -14331,8 +14331,14 @@ static int update_dev_ucode(struct ipr_dev *dev, char *file)
 	int rc;
 
 	strcpy(image.file, file);
-	image.version = get_dasd_ucode_version(file, 1);
-	image.has_header = 1;
+
+	if (dev->scsi_dev_data->type == TYPE_ENCLOSURE ||
+	    dev->scsi_dev_data->type == TYPE_PROCESSOR) {
+		image.version = get_ses_ucode_version(file);
+	} else {
+		image.version = get_dasd_ucode_version(file, 1);
+		image.has_header = 1;
+	}
 
 	rc = ipr_update_disk_fw(dev, &image, 1);
 

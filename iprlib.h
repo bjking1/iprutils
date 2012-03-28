@@ -2501,6 +2501,7 @@ u32 get_ioa_fw_version(struct ipr_ioa *);
 int ipr_disable_qerr(struct ipr_dev *);
 void ipr_log_ucode_error(struct ipr_ioa *);
 u32 get_dasd_ucode_version(char *, int);
+u32 get_ses_ucode_version(char *ucode_file);
 const char *get_bus_desc(struct ipr_ioa *);
 const char *get_ioa_desc(struct ipr_ioa *);
 int ioa_is_spi(struct ipr_ioa *);
