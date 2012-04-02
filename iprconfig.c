@@ -125,6 +125,7 @@ char *print_device(struct ipr_dev *, char *, char *, int);
 int display_menu(ITEM **, int, int, int **);
 char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int);
 static char *print_path_details(struct ipr_dev *, char *);
+static int get_drive_phy_loc(struct ipr_ioa *ioa);
 
 #define print_dev(i, dev, buf, fmt, type) \
         for (i = 0; i < 2; i++) \
@@ -2239,6 +2240,9 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 
 	device_record = (struct ipr_dev_record *)dev->dev_rcd;
 
+	if (strlen(dev->physical_location) == 0)
+		get_drive_phy_loc(dev->ioa);
+
 	if (dev->scsi_dev_data) {
 		scsi_channel = dev->scsi_dev_data->channel;
 		scsi_id = dev->scsi_dev_data->id;
@@ -2352,8 +2356,62 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	sprintf(buffer, "%d", scsi_lun);
 	body = add_line_to_body(body, _("SCSI Lun"), buffer);
 
+	if (strlen(dev->physical_location))
+		body = add_line_to_body(body,_("Platform Location"), dev->physical_location);
+
 	body = disk_extended_details(body, dev, &std_inq);
 	return body;
+}
+
+/**
+ * get_ses_phy_loc - get ses physical location
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   body
+ **/
+int get_ses_phy_loc(struct ipr_dev *dev)
+{
+	int rc, i;
+	struct ses_inquiry_page0  ses_page0_inq;
+	struct ses_serial_num_vpd ses_vpd_inq;
+	char buffer[100];
+
+	memset(&ses_vpd_inq, 0, sizeof(ses_vpd_inq));
+
+	rc = ipr_inquiry(dev, 0x00, &ses_page0_inq, sizeof(ses_page0_inq));
+
+	for (i = 0; !rc && i < ses_page0_inq.page_length; i++) {
+		if (ses_page0_inq.supported_vpd_page[i] == 0x04) {
+			rc = ipr_inquiry(dev, 0x04, &ses_vpd_inq, sizeof(ses_vpd_inq));
+			break;
+		}
+	}
+
+	dev->physical_location[0] = '\0';
+	strncat(dev->physical_location, "U", strlen("U"));
+	ipr_strncpy_0(buffer, (char *)ses_vpd_inq.feature_code,
+			sizeof(ses_vpd_inq.feature_code));
+	strncat(dev->physical_location, buffer, strlen(buffer));
+	ipr_strncpy_0(buffer, (char *)ses_vpd_inq.count,
+			sizeof(ses_vpd_inq.count));
+	strncat(dev->physical_location, ".", strlen("."));
+	strncat(dev->physical_location, buffer, strlen(buffer));
+	ipr_strncpy_0(buffer, (char *)ses_vpd_inq.ses_serial_num,
+			sizeof(ses_vpd_inq.ses_serial_num));
+	strncat(dev->physical_location, ".", strlen("."));
+	strncat(dev->physical_location, buffer, strlen(buffer));
+
+	return 1;
+}
+
+int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_desc_pg *drive_data, int slot_id, char *buf)
+{
+	char buffer[DISK_PHY_LOC_LENGTH];
+	ipr_strncpy_0(buffer, (char *)drive_data->dev_elem[slot_id].disk_physical_loc, DISK_PHY_LOC_LENGTH);
+	sprintf(buf, "%s-%s", ses->physical_location, buffer);
+
+	return 0;
 }
 
 /**
@@ -2372,6 +2430,8 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 	char vendor_id[IPR_VENDOR_ID_LEN+1];
 	char buffer[100];
 	int len;
+
+	get_ses_phy_loc(dev);
 
 	ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 	ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
@@ -2415,6 +2475,10 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 
 	sprintf(buffer, "%d", dev->scsi_dev_data->lun);
 	body = add_line_to_body(body, _("SCSI Lun"), buffer);
+
+	if (strlen(dev->physical_location))
+		body = add_line_to_body(body,_("Platform Location"), dev->physical_location);
+
 	return body;
 }
 
@@ -7076,7 +7140,7 @@ static int get_res_addrs(struct ipr_dev *dev)
  * Returns:
  *   ipr_dev struct
  **/
-static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vses)
+static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vses, char *phy_loc)
 {
 	struct ipr_ioa *ioa = ses->ioa;
 	struct ipr_dev *dev;
@@ -7113,6 +7177,8 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	dev->scsi_dev_data = scsi_dev_data;
 	dev->ses[0] = ses;
 	dev->ioa = ioa;
+	dev->physical_location[0] = '\0';
+	strncat(dev->physical_location, phy_loc, strlen(phy_loc));
 	scsi_dbg(dev, "Found empty slot\n");
 	get_res_addrs(dev);
 	return dev;
@@ -7147,7 +7213,7 @@ static int can_perform_conc_action(struct ipr_dev *dev, int action)
  * Returns:
  *   ipr_dev struct if success / NULL otherwise
  **/
-static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vses)
+static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vses, char *phy_loc)
 {
 	struct ipr_ioa *ioa = ses->ioa;
 	struct ipr_dev *dev;
@@ -7183,7 +7249,8 @@ static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vs
 					continue;
 				dev->ses[i] = ses;
 			}
-
+			dev->physical_location[0] = '\0';
+			strncat(dev->physical_location, phy_loc, strlen(phy_loc));
 			return dev;
 		}
 	}
@@ -7326,6 +7393,8 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	int num_devs = 0;
 	int ses_bus, scsi_id_found, is_spi, is_vses;
 	struct ipr_ses_config_pg ses_cfg;
+	struct drive_elem_desc_pg drive_data;
+	char phy_loc[PHYSICAL_LOCATION_LENGTH];;
 
 	for_each_primary_ioa(ioa) {
 		is_spi = ioa_is_spi(ioa);
@@ -7337,6 +7406,8 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			if (ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
 				continue;
 			if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
+				continue;
+			if (ipr_receive_diagnostics(ses, 7, &drive_data, sizeof(drive_data)))
 				continue;
 
 			overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
@@ -7351,6 +7422,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
 
 			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
+				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc);
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
 					continue;
 				if (is_spi && (scsi_id_found & (1 << elem_status->slot_id)))
@@ -7359,17 +7431,17 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
 					devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
-					devs[num_devs++] = alloc_empty_slot(ses, elem_status->slot_id, is_vses);
+					devs[num_devs++] = alloc_empty_slot(ses, elem_status->slot_id, is_vses, phy_loc);
 					continue;
 				}
 
-				dev = get_dev_for_slot(ses, elem_status->slot_id, is_vses);
+				dev = get_dev_for_slot(ses, elem_status->slot_id, is_vses, phy_loc);
 				if (dev && !can_perform_conc_action(dev, action))
 					continue;
 				if (dev && conc_dev_is_dup(dev, devs, num_devs))
 					continue;
 				else if (!dev)
-					dev = alloc_empty_slot(ses, elem_status->slot_id, is_vses);
+					dev = alloc_empty_slot(ses, elem_status->slot_id, is_vses, phy_loc);
 
 				devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
 				devs[num_devs++] = dev;
@@ -15618,6 +15690,53 @@ static int check_and_set_active_active(char *dev_name, int mode)
 	}
 
 	return set_active_active_mode(dev->ioa, mode);
+}
+
+/**
+ * get_drive_phy_loc - get drive physical location
+ * @ioa:	ipr ioa struct
+ *
+ * Returns:
+ *   body
+ **/
+static int get_drive_phy_loc(struct ipr_ioa *ioa)
+{
+	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
+	struct ipr_dev *ses, *dev;
+	struct ipr_ses_config_pg ses_cfg;
+	struct drive_elem_desc_pg drive_data;
+	char phy_loc[PHYSICAL_LOCATION_LENGTH];;
+
+	for_each_ioa(ioa)  {
+
+		for_each_hotplug_dev(ioa, dev)
+			get_res_addrs(dev);
+
+		for_each_ses(ioa, ses) {
+			get_ses_phy_loc(ses);
+			if (ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
+				continue;
+			if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
+				continue;
+
+			if (ipr_receive_diagnostics(ses, 7, &drive_data, sizeof(drive_data)))
+				continue;
+
+			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
+				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
+					continue;
+
+				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc);
+				dev = get_dev_for_slot(ses, elem_status->slot_id, 0, phy_loc);
+				if (!dev)
+					continue;
+
+			}
+
+		}
+	}
+	return 0;
 }
 
 /**

@@ -89,6 +89,7 @@
 #define IPR_SDB_CHECK_AND_QUIESCE_ENC        0x0e
 #define IPR_RDB_UNQUIESCE_AND_REBALANCE      0x20
 #define IPR_MAX_NUM_SUPP_INQ_PAGES           36
+#define SES_MAX_NUM_SUPP_INQ_PAGES           7
 #define IPR_DUMP_TRACE_ENTRY_SIZE            8192
 #define IPR_MODE_SENSE_LENGTH                255
 #define IPR_DEFECT_LIST_HDR_LEN              4
@@ -206,6 +207,8 @@
 #define IPR_IOA_SET_CACHING_DISABLED         0x10
 #define IPR_IOA_SET_CACHING_DUAL_DISABLED    0x20
 #define IPR_IOA_SET_CACHING_DUAL_ENABLED     0x30
+
+#define PHYSICAL_LOCATION_LENGTH	1024
 
 #define IPR_HDD                              0x0
 #define IPR_SSD                              0x1
@@ -1292,7 +1295,7 @@ struct ipr_dev {
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
 	struct ipr_disk_attr attr;
-	char physical_location[1024];
+	char physical_location[PHYSICAL_LOCATION_LENGTH];
 	union {
 		struct ipr_common_record *qac_entry;
 		struct ipr_dev_record *dev_rcd;
@@ -2110,6 +2113,50 @@ struct ipr_res_redundancy_info {
 	u8 data[16384];
 };
 
+struct ses_inquiry_page0 {
+	u8 peri_qual_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length;
+	u8 supported_vpd_page[SES_MAX_NUM_SUPP_INQ_PAGES];
+};
+
+struct ses_serial_num_vpd {
+	u8 peri_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 add_page_len;
+	u8 ascii_len;
+	u8 serial_num_head[3];
+	u8 feature_code[4];
+	u8 ascii_dash;
+	u8 count[3];
+	u8 ascii_space;
+	u8 ses_serial_num[7];
+};
+
+struct drive_elem_desc {
+	u8 reserved1[2];
+	u8 desc_length[2];
+	u8 reserved2;
+#define DISK_PHY_LOC_LENGTH	9
+	u8 disk_physical_loc[DISK_PHY_LOC_LENGTH];
+	u8 reserved3[2];
+	u8 form_facter;
+	u8 slot_height;
+	u8 slot_bus;
+	u8 phy_speed;
+};
+
+struct drive_elem_desc_pg {
+	u8 page_code;
+	u8 reserved1;
+	u16 page_length;
+	u8 reserved2[6];
+	u16 desc_length;
+#define DEVICE_ELEM_NUMBER	50
+	struct drive_elem_desc dev_elem[DEVICE_ELEM_NUMBER];
+};
 struct ipr_ses_type_desc {
 	u8 elem_type;
 #define IPR_SES_DEVICE_ELEM	0x01
