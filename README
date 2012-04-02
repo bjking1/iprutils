@@ -77,3 +77,9 @@ reconstruct device as an active array member.
 the current status of the Cache Battery on resources containing battery packs and allow
 maintanence actions to be performed against those resources when necessary.
 18. Analyze Log. This allows you to view the error messages logged by the ipr device driver.
+
+Changes Log:
+1. Concurrent maintience commands line changes from PCI location to physical location(3/12/2012).
+   #iprconfig --identify-slot "U5886.001.P915059-P1-D1 1"
+   #iprconfig --remove-slot "U5886.001.P915059-P1-D1 1"
+   #iprconfig --add-slot "U5886.001.P915059-P1-D1 1"
