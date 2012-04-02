@@ -4151,8 +4151,6 @@ int raid_resync(i_container *i_con)
 				continue;
 
 			dev = array;
-			if (ioa->sis64)
-				dev = get_vset_from_array(ioa, dev);
 
 			add_raid_cmd_tail(ioa, dev, dev->array_id);
 			i_con = add_i_con(i_con, "\0", raid_cmd_tail);
