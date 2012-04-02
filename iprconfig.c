@@ -12954,7 +12954,7 @@ static int raid_create(char **args, int num_args)
 	int hdd_count = 0, ssd_count = 0;
 	int next_raid_level, next_stripe_size, next_qdepth;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
-	int stripe_size, qdepth;
+	int stripe_size, qdepth, zeroed_devs;
 	struct ipr_dev *dev;
 	struct sysfs_dev *sdev;
 	struct ipr_ioa *ioa = NULL;
@@ -12966,9 +12966,12 @@ static int raid_create(char **args, int num_args)
 	next_qdepth = 0;
 	stripe_size = 0;
 	qdepth = 0;
+	zeroed_devs = 0;
 
 	for (i = 0; i < num_args; i++) {
-		if (strcmp(args[i], "-r") == 0)
+		if (strcmp(args[i], "-z") == 0)
+			zeroed_devs = 1;
+		else if (strcmp(args[i], "-r") == 0)
 			next_raid_level = 1;
 		else if (strcmp(args[i], "-s") == 0)
 			next_stripe_size = 1;
@@ -12983,8 +12986,10 @@ static int raid_create(char **args, int num_args)
 		} else if (next_qdepth) {
 			next_qdepth = 0;
 			qdepth = strtoul(args[i], NULL, 10);
-		} else if (find_dev(args[i])) {
+		} else if ((dev = find_dev(args[i]))) {
 			num_devs++;
+			if (zeroed_devs)
+				ipr_add_zeroed_dev(dev);
 			if (raid_create_add_dev(args[i]))
 				return -EIO;
 		}
