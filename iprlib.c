@@ -4324,11 +4324,13 @@ static int ipr_resume_device_bus(struct ipr_dev *dev,
 	if (ioa->sis64) {
 		/* convert res path string to bytes */
 		cdb_num = 2;
-		rp = dev->scsi_dev_data->res_path;
+		rp = dev->res_path_name;
 		do {
 			cdb[cdb_num++] = (u8)strtol(rp, &endptr, 16);
 			rp = endptr+1;
 		} while (*endptr != '\0' && cdb_num < 10);
+
+		while (cdb_num < 10) cdb[cdb_num++] = 0xff;
 	} else {
 		cdb[3] = res_addr->bus;
 		cdb[4] = res_addr->target;
@@ -4533,11 +4535,13 @@ int ipr_suspend_device_bus(struct ipr_dev *dev,
 	if (ioa->sis64) {
 		/* convert res path string to bytes */
 		cdb_num = 2;
-		rp = dev->scsi_dev_data->res_path;
+		rp = dev->res_path_name;
 		do {
 			cdb[cdb_num++] = (u8)strtol(rp, &endptr, 16);
 			rp = endptr+1;
 		} while (*endptr != '\0' && cdb_num < 10);
+
+		while (cdb_num < 10) cdb[cdb_num++] = 0xff;
 	} else {
 		cdb[3] = res_addr->bus;
 		cdb[4] = res_addr->target;
