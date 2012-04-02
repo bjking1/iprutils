@@ -1110,7 +1110,8 @@ static char *status_hdr[] = {
 		"SAS Port/SAS Address   Description        Active Status            Info",
 		"OPT Name   Platform Location           Description               Status",
 		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
-		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status"};
+		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
+		"Name   Platform Location          Description               Status"};
 
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
@@ -1124,6 +1125,7 @@ static char *status_sep[] = {
 		"--- ------ -------------------------- ------------------------ -----------------",
 		"--- ------ -------------------------- -------- ---------------- -----------------",
 		"--- ------ -------------------------- -------- ---------------- -----------------",
+		"------ -------------------------- ------------------------ -----------------",
 };
 
 /**
@@ -12568,11 +12570,15 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 	if (type == 3)
 		indent = 1;
 
-	if (type == 5)
+	if (type == 5) {
 		hw_loc = 1;
+		sg = 1;
+	}
 
-	if (type == 6 || type == 7)
+	if (type == 6 || type == 7) {
 		conc_main = 1;
+		sg = 1;
+	}
 
 	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0, hw_loc, conc_main);
 }
@@ -14786,7 +14792,7 @@ static int query_add_remove(int action)
 
 	for (i = 0; i < num_devs; i++) {
 		if (i == 0)
-			printf("%s\n%s\n", status_hdr[8], status_sep[8]);
+			printf("%s\n%s\n", status_hdr[11], status_sep[11]);
 
 		printf_device(devs[i], 5);
 	}
