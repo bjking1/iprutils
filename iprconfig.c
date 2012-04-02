@@ -123,13 +123,17 @@ struct special_status {
 
 char *print_device(struct ipr_dev *, char *, char *, int);
 int display_menu(ITEM **, int, int, int **);
-char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int);
+char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int, int, int);
 static char *print_path_details(struct ipr_dev *, char *);
 static int get_drive_phy_loc(struct ipr_ioa *ioa);
 
 #define print_dev(i, dev, buf, fmt, type) \
         for (i = 0; i < 2; i++) \
             (buf)[i] = print_device(dev, (buf)[i], fmt, type);
+
+#define print_dev_conc(i, dev, buf, fmt, type) \
+        for (i = 0; i < 3; i++) \
+            (buf)[i] = print_device(dev, (buf)[i], fmt, (type + 5));
 
 static struct sysfs_dev *head_sdev;
 static struct sysfs_dev *tail_sdev;
@@ -1103,7 +1107,10 @@ static char *status_hdr[] = {
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
-		"SAS Port/SAS Address   Description        Active Status            Info"};
+		"SAS Port/SAS Address   Description        Active Status            Info",
+		"OPT Name   Platform Location           Description               Status",
+		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
+		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status"};
 
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
@@ -1113,7 +1120,10 @@ static char *status_sep[] = {
 		"--- ---------------------- ------------------ ------ ----------------- ----------",
 		"--- ---------------------- ------------------ ------ ----------------- ----------",
 		"---------------------- ------------------ ------ ----------------- ----------",
-		"---------------------- ------------------ ------ ----------------- ----------"
+		"---------------------- ------------------ ------ ----------------- ----------",
+		"--- ------ -------------------------- ------------------------ -----------------",
+		"--- ------ -------------------------- -------- ---------------- -----------------",
+		"--- ------ -------------------------- -------- ---------------- -----------------",
 };
 
 /**
@@ -1314,6 +1324,23 @@ static void body_init_status(char *buffer[2], char **header, int *num_lines)
 
 	for (z = 0; z < 2; z++)
 		buffer[z] = __body_init_status(header, num_lines, z);
+}
+
+/**
+ * body_init_status_conc -
+ * @buffer:		char array
+ * @header:
+ * @num_lines:		number of lines
+ *
+ * Returns:
+ *   nothing
+ **/
+static void body_init_status_conc(char *buffer[3], char **header, int *num_lines)
+{
+	int z;
+
+	for (z = 0; z < 3; z++)
+		buffer[z] = __body_init_status(header, num_lines, (z + 8));
 }
 
 /**
@@ -6877,9 +6904,9 @@ int process_conc_maint(i_container *i_con, int action)
 	struct ipr_dev_record *dev_rcd;
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_drive_elem_status *elem_status, *overall;
-	char *buffer[2];
+	char *buffer[3];
 	int header_lines;
-	int toggle=1;
+	int toggle=0;
 	s_node *n_screen;
 	struct screen_output *s_out;
 	struct ipr_res_addr res_addr;
@@ -6951,15 +6978,15 @@ int process_conc_maint(i_container *i_con, int action)
 		n_screen = &n_wait_conc_add;
 
 	processing();
-	for (k = 0; k < 2; k++) {
-		buffer[k] = __body_init_status(n_screen->header, &header_lines, k);
-		buffer[k] = print_device(dev, buffer[k], "1", k);
+	for (k = 0; k < 3; k++) {
+		buffer[k] = __body_init_status(n_screen->header, &header_lines, (k + 8));
+		buffer[k] = print_device(dev, buffer[k], "1", (k + 5));
 	}
 
 	rc = ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
 	if (rc) {
-		for (k = 0; k < 2; k++) {
+		for (k = 0; k < 3; k++) {
 			free(buffer[k]);
 			buffer[k] = NULL;
 		}
@@ -6968,14 +6995,14 @@ int process_conc_maint(i_container *i_con, int action)
 
 	/* call screen driver */
 	do {
-		n_screen->body = buffer[toggle&1];
+		n_screen->body = buffer[toggle%3];
 		s_out = screen_driver(n_screen, header_lines, i_con);
 		rc = s_out->rc;
 		free(s_out);
 		toggle++;
 	} while (rc == TOGGLE_SCREEN);
 
-	for (k = 0; k < 2; k++) {
+	for (k = 0; k < 3; k++) {
 		free(buffer[k]);
 		buffer[k] = NULL;
 	}
@@ -7403,6 +7430,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			get_res_addrs(dev);
 
 		for_each_ses(ioa, ses) {
+			get_ses_phy_loc(ses);
 			if (ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
 				continue;
 			if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
@@ -7465,11 +7493,11 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 int start_conc_maint(i_container *i_con, int action)
 {
 	int rc, s_rc, i, k;
-	char *buffer[2];
+	char *buffer[3];
 	int num_lines = 0;
 	struct screen_output *s_out;
 	struct ipr_dev **devs;
-	int toggle = 1;
+	int toggle = 0;
 	s_node *n_screen;
 	int header_lines;
 	int num_devs;
@@ -7487,31 +7515,31 @@ int start_conc_maint(i_container *i_con, int action)
 	else
 		n_screen = &n_concurrent_add_device;
 
-	body_init_status(buffer, n_screen->header, &header_lines);
+	body_init_status_conc(buffer, n_screen->header, &header_lines);
 
 	num_devs = get_conc_devs(&devs, action);
 
 	for (i = 0; i < num_devs; i++) {
-		print_dev(k, devs[i], buffer, "%1", k);
+		print_dev_conc(k, devs[i], buffer, "%1", k);
 		i_con = add_i_con(i_con,"\0", devs[i]);
 		num_lines++;
 	}
 
 	if (num_lines == 0) {
-		for (k = 0; k < 2; k++) 
+		for (k = 0; k < 3; k++)
 			buffer[k] = add_string_to_body(buffer[k], _("(No Eligible Devices Found)"),
 						     "", NULL);
 	}
 
 	do {
-		n_screen->body = buffer[toggle&1];
+		n_screen->body = buffer[toggle%3];
 		s_out = screen_driver(n_screen, header_lines, i_con);
 		s_rc = s_out->rc;
 		free(s_out);
 		toggle++;
 	} while (s_rc == TOGGLE_SCREEN);
 
-	for (k = 0; k < 2; k++) {
+	for (k = 0; k < 3; k++) {
 		free(buffer[k]);
 		buffer[k] = NULL;
 	}
@@ -7637,8 +7665,8 @@ int path_status(i_container * i_con)
 			continue;
 
 		for_each_disk(ioa, dev) {
-			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1);
-			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1);
+			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1, 0 ,0);
+			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1, 0 ,0);
 			i_con = add_i_con(i_con, "\0", dev);
 			num_devs++;
 		}
@@ -11954,7 +11982,8 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
  **/
 char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		     int sd, int sg, int vpd, int percent, int indent,
-		     int res_path, int ra, int path_status)
+		     int res_path, int ra, int path_status,
+		     int hw_loc, int conc_main)
 {
 	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -11988,19 +12017,33 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 	len += sprintf(body + len, "%-6s ", node_name);
 
-	if (res_path) {
-		if (ioa->sis64)
-			loc_len = sprintf(body + len, "%-26s ", scsi_dev_data ?
-					  scsi_dev_data->res_path : "<unknown>");
-		else
-			loc_len = sprintf(body + len, "%d:", ioa->host_num);
+	if (hw_loc) {
+		loc_len = sprintf(body + len, "%-26s ", dev->physical_location);
 		len += loc_len;
 	}
 	else {
-		loc_len = sprintf(body + len, "%s/%d:",
+		if (res_path) {
+			if (ioa->sis64)
+				if (conc_main)
+					loc_len = sprintf(body + len, "%d/%-26s ", ioa->host_num,scsi_dev_data ?
+					  scsi_dev_data->res_path : "<unknown>");
+				else
+					loc_len = sprintf(body + len, "%-26s ", scsi_dev_data ?
+					  scsi_dev_data->res_path : "<unknown>");
+			else
+				if (conc_main)
+					loc_len = sprintf(body + len, "%d/%d:", ioa->host_num,ioa->host_num);
+				else
+					loc_len = sprintf(body + len, "%d:", ioa->host_num);
+
+			len += loc_len;
+		}
+		else {
+			loc_len = sprintf(body + len, "%s/%d:",
 				 ioa->pci_address,
 				 ioa->host_num);
-		len += loc_len;
+			len += loc_len;
+		}
 	}
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER && dev == &ioa->ioa) {
@@ -12141,19 +12184,22 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
  * 2: print sg, resource address (sis32)/resource path (sis64), device VPD
  * 3: print sd, pci/scsi location, device description, indent array members, print % complete
  * 4: print sg, pci/scsi location, device description, print % complete
+ * 5: print sd, hardware location, status
+ * 6: print sd, the first resource adress(sis32)/resource path(sis64), dev VPD
+ * 7: print sd, the second resource adress(sis32)/resource path(sis64), dev VPD
  */
 char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 {
-	int sd, sg, vpd, percent, indent, res_path;
+	int sd, sg, vpd, percent, indent, res_path, hw_loc, conc_main;
 
-	sd = sg = vpd = percent = indent = res_path = 0;
+	sd = sg = vpd = percent = indent = res_path = hw_loc = conc_main = 0;
 
 	if (type == 2 || type == 4)
 		sg = 1;
 	else
 		sd = 1;
 
-	if (type == 0 || type == 2) {
+	if (type == 0 || type == 2 || type == 6 || type == 7) {
 		vpd = 1;
 		res_path = 1;
 	} else
@@ -12162,7 +12208,13 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 	if (type == 3)
 		indent = 1;
 
-	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0);
+	if (type == 5)
+		hw_loc = 1;
+
+	if (type == 6 || type == 7)
+		conc_main = 1;
+
+	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0, hw_loc, conc_main);
 }
 
 /**
@@ -12728,7 +12780,7 @@ static void printf_device(struct ipr_dev *dev, int type)
 static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 			    int percent, int indent, int res_path)
 {
-	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0);
+	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0, 0, 0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -13278,13 +13330,9 @@ static int set_initiator_id(char **args, int num_args)
 static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot)
 {
 	int i;
-	char buf[100];
 
 	for (i = 0; i < num_devs; i++) {
-		sprintf(buf, "%s/%d:%d:%d:", devs[i]->ioa->pci_address, devs[i]->ioa->host_num,
-			devs[i]->res_addr[0].bus, devs[i]->res_addr[0].target);
-
-		if (!strncmp(buf, slot, strlen(buf)))
+		if (!strncmp(devs[i]->physical_location, slot, strlen(slot)))
 			return devs[i];
 	}
 
@@ -13936,7 +13984,7 @@ static int query_path_details(char **args, int num_args)
  **/
 static void printf_path_status(struct ipr_dev *dev)
 {
-	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1);
+	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -14358,9 +14406,9 @@ static int query_add_remove(int action)
 
 	for (i = 0; i < num_devs; i++) {
 		if (i == 0)
-			printf("%s\n%s\n", status_hdr[3], status_sep[3]);
+			printf("%s\n%s\n", status_hdr[8], status_sep[8]);
 
-		printf_device(devs[i], 1);
+		printf_device(devs[i], 5);
 	}
 
 	free_empty_slots(devs, num_devs);
@@ -16112,10 +16160,10 @@ static const struct {
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable, "sda 0" },
 	{ "set-log-level",			2, 0, 2, set_log_level_cmd, "sg5 2" },
 	{ "identify-disk",			2, 0, 2, identify_disk, "sda 1" },
-	{ "identify-slot",			2, 0, 2, identify_slot, "0000:d8:01.0/0:1:1: 1" },
+	{ "identify-slot",			2, 0, 2, identify_slot, "U5886.001.P915059-P1-D1 1" },
 	{ "remove-disk",			2, 0, 2, remove_disk, "sda 1" },
-	{ "remove-slot",			2, 0, 2, remove_slot, "0000:d8:01.0/0:1:1: 1" },
-	{ "add-slot",				2, 0, 2, add_slot, "0000:d8:01.0/0:1:1: 1" },
+	{ "remove-slot",			2, 0, 2, remove_slot, "U5886.001.P915059-P1-D1 1" },
+	{ "add-slot",				2, 0, 2, add_slot, "U58886.001.P915059-P1-D1 1" },
 	{ "set-initiator-id",			3, 0, 3, set_initiator_id, "sg5 0 7" },
 	{ "set-bus-speed",			3, 0, 3, set_bus_speed, "sg5 0 320" },
 	{ "set-bus-width",			3, 0, 3, set_bus_width, "sg5 0 16" },
