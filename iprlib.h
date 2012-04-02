@@ -149,6 +149,7 @@
 #define IPR_RESUME_DEV_BUS                   0xC9
 #define IPR_IOA_SERVICE_ACTION               0xD2
 #define IPR_QUERY_RES_ADDR_ALIASES           0x10
+#define IPR_QUERY_RES_PATH_ALIASES           0x20
 #define IPR_DISRUPT_DEVICE                   0x11
 #define IPR_QUERY_SAS_EXPANDER_INFO          0x12
 #define IPR_QUERY_RES_REDUNDANCY_INFO        0x13
@@ -290,6 +291,10 @@ struct ipr_res_addr {
 	u8 lun;
 #define IPR_GET_PHYSICAL_LOCATOR(res_addr) \
 	(((res_addr)->bus << 16) | ((res_addr)->target << 8) | (res_addr)->lun)
+};
+
+struct ipr_res_path {
+	u8 res_path_bytes[8];
 };
 
 struct ipr_std_inq_vpids {
@@ -683,6 +688,18 @@ struct ipr_res_addr_aliases {
                ra < ((aliases)->res_addr + (ntohl((aliases)->length) / sizeof(struct ipr_res_addr))) && \
                ra < ((aliases)->res_addr + ARRAY_SIZE((aliases)->res_addr)); \
                ra++)
+
+struct ipr_res_path_aliases {
+	u32 length;
+	u32 reserved1;
+	struct ipr_res_path res_path[10];
+};
+
+#define for_each_rp_alias(rp, aliases) \
+          for (rp = (aliases)->res_path; \
+               rp < ((aliases)->res_path + ((ntohl((aliases)->length)- 4) / sizeof(struct ipr_res_path))) && \
+               rp < ((aliases)->res_path + ARRAY_SIZE((aliases)->res_path)); \
+               rp++)
 
 struct ipr_array_cap_entry {
 	u8   prot_level;
@@ -1294,6 +1311,8 @@ struct ipr_dev {
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
+	struct ipr_res_path res_path[IPR_DEV_MAX_PATHS];
+	char res_path_name[IPR_MAX_RES_PATH_LEN];
 	struct ipr_disk_attr attr;
 	char physical_location[PHYSICAL_LOCATION_LENGTH];
 	union {
@@ -1308,6 +1327,10 @@ struct ipr_dev {
 #define for_each_ra(ra, dev) \
            for(ra = (dev)->res_addr; \
                 (ra - ((dev)->res_addr)) < IPR_DEV_MAX_PATHS; ra++)
+
+#define for_each_rp(rp, dev) \
+           for(rp = (dev)->res_path; \
+                (rp - ((dev)->res_path)) < IPR_DEV_MAX_PATHS; rp++)
 
 enum ipr_tcq_mode {
 	IPR_TCQ_DISABLE = 0,
@@ -2374,6 +2397,10 @@ int ipr_disrupt_device(struct ipr_dev *);
 int ipr_inquiry(struct ipr_dev *, u8, void *, u8);
 int ipr_query_res_addr_aliases(struct ipr_ioa *, struct ipr_res_addr *,
 			       struct ipr_res_addr_aliases *);
+int ipr_query_res_path_aliases(struct ipr_ioa *, struct ipr_res_path *,
+			       struct ipr_res_path_aliases *);
+void ipr_convert_res_path_to_bytes(struct ipr_dev *);
+void ipr_format_res_path(u8 *, char *, int);
 void ipr_reset_adapter(struct ipr_ioa *);
 void ipr_scan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);

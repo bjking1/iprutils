@@ -7159,6 +7159,30 @@ static int get_res_addrs(struct ipr_dev *dev)
 }
 
 /**
+ * get_res_path -
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0
+ **/
+static int get_res_path(struct ipr_dev *dev)
+{
+	struct ipr_res_path *rp;
+	struct ipr_res_path_aliases aliases;
+	int i = 0;
+
+	ipr_query_res_path_aliases(dev->ioa, &(dev->res_path[0]), &aliases);
+
+	for_each_rp_alias(rp, &aliases) {
+		memcpy(&(dev->res_path[i]), rp, sizeof(*rp));
+		if (++i >= IPR_DEV_MAX_PATHS)
+			break;
+	}
+
+	return 0;
+}
+
+/**
  * alloc_empty_slot -
  * @ses:		ipr dev struct
  * @slot:		slot number
@@ -7426,8 +7450,12 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	for_each_primary_ioa(ioa) {
 		is_spi = ioa_is_spi(ioa);
 
-		for_each_hotplug_dev(ioa, dev)
-			get_res_addrs(dev);
+		for_each_hotplug_dev(ioa, dev) {
+			if (ioa->sis64)
+				get_res_path(dev);
+			else
+				get_res_addrs(dev);
+		}
 
 		for_each_ses(ioa, ses) {
 			get_ses_phy_loc(ses);

@@ -3763,6 +3763,80 @@ int ipr_query_res_addr_aliases(struct ipr_ioa *ioa, struct ipr_res_addr *res_add
 }
 
 /**
+ * ipr_init_res_path_aliases -
+ * @aliases:		ipr_res_path_aliases struct
+ * @res_addr:		ipr_res_path
+ *
+ * Returns:
+ *   nothing
+ **/
+static void ipr_init_res_path_aliases(struct ipr_res_path_aliases *aliases,
+				      struct ipr_res_path *res_path)
+{
+	struct ipr_res_path *rp;
+
+	aliases->length = htonl(sizeof(*res_path) * IPR_DEV_MAX_PATHS);
+	for_each_rp_alias(rp, aliases) {
+		memcpy(rp, res_path, sizeof(*rp));
+	}
+}
+
+/**
+ * ipr_query_res_path_aliases -
+ * @ioa:		ipr ioa struct
+ * @res_addr:		ipr_res_path struct
+ * @aliases:		ipr_res_ipr_aliases struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_query_res_path_aliases(struct ipr_ioa *ioa, struct ipr_res_path *res_path,
+			       struct ipr_res_path_aliases *aliases)
+{
+	int fd, rc;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct sense_data_t sense_data;
+	char *name = ioa->ioa.gen_name;
+
+	ipr_init_res_path_aliases(aliases, res_path);
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_QUERY_RES_PATH_ALIASES;
+
+	memcpy(&cdb[2], res_path->res_path_bytes, sizeof(struct ipr_res_path));
+	cdb[10] = sizeof(*aliases) >> 24;
+	cdb[11] = (sizeof(*aliases) >> 16) & 0xff;
+	cdb[12] = (sizeof(*aliases) >> 8) & 0xff;
+	cdb[13] = sizeof(*aliases) & 0xff;
+
+	rc = sg_ioctl(fd, cdb, aliases,
+		      sizeof(*aliases), SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
+
+	if (rc || (ntohl(aliases->length) <= 8))
+		ipr_init_res_path_aliases(aliases, res_path);
+	if (rc != 0 && sense_data.sense_key != ILLEGAL_REQUEST)
+		ioa_cmd_err(ioa, &sense_data, "Query Resource Path Aliases", rc);
+	if (rc && sense_data.sense_key != ILLEGAL_REQUEST)
+		rc = 0;
+
+	close(fd);
+
+	return rc;
+}
+
+/**
  * ipr_query_sas_expander_info - 
  * @ioa:		ipr ioa struct
  * @info:		ipr_query_sas_expander_info struct
@@ -5689,6 +5763,25 @@ static void get_prot_levels(struct ipr_ioa *ioa)
 	}
 }
 
+void ipr_convert_res_path_to_bytes(struct ipr_dev *dev)
+{
+
+	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
+	int i;
+	char *startptr, *endptr;
+
+	if (scsi_dev_data) {
+		startptr = dev->res_path_name;
+		i = 0;
+		do {
+			dev->res_path[0].res_path_bytes[i++] = (u8)strtol(startptr, &endptr, 16);
+			startptr = endptr + 1;
+		} while (*endptr != '\0' &&  i < 8);
+
+		while ( i < 8 ) dev->res_path[0].res_path_bytes[i++] = 0xff;
+	}
+}
+
 /**
  * get_res_addr - 
  * @dev:		ipr dev struct
@@ -5707,6 +5800,10 @@ static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 		res_addr->bus = dev->scsi_dev_data->channel;
 		res_addr->target = dev->scsi_dev_data->id;
 		res_addr->lun = dev->scsi_dev_data->lun;
+		if (dev->ioa->sis64) {
+			strncpy(dev->res_path_name, dev->scsi_dev_data->res_path, strlen(dev->scsi_dev_data->res_path));
+			ipr_convert_res_path_to_bytes(dev);
+		}
 	} else if (ipr_is_af_dasd_device(dev)) {
 		if (dev_record && dev_record->no_cfgte_dev) {
 			res_addr->host = dev->ioa->host_num;
@@ -5718,6 +5815,10 @@ static int get_res_addr(struct ipr_dev *dev, struct ipr_res_addr *res_addr)
 			res_addr->bus = dev_record->type2.resource_addr.bus;
 			res_addr->target = dev_record->type2.resource_addr.target;
 			res_addr->lun = dev_record->type2.resource_addr.lun;
+			if (dev->ioa->sis64) {
+				ipr_format_res_path(dev_record->type3.res_path, dev->res_path_name, IPR_MAX_RES_PATH_LEN);
+				ipr_convert_res_path_to_bytes(dev);
+			}
 		} else
 			return -1;
 	} else if (ipr_is_volume_set(dev)) {
