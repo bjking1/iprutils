@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.9
+Version: 2.3.10
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,26 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Mon Apr 02 2012 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.10
+- Release 2.3.10
+- Displays Hardware Location Code for disk/expander.
+- Changes concurrent maintenance GUI to 3 ways toggle.
+- Changes README for concurrent maintenance command line.
+- Adds structures and functions for query resource paths aliases.
+- Fixes a bug in suspend/resume device bus.
+- Supports concurrent maintenance for 64bit adapter.
+- Supports not physical remove disk.
+- Fixes header problem when query-remove/add-device.
+- Sometimes receive diag failed at first time after update adapter firmware.
+- If the disk in a RAID, iprutils itself has to delete sysfs name for secondary
+  adapter.
+- Old drawers don't support query page 4 for physical location.
+- Adds display sas path detail for 64bit adapter.
+- Fixes GUI version of raid consistency check.
+- Adds new chip details entries.
+- Fixes SES microcode update failures.
+- Fixes SES microcode image version on CLI.
+- Adds a flag to raid create command for known zeroed drives.
 * Fri Dec 16 2011 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.9
 - Release 2.3.9
 - Fixes disks and arrays status.
