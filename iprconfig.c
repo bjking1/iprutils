@@ -2401,7 +2401,7 @@ static char *disk_details(char *body, struct ipr_dev *dev)
  **/
 int get_ses_phy_loc(struct ipr_dev *dev)
 {
-	int rc, i;
+	int rc, i, ret = 1;
 	struct ses_inquiry_page0  ses_page0_inq;
 	struct ses_serial_num_vpd ses_vpd_inq;
 	char buffer[100];
@@ -2412,24 +2412,28 @@ int get_ses_phy_loc(struct ipr_dev *dev)
 
 	for (i = 0; !rc && i < ses_page0_inq.page_length; i++) {
 		if (ses_page0_inq.supported_vpd_page[i] == 0x04) {
-			rc = ipr_inquiry(dev, 0x04, &ses_vpd_inq, sizeof(ses_vpd_inq));
+			ret = ipr_inquiry(dev, 0x04, &ses_vpd_inq, sizeof(ses_vpd_inq));
 			break;
 		}
 	}
 
-	dev->physical_location[0] = '\0';
-	strncat(dev->physical_location, "U", strlen("U"));
-	ipr_strncpy_0(buffer, (char *)ses_vpd_inq.feature_code,
-			sizeof(ses_vpd_inq.feature_code));
-	strncat(dev->physical_location, buffer, strlen(buffer));
-	ipr_strncpy_0(buffer, (char *)ses_vpd_inq.count,
-			sizeof(ses_vpd_inq.count));
-	strncat(dev->physical_location, ".", strlen("."));
-	strncat(dev->physical_location, buffer, strlen(buffer));
-	ipr_strncpy_0(buffer, (char *)ses_vpd_inq.ses_serial_num,
-			sizeof(ses_vpd_inq.ses_serial_num));
-	strncat(dev->physical_location, ".", strlen("."));
-	strncat(dev->physical_location, buffer, strlen(buffer));
+	if (ret == 0 ) {
+		dev->physical_location[0] = '\0';
+		strncat(dev->physical_location, "U", strlen("U"));
+		ipr_strncpy_0(buffer, (char *)ses_vpd_inq.feature_code,
+				sizeof(ses_vpd_inq.feature_code));
+		strncat(dev->physical_location, buffer, strlen(buffer));
+		ipr_strncpy_0(buffer, (char *)ses_vpd_inq.count,
+				sizeof(ses_vpd_inq.count));
+		strncat(dev->physical_location, ".", strlen("."));
+		strncat(dev->physical_location, buffer, strlen(buffer));
+		ipr_strncpy_0(buffer, (char *)ses_vpd_inq.ses_serial_num,
+				sizeof(ses_vpd_inq.ses_serial_num));
+		strncat(dev->physical_location, ".", strlen("."));
+		strncat(dev->physical_location, buffer, strlen(buffer));
+
+		return 0;
+	}
 
 	return 1;
 }
@@ -2438,7 +2442,8 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 {
 	char buffer[DISK_PHY_LOC_LENGTH];
 	ipr_strncpy_0(buffer, (char *)drive_data->dev_elem[slot_id].disk_physical_loc, DISK_PHY_LOC_LENGTH);
-	sprintf(buf, "%s-%s", ses->physical_location, buffer);
+	if (strlen(ses->physical_location))
+		sprintf(buf, "%s-%s", ses->physical_location, buffer);
 
 	return 0;
 }
@@ -2460,7 +2465,8 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 	char buffer[100];
 	int len;
 
-	get_ses_phy_loc(dev);
+	if (strlen(dev->physical_location) == 0)
+		get_ses_phy_loc(dev);
 
 	ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 	ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
@@ -2542,7 +2548,10 @@ int device_details(i_container *i_con)
 		body = ses_details(body, dev);
 	} else {
 		n_screen = &n_device_details;
-		body = disk_details(body, dev);
+		if (dev->scsi_dev_data)
+			body = disk_details(body, dev);
+		else
+			return rc;
 	}
 
 	n_screen->body = body;
@@ -6967,6 +6976,10 @@ static void wait_for_new_dev_64bit(struct ipr_ioa *ioa, struct ipr_res_path *res
 	char *buf = "0 - -";
 
 	ipr_query_res_path_aliases(ioa, res_path, &aliases);
+	if (aliases.length < (4 + 2 * sizeof(struct ipr_res_path))) {
+		aliases.length = 4 + 2 * sizeof(struct ipr_res_path);
+		memcpy(&aliases.res_path[0], res_path, 2 * sizeof(struct ipr_res_path));
+	}
 
 	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
 	attr = sysfs_get_classdev_attr(class_device, "scan");
@@ -7533,7 +7546,8 @@ static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vs
 				dev->ses[i] = ses;
 			}
 			dev->physical_location[0] = '\0';
-			strncat(dev->physical_location, phy_loc, strlen(phy_loc));
+			if (strlen(phy_loc))
+				strncat(dev->physical_location, phy_loc, strlen(phy_loc));
 			return dev;
 		}
 	}
@@ -7577,7 +7591,8 @@ static struct ipr_dev *get_dev_for_slot_64bit(struct ipr_dev *ses, int slot, cha
 					break;
 				}
 			dev->physical_location[0] = '\0';
-			strncat(dev->physical_location, phy_loc, strlen(phy_loc));
+			if (strlen(phy_loc))
+				strncat(dev->physical_location, phy_loc, strlen(phy_loc));
 			return dev;
 
 			}
@@ -7799,7 +7814,9 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 
 		for_each_ses(ioa, ses) {
 			times = 5;
-			get_ses_phy_loc(ses);
+			if (strlen(ses->physical_location) == 0)
+				get_ses_phy_loc(ses);
+
 			while (times--) {
 				if (!ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
 					break;
@@ -12113,8 +12130,12 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 		} else if (format_in_progress)
 			sprintf(buf, "%d%% Formatted", percent_cmplt);
 		else if ((!ioa->sis64 && ioa->is_secondary && !scsi_dev_data) ||
-			 (ioa->sis64 && ipr_is_remote_af_dasd_device(dev)))
-			sprintf(buf, "Remote");
+			 (ioa->sis64 && ipr_is_remote_af_dasd_device(dev))) {
+			if (!scsi_dev_data)
+				sprintf(buf, "Missing");
+			else
+				sprintf(buf, "Remote");
+			}
 		else if (!scsi_dev_data)
 			sprintf(buf, "Missing");
 		else if (!scsi_dev_data->online)
@@ -12411,8 +12432,16 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	len += sprintf(body + len, "%-6s ", node_name);
 
 	if (hw_loc) {
-		loc_len = sprintf(body + len, "%-26s ", dev->physical_location);
-		len += loc_len;
+		if (strlen(dev->physical_location)) {
+			loc_len = sprintf(body + len, "%-26s ", dev->physical_location);
+			len += loc_len;
+		}
+		else {
+			loc_len = sprintf(body + len, "%s/%d:",
+				 ioa->pci_address,
+				 ioa->host_num);
+			len += loc_len;
+		}
 	}
 	else {
 		if (res_path) {
@@ -15677,7 +15706,7 @@ static void show_dev_details(struct ipr_dev *dev)
 		body = vset_array_details(body, dev);
 	else if (ipr_is_ses(dev))
 		body = ses_details(body, dev);
-	else
+	else if (dev->scsi_dev_data)
 		body = disk_details(body, dev);
 
 	printf("%s\n", body);
@@ -16185,7 +16214,8 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 
 		for_each_ses(ioa, ses) {
 			times = 5;
-			get_ses_phy_loc(ses);
+			if (strlen(ses->physical_location) == 0)
+				get_ses_phy_loc(ses);
 			while (times--) {
 				if (!ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
 					break;
