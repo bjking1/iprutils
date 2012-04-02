@@ -7760,6 +7760,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	struct ipr_ses_config_pg ses_cfg;
 	struct drive_elem_desc_pg drive_data;
 	char phy_loc[PHYSICAL_LOCATION_LENGTH];;
+	int times;
 
 	for_each_primary_ioa(ioa) {
 		is_spi = ioa_is_spi(ioa);
@@ -7772,9 +7773,14 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 		}
 
 		for_each_ses(ioa, ses) {
+			times = 5;
 			get_ses_phy_loc(ses);
-			if (ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
-				continue;
+			while (times--) {
+				if (!ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
+					break;
+			}
+			if (times < 0 ) continue;
+
 			if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
 				continue;
 			if (ipr_receive_diagnostics(ses, 7, &drive_data, sizeof(drive_data)))
@@ -16141,6 +16147,7 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 	struct ipr_ses_config_pg ses_cfg;
 	struct drive_elem_desc_pg drive_data;
 	char phy_loc[PHYSICAL_LOCATION_LENGTH];;
+	int times;
 
 	for_each_ioa(ioa)  {
 
@@ -16152,9 +16159,14 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 		}
 
 		for_each_ses(ioa, ses) {
+			times = 5;
 			get_ses_phy_loc(ses);
-			if (ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
-				continue;
+			while (times--) {
+				if (!ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
+					break;
+			}
+			if (times < 0 ) continue;
+
 			if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
 				continue;
 
