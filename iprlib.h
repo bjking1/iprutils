@@ -153,6 +153,7 @@
 #define IPR_DISRUPT_DEVICE                   0x11
 #define IPR_QUERY_SAS_EXPANDER_INFO          0x12
 #define IPR_QUERY_RES_REDUNDANCY_INFO        0x13
+#define IPR_QUERY_RES_REDUNDANCY_INFO64      0x23
 #define IPR_CHANGE_CACHE_PARAMETERS          0x14
 #define IPR_QUERY_CACHE_PARAMETERS           0x16
 #define IPR_LIVE_DUMP                        0x31
@@ -2113,15 +2114,56 @@ struct ipr_fabric_descriptor {
 	struct ipr_fabric_config_element elem[1];
 };
 
+struct ipr_fabric_config_element64 {
+	u16 length;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 cfg_elem_id:2;
+	u8 reserved1:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved1:6;
+	u8 cfg_elem_id:2;
+#endif
+	u8 reserved2;
+	u8 type_status;
+	u8 reserved3[2];
+	u8 link_rate;
+	u8 res_path[8];
+	u32 wwid[4];
+};
+
+struct ipr_fabric_descriptor64 {
+	u16 length;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 fabric_id:2;
+	u8 reserved1:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved1:6;
+	u8 fabric_id:2;
+#endif
+	u8 reserved2[2];
+	u8 path_state;
+	u8 reserved3;
+	u8 res_path[8];
+	u32 reserved4;
+	u8 reserved5[2];
+	u16 num_entries;
+	struct ipr_fabric_config_element64 elem[1];
+};
+
 #define for_each_fabric_cfg(fabric, cfg) \
 		for (cfg = (fabric)->elem; \
 			cfg < ((fabric)->elem + ntohs((fabric)->num_entries)); \
 			cfg++)
 
 #define for_each_fabric_desc(fabric, info) \
-	for (fabric = (info)->fabric; \
+	for (fabric = (info)->u.fabric; \
 	     ((unsigned long)fabric) < (((unsigned long)(info)) + ntohl((info)->len) + sizeof((info)->len)); \
 	     fabric = (struct ipr_fabric_descriptor *)(((unsigned long)fabric) + ntohs(fabric->length)))
+
+#define for_each_fabric_desc64(fabric, info) \
+	for (fabric = (info)->u.fabric64; \
+	     ((unsigned long)fabric) < (((unsigned long)(info)) + ntohl((info)->len) + sizeof((info)->len)); \
+	     fabric = (struct ipr_fabric_descriptor64 *)(((unsigned long)fabric) + ntohs(fabric->length)))
 
 struct ipr_res_redundancy_info {
 	u32 len;
@@ -2132,7 +2174,10 @@ struct ipr_res_redundancy_info {
 	u8 active_paths;
 	u8 reserved[2];
 	u8 fabric_descriptors;
-	struct ipr_fabric_descriptor fabric[1];
+	union {
+		struct ipr_fabric_descriptor fabric[1];
+		struct ipr_fabric_descriptor64 fabric64[1];
+	} u;
 	u8 data[16384];
 };
 
@@ -2385,6 +2430,8 @@ int ipr_rebuild_device_data(struct ipr_ioa *);
 int ipr_resync_array(struct ipr_ioa *);
 int ipr_test_unit_ready(struct ipr_dev *, struct sense_data_t *);
 int ipr_format_unit(struct ipr_dev *);
+void ipr_format_res_path(u8 *, char *, int);
+void ipr_format_res_path_wo_hyphen(u8 *, char *, int);
 int ipr_add_array_device(struct ipr_ioa *, int, struct ipr_array_query_data *);
 int ipr_reclaim_cache_store(struct ipr_ioa *, int, void *);
 int ipr_evaluate_device(struct ipr_dev *, u32);

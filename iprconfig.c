@@ -8024,10 +8024,16 @@ int path_details(i_container *i_con)
 	else
 		name = dev->gen_name;
 
-	sprintf(location, "%s/%d:%d:%d:%d", dev->ioa->pci_address, dev->ioa->host_num,
-		dev->res_addr[0].bus, dev->res_addr[0].target, dev->res_addr[0].lun);
+	if (dev->ioa->sis64)
+		sprintf(location, "%d/%s", dev->ioa->host_num,dev->scsi_dev_data->res_path);
+	else
+		sprintf(location, "%s/%d:%d:%d:%d", dev->ioa->pci_address, dev->ioa->host_num,
+			dev->res_addr[0].bus, dev->res_addr[0].target, dev->res_addr[0].lun);
 	body = add_line_to_body(body, _("Device"), name);
-	body = add_line_to_body(body, _("Location"), location);
+	if (strlen(dev->physical_location))
+		body = add_line_to_body(body, _("Location"), dev->physical_location);
+	else
+		body = add_line_to_body(body, _("Location"), location);
 	body = __body_init(body, n_path_details.header, &header_lines);
 	body = status_header(body, &header_lines, 6);
 
@@ -12313,6 +12319,39 @@ static char *print_phy(struct ipr_fabric_config_element *cfg, char *body)
 }
 
 /**
+ * print_phy64 -
+ * @cfg:		ipr_fabric_config_element struct
+ * @body:		message buffer
+ *
+ * Returns:
+ *   body
+ **/
+static char *print_phy64(struct ipr_fabric_config_element64 *cfg, char *body, int res_path_len)
+{
+	int i, ff_len;
+	int len = strlen(body);
+	char buffer[IPR_MAX_RES_PATH_LEN];
+
+	body = realloc(body, len + 256);
+	body[len] = '\0';
+
+	ipr_format_res_path_wo_hyphen(cfg->res_path, buffer, IPR_MAX_RES_PATH_LEN);
+	ff_len = res_path_len - strlen(buffer);
+	for ( i = 0; i < ff_len;  i++)
+		strncat(buffer, "F", strlen("F"));
+
+	len += sprintf(body + len, "%s", buffer);
+
+	len += sprintf(body + len, "/%08X%08X",
+		       ntohl(cfg->wwid[0]), ntohl(cfg->wwid[1]));
+	len += sprintf(body + len, " %-17s       ", get_phy_type(cfg->type_status));
+	len += sprintf(body + len, " %-17s", get_phy_state(cfg->type_status));
+	len += sprintf(body + len, " %s \n",
+		       link_rate[cfg->link_rate & IPR_PHY_LINK_RATE_MASK]);
+	return body;
+}
+
+/**
  * print_path -
  * @ioa:		ipr_fabric_descriptor struct
  * @body:		message buffer
@@ -12347,6 +12386,50 @@ static char *print_path(struct ipr_fabric_descriptor *fabric, char *body)
 }
 
 /**
+ * print_path64 -
+ * @ioa:		ipr_fabric_descriptor64 struct
+ * @body:		message buffer
+ *
+ * Returns:
+ *   body
+ **/
+static char *print_path64(struct ipr_fabric_descriptor64 *fabric, char *body)
+{
+	int len = strlen(body);
+	struct ipr_fabric_config_element64 *cfg;
+	char buffer[IPR_MAX_RES_PATH_LEN];
+	int max_res_path_len = 0;
+
+	body = realloc(body, len + 256);
+	body[len] = '\0';
+
+	ipr_format_res_path_wo_hyphen(fabric->res_path, buffer, IPR_MAX_RES_PATH_LEN);
+	len += sprintf(body + len, "%s                "
+		       "Resource Path    ", buffer);
+
+	if (fabric->path_state & IPR_PATH_ACTIVE)
+		len += sprintf(body + len, " Yes    ");
+	else if (fabric->path_state & IPR_PATH_NOT_ACTIVE)
+		len += sprintf(body + len, " No     ");
+	else
+		len += sprintf(body + len, " ???    ");
+
+	len += sprintf(body + len, "%-17s \n", get_path_state(fabric->path_state));
+
+	for_each_fabric_cfg(fabric, cfg) {
+		ipr_format_res_path_wo_hyphen(cfg->res_path, buffer, IPR_MAX_RES_PATH_LEN);
+		if (strlen(buffer) > max_res_path_len)
+			max_res_path_len = strlen(buffer);
+	}
+
+	for_each_fabric_cfg(fabric, cfg) {
+		body = print_phy64(cfg, body, max_res_path_len);
+	}
+
+	return body;
+}
+
+/**
  * print_path_details -
  * @dev:		ipr dev struct
  * @body:		message buffer
@@ -12359,6 +12442,7 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
 	int rc, len = 0;
 	struct ipr_res_redundancy_info info;
 	struct ipr_fabric_descriptor *fabric;
+	struct ipr_fabric_descriptor64 *fabric64;
 
 	rc = ipr_query_res_redundancy_info(dev, &info);
 
@@ -12370,8 +12454,12 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
 	body = realloc(body, len + 256);
 	body[len] = '\0';
 
-	for_each_fabric_desc(fabric, &info)
-		body = print_path(fabric, body);
+	if (dev->ioa->sis64)
+		for_each_fabric_desc64(fabric64, &info)
+			body = print_path64(fabric64, body);
+	else
+		for_each_fabric_desc(fabric, &info)
+			body = print_path(fabric, body);
 
 	return body;
 }

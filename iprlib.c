@@ -4010,7 +4010,10 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 	memset(cdb, 0, IPR_CCB_CDB_LEN);
 
 	cdb[0] = IPR_IOA_SERVICE_ACTION;
-	cdb[1] = IPR_QUERY_RES_REDUNDANCY_INFO;
+	if (dev->ioa->sis64)
+		cdb[1] = IPR_QUERY_RES_REDUNDANCY_INFO64;
+	else
+		cdb[1] = IPR_QUERY_RES_REDUNDANCY_INFO;
 	cdb[2] = (u8)(res_handle >> 24);
 	cdb[3] = (u8)(res_handle >> 16);
 	cdb[4] = (u8)(res_handle >> 8);
@@ -5918,6 +5921,26 @@ void ipr_format_res_path(u8 *res_path, char *buffer, int len)
 	p += snprintf(p, buffer + len - p, "%02X", res_path[0]);
 	for (i = 1; res_path[i] != 0xff && ((i * 3) < len); i++)
 		p += snprintf(p, buffer + len - p, "-%02X", res_path[i]);
+}
+
+/**
+ * ipr_format_res_path_wo_hyphen - Format the resource path into a string.
+ * @res_path:	resource path
+ * @buf:	buffer
+ * @len:	buffer length
+ *
+ * Return value:
+ *	none
+ **/
+void ipr_format_res_path_wo_hyphen(u8 *res_path, char *buffer, int len)
+{
+	int i;
+	char *p = buffer;
+
+	*p = '\0';
+	p += snprintf(p, buffer + len - p, "%02X", res_path[0]);
+	for (i = 1; res_path[i] != 0xff && ((i * 3) < len); i++)
+		p += snprintf(p, buffer + len - p, "%02X", res_path[i]);
 }
 
 /**
