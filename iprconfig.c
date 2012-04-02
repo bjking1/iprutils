@@ -6985,12 +6985,31 @@ static void wait_for_new_dev_64bit(struct ipr_ioa *ioa, struct ipr_res_path *res
 	}
 }
 
+static struct ipr_dev *delete_secondary_sysfs_name(struct ipr_dev *delete_dev)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev, *ses;
+
+	for_each_secondary_ioa(ioa) {
+		for_each_ses(ioa, ses) {
+			for_each_dev(ses->ioa, dev) {
+				if (ipr_is_ses(dev))
+					continue;
+				if (!strncmp(dev->res_path_name, delete_dev->res_path_name, strlen(delete_dev->res_path_name)))
+					return dev;
+			}
+		}
+	}
+	return NULL;
+}
+
 int remove_or_add_back_device_64bit(struct ipr_dev *dev)
 {
 	struct ipr_encl_status_ctl_pg ses_data;
 	struct ipr_drive_elem_status *elem_status;
 	struct ipr_ses_config_pg ses_cfg;
 	int res_path_len, dev_slot;
+	struct ipr_dev *sec_dev;
 	int rc;
 
 	evaluate_device(dev, dev->ioa, 0);
@@ -7014,6 +7033,12 @@ int remove_or_add_back_device_64bit(struct ipr_dev *dev)
 			elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY ) {
 				ipr_write_dev_attr(dev, "delete", "1");
 				ipr_del_zeroed_dev(dev);
+				sec_dev = delete_secondary_sysfs_name(dev);
+				if (sec_dev) {
+					evaluate_device(sec_dev, dev->ioa, 0);
+					ipr_write_dev_attr(sec_dev, "delete", "1");
+					ipr_del_zeroed_dev(sec_dev);
+				}
 				rc = 1;
 				break;
 			}
@@ -7041,6 +7066,7 @@ int process_conc_maint(i_container *i_con, int action)
 	int k, rc;
 	struct ipr_dev_record *dev_rcd;
 	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_ses_config_pg ses_cfg;
 	struct ipr_drive_elem_status *elem_status, *overall;
 	char *buffer[3];
 	int header_lines;
@@ -7050,7 +7076,6 @@ int process_conc_maint(i_container *i_con, int action)
 	struct ipr_res_addr res_addr;
 	struct ipr_res_path res_path[2];
 	int max_y, max_x;
-	struct ipr_ses_config_pg ses_cfg;
 
 	for_each_icon(temp_i_con) {
 		input = temp_i_con->field_data;
