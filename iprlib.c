@@ -799,7 +799,8 @@ static const struct chip_details chip_details []= {
 	{ .vendor = 0x1014, .device = 0x02BD, "PCI-X" }, /* Obsidian */
 	{ .vendor = 0x1014, .device = 0x0339, "PCI-E" }, /* Obsidian-E */
 	{ .vendor = 0x9005, .device = 0x0503, "PCI-X" }, /* Scamp */
-	{ .vendor = 0x1014, .device = 0x034A, "PCI-E" }, /* Scamp-E */
+	{ .vendor = 0x1014, .device = 0x033D, "PCI-E" }, /* CRoC-FPGA */
+	{ .vendor = 0x1014, .device = 0x034A, "PCI-E" }, /* CRoCodile */
 };
 
 /**
