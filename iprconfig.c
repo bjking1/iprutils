@@ -6854,6 +6854,47 @@ get_elem_status(struct ipr_dev *dev, struct ipr_dev *ses,
 }
 
 /**
+ * get_elem_status_64bit -
+ * @dev:		ipr dev struct
+ * @ses:		ipr dev struct
+ * @ses_data:		ipr_encl_status_ctl_pg struct
+ * @ses_config:		ipr_ses_config_pg struct
+ *
+ * Returns:
+ *   ipr_drive_elem_status struct if success / NULL otherwise
+ **/
+static struct ipr_drive_elem_status *
+get_elem_status_64bit(struct ipr_dev *dev, struct ipr_dev *ses,
+		struct ipr_encl_status_ctl_pg *ses_data, struct ipr_ses_config_pg *ses_cfg)
+{
+	struct ipr_res_path *rp;
+	struct ipr_drive_elem_status *elem_status;
+	int slot, res_path_len, dev_slot, ses_path_len;
+
+	if (ipr_receive_diagnostics(ses, 2, ses_data, sizeof(*ses_data)))
+		return NULL;
+
+	if (ipr_receive_diagnostics(ses, 1, ses_cfg, sizeof(*ses_cfg)))
+		return NULL;
+
+	ses_path_len  = strlen(ses->res_path_name);
+	res_path_len = strlen(dev->res_path_name);
+	dev_slot = strtoul(dev->res_path_name + (res_path_len-2), NULL, 16);
+
+	if (ses_path_len != res_path_len)
+		return NULL;
+
+	for_each_elem_status(elem_status, ses_data, ses_cfg) {
+		slot = elem_status->slot_id;
+		for_each_rp(rp, dev) {
+			if (!memcmp(&rp->res_path_bytes, &ses->res_path[0], ses_path_len/3) && slot == dev_slot)
+				return elem_status;
+		}
+	}
+	return NULL;
+}
+
+/**
  * wait_for_new_dev -
  * @ioa:		ipr ioa struct
  * @res_addr:		ipr_res_addr struct
@@ -6910,6 +6951,7 @@ int process_conc_maint(i_container *i_con, int action)
 	s_node *n_screen;
 	struct screen_output *s_out;
 	struct ipr_res_addr res_addr;
+	struct ipr_res_path res_path[2];
 	int max_y, max_x;
 	struct ipr_ses_config_pg ses_cfg;
 
@@ -6926,7 +6968,10 @@ int process_conc_maint(i_container *i_con, int action)
 	if (found != 1)
 		return INVALID_OPTION_STATUS;
 
-	memcpy(&res_addr, &(dev->res_addr), sizeof(res_addr));
+	if (dev->ioa->sis64)
+		memcpy(&res_path, &(dev->res_path), sizeof(struct ipr_res_path)*2);
+	else
+		memcpy(&res_addr, &(dev->res_addr), sizeof(res_addr));
 
 	if (ipr_is_af_dasd_device(dev) &&
 	    (action == IPR_VERIFY_CONC_REMOVE || action == IPR_WAIT_CONC_REMOVE)) {
@@ -6941,7 +6986,10 @@ int process_conc_maint(i_container *i_con, int action)
 	ioa = dev->ioa;
 	ses = dev->ses[0];
 
-	elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
+	if (ioa->sis64)
+		elem_status = get_elem_status_64bit(dev, ses, &ses_data, &ses_cfg);
+	else
+		elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
 	if (!elem_status)
 		return INVALID_OPTION_STATUS;
 
@@ -7009,7 +7057,10 @@ int process_conc_maint(i_container *i_con, int action)
 
 	n_screen->body = NULL;
 
-	elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
+	if (ioa->sis64)
+		elem_status = get_elem_status_64bit(dev, ses, &ses_data, &ses_cfg);
+	else
+		elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
 	if (!elem_status)
 		return 30 | EXIT_FLAG;;
 
@@ -7179,6 +7230,9 @@ static int get_res_path(struct ipr_dev *dev)
 			break;
 	}
 
+	while (i < IPR_DEV_MAX_PATHS)
+		memset(&dev->res_path[i++], 0xff, sizeof(struct ipr_res_path));
+
 	return 0;
 }
 
@@ -7232,6 +7286,50 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	strncat(dev->physical_location, phy_loc, strlen(phy_loc));
 	scsi_dbg(dev, "Found empty slot\n");
 	get_res_addrs(dev);
+	return dev;
+}
+
+/**
+* alloc_empty_slot_64bit -
+* @ses:		ipr dev struct
+* @slot:		slot number
+* @is_vses:		vses flag
+*
+* Returns:
+*   ipr_dev struct
+**/
+static struct ipr_dev *alloc_empty_slot_64bit(struct ipr_dev *ses, int slot, int is_vses, char *phy_loc)
+{
+	struct ipr_ioa *ioa = ses->ioa;
+	struct ipr_dev *dev;
+	struct scsi_dev_data *scsi_dev_data;
+	char slot_buf[50];
+	int n, len;
+
+	dev = calloc(1, sizeof(*dev));
+	scsi_dev_data = calloc(1, sizeof(*scsi_dev_data));
+	scsi_dev_data->type = IPR_TYPE_EMPTY_SLOT;
+	scsi_dev_data->host = ioa->host_num;
+
+	n = sprintf(slot_buf, "%02X",slot);
+
+	strncpy(scsi_dev_data->res_path, ses->scsi_dev_data->res_path, strlen(ses->scsi_dev_data->res_path));
+
+	scsi_dev_data->res_path[strlen(ses->scsi_dev_data->res_path) -2] = slot_buf[0];
+	scsi_dev_data->res_path[strlen(ses->scsi_dev_data->res_path) -1] = slot_buf[1];
+
+	strncpy(dev->res_path_name, scsi_dev_data->res_path, strlen(scsi_dev_data->res_path));
+	len = strlen(ses->scsi_dev_data->res_path);
+	memcpy(&dev->res_path[0], &ses->res_path[0], sizeof(struct ipr_res_path));
+	dev->res_path[0].res_path_bytes[len/3] = slot;
+
+	dev->scsi_dev_data = scsi_dev_data;
+	dev->ses[0] = ses;
+	dev->ioa = ioa;
+	dev->physical_location[0] = '\0';
+	strncat(dev->physical_location, phy_loc, strlen(phy_loc));
+	scsi_dbg(dev, "Found empty 64bit slot\n");
+	get_res_path(dev);
 	return dev;
 }
 
@@ -7310,6 +7408,81 @@ static struct ipr_dev *get_dev_for_slot(struct ipr_dev *ses, int slot, int is_vs
 }
 
 /**
+ * get_dev_for_slot_64bit -
+ * @ses:		ipr dev struct
+ * @slot:		slot number
+ * @is_vses:		action type
+ *
+ * Returns:
+ *   ipr_dev struct if success / NULL otherwise
+ **/
+static struct ipr_dev *get_dev_for_slot_64bit(struct ipr_dev *ses, int slot, char *phy_loc)
+{
+	struct ipr_dev *dev;
+	struct ipr_res_path *rp;
+	int i, dev_slot, res_path_len,ses_path_len;
+
+	for_each_dev(ses->ioa, dev) {
+		if (ipr_is_ses(dev))
+			continue;
+
+		ses_path_len  = strlen(ses->res_path_name);
+		res_path_len  = strlen(dev->res_path_name);
+		dev_slot = strtoul(dev->res_path_name + (res_path_len - 2), NULL, 16);
+
+		if (ses_path_len != res_path_len)
+			continue;
+
+		for_each_rp(rp, dev) {
+			if ( !memcmp(&rp->res_path_bytes, &ses->res_path[0], ses_path_len/3) && slot == dev_slot ) {
+
+				for (i = 0; i < IPR_DEV_MAX_PATHS; i++) {
+					if (dev->ses[i])
+						continue;
+					dev->ses[i] = ses;
+					break;
+				}
+			dev->physical_location[0] = '\0';
+			strncat(dev->physical_location, phy_loc, strlen(phy_loc));
+			return dev;
+
+			}
+		}
+	}
+	return NULL;
+}
+
+/**
+ * search_empty_dev64 -
+ * @dev:		ipr dev struct
+ * @devs:		ipr dev struct array
+ * @num_devs:		number of devices
+ *
+ * Returns:
+ *   1 if duplicate device detected / 0 otherwise
+ **/
+static int search_empty_dev64(struct ipr_dev *dev, struct ipr_dev **devs, int num_devs)
+{
+	int i;
+	u8 empty_res_path[8];
+
+	memset(&empty_res_path, 0xff, sizeof(struct ipr_res_path));
+	if (memcmp(&dev->res_path[1], &empty_res_path, sizeof(struct ipr_res_path)))
+		return 0;
+
+	for (i = 0; i < num_devs; i++) {
+		if (devs[i]->scsi_dev_data && devs[i]->scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT &&
+			!strncmp(dev->physical_location, devs[i]->physical_location, PHYSICAL_LOCATION_LENGTH)) {
+
+			memcpy(&devs[i]->res_path[1], &dev->res_path[0], sizeof(struct ipr_res_path));
+			devs[i]->ses[1] = dev->ses[0];
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/**
  * conc_dev_is_dup -
  * @dev:		ipr dev struct
  * @devs:		ipr dev struct array
@@ -7355,6 +7528,32 @@ static int dev_is_dup(struct ipr_dev *first, struct ipr_dev *second)
 }
 
 /**
+ * dev_is_dup64 - indicate whether or not the devices are the same
+ * @first:		ipr dev struct
+ * @second:		ipr dev struct
+ *
+ * Returns:
+ *   1 if devices are the same / 0 otherwise
+ **/
+static int dev_is_dup64(struct ipr_dev *first, struct ipr_dev *second)
+{
+	struct ipr_res_path *first_rp;
+	struct ipr_res_path *second_rp;
+
+	if (first->ioa != second->ioa)
+		return 0;
+
+	for_each_rp(first_rp, first) {
+		for_each_rp(second_rp, second) {
+			if (!memcmp(first_rp, second_rp, sizeof(*first_rp)))
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * find_dup -
  * @dev:		ipr dev struct
  * @devs:		ipr dev struct array
@@ -7368,8 +7567,14 @@ static struct ipr_dev *find_dup(struct ipr_dev *dev, struct ipr_dev **devs, int 
 	int i;
 
 	for (i = 0; i < num_devs; i++) {
-		if (dev_is_dup(dev, devs[i]))
-			return devs[i];
+		if (dev->ioa->sis64) {
+			if (dev_is_dup64(dev, devs[i]))
+				return devs[i];
+		}
+		else {
+			if (dev_is_dup(dev, devs[i]))
+				return devs[i];
+		}
 	}
 
 	return NULL;
@@ -7486,18 +7691,37 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 				scsi_id_found |= (1 << elem_status->slot_id);
 
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY) {
-					devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
-					devs[num_devs++] = alloc_empty_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+					if (ioa->sis64) {
+						dev = alloc_empty_slot_64bit(ses, elem_status->slot_id, is_vses, phy_loc);
+						if (!search_empty_dev64(dev, devs, num_devs)){
+							devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
+							devs[num_devs++] = dev;
+						}
+						else
+							free_empty_slot(dev);
+					}
+					else {
+						devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
+						devs[num_devs++] = alloc_empty_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+					}
 					continue;
 				}
 
-				dev = get_dev_for_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+				if (ioa->sis64)
+					dev = get_dev_for_slot_64bit(ses, elem_status->slot_id, phy_loc);
+				else
+					dev = get_dev_for_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+
 				if (dev && !can_perform_conc_action(dev, action))
 					continue;
 				if (dev && conc_dev_is_dup(dev, devs, num_devs))
 					continue;
-				else if (!dev)
-					dev = alloc_empty_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+				else if (!dev) {
+					if (ioa->sis64)
+						dev = alloc_empty_slot_64bit(ses, elem_status->slot_id, is_vses, phy_loc);
+					else
+						dev = alloc_empty_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+				}
 
 				devs = realloc(devs, (sizeof(struct ipr_dev *) * (num_devs + 1)));
 				devs[num_devs++] = dev;
@@ -12019,6 +12243,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	char *dev_name = dev->dev_name;
 	char *gen_name = dev->gen_name;
 	char node_name[7], buf[100], raid_str[48];
+	char res_path_name[IPR_MAX_RES_PATH_LEN];
 	int tab_stop = 0;
 	int loc_len = 0;
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
@@ -12052,12 +12277,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	else {
 		if (res_path) {
 			if (ioa->sis64)
-				if (conc_main)
-					loc_len = sprintf(body + len, "%d/%-26s ", ioa->host_num,scsi_dev_data ?
-					  scsi_dev_data->res_path : "<unknown>");
-				else
+				if (conc_main) {
+					ipr_format_res_path(dev->res_path[ra].res_path_bytes, res_path_name, IPR_MAX_RES_PATH_LEN);
+					loc_len = sprintf(body + len, "%d/%-26s ", ioa->host_num, res_path_name);
+				 } else
 					loc_len = sprintf(body + len, "%-26s ", scsi_dev_data ?
-					  scsi_dev_data->res_path : "<unknown>");
+					scsi_dev_data->res_path : "<unknown>");
 			else
 				if (conc_main)
 					loc_len = sprintf(body + len, "%d/%d:", ioa->host_num,ioa->host_num);
@@ -13359,10 +13584,9 @@ static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot
 {
 	int i;
 
-	for (i = 0; i < num_devs; i++) {
+	for (i = 0; i < num_devs; i++)
 		if (!strncmp(devs[i]->physical_location, slot, strlen(slot)))
 			return devs[i];
-	}
 
 	return NULL;
 }
@@ -13388,7 +13612,10 @@ static int __add_device(struct ipr_dev *dev, int on)
 		return -EINVAL;
 	}
 
-	elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
+	if (dev->ioa->sis64)
+		elem_status = get_elem_status_64bit(dev, ses, &ses_data, &ses_cfg);
+	else
+		elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
 	if (!elem_status) {
 		scsi_err(dev, "Cannot find SES device for specified device\n");
 		return -EINVAL;
@@ -13438,7 +13665,10 @@ static int __remove_device(struct ipr_dev *dev, int on)
 		}
 	}
 
-	elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
+	if (dev->ioa->sis64)
+		elem_status = get_elem_status_64bit(dev, ses, &ses_data, &ses_cfg);
+	else
+		elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
 	if (!elem_status) {
 		scsi_err(dev, "Invalid device specified\n");
 		return -EINVAL;
@@ -13574,7 +13804,10 @@ static int __identify_device(struct ipr_dev *dev, int on)
 		return -EINVAL;
 	}
 
-	elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
+	if (dev->ioa->sis64)
+		elem_status = get_elem_status_64bit(dev, ses, &ses_data, &ses_cfg);
+	else
+		elem_status = get_elem_status(dev, ses, &ses_data, &ses_cfg);
 	if (!elem_status) {
 		scsi_err(dev, "Invalid device specified\n");
 		return -EINVAL;
@@ -15786,8 +16019,12 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 
 	for_each_ioa(ioa)  {
 
-		for_each_hotplug_dev(ioa, dev)
-			get_res_addrs(dev);
+		for_each_hotplug_dev(ioa, dev) {
+			if (ioa->sis64)
+				get_res_path(dev);
+			else
+				get_res_addrs(dev);
+		}
 
 		for_each_ses(ioa, ses) {
 			get_ses_phy_loc(ses);
@@ -15804,7 +16041,10 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 					continue;
 
 				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc);
-				dev = get_dev_for_slot(ses, elem_status->slot_id, 0, phy_loc);
+				if (ioa->sis64)
+					dev = get_dev_for_slot_64bit(ses, elem_status->slot_id, phy_loc);
+				else
+					dev = get_dev_for_slot(ses, elem_status->slot_id, 0, phy_loc);
 				if (!dev)
 					continue;
 
