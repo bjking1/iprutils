@@ -6927,6 +6927,101 @@ static void wait_for_new_dev(struct ipr_ioa *ioa, struct ipr_res_addr *res_addr)
 }
 
 /**
+ * get_dev_from_res_path -
+ * @res_addr:		ipr_res_addr struct
+ *
+ * Returns:
+ *   ipr_dev struct if success / NULL otherwise
+ **/
+struct ipr_dev *get_dev_from_res_path(struct ipr_res_path *res_path)
+{
+	struct ipr_ioa *ioa;
+	int j;
+	struct scsi_dev_data *scsi_dev_data;
+	char res_path_name[IPR_MAX_RES_PATH_LEN];
+
+	ipr_format_res_path(res_path->res_path_bytes, res_path_name, IPR_MAX_RES_PATH_LEN);
+	for_each_primary_ioa(ioa) {
+		for (j = 0; j < ioa->num_devices; j++) {
+			scsi_dev_data = ioa->dev[j].scsi_dev_data;
+
+			if (!scsi_dev_data)
+				continue;
+			if (!strncmp(scsi_dev_data->res_path, res_path_name, IPR_MAX_RES_PATH_LEN))
+				return &ioa->dev[j];
+		}
+	}
+	return NULL;
+}
+
+static void wait_for_new_dev_64bit(struct ipr_ioa *ioa, struct ipr_res_path *res_path)
+{
+	int time = 12;
+	struct ipr_dev *dev;
+	struct ipr_res_path_aliases aliases;
+	struct ipr_res_path *rp;
+	struct sysfs_class_device *class_device;
+	struct sysfs_attribute *attr;
+	char *buf = "0 - -";
+
+	ipr_query_res_path_aliases(ioa, res_path, &aliases);
+
+	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
+	attr = sysfs_get_classdev_attr(class_device, "scan");
+	sysfs_write_attribute(attr, buf, strlen(buf));
+	sysfs_close_class_device(class_device);
+
+	while (time--) {
+		check_current_config(false);
+		for_each_rp_alias(rp, &aliases) {
+			if ((dev = get_dev_from_res_path(rp))) {
+				ipr_init_new_dev(dev);
+				return;
+			}
+		}
+		sleep(5);
+	}
+}
+
+int remove_or_add_back_device_64bit(struct ipr_dev *dev)
+{
+	struct ipr_encl_status_ctl_pg ses_data;
+	struct ipr_drive_elem_status *elem_status;
+	struct ipr_ses_config_pg ses_cfg;
+	int res_path_len, dev_slot;
+	int rc;
+
+	evaluate_device(dev, dev->ioa, 0);
+	res_path_len  = strlen(dev->res_path_name);
+	dev_slot = strtoul(dev->res_path_name + (res_path_len - 2), NULL, 16);
+
+	if (ipr_receive_diagnostics(dev->ses[0], 2, &ses_data, sizeof(ses_data)))
+		return INVALID_OPTION_STATUS;
+	if (ipr_receive_diagnostics(dev->ses[0], 1, &ses_cfg, sizeof(ses_cfg)))
+		return INVALID_OPTION_STATUS;
+
+	for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
+		if (elem_status->slot_id == dev_slot &&
+		elem_status->status == IPR_DRIVE_ELEM_STATUS_POPULATED ) {
+			wait_for_new_dev_64bit(dev->ioa, &(dev->res_path[0]));
+			rc = 0;
+			break;
+		}
+		else
+			if (elem_status->slot_id == dev_slot &&
+			elem_status->status == IPR_DRIVE_ELEM_STATUS_EMPTY ) {
+				ipr_write_dev_attr(dev, "delete", "1");
+				ipr_del_zeroed_dev(dev);
+				rc = 1;
+				break;
+			}
+	}/*for_each_elem_status*/
+
+	return rc;
+
+}
+
+/**
  * process_conc_maint -
  * @i_con:		i_container struct
  * @action:		add or remove
@@ -7089,9 +7184,20 @@ int process_conc_maint(i_container *i_con, int action)
 				printw(_("Operation in progress - please wait"));
 				refresh();
 
-				ipr_write_dev_attr(dev, "delete", "1");
-				evaluate_device(dev, dev->ioa, 0);
-				ipr_del_zeroed_dev(dev);
+				if (dev->ioa->sis64) {
+					if (!remove_or_add_back_device_64bit(dev)) {
+						clear();
+						move(max_y/2,0);
+						printw(_("    Disk was not removed!") );
+						refresh();
+						sleep(5);
+					}
+				}
+				else {
+					ipr_write_dev_attr(dev, "delete", "1");
+					evaluate_device(dev, dev->ioa, 0);
+					ipr_del_zeroed_dev(dev);
+				}
 			}
 		} else if (action == IPR_VERIFY_CONC_ADD) {
 			rc = process_conc_maint(i_con, IPR_WAIT_CONC_ADD);
@@ -7100,7 +7206,10 @@ int process_conc_maint(i_container *i_con, int action)
 				move(max_y-1,0);
 				printw(_("Operation in progress - please wait"));
 				refresh();
-				wait_for_new_dev(ioa, &res_addr);
+				if (ioa->sis64)
+					wait_for_new_dev_64bit(ioa, res_path);
+				else
+					wait_for_new_dev(ioa, &res_addr);
 			}
 		}
 	}
@@ -7284,7 +7393,6 @@ static struct ipr_dev *alloc_empty_slot(struct ipr_dev *ses, int slot, int is_vs
 	dev->ioa = ioa;
 	dev->physical_location[0] = '\0';
 	strncat(dev->physical_location, phy_loc, strlen(phy_loc));
-	scsi_dbg(dev, "Found empty slot\n");
 	get_res_addrs(dev);
 	return dev;
 }
@@ -7328,7 +7436,6 @@ static struct ipr_dev *alloc_empty_slot_64bit(struct ipr_dev *ses, int slot, int
 	dev->ioa = ioa;
 	dev->physical_location[0] = '\0';
 	strncat(dev->physical_location, phy_loc, strlen(phy_loc));
-	scsi_dbg(dev, "Found empty 64bit slot\n");
 	get_res_path(dev);
 	return dev;
 }
@@ -13632,8 +13739,12 @@ static int __add_device(struct ipr_dev *dev, int on)
 
 	rc = ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
-	if (!on)
-		wait_for_new_dev(dev->ioa, &(dev->res_addr[0]));
+	if (!on) {
+		if (dev->ioa->sis64)
+			wait_for_new_dev_64bit(dev->ioa, &(dev->res_path[0]));
+		else
+			wait_for_new_dev(dev->ioa, &(dev->res_addr[0]));
+	}
 	return rc;
 }
 
@@ -13686,9 +13797,17 @@ static int __remove_device(struct ipr_dev *dev, int on)
 	rc = ipr_send_diagnostics(ses, &ses_data, ntohs(ses_data.byte_count) + 4);
 
 	if (!on) {
-		ipr_write_dev_attr(dev, "delete", "1");
-		evaluate_device(dev, dev->ioa, 0);
-		ipr_del_zeroed_dev(dev);
+		if (dev->ioa->sis64) {
+			if (!remove_or_add_back_device_64bit(dev)) {
+				printf(_("Disk is not removed physically, Add it back automically\n"));
+				sleep(5);
+			}
+		}
+		else {
+			ipr_write_dev_attr(dev, "delete", "1");
+			evaluate_device(dev, dev->ioa, 0);
+			ipr_del_zeroed_dev(dev);
+		}
 	}
 
 	return rc;
