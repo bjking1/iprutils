@@ -2965,6 +2965,7 @@ int do_confirm_raid_stop(i_container *i_con)
 	struct ipr_ioa *ioa;
 	int rc;
 	int max_y, max_x;
+	struct ipr_res_addr *ra;
 
 	for_each_raid_cmd(cur_raid_cmd) {
 		if (!cur_raid_cmd->do_cmd)
@@ -2988,22 +2989,18 @@ int do_confirm_raid_stop(i_container *i_con)
 
 		if (vset->scsi_dev_data) {
 			ipr_allow_restart(vset, 0);
-			rc = ipr_start_stop_stop(vset);
+			ipr_set_manage_start_stop(vset);
+			ipr_write_dev_attr(vset, "delete", "1");
 		}
 		if (vset->alt_path && vset->alt_path->scsi_dev_data) {
 			ipr_allow_restart(vset->alt_path, 0);
-			rc = ipr_start_stop_stop(vset->alt_path);
-		}
-
-		if (rc != 0) {
-			if (vset->scsi_dev_data)
-				ipr_allow_restart(vset, 1);
-			if (vset->alt_path && vset->alt_path->scsi_dev_data)
-				ipr_allow_restart(vset->alt_path, 1);
-			return (20 | EXIT_FLAG);
+			ipr_set_manage_start_stop(vset->alt_path);
+			ipr_write_dev_attr(vset->alt_path, "delete", "1");
 		}
 		ioa->num_raid_cmds++;
 	}
+
+	sleep(2);
 
 	for_each_ioa(ioa) {
 		if (ioa->num_raid_cmds == 0)
@@ -3012,10 +3009,16 @@ int do_confirm_raid_stop(i_container *i_con)
 
 		rc = ipr_stop_array_protection(ioa);
 		if (rc != 0) {
-			if (vset->scsi_dev_data)
+			if (vset->scsi_dev_data) {
+				ra = &vset->res_addr[0];
+				ipr_scan(vset->ioa, ra->bus, ra->target, ra->lun);
 				ipr_allow_restart(vset, 1);
-			if (vset->alt_path && vset->alt_path->scsi_dev_data)
+			}
+			if (vset->alt_path && vset->alt_path->scsi_dev_data) {
+				ra = &vset->alt_path->res_addr[0];
+				ipr_scan(vset->alt_path->ioa, ra->bus, ra->target, ra->lun);
 				ipr_allow_restart(vset->alt_path, 1);
+			}
 			return (20 | EXIT_FLAG);
 		}
 	}
@@ -13233,6 +13236,7 @@ static int raid_delete(char **args, int num_args)
 {
 	int rc;
 	struct ipr_dev *dev;
+	struct ipr_res_addr *ra;
 
 	dev = find_and_add_dev(args[0]);
 
@@ -13244,21 +13248,30 @@ static int raid_delete(char **args, int num_args)
 	dev->array_rcd->issue_cmd = 1;
 	if (dev->scsi_dev_data) {
 		ipr_allow_restart(dev, 0);
-		rc = ipr_start_stop_stop(dev);
+		ipr_set_manage_start_stop(dev);
+		ipr_write_dev_attr(dev, "delete", "1");
 	}
 	if (dev->alt_path && dev->alt_path->scsi_dev_data) {
 		ipr_allow_restart(dev->alt_path, 0);
-		rc = ipr_start_stop_stop(dev->alt_path);
+		ipr_set_manage_start_stop(dev->alt_path);
+		ipr_write_dev_attr(dev->alt_path, "delete", "1");
 	}
 
-	if (rc == 0)
-		rc = ipr_stop_array_protection(dev->ioa);
+	sleep(2);
+
+	rc = ipr_stop_array_protection(dev->ioa);
 
 	if (rc != 0) {
-		if (dev->scsi_dev_data)
+		if (dev->scsi_dev_data) {
+			ra = &dev->res_addr[0];
+			ipr_scan(dev->ioa, ra->bus, ra->target, ra->lun);
 			ipr_allow_restart(dev, 1);
-		if (dev->alt_path && dev->alt_path->scsi_dev_data)
+		}
+		if (dev->alt_path && dev->alt_path->scsi_dev_data) {
+			ra = &dev->alt_path->res_addr[0];
+			ipr_scan(dev->alt_path->ioa, ra->bus, ra->target, ra->lun);
 			ipr_allow_restart(dev->alt_path, 1);
+		}
 	}
 
 	return rc;

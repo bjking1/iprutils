@@ -2417,6 +2417,7 @@ int ipr_read_capacity(struct ipr_dev *, void *);
 int ipr_read_capacity_16(struct ipr_dev *, void *);
 int ipr_query_resource_state(struct ipr_dev *, void *);
 void ipr_allow_restart(struct ipr_dev *, int);
+void ipr_set_manage_start_stop(struct ipr_dev *);
 int ipr_start_stop_start(struct ipr_dev *);
 int ipr_start_stop_stop(struct ipr_dev *);
 int ipr_stop_array_protection(struct ipr_ioa *);

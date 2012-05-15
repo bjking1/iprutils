@@ -9254,3 +9254,33 @@ int ipr_disable_qerr(struct ipr_dev *dev)
 
 	return 0;
 }
+
+void ipr_set_manage_start_stop(struct ipr_dev *dev)
+{
+	struct sysfs_attribute *sysfs_attr;
+	char path[SYSFS_PATH_MAX];
+	char value_str[2];
+	int value;
+
+	sprintf(path, "%s/%s/%s", "/sys/class/scsi_disk",
+		dev->scsi_dev_data->sysfs_device_name, "manage_start_stop");
+
+	sysfs_attr = sysfs_open_attribute(path);
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open manage_start_stop parameter.\n");
+		return;
+	}
+
+	sysfs_read_attribute(sysfs_attr);
+	value = atoi(sysfs_attr->value);
+
+	snprintf(value_str, sysfs_attr->len, "%d", 1);
+
+	if (sysfs_write_attribute(sysfs_attr, value_str, 1))
+		syslog_dbg("Failed to write manage_start_stop parameter.\n");
+
+	sysfs_read_attribute(sysfs_attr);
+	value = atoi(sysfs_attr->value);
+
+	sysfs_close_attribute(sysfs_attr);
+}
