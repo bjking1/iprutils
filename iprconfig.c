@@ -2440,7 +2440,7 @@ int get_ses_phy_loc(struct ipr_dev *dev)
 
 int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_desc_pg *drive_data, int slot_id, char *buf)
 {
-	char buffer[DISK_PHY_LOC_LENGTH];
+	char buffer[DISK_PHY_LOC_LENGTH + 1];
 	ipr_strncpy_0(buffer, (char *)drive_data->dev_elem[slot_id].disk_physical_loc, DISK_PHY_LOC_LENGTH);
 	if (strlen(ses->physical_location))
 		sprintf(buf, "%s-%s", ses->physical_location, buffer);
