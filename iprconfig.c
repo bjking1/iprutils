@@ -1174,13 +1174,23 @@ static char *add_string_to_body(char *body, char *new_text, char *line_fill, int
 	int max_y, max_x;
 	int len, i;
 	int num_lines = 0;
-
-	getmaxyx(stdscr,max_y,max_x);
+	struct winsize w;
 
 	if (body)
 		body_len = strlen(body);
 
 	len = body_len;
+
+	if (use_curses)
+		getmaxyx(stdscr,max_y,max_x);
+	else {
+		memset(&w, 0, sizeof(struct winsize));
+		ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+		if (w.ws_col > 0)
+			max_x = w.ws_col;
+		else
+			max_x = 80;
+	}
 	rem_length = max_x - 1;
 
 	for (i = 0; i < strlen(new_text); i++) {
