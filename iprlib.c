@@ -5281,8 +5281,7 @@ int set_active_active_mode(struct ipr_ioa *ioa, int mode)
 
 	if (attr.active_active == mode) {
 		/* We should never get here. */
-		ioa_dbg(ioa, "Requested and current asymmetric access mode are the same.\n");
-		return 0;
+		ioa_dbg(ioa, "Saved and current asymmetric access mode are not the same.\n");
 	}
 
 	attr.active_active = mode;
