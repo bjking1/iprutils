@@ -12136,13 +12136,14 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 				sprintf(buf, "No Paths");
 		} else if (format_in_progress)
 			sprintf(buf, "%d%% Formatted", percent_cmplt);
-		else if ((!ioa->sis64 && ioa->is_secondary && !scsi_dev_data) ||
-			 (ioa->sis64 && ipr_is_remote_af_dasd_device(dev))) {
+		else if (ioa->sis64 && ipr_is_remote_af_dasd_device(dev)) {
 			if (!scsi_dev_data)
 				sprintf(buf, "Missing");
 			else
 				sprintf(buf, "Remote");
 			}
+		else if (!ioa->sis64 && ioa->is_secondary && !scsi_dev_data)
+			sprintf(buf, "Remote");
 		else if (!scsi_dev_data)
 			sprintf(buf, "Missing");
 		else if (!scsi_dev_data->online)
