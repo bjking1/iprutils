@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.10
+Version: 2.3.11
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,15 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Jun 12 2012 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.11
+- Release 2.3.11
+- Fixes deleting an array logs I/O errors.
+- Fixes buffer overflow in disk details.
+- Fixes wrong status on an array for the secondary controller.
+- Fixes add_string_to_body() for non-interactive interface.
+- Fixes IOA asymmetric access mode change.
+- Gets location code when SES page 4 is unavailable.
+- Fixes physical location error if disk is vses disk.
 * Mon Apr 02 2012 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.10
 - Release 2.3.10
 - Displays Hardware Location Code for disk/expander.
