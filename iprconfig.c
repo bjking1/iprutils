@@ -3009,11 +3009,13 @@ int do_confirm_raid_stop(i_container *i_con)
 		if (vset->scsi_dev_data) {
 			ipr_allow_restart(vset, 0);
 			ipr_set_manage_start_stop(vset);
+			ipr_start_stop_stop(vset);
 			ipr_write_dev_attr(vset, "delete", "1");
 		}
 		if (vset->alt_path && vset->alt_path->scsi_dev_data) {
 			ipr_allow_restart(vset->alt_path, 0);
 			ipr_set_manage_start_stop(vset->alt_path);
+			ipr_start_stop_stop(vset->alt_path);
 			ipr_write_dev_attr(vset->alt_path, "delete", "1");
 		}
 		ioa->num_raid_cmds++;
@@ -13271,11 +13273,13 @@ static int raid_delete(char **args, int num_args)
 	if (dev->scsi_dev_data) {
 		ipr_allow_restart(dev, 0);
 		ipr_set_manage_start_stop(dev);
+		ipr_start_stop_stop(dev);
 		ipr_write_dev_attr(dev, "delete", "1");
 	}
 	if (dev->alt_path && dev->alt_path->scsi_dev_data) {
 		ipr_allow_restart(dev->alt_path, 0);
 		ipr_set_manage_start_stop(dev->alt_path);
+		ipr_start_stop_stop(dev->alt_path);
 		ipr_write_dev_attr(dev->alt_path, "delete", "1");
 	}
 
