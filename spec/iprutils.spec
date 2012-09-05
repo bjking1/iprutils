@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.11
+Version: 2.3.12
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Sep 2012 Wen Xiong <wenxiong@linux.vnet.ibm.com> 2.3.12
+- Release 2.3.12
+- Addes supporting suspend/resume utility for BlueHawk.
+- Fixes raid array delete error.
 * Tue Jun 12 2012 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.11
 - Release 2.3.11
 - Fixes deleting an array logs I/O errors.
