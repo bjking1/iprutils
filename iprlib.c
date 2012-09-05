@@ -4301,7 +4301,7 @@ fail:
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int ipr_resume_device_bus(struct ipr_dev *dev,
+int ipr_resume_device_bus(struct ipr_dev *dev,
 				 struct ipr_res_addr *res_addr)
 {
 	int fd, rc, cdb_num;
@@ -6026,6 +6026,8 @@ void check_current_config(bool allow_rebuild_refresh)
 	struct ipr_res_addr res_addr, *ra;
 	struct ipr_dev *dev;
 	int *qac_entry_ref;
+	struct ipr_dev_identify_vpd di_vpd;
+	char *pchr;
 
 	if (ipr_qac_data == NULL) {
 		ipr_qac_data =
@@ -6233,6 +6235,18 @@ void check_current_config(bool allow_rebuild_refresh)
 			}
 		}
 		get_prot_levels(ioa);
+	}
+
+	for_each_ioa(ioa) {
+		if (strlen((char *)ioa->yl_serial_num) == 0) {
+			memset(&di_vpd, 0, sizeof(di_vpd));
+			ipr_inquiry(&ioa->ioa, 0x83, &di_vpd, sizeof(di_vpd));
+			if (ntohs(di_vpd.add_page_len) > 120) {
+				pchr = strstr((char *)&di_vpd.dev_identify_contxt[0],"SN");
+
+				strncpy((char *)ioa->yl_serial_num, (pchr + 3), YL_SERIAL_NUM_LEN);
+			}
+		}
 	}
 
 	link_multipath_vsets();
@@ -7557,18 +7571,22 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	class_device = sysfs_open_class_device("scsi_device",
 					       sysfs_dev_name);
 
-	if (!class_device)
+	if (!class_device) {
+		printf("Cannot open class_device\n");
 		return -EIO;
+	}
 
 	device = sysfs_get_classdev_device(class_device);
 
 	if (!device) {
+		printf("Cannot get classdev\n");
 		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
 
 	dev_attr = sysfs_get_device_attr(device, attr);
 	if (sysfs_write_attribute(dev_attr, value, strlen(value))) {
+		printf("Failed to write attribute: %p\n", dev_attr);
 		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
@@ -9283,3 +9301,68 @@ void ipr_set_manage_start_stop(struct ipr_dev *dev)
 
 	sysfs_close_attribute(sysfs_attr);
 }
+
+/**
+ * ipr_query_ioa_device_port - 
+ * @ioa:		ipr ioa struct
+ * @res_addr:	        ipr_res_addr struct
+ * @option:		option value
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_query_io_dev_port(struct ipr_dev *dev, struct ipr_query_io_port *io_port)
+{
+	int fd, rc, cdb_num;
+	u8 cdb[IPR_CCB_CDB_LEN];
+	struct ipr_ioa *ioa = dev->ioa;
+	struct sense_data_t sense_data;
+	char *rp, *endptr;
+
+	if (strlen(ioa->ioa.gen_name) == 0)
+		return -ENOENT;
+
+	fd = open(ioa->ioa.gen_name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", ioa->ioa.gen_name);
+		return errno;
+	}
+
+	memset(cdb, 0, IPR_CCB_CDB_LEN);
+
+	cdb[0] = IPR_IOA_SERVICE_ACTION;
+	cdb[1] = IPR_QUERY_IOA_DEV_PORT;
+	if (ioa->sis64) {
+		/* convert res path string to bytes */
+		cdb_num = 2;
+		rp = dev->res_path_name;
+		do {
+			cdb[cdb_num++] = (u8)strtol(rp, &endptr, 16);
+			rp = endptr+1;
+		} while (*endptr != '\0' && cdb_num < 10);
+
+		while (cdb_num < 10) 
+			cdb[cdb_num++] = 0xff;
+
+		cdb[10] = sizeof(*io_port) >> 24;
+		cdb[11] = (sizeof(*io_port) >> 16) & 0xff;
+		cdb[12] = (sizeof(*io_port) >> 8) & 0xff;
+		cdb[13] = sizeof(*io_port) & 0xff;
+	}
+	else {
+		close(fd);
+		return -1;
+	}
+
+	rc = sg_ioctl(fd, cdb, io_port,
+		      sizeof(*io_port), SG_DXFER_FROM_DEV,
+		      &sense_data, IPR_INTERNAL_TIMEOUT);
+
+	if (rc != 0)
+		scsi_cmd_err(dev, &sense_data, "Query IO port status", rc);
+
+	close(fd);
+	return rc;
+}
+

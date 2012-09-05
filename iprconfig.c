@@ -123,7 +123,7 @@ struct special_status {
 
 char *print_device(struct ipr_dev *, char *, char *, int);
 int display_menu(ITEM **, int, int, int **);
-char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int, int, int);
+char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int, int, int, int, int);
 static char *print_path_details(struct ipr_dev *, char *);
 static int get_drive_phy_loc(struct ipr_ioa *ioa);
 
@@ -134,6 +134,14 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa);
 #define print_dev_conc(i, dev, buf, fmt, type) \
         for (i = 0; i < 3; i++) \
             (buf)[i] = print_device(dev, (buf)[i], fmt, (type + 5));
+
+#define print_dev_enclosure(i, dev, buf, fmt, type) \
+        for (i = 0; i < 2; i++) { \
+		if ( i == 0 ) \
+		    (buf)[i] = print_device(dev, (buf)[i], fmt, (type + 8)); \
+		if (i == 1) \
+		    (buf)[i] = print_device(dev, (buf)[i], fmt, (type + 8)); \
+	}
 
 static struct sysfs_dev *head_sdev;
 static struct sysfs_dev *tail_sdev;
@@ -1101,31 +1109,37 @@ static char *status_hdr[] = {
 		/*   .        .                  .            .                           .          */
 		/*012345678901234567890123456789012345678901234567890123456789012345678901234567890 */
 		"OPT Name   Resource Path/Address      Vendor   Product ID       Status",
-		"OPT Name   PCI/SCSI Location          Description               Status",
+		"OPT Name   PCI/SCSI Location         Description               Status",
 		"Name   Resource Path/Address      Vendor   Product ID       Status",
-		"Name   PCI/SCSI Location          Description               Status",
+		"Name   PCI/SCSI Location         Description               Status",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
-		"OPT Name   Platform Location           Description               Status",
+		"OPT Name   Platform Location          Description               Status",
 		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
 		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
-		"Name   Platform Location          Description               Status"};
+		"Name   Platform Location          Description               Status",
+		"OPT Name   PCI/Host/Resource Path                   Serial Number Status",
+		"OPT Name   Physical Location                        Production ID    Status",
+		"Name   Physical Location                        Serial Number Status"};
 
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
-		"--- ------ -------------------------- ------------------------- -----------------",
+		"--- ------ ------------------------- ------------------------- -----------------",
 		"------ -------------------------- -------- ---------------- -----------------",
-		"------ -------------------------- ------------------------- -----------------",
-		"--- ---------------------- ------------------ ------ ----------------- ----------",
+		"------ ------------------------- ------------------------- -----------------",
+		"--- --------------------- ------------------ ------ ----------------- ----------",
 		"--- ---------------------- ------------------ ------ ----------------- ----------",
 		"---------------------- ------------------ ------ ----------------- ----------",
 		"---------------------- ------------------ ------ ----------------- ----------",
-		"--- ------ -------------------------- ------------------------ -----------------",
-		"--- ------ -------------------------- -------- ---------------- -----------------",
-		"--- ------ -------------------------- -------- ---------------- -----------------",
-		"------ -------------------------- ------------------------ -----------------",
+		"--- ------ -------------------------- ------------------------- -----------------",
+		"--- ------ ---------------------------- -------- ---------------- --------------",
+		"--- ------ ---------------------------- -------- ---------------- --------------",
+		"------ -------------------------- ------------------------- ------------",
+		"--- ------ ---------------------------------------- ------------- ------------",
+		"--- ------ ---------------------------------------- ---------------- ------------",
+		"------ ---------------------------------------- ------------- ------------",
 };
 
 /**
@@ -1353,6 +1367,21 @@ static void body_init_status_conc(char *buffer[3], char **header, int *num_lines
 
 	for (z = 0; z < 3; z++)
 		buffer[z] = __body_init_status(header, num_lines, (z + 8));
+}
+
+/**
+ * body_init_status_enclosure -
+ * @buffer:		char array
+ * @header:
+ * @num_lines:		number of lines
+ *
+ * Returns:
+ *   nothing
+ **/
+static void body_init_status_enclosure(char *buffer[2], char **header, int *num_lines)
+{
+	buffer[0] = __body_init_status(header, num_lines, 12);
+	buffer[1] = __body_init_status(header, num_lines, 13);
 }
 
 /**
@@ -2414,6 +2443,7 @@ int get_ses_phy_loc(struct ipr_dev *dev)
 	int rc, i, ret = 1;
 	struct ses_inquiry_page0  ses_page0_inq;
 	struct ses_serial_num_vpd ses_vpd_inq;
+	struct esm_serial_num_vpd esm_vpd_inq;
 	char buffer[100];
 
 	memset(&ses_vpd_inq, 0, sizeof(ses_vpd_inq));
@@ -2442,22 +2472,43 @@ int get_ses_phy_loc(struct ipr_dev *dev)
 		strncat(dev->physical_location, ".", strlen("."));
 		strncat(dev->physical_location, buffer, strlen(buffer));
 
+	}
+
+	for (i = 0; !rc && i < ses_page0_inq.page_length; i++) {
+		if (ses_page0_inq.supported_vpd_page[i] == 0x01) {
+			ret = ipr_inquiry(dev, 0x01, &esm_vpd_inq, sizeof(esm_vpd_inq));
+			break;
+		}
+	}
+
+	if (ret == 0 ) {
+		ipr_strncpy_0((char *)&dev->serial_number, (char *)&esm_vpd_inq.esm_serial_num[0], sizeof(esm_vpd_inq.esm_serial_num));
+		ipr_strncpy_0(buffer, (char *)esm_vpd_inq.frb_label,
+				sizeof(esm_vpd_inq.frb_label));
+		strncat(dev->physical_location, "-", strlen("-"));
+		strncat(dev->physical_location, buffer, strlen(buffer));
 		return 0;
 	}
 
 	return 1;
 }
 
-int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_desc_pg *drive_data, int slot_id, char *buf)
+int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_desc_pg *drive_data, int slot_id, char *buf, int conc_maint)
 {
-	char buffer[DISK_PHY_LOC_LENGTH + 1];
+	char buffer[DISK_PHY_LOC_LENGTH + 1], *first_hyphen;
+	char unit_phy_loc[PHYSICAL_LOCATION_LENGTH+1];
 
 	ipr_strncpy_0(buffer, (char *)drive_data->dev_elem[slot_id].disk_physical_loc, DISK_PHY_LOC_LENGTH);
 	if (strlen(ses->physical_location))
-		sprintf(buf, "%s-%s", ses->physical_location, buffer);
+		if (!conc_maint)
+			sprintf(buf, "%s-%s", ses->physical_location, buffer);
+		else {
+			ipr_strncpy_0(unit_phy_loc, ses->physical_location, PHYSICAL_LOCATION_LENGTH);
+			first_hyphen = strchr(unit_phy_loc, '-');
+			*first_hyphen = '\0';
+			sprintf(buf, "%s-%s", unit_phy_loc, buffer);
+		}
 	else if (strlen(buffer)) {
-		char unit_phy_loc[PHYSICAL_LOCATION_LENGTH+1], *first_hyphen;
-
 		ipr_strncpy_0(unit_phy_loc, ses->ioa->physical_location, PHYSICAL_LOCATION_LENGTH);
 		first_hyphen = strchr(unit_phy_loc, '-');
 		*first_hyphen = '\0';
@@ -2489,10 +2540,12 @@ static char *ses_details(char *body, struct ipr_dev *dev)
 
 	ipr_strncpy_0(vendor_id, dev->scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 	ipr_strncpy_0(product_id, dev->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+	ipr_strncpy_0(buffer, (char *)&dev->serial_number, ESM_SERIAL_NUM_LEN);
 
 	body = add_line_to_body(body,"", NULL);
 	body = add_line_to_body(body,_("Manufacturer"), vendor_id);
 	body = add_line_to_body(body,_("Product ID"), product_id);
+	body = add_line_to_body(body,_("Serial Number"), buffer);
 
 	rc = ipr_get_fw_version(dev, release_level);
 
@@ -7862,7 +7915,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
 
 			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
-				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc);
+				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc, 1);
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
 					continue;
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_NO_ACCESS)
@@ -8104,8 +8157,8 @@ int path_status(i_container * i_con)
 			continue;
 
 		for_each_disk(ioa, dev) {
-			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1, 0 ,0);
-			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1, 0 ,0);
+			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1, 0 ,0, 0, 0);
+			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1, 0 ,0, 0, 0);
 			i_con = add_i_con(i_con, "\0", dev);
 			num_devs++;
 		}
@@ -12026,6 +12079,19 @@ int ibm_boot_log(i_container *i_con)
 		return 1; /* return with no status */
 }
 
+int get_ses_ioport_status(struct ipr_dev *ses)
+{
+	struct ipr_query_io_port io_status;
+	int rc = ipr_query_io_dev_port(ses, &io_status);
+
+	if (!rc)
+		ses->active_suspend = io_status.port_state;
+	else
+		ses->active_suspend = IOA_DEV_PORT_UNKNOWN;
+	
+	return rc;
+}
+
 /**
  * get_status -
  * @dev:		ipr dev struct
@@ -12169,8 +12235,15 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 			sprintf(buf, "Remote");
 		else if (!scsi_dev_data)
 			sprintf(buf, "Missing");
-		else if (!scsi_dev_data->online)
-			sprintf(buf, "Offline");
+		else if (!scsi_dev_data->online) {
+				if (dev->scsi_dev_data->type == TYPE_ENCLOSURE) {
+					get_ses_ioport_status(dev);
+					if (dev->active_suspend == IOA_DEV_PORT_SUSPEND)
+						sprintf(buf, "Suspend");
+					else
+						sprintf(buf, "Offline");
+				}
+			}
 		else if (res_state.not_oper || res_state.not_func)
 			sprintf(buf, "Failed");
 		else if (res_state.read_write_prot)
@@ -12509,7 +12582,7 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
 char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		     int sd, int sg, int vpd, int percent, int indent,
 		     int res_path, int ra, int path_status,
-		     int hw_loc, int conc_main)
+		     int hw_loc, int conc_main, int ioa_flag, int serial_num)
 {
 	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -12522,11 +12595,14 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	int loc_len = 0;
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
-	struct ipr_ioa *ioa = dev->ioa;
+	struct ipr_ioa *ioa = dev->ioa, *ioa_phy_loc;
 
 	/* In cases where we're having problems with the device */
 	if (!ioa)
 		return body;
+
+	if (ioa_flag)
+		ioa_phy_loc = dev->ioa;
 
 	if (body)
 		len = strlen(body);
@@ -12542,31 +12618,71 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	if (option)
 		len += sprintf(body + len, " %s  ", option);
 
-	len += sprintf(body + len, "%-6s ", node_name);
+	if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE && (serial_num == 1 || hw_loc == 1)) 
+		len += sprintf(body + len, "%-8s ", node_name);
+	else
+		len += sprintf(body + len, "%-6s ", node_name);
 
 	if (hw_loc) {
-		if (strlen(dev->physical_location)) {
-			loc_len = sprintf(body + len, "%-26s ", dev->physical_location);
-			len += loc_len;
-		}
-		else {
-			loc_len = sprintf(body + len, "%s/%d:",
-				 ioa->pci_address,
-				 ioa->host_num);
-			len += loc_len;
+		if (ioa_flag) {
+			if (strlen(ioa_phy_loc->physical_location)) {
+				loc_len = sprintf(body + len, "%-40s ", ioa_phy_loc->physical_location);
+				len += loc_len;
+			}
+			else {
+				for (i = 0; i < 40-loc_len; i++)
+					body[len+i] = ' ';
+
+				len += 40-loc_len;
+			}
+		} else {
+			if (strlen(dev->physical_location)) {
+				if (conc_main) {
+					loc_len = sprintf(body + len, "%-26s ", dev->physical_location);
+					len += loc_len;
+				} else {
+					loc_len = sprintf(body + len, "%-38s ", dev->physical_location);
+					len += loc_len;
+				}
+			} else {
+				if (conc_main) {
+					for (i = 0; i < 26-loc_len; i++)
+						body[len+i] = ' ';
+
+					len += 26-loc_len;
+				} else {
+					for (i = 0; i < 39-loc_len; i++)
+						body[len+i] = ' ';
+
+					len += 39-loc_len;
+				}
+			}
 		}
 	}
 	else {
 		if (res_path) {
 			if (ioa->sis64)
-				if (conc_main) {
+				if (serial_num == 1) {
+					if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER)
+						loc_len = sprintf(body + len, "%s/%-28d", ioa->pci_address, ioa->host_num);
+					else {
+						ipr_format_res_path(dev->res_path[ra].res_path_bytes, res_path_name, IPR_MAX_RES_PATH_LEN);
+						loc_len = sprintf(body + len, "%s/%d/%-24s", ioa->pci_address, ioa->host_num, res_path_name);
+					}
+				} else if (conc_main) {
+			
 					ipr_format_res_path(dev->res_path[ra].res_path_bytes, res_path_name, IPR_MAX_RES_PATH_LEN);
 					loc_len = sprintf(body + len, "%d/%-26s ", ioa->host_num, res_path_name);
 				 } else
-					loc_len = sprintf(body + len, "%-26s ", scsi_dev_data ?
+					loc_len = sprintf(body + len, "%-26s ",scsi_dev_data ?
 					scsi_dev_data->res_path : "<unknown>");
-			else
-				if (conc_main)
+			else /*32bit*/
+				if (serial_num == 1) {
+					if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER)
+						loc_len = sprintf(body + len, "%s/%-29d:", ioa->pci_address, ioa->host_num);
+					else
+						loc_len = sprintf(body + len, "%s/%d", ioa->pci_address, ioa->host_num);
+				} else if (conc_main)
 					loc_len = sprintf(body + len, "%d/%d:", ioa->host_num,ioa->host_num);
 				else
 					loc_len = sprintf(body + len, "%d:", ioa->host_num);
@@ -12582,27 +12698,50 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	}
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER && dev == &ioa->ioa) {
-		if (!res_path || !ioa->sis64) {
-			for (i = 0; i < 27-loc_len; i++)
-				body[len+i] = ' ';
+		if (serial_num == 1 ) {
+			if (!res_path || !ioa->sis64) {
+				for (i = 0; i < 28-loc_len; i++)
+					body[len+i] = ' ';
 
-			len += 27-loc_len;
-		}
+				len += 28-loc_len;
+			}
 
-		if (!vpd) {
-			tab_stop = sprintf(body + len,"%s %s", get_bus_desc(ioa),
-					   get_ioa_desc(dev->ioa));
+			len += sprintf(body + len,"%-13s ",
+				       ioa->yl_serial_num);
 
-			len += tab_stop;
+		} else if (hw_loc == 1 ) {
+				if (!res_path || !ioa->sis64) {
+					for (i = 0; i < 40-loc_len; i++)
+						body[len+i] = ' ';
 
-			for (i = 0; i < 26-tab_stop; i++)
-				body[len+i] = ' ';
-
-			len += 26-tab_stop;
-		} else
-			len += sprintf(body + len,"%-8s %-16s ",
-				       scsi_dev_data->vendor_id,
+					len += 40-loc_len;
+				}
+				len += sprintf(body + len,"%-16s ",
 				       scsi_dev_data->product_id);
+			}
+		else { 
+			if (!res_path || !ioa->sis64) {
+				for (i = 0; i < 26-loc_len; i++)
+					body[len+i] = ' ';
+
+				len += 26-loc_len;
+			}
+
+			if (!vpd) {
+				tab_stop = sprintf(body + len,"%s %s", get_bus_desc(ioa),
+						   get_ioa_desc(dev->ioa));
+
+				len += tab_stop;
+
+				for (i = 0; i < 26-tab_stop; i++)
+					body[len+i] = ' ';
+
+				len += 26-tab_stop;
+			} else 
+				len += sprintf(body + len,"%-8s %-16s ",
+					       scsi_dev_data->vendor_id,
+					       scsi_dev_data->product_id);
+		}
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 		if (!res_path || !ioa->sis64) {
 			tab_stop = sprintf(body + len,"%d:%d: ",
@@ -12619,17 +12758,35 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		}
 		len += sprintf(body + len, "%-8s %-16s ", " ", " ");
 	} else {
-		if (!res_path || !ioa->sis64) {
-			tab_stop = sprintf(body + len,"%d:%d:%d ", dev->res_addr[ra].bus,
-					   dev->res_addr[ra].target, dev->res_addr[ra].lun);
+		if (serial_num) {
+			if (!res_path || !ioa->sis64) {
+				for (i = 0; i < 26-loc_len; i++)
+					body[len+i] = ' ';
 
-			loc_len += tab_stop;
-			len += tab_stop;
+				len += 26-loc_len;
+			}
+		}
+		else  if (hw_loc) {
+			if (!res_path || !ioa->sis64) {
+				for (i = 0; i < 27-loc_len; i++)
+					body[len+i] = ' ';
 
-			for (i = 0; i < 27-loc_len; i++)
-				body[len+i] = ' ';
+				len += 27-loc_len;
+			}
+		}
+		else {
+			if (!res_path || !ioa->sis64) {
+				tab_stop = sprintf(body + len,"%d:%d:%d ", dev->res_addr[ra].bus,
+						   dev->res_addr[ra].target, dev->res_addr[ra].lun);
 
-			len += 27-loc_len;
+				loc_len += tab_stop;
+				len += tab_stop;
+
+				for (i = 0; i < 26-loc_len; i++)
+					body[len+i] = ' ';
+
+				len += 26-loc_len;
+			}
 		}
 
 		if (vpd) {
@@ -12645,9 +12802,15 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 					ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
 				}
 			}
+			if (hw_loc) {
+				len += sprintf(body + len, "%-16s ",
+						product_id);
+			}
+			else {
+				len += sprintf(body + len, "%-8s %-16s ",
+					       vendor_id, product_id);
+			}
 
-			len += sprintf(body + len, "%-8s %-16s ",
-				       vendor_id, product_id);
 		} else {
 			if (ipr_is_hot_spare(dev))
 				if (dev->block_dev_class == IPR_SSD)
@@ -12684,9 +12847,13 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 					len += sprintf(body + len, "%-25s ", "Advanced Function SSD");
 				else
 					len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
-			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE)
-				len += sprintf(body + len, "%-25s ", "Enclosure");
-			else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE) {
+				if (serial_num == 1)
+					len += sprintf(body + len, "%-13s ", (char *)&dev->serial_number);
+				else
+					len += sprintf(body + len, "%-25s ", "Enclosure");
+		
+			} else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
 				len += sprintf(body + len, "%-25s ", "Processor");
 			else if (ioa->ioa_dead)
 				len += sprintf(body + len, "%-25s ", "Unavailable Device");
@@ -12722,12 +12889,18 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
  * 5: print sd, hardware location, status
  * 6: print sd, the first resource adress(sis32)/resource path(sis64), dev VPD
  * 7: print sd, the second resource adress(sis32)/resource path(sis64), dev VPD
+ * 8: print sg, pci/host/resource path, serial number, status
+ * 9: print sg, physical location, production id, status
  */
 char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 {
-	int sd, sg, vpd, percent, indent, res_path, hw_loc, conc_main;
+	int sd, sg, vpd, percent, indent, res_path, hw_loc, conc_main, ioa_flag, serial_num;
 
-	sd = sg = vpd = percent = indent = res_path = hw_loc = conc_main = 0;
+	sd = sg = vpd = percent = indent = res_path = hw_loc = conc_main = ioa_flag = serial_num = 0;
+
+	if ((type & 0x1000) == 0x1000) ioa_flag = 1;
+
+	type &= 0x0fff;
 
 	if (type == 2 || type == 4)
 		sg = 1;
@@ -12745,6 +12918,7 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 
 	if (type == 5) {
 		hw_loc = 1;
+		conc_main = 1;
 		sg = 1;
 	}
 
@@ -12752,8 +12926,25 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 		conc_main = 1;
 		sg = 1;
 	}
+	if (type == 8) {
+		sg = 1;
+		if (dev->ioa->sis64)
+			res_path = 1;
+		else
+			res_path = 0;
+		serial_num = 1;
+	}
+	if (type == 9) {
+		sg = 1;
+		hw_loc = 1;
+		if (dev->ioa->sis64)
+			res_path = 1;
+		else
+			res_path = 0;
+		vpd = 1;
+	}
 
-	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0, hw_loc, conc_main);
+	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0, hw_loc, conc_main, ioa_flag, serial_num);
 }
 
 /**
@@ -13336,7 +13527,7 @@ static void printf_device(struct ipr_dev *dev, int type)
 static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 			    int percent, int indent, int res_path)
 {
-	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0, 0, 0);
+	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0, 0, 0, 0, 0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -14566,7 +14757,7 @@ static int query_path_details(char **args, int num_args)
  **/
 static void printf_path_status(struct ipr_dev *dev)
 {
-	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0);
+	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -16378,7 +16569,7 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
 
 			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
-				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc);
+				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc, 0);
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
 					continue;
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_NO_ACCESS)
@@ -16683,6 +16874,436 @@ static int set_ses_mode (char **args, int num_args)
 	return 0;
 }
 
+/**
+ * show_enclosure_info -
+ * @ioa:		ipr ioa struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int show_enclosure_info(struct ipr_dev *ses)
+{
+	struct screen_output *s_out;
+	int rc;
+
+	if (ses->scsi_dev_data->type == TYPE_ENCLOSURE)
+		n_show_enclosure_info.body = ses_details(n_show_enclosure_info.body, ses);
+	else
+		n_show_enclosure_info.body = ioa_details(n_show_enclosure_info.body, ses);
+	s_out = screen_driver(&n_show_enclosure_info, 0, NULL);
+
+	free(n_show_enclosure_info.body);
+	n_show_enclosure_info.body = NULL;
+	rc = s_out->rc;
+	free(s_out);
+	return rc;
+}
+
+int ipr_suspend_disk_enclosure(i_container *i_con)
+{
+	int rc, suspend_rc;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+
+	suspend_rc = rc = RC_SUCCESS;
+
+	for_each_ioa(ioa) {
+		for_each_ses(ioa, ses) {
+			if (ses->is_suspend_cand) {
+				rc = ipr_suspend_device_bus(ses, &ses->res_addr[0],
+						    IPR_SDB_CHECK_AND_QUIESCE_ENC);
+				if (rc !=0 )
+					suspend_rc = 82;
+				else
+					rc = ipr_write_dev_attr(ses, "state", "offline\n");
+			}
+		}
+	}
+	if (suspend_rc != RC_SUCCESS)
+		return suspend_rc | EXIT_FLAG;
+
+	return  81 | EXIT_FLAG;
+}
+
+int ipr_resume_disk_enclosure(i_container *i_con)
+{
+	int rc, resume_rc;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+
+	resume_rc = rc = RC_SUCCESS;
+
+	for_each_ioa(ioa) {
+		for_each_ses(ioa, ses) {
+			if (ses->is_resume_cand) {
+				rc = ipr_resume_device_bus(ses, &ses->res_addr[0]);
+				if (rc !=0 )
+					resume_rc = 86;
+				else
+					ipr_write_dev_attr(ses, "state", "running\n");
+			}
+		}
+	}
+	if (resume_rc != RC_SUCCESS)
+		return resume_rc | EXIT_FLAG;
+
+	return  85 | EXIT_FLAG;
+}
+
+/**
+ * confirm_suspend_disk_enclosure -
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int confirm_suspend_disk_enclosure(void)
+{
+	int rc,k;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+	char *buffer[2];
+	struct screen_output *s_out;
+	int header_lines;
+	int toggle= 0;
+
+	rc = RC_SUCCESS;
+
+	body_init_status_enclosure(buffer, n_confirm_suspend_disk_enclosure.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		for_each_ses(ioa, ses) {
+			if (!ses->is_suspend_cand)
+				continue;
+			print_dev_enclosure(k, ses, buffer, "2", k);
+		}
+	}
+
+	do {
+		n_confirm_suspend_disk_enclosure.body = buffer[toggle&1];
+		s_out = screen_driver(&n_confirm_suspend_disk_enclosure, header_lines, NULL);
+		rc = s_out->rc;
+		free(s_out);
+		toggle++;
+	} while (rc == TOGGLE_SCREEN);
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+	n_confirm_suspend_disk_enclosure.body = NULL;
+
+	return rc;
+}
+
+/**
+ * confirm_resume_disk_enclosure -
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int confirm_resume_disk_enclosure(void)
+{
+	int rc,k;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+	char *buffer[2];
+	struct screen_output *s_out;
+	int header_lines;
+	int toggle= 0;
+
+	rc = RC_SUCCESS;
+
+	body_init_status_enclosure(buffer, n_confirm_resume_disk_enclosure.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		for_each_ses(ioa, ses) {
+			if (!ses->is_resume_cand)
+				continue;
+			print_dev_enclosure(k, ses, buffer, "3", k);
+		}
+	}
+
+	do {
+		n_confirm_resume_disk_enclosure.body = buffer[toggle&1];
+		s_out = screen_driver(&n_confirm_resume_disk_enclosure, header_lines, NULL);
+		rc = s_out->rc;
+		free(s_out);
+		toggle++;
+	} while (rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+	n_confirm_resume_disk_enclosure.body = NULL;
+
+	return rc;
+}
+
+
+/**
+ * enclosures_fork -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int enclosures_fork(i_container *i_con)
+{
+	int rc = 0, suspend_flag =0, resume_flag = 0;
+	struct ipr_dev *ses;
+	struct ipr_ioa *ioa;
+	char *input;
+	i_container *temp_i_con;
+
+	for_each_icon(temp_i_con) {
+		ses = (struct ipr_dev *)temp_i_con->data;
+		if (ses == NULL)
+			continue;
+
+		input = temp_i_con->field_data;
+
+		if (strcmp(input, "3") == 0) {
+				if (ses->scsi_dev_data && ses->scsi_dev_data->type == IPR_TYPE_ADAPTER && ses == &ses->ioa->ioa) 
+				return 89;
+
+			if (ses->active_suspend == IOA_DEV_PORT_UNKNOWN)	
+				return 90;
+
+			if (ses->active_suspend == IOA_DEV_PORT_ACTIVE)	
+				return 84;
+
+			ses->is_resume_cand = 1;
+			resume_flag = 1;
+		} else if (strcmp(input, "2") == 0) {
+				if (ses->scsi_dev_data && ses->scsi_dev_data->type == IPR_TYPE_ADAPTER && ses == &ses->ioa->ioa) 
+					return 88;
+
+				if (ses->active_suspend == IOA_DEV_PORT_UNKNOWN)	
+					return 90;
+
+				if (!strncmp((char *)&ses->serial_number, (char *)&ses->ioa->yl_serial_num[0], ESM_SERIAL_NUM_LEN))
+					return 87;
+
+				if (ses->active_suspend == IOA_DEV_PORT_SUSPEND)	
+					return 83;
+
+				ses->is_suspend_cand = 1;
+				suspend_flag = 1;
+		} else if (strcmp(input, "1") == 0)	{
+			rc = show_enclosure_info(ses);
+			return rc;
+		} 
+	}
+
+	if (suspend_flag) {
+		rc =confirm_suspend_disk_enclosure();
+		for_each_ioa(ioa)
+			for_each_ses(ioa, ses) 
+				ses->is_suspend_cand = 0;
+		return rc;
+	}
+
+	if (resume_flag) {
+		rc = confirm_resume_disk_enclosure();
+		for_each_ioa(ioa)
+			for_each_ses(ioa, ses) 
+				ses->is_resume_cand = 0;
+		return rc;
+	}
+
+	return INVALID_OPTION_STATUS;
+}
+
+/**
+ * enclosures_maint -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int enclosures_maint(i_container *i_con)
+{
+	int rc, k, first_ses;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+	char *buffer[2];
+	struct screen_output *s_out;
+	int header_lines;
+	int toggle=0;
+	char product_id[IPR_PROD_ID_LEN + 1];
+
+	processing();
+	i_con = free_i_con(i_con);
+	body_init_status_enclosure(buffer, n_enclosures_maint.header, &header_lines);
+
+	check_current_config(false);
+
+	for_each_ioa(ioa) {
+		if (!ioa->sis64) 
+			continue;
+		first_ses = 1;
+		for_each_ses(ioa, ses) {
+			ipr_strncpy_0(product_id, ses->scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+			if (!strncmp(product_id,"5888", strlen("5888")) || !strncmp(product_id, "EDR1", strlen("EDR1"))) {
+				if (strlen(ses->physical_location) == 0)
+					get_ses_phy_loc(ses);
+				if (first_ses) {
+					i_con = add_i_con(i_con, "\0",ioa);
+					print_dev_enclosure(k, &ioa->ioa, buffer, "%1", (k | 0x1000));
+					first_ses = 0;
+				}
+				i_con = add_i_con(i_con, "\0",ses);
+				print_dev_enclosure(k, ses, buffer, "%1", k);
+			}
+		}
+	}
+
+	do {
+		n_enclosures_maint.body = buffer[toggle&1];
+		s_out = screen_driver(&n_enclosures_maint, header_lines, i_con);
+		rc = s_out->rc;
+		free(s_out);
+		toggle++;
+	} while (rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+
+	n_enclosures_maint.body = NULL;
+
+	return rc;
+}
+
+/**
+ * suspend_disk_enclosure -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int suspend_disk_enclosure(char **args, int num_args)
+{
+	struct ipr_dev *ses;
+	int rc = 0;
+
+	ses = find_dev(args[0]);
+	get_ses_ioport_status(ses);
+
+	if (ses->scsi_dev_data && ses->scsi_dev_data->type == IPR_TYPE_ADAPTER && ses == &ses->ioa->ioa)  {
+		fprintf(stderr,"Incorrect device type specified. Please specify a valid SAS device to suspend.\n");
+		return 1;
+	}
+
+	if (ses->scsi_dev_data && ses->scsi_dev_data->type != TYPE_ENCLOSURE) {
+		fprintf(stderr, "Selected device is not SAS expander.\n");
+		return 1;
+	}
+
+	if (strlen(ses->physical_location) == 0)
+		get_ses_phy_loc(ses);
+
+	if (!strncmp((char *)&ses->serial_number, (char *)&ses->ioa->yl_serial_num[0], ESM_SERIAL_NUM_LEN)) {
+		fprintf(stderr, "Could not suspend an expander from the RAID controller with the same serial number.\n");
+		return 1;
+	}
+
+	if (ses->active_suspend == IOA_DEV_PORT_SUSPEND) {
+		printf("The expander is already suspended\n");
+		return 1;
+	}
+
+	if (ses->active_suspend == IOA_DEV_PORT_UNKNOWN)	
+		return 90;
+
+	rc = ipr_suspend_device_bus(ses, &ses->res_addr[0],
+			    IPR_SDB_CHECK_AND_QUIESCE_ENC);
+	if (!rc) {
+		rc = ipr_write_dev_attr(ses, "state", "offline\n");
+		printf("Selected disk enclosure was suspended successfully.\n");
+		return  rc;
+	}
+	fprintf(stderr, "Failed to suspend this SAS expander.\n");
+	return 1;
+}
+
+/**
+ * resume_disk_enclosure -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int resume_disk_enclosure(char **args, int num_args)
+{
+	struct ipr_dev *ses;
+	int rc = 0;
+
+	ses = find_dev(args[0]);
+	get_ses_ioport_status(ses);
+
+	if (ses->scsi_dev_data && ses->scsi_dev_data->type == IPR_TYPE_ADAPTER && ses == &ses->ioa->ioa) {
+		fprintf(stderr,"Incorrect device type specified. Please specify a valid SAS device to resume.\n");
+		return 1;
+	}
+
+	if (ses->scsi_dev_data && ses->scsi_dev_data->type != TYPE_ENCLOSURE) {
+		fprintf(stderr, "Selected device is not SAS expander.\n");
+		return 1;
+	}
+
+	if (ses->active_suspend == IOA_DEV_PORT_ACTIVE)	 {
+		printf("The expander is already in active state.\n");
+		return 1;
+	}
+
+	if (ses->active_suspend == IOA_DEV_PORT_UNKNOWN)	 {
+		printf("The expander is an unknown state.\n");
+		return 1;
+	}
+
+	rc = ipr_resume_device_bus(ses, &ses->res_addr[0]);
+	if (!rc) {
+		ipr_write_dev_attr(ses, "state", "running\n");
+		printf("Selected disk enclosure was resumed successfully.\n");
+		return  rc;
+	}
+
+	printf("Failed to resume this SAS expander.\n");
+	return 1;
+}
+
+/**
+ * query_disk_enclosure_status -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_disk_enclosure_status(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *ses;
+	int rc = 0;
+
+	printf("%s\n%s\n", status_hdr[14], status_sep[14]);
+
+	for_each_ioa(ioa) {
+		printf_device((struct ipr_dev *)ioa, 0x8 | 0x1000);
+		for_each_ses(ioa, ses) {
+			get_ses_ioport_status(ses);
+			if (strlen(ses->physical_location) == 0)
+				get_ses_phy_loc(ses);
+			printf_device(ses, 0x8);
+		}
+	}
+	return rc;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -16785,6 +17406,9 @@ static const struct {
 	{ "get-live-dump",			1, 0, 1, get_live_dump, "sg5" },
 	{ "query-ses-mode",                     1, 0, 1, query_ses_mode, "sg8"},
 	{ "set-ses-mode",                       2, 0, 2, set_ses_mode, "sg8 2"},
+	{ "query-disk-enclosure-status",        0, 0, 0, query_disk_enclosure_status},
+	{ "suspend-disk-enclosure",             1, 0, 1, suspend_disk_enclosure, "sg8"},
+	{ "resume-disk-enclosure",              1, 0, 1, resume_disk_enclosure, "sg8 "},
 };
 
 /**

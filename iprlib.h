@@ -73,6 +73,8 @@
 #define IPR_VENDOR_ID_LEN                    8
 #define IPR_PROD_ID_LEN                      16
 #define IPR_SERIAL_NUM_LEN                   8
+#define ESM_SERIAL_NUM_LEN                   12
+#define YL_SERIAL_NUM_LEN                    12
 #define IPR_DESCRIPTION_LEN                  16
 #define IPR_VPD_PLANT_CODE_LEN               4
 #define IPR_VPD_CACHE_SIZE_LEN               3
@@ -158,6 +160,7 @@
 #define IPR_CHANGE_CACHE_PARAMETERS          0x14
 #define IPR_QUERY_CACHE_PARAMETERS           0x16
 #define IPR_LIVE_DUMP                        0x31
+#define IPR_QUERY_IOA_DEV_PORT               0x32
 #define IPR_EVALUATE_DEVICE                  0xE4
 #define SKIP_READ                            0xE8
 #define SKIP_WRITE                           0xEA
@@ -678,6 +681,18 @@ struct ipr_query_res_state {
 		struct ipr_dasd_res_state dasd;
 		struct ipr_gscsi_res_state gscsi;
 	};
+};
+
+struct ipr_query_io_port {
+	u32 length;
+#define IOA_DEV_PORT_ACTIVE	0x0
+#define IOA_DEV_PORT_SUSPEND	0x1
+#define IOA_DEV_PORT_PARTIAL_SUSPEND	0x2
+#define IOA_DEV_PORT_UNKNOWN	0xFF
+	u8 port_state;
+	u8 reserved1;
+	u8 reserved2;
+	u8 reserved3;
 };
 
 struct ipr_res_addr_aliases {
@@ -1310,6 +1325,9 @@ struct ipr_dev {
 	u32 init_not_allowed:1;
 	u32 local_flag:1;
 	u32 rescan:1;
+	u8 active_suspend;
+	u32 is_suspend_cand:1;
+	u32 is_resume_cand:1;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
@@ -1380,6 +1398,7 @@ struct ipr_ioa {
 	char pci_address[16];
 	char host_name[16];
 	char physical_location[1024];
+	u8 yl_serial_num[YL_SERIAL_NUM_LEN];
 	struct ipr_dev dev[IPR_MAX_IOA_DEVICES];
 	struct ipr_multi_ioa_status ioa_status;
 	struct ipr_array_query_data *qac_data;
@@ -1851,6 +1870,14 @@ struct ipr_cache_cap_vpd {
 	u32 comp_read_cache_size;
 };
 
+struct ipr_dev_identify_vpd {
+	u8 peri_dev_type;
+	u8 page_code;
+	u16 add_page_len;
+	u8 reserved[80];
+	u8 dev_identify_contxt[40];
+};
+
 #define IPR_IOA_MAX_SUPP_LOG_PAGES		16
 struct ipr_supp_log_pages {
 	u8 page_code;
@@ -2204,6 +2231,27 @@ struct ses_serial_num_vpd {
 	u8 ses_serial_num[7];
 };
 
+
+struct esm_serial_num_vpd {
+	u8 peri_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 page_len;
+	u8 ascii_len;
+	u8 fru_part_number[3];
+	u8 frb_number[8];
+	u8 reserved2;
+	u8 serial_num_head[3];
+	u8 esm_serial_num[12];
+	u8 reserved3;
+	u8 model_num_head[3];
+	u8 model_num[4];
+	u8 reserved4;
+	u8 frb_label_head[3];
+	u8 frb_label[5];
+	u8 reserved5;
+};
+
 struct drive_elem_desc {
 	u8 reserved1[2];
 	u8 desc_length[2];
@@ -2408,6 +2456,7 @@ bool is_af_blocked(struct ipr_dev *, int);
 int ipr_query_array_config(struct ipr_ioa *, bool, bool, bool, int, struct ipr_array_query_data *);
 int __ipr_query_array_config(struct ipr_ioa *, int, bool, bool, bool, int, struct ipr_array_query_data *);
 int ipr_query_command_status(struct ipr_dev *, void *);
+int ipr_query_io_dev_port(struct ipr_dev *, struct ipr_query_io_port *);
 int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);
 int ipr_log_sense(struct ipr_dev *, u8, void *, u16);
@@ -2455,6 +2504,7 @@ void ipr_scan(struct ipr_ioa *, int, int, int);
 int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_suspend_device_bus(struct ipr_dev *, struct ipr_res_addr *, u8);
+int ipr_resume_device_bus(struct ipr_dev *, struct ipr_res_addr *);
 int ipr_can_remove_device(struct ipr_dev *);
 int ipr_receive_diagnostics(struct ipr_dev *, u8, void *, int);
 int ipr_send_diagnostics(struct ipr_dev *, void *, int);

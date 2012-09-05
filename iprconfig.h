@@ -119,9 +119,13 @@ int raid_resync(i_container * i_con);
 int confirm_raid_resync(i_container * i_con);
 
 int battery_maint(i_container * i_con);
+int enclosures_maint(i_container * i_con);
 int battery_fork(i_container * i_con);
+int enclosures_fork(i_container * i_con);
 int force_battery_error(i_container *i_con);
 int enable_battery(i_container *i_con);
+int ipr_suspend_disk_enclosure(i_container *i_con);
+int ipr_resume_disk_enclosure(i_container *i_con);
 int bus_config(i_container * i_con);
 int change_bus_attr(i_container * i_con);
 int confirm_change_bus_attr(i_container *i_con);
@@ -781,7 +785,8 @@ struct screen_opts disk_unit_recovery_opt[] = {
 	{raid_rebuild,             "5", __("Rebuild disk unit data")},
 	{raid_resync,              "6", __("Force RAID Consistency Check")},
 	{battery_maint,            "7", __("Work with resources containing cache battery packs")},
-	{path_status,              "8", __("Display SAS path status")}
+	{path_status,              "8", __("Display SAS path status")},
+	{enclosures_maint,              "9", __("Work with disk enclosures")}
 };
 
 s_node n_disk_unit_recovery = {
@@ -1157,6 +1162,61 @@ s_node n_confirm_start_cache = {
 s_node n_show_battery_info = {
 	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
 	.title    = __("Battery Information")
+};
+
+struct screen_opts enclosures_maint_opt[] = {
+	{enclosures_fork, "\n"}
+};
+
+s_node n_enclosures_maint = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(enclosures_maint_opt),
+	.options  = &enclosures_maint_opt[0],
+	.title    = __("Work with disk enclosures"),
+	.header   = {
+		__("Type options, press Enter\n"),
+		__("  1=Display disk enclosure details\n"),
+		__("  2=Suspend disk enclosure path\n"),
+		__("  3=Resume disk enclosure path\n\n"),
+		"" }
+};
+
+struct screen_opts confirm_suspend_disk_enclosure_opt[] = {
+	{ipr_suspend_disk_enclosure, "c"}
+};
+
+s_node n_confirm_suspend_disk_enclosure = {
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(confirm_suspend_disk_enclosure_opt),
+	.options  = &confirm_suspend_disk_enclosure_opt[0],
+	.title    = __("Suspend Disk Enclosure"),
+	.header   = {
+		__("ATTENTION: This service function should be run only "
+		   "under the direction of the IBM Hardware Service Support\n\n"),
+		__("  c=Continue to issue suspend enclosure command\n\n"),
+		"" },
+};
+
+struct screen_opts confirm_resume_disk_enclosure_opt[] = {
+	{ipr_resume_disk_enclosure, "c"}
+};
+
+s_node n_confirm_resume_disk_enclosure = {
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(confirm_resume_disk_enclosure_opt),
+	.options  = &confirm_resume_disk_enclosure_opt[0],
+	.title    = __("Resume Disk Enclosure"),
+	.header   = {
+		__("ATTENTION: This service function should be run only "
+		   "under the direction of the IBM Hardware Service Support\n\n"),
+		__("  c=Continue to issue resume enclosure command\n\n"),
+		"" },
+};
+
+s_node n_show_enclosure_info = {
+	.f_flags  = (ENTER_FLAG | EXIT_FLAG | CANCEL_FLAG),
+	.title    = __("Hardware detail Information")
 };
 
 struct screen_opts path_status_opt[] = {
@@ -1577,6 +1637,16 @@ const char *screen_status[] = {
 	/* 78 */ __("Too few disks were selected.  The minimum is %d."),
 	/* 79 */ __("Migrate Array Protection completed successfully."),
 	/* 80 */ __("Migrate Array Protection failed."),
+	/* 81 */ __("Selected disk enclosure was suspended successfully."),
+	/* 82 */ __("Failed to suspend disk enclosure"),
+	/* 83 */ __("Disk enclosure is already in suspend state"),
+	/* 84 */ __("Disk enclosure is already in active state"),
+	/* 85 */ __("Selected disk enclosure was resumed successfully."),
+	/* 86 */ __("Failed to resume disk enclosure"),
+	/* 87 */ __("Can not suspend an expander from the RAID controller with the same serial number"),
+	/* 88 */ __("Incorrect device type specified. Please specify a valid disk enclosure to suspend"),
+	/* 89 */ __("Incorrect device type specified. Please specify a valid disk enclosure to resume"),
+	/* 90 */ __("Selected disk enclosure is in Unknown state. Please check your hardware support"),
 
       /* NOTE:  127 maximum limit */
 };
