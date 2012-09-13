@@ -2474,20 +2474,22 @@ int get_ses_phy_loc(struct ipr_dev *dev)
 
 	}
 
-	for (i = 0; !rc && i < ses_page0_inq.page_length; i++) {
-		if (ses_page0_inq.supported_vpd_page[i] == 0x01) {
-			ret = ipr_inquiry(dev, 0x01, &esm_vpd_inq, sizeof(esm_vpd_inq));
-			break;
+	if (strlen(dev->physical_location)) {
+		for (i = 0; !rc && i < ses_page0_inq.page_length; i++) {
+			if (ses_page0_inq.supported_vpd_page[i] == 0x01) {
+				ret = ipr_inquiry(dev, 0x01, &esm_vpd_inq, sizeof(esm_vpd_inq));
+				break;
+			}
 		}
-	}
 
-	if (ret == 0 ) {
-		ipr_strncpy_0((char *)&dev->serial_number, (char *)&esm_vpd_inq.esm_serial_num[0], sizeof(esm_vpd_inq.esm_serial_num));
-		ipr_strncpy_0(buffer, (char *)esm_vpd_inq.frb_label,
-				sizeof(esm_vpd_inq.frb_label));
-		strncat(dev->physical_location, "-", strlen("-"));
-		strncat(dev->physical_location, buffer, strlen(buffer));
-		return 0;
+		if (ret == 0 ) {
+			ipr_strncpy_0((char *)&dev->serial_number, (char *)&esm_vpd_inq.esm_serial_num[0], sizeof(esm_vpd_inq.esm_serial_num));
+			ipr_strncpy_0(buffer, (char *)esm_vpd_inq.frb_label,
+					sizeof(esm_vpd_inq.frb_label));
+			strncat(dev->physical_location, "-", strlen("-"));
+			strncat(dev->physical_location, buffer, strlen(buffer));
+			return 0;
+		}
 	}
 
 	return 1;
