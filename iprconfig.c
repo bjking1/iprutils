@@ -2501,7 +2501,7 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 	char unit_phy_loc[PHYSICAL_LOCATION_LENGTH+1];
 
 	ipr_strncpy_0(buffer, (char *)drive_data->dev_elem[slot_id].disk_physical_loc, DISK_PHY_LOC_LENGTH);
-	if (strlen(ses->physical_location))
+	if (strlen(ses->physical_location) && !strlen(buffer))
 		if (!conc_maint)
 			sprintf(buf, "%s-%s", ses->physical_location, buffer);
 		else {
@@ -2516,6 +2516,8 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 		*first_hyphen = '\0';
 		sprintf(buf, "%s-%s", unit_phy_loc, buffer);
 	}
+	else 
+		sprintf(buf, "%s", "\0");
 
 	return 0;
 }
@@ -7567,6 +7569,10 @@ static struct ipr_dev *alloc_empty_slot_64bit(struct ipr_dev *ses, int slot, int
  **/
 static int can_perform_conc_action(struct ipr_dev *dev, int action)
 {
+
+	if (dev->scsi_dev_data->type == TYPE_ROM || dev->scsi_dev_data->type==TYPE_TAPE)
+		return 0;
+
 	if (action == IPR_CONC_REMOVE) {
 		if (format_in_prog(dev))
 			return 0;
@@ -12648,10 +12654,8 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				}
 			} else {
 				if (conc_main) {
-					for (i = 0; i < 26-loc_len; i++)
-						body[len+i] = ' ';
-
-					len += 26-loc_len;
+					loc_len = sprintf(body + len, "%d/%d:", ioa->host_num,ioa->host_num);
+					len += loc_len;
 				} else {
 					for (i = 0; i < 39-loc_len; i++)
 						body[len+i] = ' ';
@@ -12723,10 +12727,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			}
 		else { 
 			if (!res_path || !ioa->sis64) {
-				for (i = 0; i < 26-loc_len; i++)
+				for (i = 0; i < 27-loc_len; i++)
 					body[len+i] = ' ';
 
-				len += 26-loc_len;
+				len += 27-loc_len;
 			}
 
 			if (!vpd) {
@@ -12746,17 +12750,25 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		}
 	} else if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_EMPTY_SLOT) {
 		if (!res_path || !ioa->sis64) {
-			tab_stop = sprintf(body + len,"%d:%d: ",
-					   dev->res_addr[ra].bus,
-					   dev->res_addr[ra].target);
+			if (hw_loc) {
+				for (i = 0; i < 27-loc_len; i++)
+					body[len+i] = ' ';
 
-			loc_len += tab_stop;
-			len += tab_stop;
-			
-			for (i = 0; i < 27-loc_len; i++)
-				body[len+i] = ' ';
+				len += 27-loc_len;
+			}
+			else {
+				tab_stop = sprintf(body + len,"%d:%d: ",
+						   dev->res_addr[ra].bus,
+						   dev->res_addr[ra].target);
 
-			len += 27-loc_len;
+				loc_len += tab_stop;
+				len += tab_stop;
+				
+				for (i = 0; i < 29-loc_len; i++)
+					body[len+i] = ' ';
+
+				len += 29-loc_len;
+			}
 		}
 		len += sprintf(body + len, "%-8s %-16s ", " ", " ");
 	} else {
@@ -12784,10 +12796,17 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				loc_len += tab_stop;
 				len += tab_stop;
 
-				for (i = 0; i < 26-loc_len; i++)
-					body[len+i] = ' ';
+				if (conc_main && (hw_loc != 1)) {
+					for (i = 0; i < 29-loc_len; i++)
+						body[len+i] = ' ';
 
-				len += 26-loc_len;
+					len += 29-loc_len;
+				} else {
+					for (i = 0; i < 27-loc_len; i++)
+						body[len+i] = ' ';
+
+					len += 27-loc_len;
+				}
 			}
 		}
 
@@ -12857,6 +12876,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		
 			} else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
 				len += sprintf(body + len, "%-25s ", "Processor");
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ROM)
+				len += sprintf(body + len, "%-25s ", "CD/DVD");
+
+			else if (scsi_dev_data && scsi_dev_data->type == TYPE_TAPE)
+				len += sprintf(body + len, "%-25s ", "Tape");
+
 			else if (ioa->ioa_dead)
 				len += sprintf(body + len, "%-25s ", "Unavailable Device");
 			else

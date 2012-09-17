@@ -6081,6 +6081,8 @@ void check_current_config(bool allow_rebuild_refresh)
 			    scsi_dev_data->type == IPR_TYPE_AF_DISK ||
 			    scsi_dev_data->type == IPR_TYPE_ADAPTER ||
 			    scsi_dev_data->type == TYPE_ENCLOSURE ||
+			    scsi_dev_data->type == TYPE_ROM ||
+			    scsi_dev_data->type == TYPE_TAPE ||
 			    scsi_dev_data->type == TYPE_PROCESSOR) {
 				ioa->dev[device_count].ioa = ioa;
 				ioa->dev[device_count].scsi_dev_data = scsi_dev_data;
