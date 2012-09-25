@@ -2501,10 +2501,7 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 	char unit_phy_loc[PHYSICAL_LOCATION_LENGTH+1];
 
 	ipr_strncpy_0(buffer, (char *)drive_data->dev_elem[slot_id].disk_physical_loc, DISK_PHY_LOC_LENGTH);
-	if (strlen(ses->physical_location) && !strlen(buffer))
-		if (!conc_maint)
-			sprintf(buf, "%s-%s", ses->physical_location, buffer);
-		else {
+	if (strlen(ses->physical_location) && !strlen(buffer)) {
 			ipr_strncpy_0(unit_phy_loc, ses->physical_location, PHYSICAL_LOCATION_LENGTH);
 			first_hyphen = strchr(unit_phy_loc, '-');
 			*first_hyphen = '\0';
