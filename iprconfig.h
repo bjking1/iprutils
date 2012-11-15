@@ -1411,7 +1411,7 @@ s_node n_download_ucode = {
 	.options  = &download_ucode_opt[0],
 	.title    = __("Download Microcode"),
 	.header   = {
-		__("Select the adapter(s) to download microcode\n\n"),
+		__("Select the device(s) to download microcode\n\n"),
 		__("Type choice, press Enter.\n"),
 		__("  1=device to download microcode\n\n"),
 		"" }
