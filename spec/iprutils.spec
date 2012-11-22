@@ -36,17 +36,17 @@ if [ $1 = 2 ]; then
 	%{_sysconfdir}/init.d/iprdump restart  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprupdate restart  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprinit restart  > /dev/null 2>&1
-elif [ -f /usr/lib/lsb/install_initd ]; then
+elif [ -f /sbin/chkconfig ]; then
+	/sbin/chkconfig --add iprinit > /dev/null 2>&1
+	/sbin/chkconfig --add iprdump > /dev/null 2>&1
+	/sbin/chkconfig --add iprupdate > /dev/null 2>&1
+	/sbin/chkconfig iprinit on > /dev/null 2>&1
+	/sbin/chkconfig iprdump on > /dev/null 2>&1
+	/sbin/chkconfig iprupdate on > /dev/null 2>&1
+else
 	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
 	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
 	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
-else
-	chkconfig --add iprinit > /dev/null 2>&1
-	chkconfig --add iprdump > /dev/null 2>&1
-	chkconfig --add iprupdate > /dev/null 2>&1
-	chkconfig iprinit on > /dev/null 2>&1
-	chkconfig iprdump on > /dev/null 2>&1
-	chkconfig iprupdate on > /dev/null 2>&1
 fi
 %endif
 
@@ -57,14 +57,14 @@ if [ $1 = 0 ]; then
 	%{_sysconfdir}/init.d/iprupdate stop  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprinit stop  > /dev/null 2>&1
 
-	if [ -f /usr/lib/lsb/remove_initd ]; then
+	if [ -f /sbin/chkconfig ]; then
+		/sbin/chkconfig --del iprinit > /dev/null 2>&1
+		/sbin/chkconfig --del iprdump > /dev/null 2>&1
+		/sbin/chkconfig --del iprupdate > /dev/null 2>&1
+	else
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
-	else
-		chkconfig --del iprinit > /dev/null 2>&1
-		chkconfig --del iprdump > /dev/null 2>&1
-		chkconfig --del iprupdate > /dev/null 2>&1
 	fi
 fi
 %endif
