@@ -81,7 +81,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
-* Fri Sep 2012 Wen Xiong <wenxiong@linux.vnet.ibm.com> 2.3.12
+* Fri Sep 05 2012 Wen Xiong <wenxiong@linux.vnet.ibm.com> 2.3.12
 - Release 2.3.12
 - Addes supporting suspend/resume utility for BlueHawk.
 - Fixes raid array delete error.
