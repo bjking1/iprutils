@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.12
+Version: 2.3.13
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Dec 04 2012 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.13
+- Release 2.3.13
+- Fixes Platform Location for 32bit adapter.
+- Adds support for optical devices.
+- Fixes platform location for disks.
+- Changes %post and %preun sections of spec file.
+- Fixes release date on the spec file.
 * Fri Sep 05 2012 Wen Xiong <wenxiong@linux.vnet.ibm.com> 2.3.12
 - Release 2.3.12
 - Addes supporting suspend/resume utility for BlueHawk.
