@@ -3322,6 +3322,36 @@ int ipr_start_stop_start(struct ipr_dev *dev)
 }
 
 /**
+ * ipr_check_allow_restart - check the allow_restart flag for a device
+ * @dev:		ipr dev struct
+ *
+ * Return value:
+ *   none
+ **/
+int ipr_check_allow_restart(struct ipr_dev *dev)
+{
+	struct sysfs_attribute *sysfs_attr;
+	char path[SYSFS_PATH_MAX];
+	int rc;
+
+	sprintf(path, "%s/%s/%s", "/sys/class/scsi_disk",
+		dev->scsi_dev_data->sysfs_device_name, "allow_restart");
+
+	sysfs_attr = sysfs_open_attribute(path);
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open allow_restart parameter.\n");
+		return -1;
+	}
+
+	sysfs_read_attribute(sysfs_attr);
+	rc = atoi(sysfs_attr->value);
+
+	sysfs_close_attribute(sysfs_attr);
+
+	return rc;
+}
+
+/**
  * ipr_allow_restart - set or clear the allow_restart flag for a device
  * @dev:		ipr dev struct
  * @allow:		value to set
@@ -3386,7 +3416,7 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 {
 	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
-	int length = 0;
+	int length = 0, allow_restart = 0;
 	char *name = dev->gen_name;
 
 	if (strlen(dev->dev_name))
@@ -3411,6 +3441,15 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 		      sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	close(fd);
+
+	if (rc && sense_data->sense_key == NOT_READY &&
+		   sense_data->add_sense_code == 0x4 &&
+		   sense_data->add_sense_code_qual == 0x2) {
+		allow_restart = ipr_check_allow_restart(dev);	
+		if (allow_restart)
+			ipr_start_stop(dev, IPR_START_STOP_START, "Start Unit");
+	}
+
 	return rc;
 }
 
