@@ -5681,6 +5681,7 @@ static void get_dual_ioa_state(struct ipr_ioa *ioa)
 
 	sprintf(ioa->dual_state, "Primary");
 	sprintf(ioa->preferred_dual_state, "No Preference");
+	ioa->is_secondary = 0;
 
 	if (!ioa->dual_raid_support)
 		return;
@@ -5690,15 +5691,15 @@ static void get_dual_ioa_state(struct ipr_ioa *ioa)
 	if (rc)
 		return;
 
-	ioa_entry = (struct ipr_dual_ioa_entry *)
-		(((unsigned long)&ioa->ioa_status.cap) + ntohl(ioa->ioa_status.cap.length));
-	if (ntohl(ioa->ioa_status.num_entries))
-		print_ioa_state(ioa->dual_state, ioa_entry->cur_state);
 	print_ioa_state(ioa->preferred_dual_state, ioa->ioa_status.cap.preferred_role);
-	if (ioa_entry->cur_state == IPR_IOA_STATE_SECONDARY)
-		ioa->is_secondary = 1;
-	else
-		ioa->is_secondary = 0;
+
+	if (ntohl(ioa->ioa_status.num_entries)) {
+		ioa_entry = (struct ipr_dual_ioa_entry *)
+			(((unsigned long)&ioa->ioa_status.cap) + ntohl(ioa->ioa_status.cap.length));
+		print_ioa_state(ioa->dual_state, ioa_entry->cur_state);
+		if (ioa_entry->cur_state == IPR_IOA_STATE_SECONDARY)
+			ioa->is_secondary = 1;
+	}
 }
 
 /**
