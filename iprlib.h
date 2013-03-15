@@ -1390,8 +1390,8 @@ struct ipr_ioa {
 	u16 subsystem_device;
 	u16 hop_count;
 #define IPR_NOHOP            0x00
-#define IPR_2BIT_HOP         0x02
-#define IPR_3BIT_HOP         0x03
+#define IPR_2BIT_HOP         0x01
+#define IPR_3BIT_HOP         0x02
 	char dual_state[16];
 	char preferred_dual_state[16];
 	int host_num;
