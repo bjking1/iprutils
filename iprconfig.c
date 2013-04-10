@@ -7113,12 +7113,21 @@ int remove_or_add_back_device_64bit(struct ipr_dev *dev)
 	struct ipr_drive_elem_status *elem_status;
 	struct ipr_ses_config_pg ses_cfg;
 	int res_path_len, dev_slot;
-	struct ipr_dev *sec_dev;
+	struct ipr_dev *sec_dev, *tmp_dev;
+	char new_sysfs_res_path[IPR_MAX_RES_PATH_LEN];
 	int rc;
 
-	evaluate_device(dev, dev->ioa, 0);
 	res_path_len  = strlen(dev->res_path_name);
 	dev_slot = strtoul(dev->res_path_name + (res_path_len - 2), NULL, 16);
+
+	if (!ipr_read_dev_attr(dev, "resource_path", new_sysfs_res_path))
+		if (strncmp(dev->res_path_name, new_sysfs_res_path, sizeof(dev->res_path_name)))
+			for_each_dev(dev->ioa, tmp_dev)
+				if (!strncmp(tmp_dev->res_path_name, new_sysfs_res_path, sizeof(tmp_dev->res_path_name))) {
+					dev = tmp_dev;
+					break;
+				}
+	evaluate_device(dev, dev->ioa, 0);
 
 	if (ipr_receive_diagnostics(dev->ses[0], 2, &ses_data, sizeof(ses_data)))
 		return INVALID_OPTION_STATUS;
