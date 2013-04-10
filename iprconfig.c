@@ -2528,7 +2528,6 @@ int index_in_page2(struct ipr_encl_status_ctl_pg *ses_data, int slot_id)
 	int i;
 
 	for (i = 1; i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++) {
-syslog(LOG_ERR, "slot_is=%d new=%d i=%d\n",slot_id, ses_data->elem_status[i].slot_id, i);
 		if (ses_data->elem_status[i].slot_id == slot_id)
 			return (i - 1);
 	}
