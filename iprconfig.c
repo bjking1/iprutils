@@ -2523,6 +2523,18 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 	return 0;
 }
 
+int index_in_page2(struct ipr_encl_status_ctl_pg *ses_data, int slot_id)
+{
+	int i;
+
+	for (i = 1; i < IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES; i++) {
+syslog(LOG_ERR, "slot_is=%d new=%d i=%d\n",slot_id, ses_data->elem_status[i].slot_id, i);
+		if (ses_data->elem_status[i].slot_id == slot_id)
+			return (i - 1);
+	}
+
+	return -1;
+}
 /**
  * ses_details - get ses details
  * @body:		data buffer
@@ -7884,7 +7896,7 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 	struct ipr_ses_config_pg ses_cfg;
 	struct drive_elem_desc_pg drive_data;
 	char phy_loc[PHYSICAL_LOCATION_LENGTH + 1];
-	int times;
+	int times, index;
 
 	for_each_primary_ioa(ioa) {
 		is_spi = ioa_is_spi(ioa);
@@ -7924,7 +7936,10 @@ static int get_conc_devs(struct ipr_dev ***ret, int action)
 			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
 
 			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
-				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc, 1);
+				index = index_in_page2(&ses_data, elem_status->slot_id);
+				if (index != -1)
+					get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, index, phy_loc, 0);
+				
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
 					continue;
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_NO_ACCESS)
@@ -16557,7 +16572,7 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 	int ses_bus, scsi_id_found, is_spi, is_vses;
 	struct drive_elem_desc_pg drive_data;
 	char phy_loc[PHYSICAL_LOCATION_LENGTH + 1];
-	int times;
+	int times, index;
 
 	for_each_ioa(ioa)  {
 		is_spi = ioa_is_spi(ioa);
@@ -16597,7 +16612,10 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
 
 			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
-				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, elem_status->slot_id, phy_loc, 0);
+				index = index_in_page2(&ses_data, elem_status->slot_id);
+				if (index != -1)
+					get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, index, phy_loc, 0);
+
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
 					continue;
 				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_NO_ACCESS)
