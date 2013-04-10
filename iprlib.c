@@ -1655,11 +1655,13 @@ static void resolve_dev(struct ipr_dev *new, struct ipr_dev *old)
 	new->init_not_allowed = !dev_init_allowed(new);
 	if (!old->init_not_allowed || new->init_not_allowed)
 		new->should_init = 0;
-	if (new->ioa->is_secondary && !old->ioa->is_secondary &&
-	    ipr_is_af_dasd_device(new) && new->scsi_dev_data)
+	if (!new->ioa->sis64 && new->ioa->is_secondary &&
+	   !old->ioa->is_secondary && ipr_is_af_dasd_device(new) &&
+	   new->scsi_dev_data)
 		new->rescan = 1;
-	if (!new->ioa->is_secondary && old->ioa->is_secondary &&
-	    ipr_is_af_dasd_device(new) && !new->scsi_dev_data)
+	if (!new->ioa->sis64 && !new->ioa->is_secondary &&
+	   old->ioa->is_secondary && ipr_is_af_dasd_device(new) &&
+	   !new->scsi_dev_data)
 		new->rescan = 1;
 }
 
