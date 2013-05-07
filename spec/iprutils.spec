@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.13
+Version: 2.3.14
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,7 +81,13 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
-* Tue Dec 04 2012 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.13
+* Tue May 07 2013 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.14
+- Release 2.3.14
+- Fixes stale information after hot plug a disk into an array
+- Segmentation fault when removing a disk with hot spare disk
+- Fxied sysfs error when updating microcode
+- Fixes the platform location issue for Tres drawer
+- Fix hop count defines
 - Release 2.3.13
 - Fixes Platform Location for 32bit adapter.
 - Adds support for optical devices.
