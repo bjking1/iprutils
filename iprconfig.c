@@ -12836,8 +12836,13 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 		if (vpd) {
 			if (scsi_dev_data) {
+				if (dev->qac_entry && ipr_is_device_record(dev->qac_entry->record_id)) {
+					ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
+					ipr_strncpy_0(product_id, (char *)dev->product_id, IPR_PROD_ID_LEN);
+			} else {
 				ipr_strncpy_0(vendor_id, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
 				ipr_strncpy_0(product_id, scsi_dev_data->product_id, IPR_PROD_ID_LEN);
+				}
 			} else if (dev->qac_entry) {
 				if (ipr_is_device_record(dev->qac_entry->record_id)) {
 						ipr_strncpy_0(vendor_id, (char *)dev->vendor_id, IPR_VENDOR_ID_LEN);
