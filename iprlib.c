@@ -6284,11 +6284,11 @@ void check_current_config(bool allow_rebuild_refresh)
 	for_each_ioa(ioa) {
 		if (strlen((char *)ioa->yl_serial_num) == 0) {
 			memset(&di_vpd, 0, sizeof(di_vpd));
-			ipr_inquiry(&ioa->ioa, 0x83, &di_vpd, sizeof(di_vpd));
-			if (ntohs(di_vpd.add_page_len) > 120) {
+			rc = ipr_inquiry(&ioa->ioa, 0x83, &di_vpd, sizeof(di_vpd));
+			if (!rc && ntohs(di_vpd.add_page_len) > 120) {
 				pchr = strstr((char *)&di_vpd.dev_identify_contxt[0],"SN");
-
-				strncpy((char *)ioa->yl_serial_num, (pchr + 3), YL_SERIAL_NUM_LEN);
+				if (pchr)
+					strncpy((char *)ioa->yl_serial_num, (pchr + 3), YL_SERIAL_NUM_LEN);
 			}
 		}
 	}
