@@ -268,7 +268,7 @@ struct screen_opts raid_screen_opt[] = {
 	{raid_stop,        "3", __("Delete a disk array")},
 	{raid_include,     "4", __("Add a device to a disk array")},
 	{af_include,       "5", __("Format device for RAID function")},
-	{af_remove,        "6", __("Format device for JBOD function (512)")},
+	{af_remove,        "6", __("Format device for JBOD function")},
 	{hot_spare_screen, "7", __("Work with hot spares")},
 	{asym_access,      "8", __("Work with asymmetric access")},
 	{raid_resync,      "9", __("Force RAID Consistency Check")},

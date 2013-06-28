@@ -6048,6 +6048,36 @@ void ipr_debug_dump_rcd(struct ipr_common_record *rcd)
 	dprintf("\n");
 }
 
+/**
+ * ipr_get_logical_block_size - check the logical block size
+ * @dev:		ipr dev struct
+ *
+ * Return value:
+ *   none
+ **/
+int ipr_get_logical_block_size(struct ipr_dev *dev)
+{
+	struct sysfs_attribute *sysfs_attr;
+	char path[SYSFS_PATH_MAX], *first_hyphen;
+	int rc;
+
+	first_hyphen = strrchr(dev->dev_name, 's');
+	sprintf(path, "%s/%s/%s", "/sys/block",
+		first_hyphen, "queue/logical_block_size");
+
+	sysfs_attr = sysfs_open_attribute(path);
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open logical_block_size parameter.\n");
+		return -1;
+	}
+
+	sysfs_read_attribute(sysfs_attr);
+	rc = atoi(sysfs_attr->value);
+
+	sysfs_close_attribute(sysfs_attr);
+
+	return rc;
+}
 
 /**
  * check_current_config - populates the ioa configuration data
@@ -6136,6 +6166,10 @@ void check_current_config(bool allow_rebuild_refresh)
 				strcpy(ioa->dev[device_count].gen_name,
 				       scsi_dev_data->gen_name);
 
+				if (ioa->support_4k && scsi_dev_data->type == TYPE_DISK) {
+					if (ipr_get_logical_block_size(&ioa->dev[device_count]) == IPR_JBOD_4K_BLOCK_SIZE)
+						ioa->dev[device_count].block_dev_class |= IPR_BLK_DEV_CLASS_4K;
+				}
 				/* find array config data matching resource entry */
 				k = 0;
 				for_each_qac_entry(common_record, qac_data) {
@@ -6237,6 +6271,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 			if (!dev || !dev->qac_entry)
 				continue;
+
 			if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
 				dev->vendor_id = dev->dev_rcd->type2.vendor_id;
 				dev->product_id = dev->dev_rcd->type2.product_id;

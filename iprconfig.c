@@ -12141,6 +12141,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 	struct ipr_query_res_state res_state;
 	int status, rc;
 	int format_req = 0;
+	int blk_size = 0;
 	struct ipr_mode_pages mode_pages;
 	struct ipr_block_desc *block_desc;
 	struct sense_data_t sense_data;
@@ -12224,9 +12225,12 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 				if (!status) {
 					if (mode_pages.hdr.block_desc_len > 0) {
 						block_desc = (struct ipr_block_desc *)(mode_pages.data);
+						blk_size = block_desc->block_length[2] +
+							   (block_desc->block_length[1] << 8) +
+							   (block_desc->block_length[0] << 16);
 
-						if ((block_desc->block_length[1] != 0x02) ||
-						    (block_desc->block_length[2] != 0x00))
+						if ((blk_size != IPR_JBOD_BLOCK_SIZE) &&
+						    (blk_size != IPR_JBOD_4K_BLOCK_SIZE))
 							format_req = 1;
 					}
 				}
@@ -12628,6 +12632,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
 	struct ipr_ioa *ioa = dev->ioa, *ioa_phy_loc;
+	bool is4k = false;
 
 	/* In cases where we're having problems with the device */
 	if (!ioa)
@@ -12862,41 +12867,51 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			}
 
 		} else {
-			if (ipr_is_hot_spare(dev))
-				if (dev->block_dev_class == IPR_SSD)
-					len += sprintf(body + len, "%-25s ", "SSD Hot Spare");
+			if (ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
+				is4k = true;
+			else
+				is4k = false;
+
+			if (ipr_is_hot_spare(dev)) {
+				if (dev->block_dev_class & IPR_SSD)
+					sprintf(buf, "%s%s", is4k ? "4K " : "", "SSD Hot Spare");
 				else
-					len += sprintf(body + len, "%-25s ", "Hot Spare");
-			else if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
-				if (dev->block_dev_class == IPR_SSD)
-					sprintf(buf, "RAID %s SSD Disk Array",
-						get_prot_level_str(ioa->supported_arrays, dev->raid_level));
+					sprintf(buf, "%s%s", is4k ? "4K " : "", "Hot Spare");
+				len += sprintf(body + len, "%-25s ", buf);
+			} else if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
+				if (dev->block_dev_class & IPR_SSD)
+					sprintf(buf, "RAID %s %s SSD Disk Array",
+						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
+						is4k ? "4K" : "");
 				else
-					sprintf(buf, "RAID %s Disk Array",
-						get_prot_level_str(ioa->supported_arrays, dev->raid_level));
+					sprintf(buf, "RAID %s %s Disk Array",
+						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
+						is4k ? "4K" : "");
 				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
-					if (dev->block_dev_class == IPR_SSD)
-						sprintf(raid_str,"  RAID %s SSD Member",
-							dev->prot_level_str);
+					if (dev->block_dev_class & IPR_SSD)
+						sprintf(raid_str,"  RAID %s %s SSD Member",
+							dev->prot_level_str, is4k ? "4K" : "");
 					else
-						sprintf(raid_str,"  RAID %s Array Member",
-							dev->prot_level_str);
+						sprintf(raid_str,"  RAID %s %s Array Member",
+							dev->prot_level_str, is4k ? "4K" : "");
 				else
-					if (dev->block_dev_class == IPR_SSD)
-						sprintf(raid_str,"RAID %s SSD Member",
-							dev->prot_level_str);
+					if (dev->block_dev_class & IPR_SSD)
+						sprintf(raid_str,"RAID %s %sSSD Member",
+							dev->prot_level_str, is4k ? "4K" : "");
 					else
-						sprintf(raid_str,"RAID %s Array Member",
-							dev->prot_level_str);
+						sprintf(raid_str,"RAID %s %s Array Member",
+							dev->prot_level_str, is4k ? "4K" : "");
 
 				len += sprintf(body + len, "%-25s ", raid_str);
 			} else if (ipr_is_af_dasd_device(dev))
-				if (dev->block_dev_class == IPR_SSD)
-					len += sprintf(body + len, "%-25s ", "Advanced Function SSD");
+				if (dev->block_dev_class & IPR_SSD)
+					len += sprintf(body + len, "%-25s ", is4k ? "Advanced Function 4K SSD" :
+							"Advanced Function SSD");
 				else
-					len += sprintf(body + len, "%-25s ", "Advanced Function Disk");
+					len += sprintf(body + len, "%-25s ", is4k ? "Advanced Function 4K Disk" :
+							"Advanced Function Disk");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE) {
 				if (serial_num == 1)
 					len += sprintf(body + len, "%-13s ", (char *)&dev->serial_number);
@@ -12913,8 +12928,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 			else if (ioa->ioa_dead)
 				len += sprintf(body + len, "%-25s ", "Unavailable Device");
-			else
-				len += sprintf(body + len, "%-25s ", "Physical Disk");
+			else {
+				len += sprintf(body + len, "%-25s ",
+						is4k ? "Physical 4K Disk" : "Physical Disk");
+			}
 		}
 	}
 
