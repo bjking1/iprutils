@@ -1692,6 +1692,7 @@ struct ipr_cmd_status_record {
 #define IPR_CMD_STATUS_FAILED                4
 #define IPR_CMD_STATUS_INSUFF_DATA_MOVED     5
 #define IPR_CMD_STATUS_MIXED_BLK_DEV_CLASESS 6
+#define IPR_CMD_STATUS_MIXED_LOG_BLK_SIZE    7
 
 	u8 percent_complete;
 	struct ipr_res_addr failing_dev_res_addr;

@@ -1647,6 +1647,7 @@ const char *screen_status[] = {
 	/* 88 */ __("Incorrect device type specified. Please specify a valid disk enclosure to suspend"),
 	/* 89 */ __("Incorrect device type specified. Please specify a valid disk enclosure to resume"),
 	/* 90 */ __("Selected disk enclosure is in Unknown state. Please check your hardware support"),
+	/* 91 */ __("Create disk array failed - can not mix 5XX and 4K disks."),
 
       /* NOTE:  127 maximum limit */
 };

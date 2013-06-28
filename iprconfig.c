@@ -3938,6 +3938,11 @@ int raid_start_complete()
 								  "SSDs and HDDs can not be mixed in an array.\n"),
 						       ioa->ioa.gen_name);
 						rc = RC_22_Mixed_Block_Dev_Classes;
+					} else  if (status_record->status == IPR_CMD_STATUS_MIXED_LOG_BLK_SIZE) {
+						 syslog(LOG_ERR, _("Start parity protect to %s failed.  "
+								  "non 4K disks and 4K disks can not be mixed in an array.\n"),
+						       ioa->ioa.gen_name);
+						rc = 91;
 					} else {
 
 						syslog(LOG_ERR, _("Start parity protect to %s failed.  "
@@ -13267,7 +13272,7 @@ static int format_for_raid(char **args, int num_args)
 static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
-	int hdd_count = 0, ssd_count = 0;
+	int hdd_count = 0, ssd_count = 0, non_4k_count = 0, is_4k_count = 0;
 	int next_raid_level, next_stripe_size, next_qdepth;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
 	int stripe_size, qdepth, zeroed_devs;
@@ -13325,14 +13330,24 @@ static int raid_create(char **args, int num_args)
 			return -EINVAL;
 		}
 
-		if (dev->block_dev_class == IPR_SSD)
+		if (dev->block_dev_class & IPR_SSD)
 			ssd_count++;
 		else
 			hdd_count++;
+
+		if (dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
+			is_4k_count++;
+		else
+			non_4k_count++;
 	}
 
 	if (hdd_count > 0 && ssd_count > 0) {
 		syslog(LOG_ERR, _("SSDs and HDDs can not be mixed in an array.\n"));
+		return -EINVAL;
+	}
+
+	if (is_4k_count > 0 && non_4k_count > 0) {
+		syslog(LOG_ERR, _("4K disks and 5XX disks can not be mixed in an array.\n"));
 		return -EINVAL;
 	}
 
