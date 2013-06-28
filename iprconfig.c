@@ -2655,6 +2655,8 @@ int device_details(i_container *i_con)
 #define IPR_REMOVE  1
 #define IPR_ADD_HOT_SPARE 0
 #define IPR_RMV_HOT_SPARE 1
+#define IPR_FMT_JBOD 0
+#define IPR_FMT_RECOVERY 1
 
 /**
 * hot_spare_screen - Display choices for working with hot spares.
@@ -8635,7 +8637,8 @@ int send_dev_inits(i_container *i_con)
 
 			ipr_disable_qerr(cur_dev_init->dev);
 
-			if (cur_dev_init->new_block_size == IPR_JBOD_BLOCK_SIZE) {
+			if (cur_dev_init->new_block_size == IPR_JBOD_BLOCK_SIZE ||
+				cur_dev_init->new_block_size == IPR_JBOD_4K_BLOCK_SIZE) {
 				/* Issue mode select to change block size */
 				mode_parm_hdr = (struct ipr_mode_parm_hdr *)ioctl_buffer;
 				memset(ioctl_buffer, 0, 255);
@@ -8645,8 +8648,8 @@ int send_dev_inits(i_container *i_con)
 
 				/* Setup block size */
 				block_desc->block_length[0] = 0x00;
-				block_desc->block_length[1] = IPR_JBOD_BLOCK_SIZE >> 8;
-				block_desc->block_length[2] = IPR_JBOD_BLOCK_SIZE & 0xff;
+				block_desc->block_length[1] = cur_dev_init->new_block_size >> 8;
+				block_desc->block_length[2] = cur_dev_init->new_block_size & 0xff;
 
 				rc = ipr_mode_select(cur_dev_init->dev,ioctl_buffer,
 						     sizeof(struct ipr_block_desc) +
@@ -8707,8 +8710,8 @@ int send_dev_inits(i_container *i_con)
 				block_desc->block_length[2] = ioa->af_block_size & 0xff;
 			} else {
 				block_desc->block_length[0] = 0x00;
-				block_desc->block_length[1] = IPR_JBOD_BLOCK_SIZE >> 8;
-				block_desc->block_length[2] = IPR_JBOD_BLOCK_SIZE & 0xff;
+				block_desc->block_length[1] = cur_dev_init->new_block_size >> 8;
+				block_desc->block_length[2] = cur_dev_init->new_block_size & 0xff;
 			}
 
 			length = sizeof(struct ipr_block_desc) +
@@ -13142,9 +13145,9 @@ static void curses_init()
  * Returns:
  *   0 if success / non-zero on failure FIXME
  **/
-static int format_devices(char **args, int num_args, int blksz)
+static int format_devices(char **args, int num_args, int fmt_flag)
 {
-	int i, rc;
+	int i, rc, blksz;
 	struct ipr_dev *dev;
 
 	for (i = 0; i < num_args; i++) {
@@ -13153,6 +13156,18 @@ static int format_devices(char **args, int num_args, int blksz)
 			fprintf(stderr, "Invalid device: %s\n", args[i]);
 			continue;
 		}
+		if (!dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K) {
+			fprintf(stderr, "Invalid device specified: %s. 4K disks not supprted on this adapter", args[i]);
+			continue;
+		}
+
+		if (fmt_flag == IPR_FMT_JBOD ) {
+			if (dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
+				blksz = IPR_JBOD_4K_BLOCK_SIZE;
+			else
+				blksz = IPR_JBOD_BLOCK_SIZE;
+		} else if (fmt_flag == IPR_FMT_RECOVERY)
+			blksz = 0;
 
 		if (!ipr_is_af_dasd_device(dev) && !ipr_is_gscsi(dev))
 			continue;
@@ -13186,7 +13201,7 @@ static int format_devices(char **args, int num_args, int blksz)
  **/
 static int recovery_format(char **args, int num_args)
 {
-	return format_devices(args, num_args, 0);
+	return format_devices(args, num_args, IPR_FMT_RECOVERY);
 }
 
 /**
@@ -13199,7 +13214,7 @@ static int recovery_format(char **args, int num_args)
  **/
 static int format_for_jbod(char **args, int num_args)
 {
-	return format_devices(args, num_args, IPR_JBOD_BLOCK_SIZE);
+	return format_devices(args, num_args, IPR_FMT_JBOD);
 }
 
 /**
@@ -13212,7 +13227,7 @@ static int format_for_jbod(char **args, int num_args)
  **/
 static int format_for_raid(char **args, int num_args)
 {
-	int i, rc;
+	int i, rc, blk_size;
 	struct ipr_dev *dev;
 
 	for (i = 0; i < num_args; i++) {
@@ -13222,7 +13237,17 @@ static int format_for_raid(char **args, int num_args)
 			return -EINVAL;
 		}
 
-		add_format_device(dev, dev->ioa->af_block_size);
+		if (!dev->ioa->support_4k && (ipr_get_logical_block_size(dev) == IPR_JBOD_4K_BLOCK_SIZE)) {
+			fprintf(stderr, "Invalid device specified: %s. 4K disks not supprted on this adapter", args[i]);
+			return -EINVAL;
+		}
+
+		if (dev->ioa->support_4k && (ipr_get_logical_block_size(dev) == IPR_JBOD_4K_BLOCK_SIZE))
+			blk_size = IPR_AF_4K_BLOCK_SIZE;
+		else
+			blk_size = dev->ioa->af_block_size;
+
+		add_format_device(dev, blk_size);
 		dev_init_tail->do_init = 1;
 	}
 
