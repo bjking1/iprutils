@@ -6350,7 +6350,10 @@ static int configure_af_device(i_container *i_con, int action_code)
 					if (ipr_device_is_zeroed(&ioa->dev[j]))
 						continue;
 					new_block_size = 0;
-				} else
+				} else if (ioa->dev[j].block_dev_class & IPR_BLK_DEV_CLASS_4K)
+						new_block_size = IPR_JBOD_4K_BLOCK_SIZE;
+					else
+						new_block_size = IPR_JBOD_BLOCK_SIZE;
 					new_block_size = IPR_JBOD_BLOCK_SIZE;
 
 				dev_type = IPR_AF_DASD_DEVICE;
@@ -6378,10 +6381,17 @@ static int configure_af_device(i_container *i_con, int action_code)
 				if (action_code == IPR_REMOVE && !format_req(&ioa->dev[j]))
 					continue;
 
-				if (action_code == IPR_REMOVE)
-					new_block_size = IPR_JBOD_BLOCK_SIZE;
-				else
-					new_block_size = ioa->af_block_size;
+				if (action_code == IPR_REMOVE) {
+					if (ioa->support_4k && ioa->dev[j].block_dev_class & IPR_BLK_DEV_CLASS_4K)
+						new_block_size = IPR_JBOD_4K_BLOCK_SIZE;
+					else
+						new_block_size = IPR_JBOD_BLOCK_SIZE;
+				} else {
+					if (ioa->support_4k && ioa->dev[j].block_dev_class & IPR_BLK_DEV_CLASS_4K)
+						new_block_size = IPR_AF_4K_BLOCK_SIZE;
+					else
+						new_block_size = ioa->af_block_size;
+				}
 
 				dev_type = IPR_JBOD_DASD_DEVICE;
 
