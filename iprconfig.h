@@ -1735,6 +1735,18 @@ enum {
 	RC_78_Too_Few_Disks,
 	RC_79_Migrate_Prot_Success,
 	RC_80_Migrate_Prot_Fail,
+	RC_81_Suspended_Success,
+	RC_82_Suspended_Fail,
+	RC_83_Enclosure_Is_Suspend,
+	RC_84_Enclosure_Is_Active,
+	RC_85_Enclosure_Resume_Success,
+	RC_86_Enclosure_Resume_Fail,
+	RC_87_No_Suspend_Same_Seri_Num,
+	RC_88_Invalid_Dev_For_Suspend,
+	RC_89_Invalid_Dev_For_Resume,
+	RC_90_Enclosure_Is_Unknown,
+	RC_91_Mixed_Logical_Blk_Size,
+
 	/* NOTE:  127 maximum limit */
 };
 

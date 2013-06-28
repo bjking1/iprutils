@@ -3942,7 +3942,7 @@ int raid_start_complete()
 						 syslog(LOG_ERR, _("Start parity protect to %s failed.  "
 								  "non 4K disks and 4K disks can not be mixed in an array.\n"),
 						       ioa->ioa.gen_name);
-						rc = 91;
+						rc = RC_91_Mixed_Logical_Blk_Size;
 					} else {
 
 						syslog(LOG_ERR, _("Start parity protect to %s failed.  "
@@ -17039,7 +17039,7 @@ int ipr_suspend_disk_enclosure(i_container *i_con)
 				rc = ipr_suspend_device_bus(ses, &ses->res_addr[0],
 						    IPR_SDB_CHECK_AND_QUIESCE_ENC);
 				if (rc !=0 )
-					suspend_rc = 82;
+					suspend_rc = RC_82_Suspended_Fail;
 				else
 					rc = ipr_write_dev_attr(ses, "state", "offline\n");
 			}
@@ -17048,7 +17048,7 @@ int ipr_suspend_disk_enclosure(i_container *i_con)
 	if (suspend_rc != RC_SUCCESS)
 		return suspend_rc | EXIT_FLAG;
 
-	return  81 | EXIT_FLAG;
+	return  RC_81_Suspended_Success | EXIT_FLAG;
 }
 
 int ipr_resume_disk_enclosure(i_container *i_con)
@@ -17064,7 +17064,7 @@ int ipr_resume_disk_enclosure(i_container *i_con)
 			if (ses->is_resume_cand) {
 				rc = ipr_resume_device_bus(ses, &ses->res_addr[0]);
 				if (rc !=0 )
-					resume_rc = 86;
+					resume_rc = RC_86_Enclosure_Resume_Fail;
 				else
 					ipr_write_dev_attr(ses, "state", "running\n");
 			}
@@ -17073,7 +17073,7 @@ int ipr_resume_disk_enclosure(i_container *i_con)
 	if (resume_rc != RC_SUCCESS)
 		return resume_rc | EXIT_FLAG;
 
-	return  85 | EXIT_FLAG;
+	return  RC_85_Enclosure_Resume_Success | EXIT_FLAG;
 }
 
 /**
@@ -17190,28 +17190,28 @@ int enclosures_fork(i_container *i_con)
 
 		if (strcmp(input, "3") == 0) {
 				if (ses->scsi_dev_data && ses->scsi_dev_data->type == IPR_TYPE_ADAPTER && ses == &ses->ioa->ioa) 
-				return 89;
+				return RC_89_Invalid_Dev_For_Resume;
 
 			if (ses->active_suspend == IOA_DEV_PORT_UNKNOWN)	
-				return 90;
+				return RC_90_Enclosure_Is_Unknown;
 
 			if (ses->active_suspend == IOA_DEV_PORT_ACTIVE)	
-				return 84;
+				return RC_84_Enclosure_Is_Active;
 
 			ses->is_resume_cand = 1;
 			resume_flag = 1;
 		} else if (strcmp(input, "2") == 0) {
 				if (ses->scsi_dev_data && ses->scsi_dev_data->type == IPR_TYPE_ADAPTER && ses == &ses->ioa->ioa) 
-					return 88;
+					return RC_88_Invalid_Dev_For_Suspend;
 
 				if (ses->active_suspend == IOA_DEV_PORT_UNKNOWN)	
-					return 90;
+					return RC_90_Enclosure_Is_Unknown;
 
 				if (!strncmp((char *)&ses->serial_number, (char *)&ses->ioa->yl_serial_num[0], ESM_SERIAL_NUM_LEN))
-					return 87;
+					return RC_87_No_Suspend_Same_Seri_Num;
 
 				if (ses->active_suspend == IOA_DEV_PORT_SUSPEND)	
-					return 83;
+					return RC_83_Enclosure_Is_Suspend;
 
 				ses->is_suspend_cand = 1;
 				suspend_flag = 1;
