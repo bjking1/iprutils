@@ -68,6 +68,8 @@
 
 #define IPR_JBOD_BLOCK_SIZE                  512
 #define IPR_DEFAULT_AF_BLOCK_SIZE            522
+#define IPR_JBOD_4K_BLOCK_SIZE               4096
+#define IPR_AF_4K_BLOCK_SIZE                 4224
 #define IOCTL_BUFFER_SIZE                    512
 #define IPR_MAX_NUM_BUSES                    4
 #define IPR_VENDOR_ID_LEN                    8
@@ -218,6 +220,7 @@
 
 #define IPR_HDD                              0x0
 #define IPR_SSD                              0x1
+#define IPR_BLK_DEV_CLASS_4K                 0x4
 
 #define IPR_ARRAY_VIRTUAL_BUS			0x1
 #define IPR_VSET_VIRTUAL_BUS			0x2
@@ -1383,6 +1386,7 @@ struct ipr_ioa {
 	u8 sis64:1;
 #define IPR_SIS32		0x00
 #define IPR_SIS64		0x01
+	u8 support_4k:1;
 	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
@@ -1752,9 +1756,11 @@ struct ipr_inquiry_ioa_cap {
 	u8 gscsi_only_ha:1;
 	u8 reserved3:4;
 
-	u8 reserved4;
+	u8 reserved4:1;
+	u8 af_4k_support:1;
+	u8 reserved5:6;
 
-	u8 reserved5:3;
+	u8 reserved6:3;
 	u8 ra_id_encoding:3;
 	u8 sis_format:2;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
@@ -1769,11 +1775,13 @@ struct ipr_inquiry_ioa_cap {
 	u8 is_aux_cache:1;
 	u8 can_attach_to_aux_cache:1;
 
-	u8 reserved4;
+	u8 reserved4:6;
+	u8 af_4k_support:1;
+	u8 reserved5:1;
 
 	u8 sis_format:2;
 	u8 ra_id_encoding:3;
-	u8 reserved5:3;
+	u8 reserved6:3;
 #endif
 	u16 af_block_size;
 	u16 af_ext_cap;
@@ -2467,6 +2475,7 @@ int ipr_read_capacity(struct ipr_dev *, void *);
 int ipr_read_capacity_16(struct ipr_dev *, void *);
 int ipr_query_resource_state(struct ipr_dev *, void *);
 void ipr_allow_restart(struct ipr_dev *, int);
+int ipr_get_logical_block_size(struct ipr_dev *);
 void ipr_set_manage_start_stop(struct ipr_dev *);
 int ipr_start_stop_start(struct ipr_dev *);
 int ipr_start_stop_stop(struct ipr_dev *);

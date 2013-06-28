@@ -5763,6 +5763,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 			break;
 
 		ioa->af_block_size = get_af_block_size(&ioa_cap);
+		ioa->support_4k = ioa_cap.af_4k_support;
+
 		if (ioa_cap.is_aux_cache)
 			ioa->is_aux_cache = 1;
 		if (ioa_cap.can_attach_to_aux_cache && ioa_cap.is_dual_wide)
