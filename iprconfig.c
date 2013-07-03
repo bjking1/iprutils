@@ -6354,7 +6354,6 @@ static int configure_af_device(i_container *i_con, int action_code)
 						new_block_size = IPR_JBOD_4K_BLOCK_SIZE;
 					else
 						new_block_size = IPR_JBOD_BLOCK_SIZE;
-					new_block_size = IPR_JBOD_BLOCK_SIZE;
 
 				dev_type = IPR_AF_DASD_DEVICE;
 
@@ -13252,12 +13251,12 @@ static int format_for_raid(char **args, int num_args)
 			return -EINVAL;
 		}
 
-		if (!dev->ioa->support_4k && (ipr_get_logical_block_size(dev) == IPR_JBOD_4K_BLOCK_SIZE)) {
+		if (!dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K) {
 			fprintf(stderr, "Invalid device specified: %s. 4K disks not supprted on this adapter", args[i]);
 			return -EINVAL;
 		}
 
-		if (dev->ioa->support_4k && (ipr_get_logical_block_size(dev) == IPR_JBOD_4K_BLOCK_SIZE))
+		if (dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
 			blk_size = IPR_AF_4K_BLOCK_SIZE;
 		else
 			blk_size = dev->ioa->af_block_size;

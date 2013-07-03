@@ -6061,7 +6061,7 @@ int ipr_get_logical_block_size(struct ipr_dev *dev)
 	char path[SYSFS_PATH_MAX], *first_hyphen;
 	int rc;
 
-	first_hyphen = strrchr(dev->dev_name, 's');
+	first_hyphen = strchr(dev->dev_name, 's');
 	sprintf(path, "%s/%s/%s", "/sys/block",
 		first_hyphen, "queue/logical_block_size");
 
