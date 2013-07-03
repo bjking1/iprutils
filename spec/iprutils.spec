@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.14
+Version: 2.3.15
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,7 +81,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
-* Tue June 28 2013 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.15
+* Tue Jul 03 2013 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.15
 - Release 2.3.15
 - Add support for 4K bytes/sector disks in iprutils
 - Release 2.3.14
