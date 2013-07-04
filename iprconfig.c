@@ -12773,10 +12773,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			}
 		else { 
 			if (!res_path || !ioa->sis64) {
-				for (i = 0; i < 27-loc_len; i++)
+				for (i = 0; i < 26-loc_len; i++)
 					body[len+i] = ' ';
 
-				len += 27-loc_len;
+				len += 26-loc_len;
 			}
 
 			if (!vpd) {
@@ -12848,10 +12848,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 					len += 29-loc_len;
 				} else {
-					for (i = 0; i < 27-loc_len; i++)
+					for (i = 0; i < 26-loc_len; i++)
 						body[len+i] = ' ';
 
-					len += 27-loc_len;
+					len += 26-loc_len;
 				}
 			}
 		}
