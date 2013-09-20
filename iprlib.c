@@ -856,6 +856,16 @@ static const struct ioa_details *get_ioa_details(struct ipr_ioa *ioa)
 	return NULL;
 }
 
+bool ipr_is_af_blk_size(struct ipr_ioa *ioa, int blk_sz)
+{
+
+	if (blk_sz == ioa->af_block_size ||
+			(ioa->support_4k && blk_sz == IPR_AF_4K_BLOCK_SIZE))
+		return true;
+	else
+		return false;
+}
+
 /**
  * ipr_improper_device_type -
  * @dev:		ipr dev struct
@@ -872,10 +882,10 @@ int ipr_improper_device_type(struct ipr_dev *dev)
 	if (!dev->ioa->qac_data || !dev->ioa->qac_data->num_records)
 		return 0;
 	if (dev->scsi_dev_data->type == IPR_TYPE_AF_DISK && !dev->qac_entry &&
-	    ipr_get_blk_size(dev) == IPR_JBOD_BLOCK_SIZE)
+	    (ipr_get_blk_size(dev) == IPR_JBOD_BLOCK_SIZE ||
+			(dev->ioa->support_4k && ipr_get_blk_size(dev) == IPR_JBOD_4K_BLOCK_SIZE)))
 		return 1;
-	if (dev->scsi_dev_data->type == TYPE_DISK && dev->qac_entry &&
-	    ipr_get_blk_size(dev) == dev->ioa->af_block_size)
+	if (dev->scsi_dev_data->type == TYPE_DISK && dev->qac_entry && ipr_is_af_blk_size(dev->ioa, ipr_get_blk_size(dev)))
 		return 1;
 	return 0;
 }

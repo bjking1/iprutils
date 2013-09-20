@@ -1635,15 +1635,21 @@ static void verify_device(struct ipr_dev *dev)
 		    cmd_status.record->status == IPR_CMD_STATUS_SUCCESSFUL) {
 			if (ipr_get_blk_size(dev) == 512)
 				evaluate_device(dev, dev->ioa, IPR_JBOD_BLOCK_SIZE);
+			else if (dev->ioa->support_4k && ipr_get_blk_size(dev) == IPR_JBOD_4K_BLOCK_SIZE)
+				evaluate_device(dev, dev->ioa, IPR_JBOD_4K_BLOCK_SIZE);
 		}
 	} else if (dev->scsi_dev_data->type == TYPE_DISK) {
 		rc = ipr_test_unit_ready(dev, &sense_data);
-
 		if (!rc) {
 			if (ipr_get_blk_size(dev) == dev->ioa->af_block_size &&
 			    dev->ioa->qac_data->num_records != 0) {
 				enable_af(dev);
 				evaluate_device(dev, dev->ioa, dev->ioa->af_block_size);
+			}
+			else if (dev->ioa->support_4k && ipr_get_blk_size(dev) == IPR_AF_4K_BLOCK_SIZE &&
+			    dev->ioa->qac_data->num_records != 0) {
+				enable_af(dev);
+				evaluate_device(dev, dev->ioa, IPR_AF_4K_BLOCK_SIZE);
 			}
 		}
 	}
@@ -8541,20 +8547,20 @@ static int dev_init_complete(u8 num_devs)
 					rc = ipr_test_unit_ready(dev->dev, &sense_data);
 					if (rc) {
 						done_bad = 1;
-					} else if (dev->new_block_size != ioa->af_block_size) {
+					} else if (!ipr_is_af_blk_size(ioa, dev->new_block_size)) {
 						ipr_write_dev_attr(dev->dev, "rescan", "1");
 						ipr_init_dev(dev->dev);
 					}
 				}
 
 				if (dev->new_block_size != 0) {
-					if (dev->new_block_size == ioa->af_block_size)
+					if (ipr_is_af_blk_size(ioa, dev->new_block_size))
 						enable_af(dev->dev);
 
 					evaluate_device(dev->dev, ioa, dev->new_block_size);
 				}
 
-				if (dev->new_block_size == ioa->af_block_size || ipr_is_af_dasd_device(dev->dev))
+				if (ipr_is_af_blk_size(ioa, dev->new_block_size) || ipr_is_af_dasd_device(dev->dev))
 					ipr_add_zeroed_dev(dev->dev);
 			}
 
@@ -8613,7 +8619,6 @@ int send_dev_inits(i_container *i_con)
 	for_each_dev_to_init(cur_dev_init) {
 		if (cur_dev_init->do_init &&
 		    cur_dev_init->dev_type == IPR_AF_DASD_DEVICE) {
-
 			num_devs++;
 			ioa = cur_dev_init->ioa;
 
@@ -8683,7 +8688,6 @@ int send_dev_inits(i_container *i_con)
 			   cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE) {
 			num_devs++;
 			ioa = cur_dev_init->ioa;
-
 			scsi_dev_data = cur_dev_init->dev->scsi_dev_data;
 			if (!scsi_dev_data) {
 				cur_dev_init->do_init = 0;
@@ -8716,7 +8720,6 @@ int send_dev_inits(i_container *i_con)
 			mode_parm_hdr->block_desc_len = sizeof(struct ipr_block_desc);
 
 			block_desc = (struct ipr_block_desc *)(mode_parm_hdr + 1);
-
 			/* xxx Setup block size */
 			if (cur_dev_init->new_block_size == ioa->af_block_size) {
 				block_desc->block_length[0] = 0x00;
@@ -8734,7 +8737,7 @@ int send_dev_inits(i_container *i_con)
 			status = ipr_mode_select(cur_dev_init->dev,
 						 &ioctl_buffer, length);
 
-			if (status && cur_dev_init->new_block_size == ioa->af_block_size) {
+			if (status && ipr_is_af_blk_size(ioa, cur_dev_init->new_block_size)) {
 				cur_dev_init->do_init = 0;
 				num_devs--;
 				failure++;
@@ -13095,7 +13098,10 @@ static int raid_create_add_dev(char *name)
 			return -EINVAL;
 		if (!is_format_allowed(dev))
 			return -EIO;
-		add_format_device(dev, dev->ioa->af_block_size);
+		if (dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
+			add_format_device(dev, IPR_AF_4K_BLOCK_SIZE);
+		else
+			add_format_device(dev, dev->ioa->af_block_size);
 		dev_init_tail->do_init = 1;
 	}
 

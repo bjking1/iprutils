@@ -2477,6 +2477,7 @@ int ipr_read_capacity_16(struct ipr_dev *, void *);
 int ipr_query_resource_state(struct ipr_dev *, void *);
 void ipr_allow_restart(struct ipr_dev *, int);
 int ipr_get_logical_block_size(struct ipr_dev *);
+bool ipr_is_af_blk_size(struct ipr_ioa *, int);
 void ipr_set_manage_start_stop(struct ipr_dev *);
 int ipr_start_stop_start(struct ipr_dev *);
 int ipr_start_stop_stop(struct ipr_dev *);
