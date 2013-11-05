@@ -908,9 +908,6 @@ static int mode_sense(struct ipr_dev *dev, u8 page, void *buff,
 	u8 length = IPR_MODE_SENSE_LENGTH; /* xxx FIXME? */
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
 	if (strlen(name) == 0)
 		return -ENOENT;
 
@@ -2748,9 +2745,6 @@ int ipr_query_command_status(struct ipr_dev *dev, void *buff)
 	int length = sizeof(struct ipr_cmd_status);
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
 	if (strlen(name) == 0)
 		return -ENOENT;
 
@@ -2793,9 +2787,6 @@ int ipr_query_resource_state(struct ipr_dev *dev, void *buff)
 	struct sense_data_t sense_data;
 	int length = sizeof(struct ipr_query_res_state);
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -2870,9 +2861,6 @@ int ipr_log_sense(struct ipr_dev *dev, u8 page, void *buff, u16 length)
 	char *name = dev->gen_name;
 
 	memset(&sense_data, 0, sizeof(sense_data));
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -2968,9 +2956,6 @@ int ipr_mode_select(struct ipr_dev *dev, void *buff, int length)
 	struct sense_data_t sense_data;
 	int rc;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -3148,9 +3133,6 @@ int ipr_read_capacity(struct ipr_dev *dev, void *buff)
 	int length = sizeof(struct ipr_read_cap);
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
 	if (strlen(name) == 0)
 		return -ENOENT;
 
@@ -3191,9 +3173,6 @@ int ipr_read_capacity_16(struct ipr_dev *dev, void *buff)
 	struct sense_data_t sense_data;
 	int length = sizeof(struct ipr_read_cap16);
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -3291,9 +3270,6 @@ static int ipr_start_stop(struct ipr_dev *dev, u8 start, char *cmd)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -3431,9 +3407,6 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 	int length = 0, allow_restart = 0;
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
 	if (strlen(name) == 0)
 		return -ENOENT;
 
@@ -3486,6 +3459,24 @@ int ipr_test_unit_ready(struct ipr_dev *dev,
 	return rc;
 }
 
+static struct ipr_dev *find_multipath_jbod(struct ipr_dev *dev)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *multipath_dev;
+
+	for_each_sas_ioa(ioa) {
+		if (ioa == dev->ioa)
+			continue;
+
+		for_each_dev(ioa, multipath_dev) {
+			if (dev->scsi_dev_data->device_id == multipath_dev->scsi_dev_data->device_id)
+				return multipath_dev;
+			}
+	}
+
+	return NULL;
+}
+
 /**
  * ipr_format_unit - 
  * @dev:		ipr dev struct
@@ -3501,9 +3492,24 @@ int ipr_format_unit(struct ipr_dev *dev)
 	u8 *defect_list_hdr;
 	int length = IPR_DEFECT_LIST_HDR_LEN;
 	char *name = dev->gen_name;
+	char cmnd[1000];
+	struct ipr_dev *multipath_dev;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
+	if (strlen(dev->dev_name) && dev->scsi_dev_data->device_id) {
+		sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" &> /dev/null", strrchr(dev->dev_name, '/') + 1);
+		system(cmnd);
+		sprintf(cmnd, "/bin/rm -rf %s %s%s", dev->dev_name, dev->dev_name, "[0-9]*");
+		system(cmnd);
+
+		multipath_dev = find_multipath_jbod(dev);
+		if (multipath_dev) {
+			sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" &> /dev/null", strrchr(multipath_dev->dev_name, '/') + 1);
+			system(cmnd);
+			sprintf(cmnd, "/bin/rm -rf %s %s%s", multipath_dev->dev_name, multipath_dev->dev_name , "[0-9]*");
+			system(cmnd);
+		}
+		system("/sbin/multipath -F &> /dev/null");
+	}
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -3535,6 +3541,7 @@ int ipr_format_unit(struct ipr_dev *dev)
 		scsi_cmd_err(dev, &sense_data, "Format Unit", rc);
 
 	close(fd);
+
 	return rc;
 }
 
@@ -3554,9 +3561,6 @@ int ipr_evaluate_device(struct ipr_dev *dev, u32 res_handle)
 	u32 resource_handle;
 	int length = 0;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -3659,9 +3663,6 @@ int ipr_inquiry(struct ipr_dev *dev, u8 page, void *buff, u8 length)
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -4671,9 +4672,6 @@ int ipr_receive_diagnostics(struct ipr_dev *dev,
 	int rc;
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
 	if (strlen(name) == 0)
 		return -ENOENT;
 
@@ -4719,9 +4717,6 @@ int ipr_send_diagnostics(struct ipr_dev *dev, void *buff, int length)
 	struct sense_data_t sense_data;
 	int rc;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	if (strlen(name) == 0)
 		return -ENOENT;
@@ -5440,6 +5435,10 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "resource_path");
 		if (sysfs_attr)
 			ipr_strncpy_0n(scsi_dev_data->res_path, sysfs_attr->value, IPR_MAX_RES_PATH_LEN);
+
+		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "device_id");
+		if (sysfs_attr)
+			sscanf(sysfs_attr->value, "%lX", &scsi_dev_data->device_id);
 
 		strcpy(scsi_dev_data->dev_name,"");
 		strcpy(scsi_dev_data->gen_name,"");
@@ -6866,9 +6865,6 @@ static int ipr_set_dasd_timeouts(struct ipr_dev *dev, int format_timeout)
 	struct ipr_disk_attr attr;
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
-
 	fd = open(name, O_RDWR);
 
 	if (fd <= 1) {
@@ -7213,9 +7209,6 @@ int ipr_query_dasd_timeouts(struct ipr_dev *dev,
 	u8 cdb[IPR_CCB_CDB_LEN];
 	struct sense_data_t sense_data;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	fd = open(name, O_RDWR);
 
@@ -8576,9 +8569,6 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 	struct sense_data_t sense_data;
 	int rc;
 	char *name = dev->gen_name;
-
-	if (strlen(dev->dev_name))
-		name = dev->dev_name;
 
 	fd = open(name, O_RDWR);
 	if (fd <= 1) {

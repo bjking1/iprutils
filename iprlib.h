@@ -1216,6 +1216,7 @@ struct scsi_dev_data {
 	char gen_name[64];
 #define IPR_MAX_RES_PATH_LEN		24
 	char res_path[IPR_MAX_RES_PATH_LEN];
+	u64 device_id;
 };
 
 struct ipr_path_entry {
