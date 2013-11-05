@@ -7817,12 +7817,19 @@ static int dev_is_dup64(struct ipr_dev *first, struct ipr_dev *second)
 {
 	struct ipr_res_path *first_rp;
 	struct ipr_res_path *second_rp;
+	struct ipr_res_path no_exist_rp;
 
 	if (first->ioa != second->ioa)
 		return 0;
 
+	memset(&no_exist_rp, 0xff, sizeof(struct ipr_res_path));
+
 	for_each_rp(first_rp, first) {
 		for_each_rp(second_rp, second) {
+			if (!memcmp(first_rp, &no_exist_rp, sizeof(*first_rp))
+			|| !memcmp(second_rp, &no_exist_rp, sizeof(*second_rp)))
+				continue;
+
 			if (!memcmp(first_rp, second_rp, sizeof(*first_rp)))
 				return 1;
 		}
