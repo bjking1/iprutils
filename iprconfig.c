@@ -1109,9 +1109,9 @@ static char *status_hdr[] = {
 		/*   .        .                  .            .                           .          */
 		/*012345678901234567890123456789012345678901234567890123456789012345678901234567890 */
 		"OPT Name   Resource Path/Address      Vendor   Product ID       Status",
-		"OPT Name   PCI/SCSI Location         Description               Status",
+		"OPT Name   PCI/SCSI Location          Description               Status",
 		"Name   Resource Path/Address      Vendor   Product ID       Status",
-		"Name   PCI/SCSI Location         Description               Status",
+		"Name   PCI/SCSI Location          Description               Status",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
@@ -1126,9 +1126,9 @@ static char *status_hdr[] = {
 
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ---------------- -----------------",
-		"--- ------ ------------------------- ------------------------- -----------------",
+		"--- ------ -------------------------  ------------------------- -----------------",
 		"------ -------------------------- -------- ---------------- -----------------",
-		"------ ------------------------- ------------------------- -----------------",
+		"------ -------------------------  ------------------------- -----------------",
 		"--- --------------------- ------------------ ------ ----------------- ----------",
 		"--- ---------------------- ------------------ ------ ----------------- ----------",
 		"---------------------- ------------------ ------ ----------------- ----------",
@@ -12779,10 +12779,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 			}
 		else { 
 			if (!res_path || !ioa->sis64) {
-				for (i = 0; i < 26-loc_len; i++)
+				for (i = 0; i < 27-loc_len; i++)
 					body[len+i] = ' ';
 
-				len += 26-loc_len;
+				len += 27-loc_len;
 			}
 
 			if (!vpd) {
@@ -12854,10 +12854,10 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 					len += 29-loc_len;
 				} else {
-					for (i = 0; i < 26-loc_len; i++)
+					for (i = 0; i < 27-loc_len; i++)
 						body[len+i] = ' ';
 
-					len += 26-loc_len;
+					len += 27-loc_len;
 				}
 			}
 		}
