@@ -19,7 +19,7 @@
 
 #include <sys/mman.h>
 
-#define IPRDUMP_SIZE (32 * 1024 * 1024)
+#define IPRDUMP_SIZE (80 * 1024 * 1024)
 #define MAX_DUMP_FILES 4
 #define TOOL_NAME "iprdump"
 #define DUMP_PREFIX TOOL_NAME"."
