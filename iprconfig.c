@@ -2191,8 +2191,15 @@ static char *vset_array_details(char *body, struct ipr_dev *dev)
 		body = add_line_to_body(body, _("Capacity"), buffer);
 	}
 
-	if (ipr_is_volume_set(dev))
+	if (ipr_is_volume_set(dev)) {
 		body = add_line_to_body(body, _("Resource Name"), dev->dev_name);
+
+		if (dev->ioa->sis64 && dev->array_rcd->type3.desc[0] != ' ') {
+			ipr_strncpy_0(buffer, (char *)dev->array_rcd->type3.desc,
+				      sizeof (dev->array_rcd->type3.desc));
+			body = add_line_to_body(body,_("Label"), buffer);
+		}
+	}
 
 	ipr_strncpy_0(buffer, (char *)dev->serial_number, IPR_SERIAL_NUM_LEN);
 	body = add_line_to_body(body,_("Serial Number"), buffer);
@@ -13298,8 +13305,9 @@ static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
 	int hdd_count = 0, ssd_count = 0, non_4k_count = 0, is_4k_count = 0;
-	int next_raid_level, next_stripe_size, next_qdepth;
+	int next_raid_level, next_stripe_size, next_qdepth, next_label;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
+	char label[8];
 	int stripe_size, qdepth, zeroed_devs;
 	struct ipr_dev *dev;
 	struct sysfs_dev *sdev;
@@ -13307,9 +13315,11 @@ static int raid_create(char **args, int num_args)
 	struct ipr_array_cap_entry *cap;
 	u8 array_id;
 
+	label[0] = '\0';
 	next_raid_level = 0;
 	next_stripe_size = 0;
 	next_qdepth = 0;
+	next_label = 0;
 	stripe_size = 0;
 	qdepth = 0;
 	zeroed_devs = 0;
@@ -13323,6 +13333,8 @@ static int raid_create(char **args, int num_args)
 			next_stripe_size = 1;
 		else if (strcmp(args[i], "-q") == 0)
 			next_qdepth = 1;
+		else if (strcmp(args[i], "-l") == 0)
+			next_label = 1;
 		else if (next_raid_level) {
 			next_raid_level = 0;
 			raid_level = args[i];
@@ -13332,6 +13344,15 @@ static int raid_create(char **args, int num_args)
 		} else if (next_qdepth) {
 			next_qdepth = 0;
 			qdepth = strtoul(args[i], NULL, 10);
+		} else if (next_label) {
+			next_label = 0;
+			if (strlen(args[i]) > (sizeof(label) - 1)) {
+				syslog(LOG_ERR, _("RAID array label too long. Maximum length is %d characters\n"),
+				       (int)(sizeof(label) - 1));
+				return -EINVAL;
+			}
+
+			strcpy(label, args[i]);
 		} else if ((dev = find_dev(args[i]))) {
 			num_devs++;
 			if (zeroed_devs)
@@ -13432,9 +13453,11 @@ static int raid_create(char **args, int num_args)
 		dev->dev_rcd->issue_cmd = 1;
 	}
 
-	if (ioa->sis64)
+	if (ioa->sis64) {
 		array_id = ioa->start_array_qac_entry->type3.array_id;
-	else
+		if (strlen(label))
+			strcpy((char *)ioa->start_array_qac_entry->type3.desc, label);
+	} else
 		array_id = ioa->start_array_qac_entry->type2.array_id;
 
 	add_raid_cmd_tail(ioa, &ioa->ioa, array_id);
@@ -16833,6 +16856,35 @@ static int set_array_asymmetric_access(char **args, int num_args)
 }
 
 /**
+ * query_array_label - Display the device name for the specified label
+ * @args:	       argument vector
+ * @num_args:	       number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_array_label(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset;
+
+	for_each_ioa(ioa) {
+		if (!ioa->sis64)
+			continue;
+
+		for_each_vset(ioa, vset) {
+			if (!strcmp((char *)vset->array_rcd->type3.desc, args[0])) {
+				fprintf(stdout, "%s\n", vset->dev_name);
+				return 0;
+			}
+		}
+	}
+
+	return -ENODEV;
+}
+
+
+/**
  * query_ioa_caching - Show whether or not user requested caching mode is set
  * 		       to default or disabled.
  * @args:	       argument vector
@@ -17506,6 +17558,7 @@ static const struct {
 	{ "query-path-status",			0, 0, 1, query_path_status, "sg5" },
 	{ "query-path-details",			1, 0, 1, query_path_details, "sda" },
 	{ "query-ioa-caching",			1, 0, 1, query_ioa_caching, "sg5" },
+	{ "query-array-label",			1, 0, 1, query_array_label, "mylabel" },
 	{ "set-ioa-caching",			2, 0, 2, set_ioa_caching, "sg5 [Default | Disabled]" },
 	{ "primary",				1, 0, 1, set_primary, "sg5" },
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
