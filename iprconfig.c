@@ -3854,6 +3854,8 @@ int confirm_raid_start(i_container *i_con)
 		rc = ipr_start_array_protection(ioa,
 						cur_raid_cmd->stripe_size,
 						cur_raid_cmd->prot_level);
+		if (rc) 
+			return RC_19_Create_Fail;
 	}
 
 	rc = raid_start_complete();
@@ -13304,7 +13306,7 @@ static int format_for_raid(char **args, int num_args)
 static int raid_create(char **args, int num_args)
 {
 	int i, num_devs = 0, rc;
-	int hdd_count = 0, ssd_count = 0, non_4k_count = 0, is_4k_count = 0;
+	int non_4k_count = 0, is_4k_count = 0;
 	int next_raid_level, next_stripe_size, next_qdepth, next_label;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
 	char label[8];
@@ -13376,20 +13378,10 @@ static int raid_create(char **args, int num_args)
 			return -EINVAL;
 		}
 
-		if (dev->block_dev_class & IPR_SSD)
-			ssd_count++;
-		else
-			hdd_count++;
-
 		if (dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
 			is_4k_count++;
 		else
 			non_4k_count++;
-	}
-
-	if (hdd_count > 0 && ssd_count > 0) {
-		syslog(LOG_ERR, _("SSDs and HDDs can not be mixed in an array.\n"));
-		return -EINVAL;
 	}
 
 	if (is_4k_count > 0 && non_4k_count > 0) {
