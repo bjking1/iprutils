@@ -8941,6 +8941,8 @@ static void init_ioa_dev(struct ipr_dev *dev)
 		return;
 	if (ipr_get_ioa_attr(dev->ioa, &attr))
 		return;
+	if (dev->ioa->asymmetric_access && dev->ioa->sis64)
+		attr.active_active = 1;
 	ipr_modify_ioa_attr(dev->ioa, &attr);
 	if (ipr_set_ioa_attr(dev->ioa, &attr, 0))
 		return;
