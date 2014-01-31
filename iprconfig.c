@@ -13411,7 +13411,7 @@ static int raid_create(char **args, int num_args)
 		return rc;
 
 	if (!stripe_size)
-		stripe_size = cap->recommended_stripe_size;
+		stripe_size = ntohs(cap->recommended_stripe_size);
 
 	if (!qdepth) {
 		if (ioa->sis64)
@@ -13443,6 +13443,11 @@ static int raid_create(char **args, int num_args)
 		}
 
 		dev->dev_rcd->issue_cmd = 1;
+	}
+
+	if (!ioa->start_array_qac_entry) {
+		scsi_err(dev, "Invalid device type\n");
+		return -EIO;
 	}
 
 	if (ioa->sis64) {
@@ -17643,6 +17648,24 @@ static int non_interactive_cmd(char *cmd, char **args, int num_args)
 	return -EINVAL;
 }
 
+int check_sg_module()
+{
+	struct sysfs_attribute *sysfs_attr;
+	char path[SYSFS_PATH_MAX];
+
+	sprintf(path, "%s", "/sys/module/sg");
+
+	sysfs_attr = sysfs_open_attribute(path);
+	if (!sysfs_attr) {
+		syslog_dbg("Failed to open sg parameter.\n");
+		return -1;
+	}
+
+	sysfs_close_attribute(sysfs_attr);
+
+	return 0;
+}
+
 /**
  * main - program entry point
  * @argc:		number of arguments
@@ -17706,7 +17729,8 @@ int main(int argc, char *argv[])
 	strcpy(log_root_dir, parm_dir);
 	strcpy(editor, parm_editor);
 
-	system("modprobe sg");
+	if (check_sg_module() == -1)
+		system("modprobe sg");
 	exit_func = tool_exit_func;
 	tool_init(0);
 
