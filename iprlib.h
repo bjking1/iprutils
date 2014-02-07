@@ -16,6 +16,7 @@
  */
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -42,7 +43,6 @@
 #include <pci/pci.h>
 #include <stdbool.h>
 #include <netinet/in.h>
-#include <sysfs/libsysfs.h>
 #include <asm/byteorder.h>
 #include <sys/mman.h>
 #include <paths.h>
@@ -265,7 +265,7 @@ extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
 
 struct sysfs_dev {
-	char sysfs_device_name[SYSFS_NAME_LEN];
+	char sysfs_device_name[PATH_MAX];
 	struct sysfs_dev *next, *prev;
 };
 
@@ -1212,7 +1212,7 @@ struct scsi_dev_data {
 	u32 handle;
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
-	char sysfs_device_name[SYSFS_NAME_LEN];
+	char sysfs_device_name[PATH_MAX];
 	char dev_name[64];
 	char gen_name[64];
 #define IPR_MAX_RES_PATH_LEN		24
@@ -2523,7 +2523,9 @@ void ipr_convert_res_path_to_bytes(struct ipr_dev *);
 void ipr_format_res_path(u8 *, char *, int);
 void ipr_reset_adapter(struct ipr_ioa *);
 void ipr_scan(struct ipr_ioa *, int, int, int);
-int ipr_read_dev_attr(struct ipr_dev *, char *, char *);
+int ipr_read_host_attr(struct ipr_ioa *, char *, void *, size_t);
+int ipr_write_host_attr(struct ipr_ioa *, char *, void *, size_t);
+int ipr_read_dev_attr(struct ipr_dev *, char *, char *, size_t);
 int ipr_write_dev_attr(struct ipr_dev *, char *, char *);
 int ipr_suspend_device_bus(struct ipr_dev *, struct ipr_res_addr *, u8);
 int ipr_resume_device_bus(struct ipr_dev *, struct ipr_res_addr *);

@@ -7097,9 +7097,6 @@ static void wait_for_new_dev_64bit(struct ipr_ioa *ioa, struct ipr_res_path *res
 	struct ipr_dev *dev;
 	struct ipr_res_path_aliases aliases;
 	struct ipr_res_path *rp;
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	char *buf = "0 - -";
 
 	ipr_query_res_path_aliases(ioa, res_path, &aliases);
 	if (aliases.length < (4 + 2 * sizeof(struct ipr_res_path))) {
@@ -7107,10 +7104,7 @@ static void wait_for_new_dev_64bit(struct ipr_ioa *ioa, struct ipr_res_path *res
 		memcpy(&aliases.res_path[0], res_path, 2 * sizeof(struct ipr_res_path));
 	}
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "scan");
-	sysfs_write_attribute(attr, buf, strlen(buf));
-	sysfs_close_class_device(class_device);
+	ipr_scan(ioa, 0, -1, -1);
 
 	while (time--) {
 		check_current_config(false);
@@ -7155,7 +7149,8 @@ int remove_or_add_back_device_64bit(struct ipr_dev *dev)
 	res_path_len  = strlen(dev->res_path_name);
 	dev_slot = strtoul(dev->res_path_name + (res_path_len - 2), NULL, 16);
 
-	if (!ipr_read_dev_attr(dev, "resource_path", new_sysfs_res_path))
+	if (!ipr_read_dev_attr(dev, "resource_path",
+			       new_sysfs_res_path, IPR_MAX_RES_PATH_LEN))
 		if (strncmp(dev->res_path_name, new_sysfs_res_path, sizeof(dev->res_path_name)))
 			for_each_dev(dev->ioa, tmp_dev)
 				if (!strncmp(tmp_dev->res_path_name, new_sysfs_res_path, sizeof(tmp_dev->res_path_name))) {
@@ -8494,7 +8489,8 @@ static int dev_init_complete(u8 num_devs)
 			if (!dev->do_init || dev->done)
 				continue;
 
-			if (ipr_read_dev_attr(dev->dev, "type", dev_type)) {
+			if (ipr_read_dev_attr(dev->dev, "type",
+					      dev_type, 100)) {
 				dev->done = 1;
 				continue;
 			}
@@ -10421,23 +10417,13 @@ int driver_config(i_container *i_con)
  **/
 int get_log_level(struct ipr_ioa *ioa)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
+	char value_str[100];
 	int value;
 
-	class_device = sysfs_open_class_device("scsi_host",
-					       ioa->host_name);
-	if (!class_device)
+	if (ipr_read_host_attr(ioa, "log_level", value_str, 100) < 0)
 		return 0;
 
-	attr = sysfs_get_classdev_attr(class_device,
-				       "log_level");
-	if (!attr)
-		return 0;
-
-	sscanf(attr->value, "%d", &value);
-	sysfs_close_class_device(class_device);
-
+	sscanf(value_str, "%d", &value);
 	return value;
 }
 
@@ -10451,21 +10437,8 @@ int get_log_level(struct ipr_ioa *ioa)
  **/
 void set_log_level(struct ipr_ioa *ioa, char *log_level)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-
-	class_device = sysfs_open_class_device("scsi_host",
-					       ioa->host_name);
-	if (!class_device)
-		return;
-
-	attr = sysfs_get_classdev_attr(class_device,
-				       "log_level");
-	if (!attr)
-		return;
-
-	sysfs_write_attribute(attr, log_level, 2);
-	sysfs_close_class_device(class_device);
+	ipr_write_host_attr(ioa, "log_level", log_level,
+			    strlen(log_level));
 }
 
 /**
@@ -14238,9 +14211,11 @@ static struct ipr_dev *find_slot(struct ipr_dev **devs, int num_devs, char *slot
 {
 	int i;
 
-	for (i = 0; i < num_devs; i++)
+	for (i = 0; i < num_devs; i++) {
+		syslog_dbg("Looking for slot %s at pos %d\n", slot, i);
 		if (!strncmp(devs[i]->physical_location, slot, strlen(slot)))
 			return devs[i];
+	}
 
 	return NULL;
 }
@@ -16440,6 +16415,8 @@ static int show_ioas(char **args, int num_args)
 
 	if (num_ioas)
 		printf("%s\n%s\n", status_hdr[2], status_sep[2]);
+	else
+		printf("No IOAs found\n");
 	for_each_ioa(ioa)
 		printf_device(&ioa->ioa, 2);
 
@@ -17652,18 +17629,19 @@ static int non_interactive_cmd(char *cmd, char **args, int num_args)
 
 int check_sg_module()
 {
-	struct sysfs_attribute *sysfs_attr;
-	char path[SYSFS_PATH_MAX];
+	DIR *sg_dirfd;
+	char devpath[PATH_MAX];
 
-	sprintf(path, "%s", "/sys/module/sg");
+	sprintf(devpath, "%s", "/sys/module/sg");
 
-	sysfs_attr = sysfs_open_attribute(path);
-	if (!sysfs_attr) {
-		syslog_dbg("Failed to open sg parameter.\n");
+	sg_dirfd = opendir(devpath);
+	
+	if (!sg_dirfd) {
+		exit_on_error("Failed to open sg parameter.\n");
 		return -1;
 	}
 
-	sysfs_close_attribute(sysfs_attr);
+	closedir(sg_dirfd);
 
 	return 0;
 }

@@ -16,22 +16,22 @@ TAR = cd .. && tar -zcpf iprutils-$(UTILS_VER)-src.tgz --exclude CVS --exclude a
 all: iprconfig iprupdate iprdump iprinit iprdbg docs 
 
 iprconfig: iprconfig.c iprlib.o iprconfig.h
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprconfig iprconfig.c iprlib.o -lform -lpanel -lncurses -lmenu
 
 iprupdate: iprupdate.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprupdate iprlib.o iprupdate.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprupdate iprlib.o iprupdate.c
 
 iprdump:iprdump.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdump iprlib.o iprdump.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdump iprlib.o iprdump.c
 
 iprinit:iprinit.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprinit iprlib.o iprinit.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprinit iprlib.o iprinit.c
 
 iprdbg:iprdbg.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprdbg iprlib.o iprdbg.c
 
 iprucode:iprucode.c iprlib.o
-	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprucode iprlib.o iprucode.c -lsysfs
+	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprucode iprlib.o iprucode.c
 
 iprlib.o: iprlib.c iprlib.h
 	$(CC) $(CFLAGS) $(INCLUDEDIR) -o iprlib.o -c iprlib.c
