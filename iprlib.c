@@ -509,6 +509,46 @@ struct ipr_dev *get_array_from_vset(struct ipr_ioa *ioa, struct ipr_dev *vset)
 	return vset;
 }
 
+static ssize_t sysfs_read_attr(const char *devpath, const char *attr,
+			       void *value, size_t len)
+{
+	char attrpath[256];
+	ssize_t ret;
+	int fd;
+
+	sprintf(attrpath, "%s/%s", devpath, attr);
+	fd = open(attrpath, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = read(fd, value, len);
+	close(fd);
+	if (ret < 0)
+		return -1;
+
+	return ret;
+}
+
+static ssize_t sysfs_write_attr(const char *devpath, const char *attr,
+				void *value, size_t len)
+{
+	char attrpath[256];
+	ssize_t ret;
+	int fd;
+
+	sprintf(attrpath, "%s/%s", devpath, attr);
+	fd = open(attrpath, O_WRONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = write(fd, value, len);
+	close(fd);
+	if (ret < 0)
+		return -1;
+
+	return ret;
+}
+
 /**
  * ipr_find_sysfs_dev - 
  * @dev:		ipr dev struct
@@ -767,16 +807,18 @@ void ipr_cleanup_zeroed_devs()
  **/
 int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
 	const struct ses_table_entry *ste = get_ses_entry(ioa, bus);
 	u32 fw_version;
 	int max_xfer_rate = IPR_MAX_XFER_RATE;
+	char devpath[PATH_MAX];
+	char value[16];
+	ssize_t len;
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "fw_version");
-	sscanf(attr->value, "%8X", &fw_version);
-	sysfs_close_class_device(class_device);
+	sprintf(devpath, "/sys/class/scsi_host/host%s", ioa->host_name);
+	len = sysfs_read_attr(devpath, "fw_version", value, 16);
+	if (len < 0)
+		return -1;
+	sscanf(value, "%8X", &fw_version);
 
 	if (ipr_force)
 		return IPR_MAX_XFER_RATE;
@@ -1239,28 +1281,17 @@ struct ipr_dev *find_dev(char *name)
  **/
 static int ipr_uevents_supported()
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
 	struct ipr_ioa *ioa = ipr_ioa_head;
+	char devpath[PATH_MAX];
+	char value[16];
+	ssize_t len;
 
 	if (!ioa)
 		return 0;
 
-	class_device = sysfs_open_class_device("scsi_host",
-					       ioa->host_name);
-
-	if (!class_device) {
-		ioa_dbg(ioa, "Failed to open scsi_host device. %m\n");
-		return 0;
-	}
-
-	attr = sysfs_get_classdev_attr(class_device,
-				       "uevent");
-	if (!attr)
-		ioa_dbg(ioa, "Failed to get uevent attribute. %m\n");
-
-	sysfs_close_class_device(class_device);
-	return attr ? 1 : 0;
+	sprintf(devpath, "/sys/class/scsi_host/host%s", ioa->host_name);
+	len = sysfs_read_attr(devpath, "uevent", value, 16);
+	return len > 0;
 }
 
 #define NETLINK_KOBJECT_UEVENT        15
@@ -1421,14 +1452,13 @@ int parse_option(char *opt)
  * Returns:
  *    pci attribute value if success / 0 on failure
  **/
-static int get_pci_attr(struct sysfs_device *sysfs_pci_device,
-			char *attr)
+static int get_pci_attr(char *devpath, char *attr)
 {
 	int temp, fd, len;
-	char path[SYSFS_PATH_MAX];
+	char path[PATH_MAX];
 	char data[200];
 
-	sprintf(path, "%s/%s", sysfs_pci_device->path, attr);
+	sprintf(path, "%s/%s", devpath, attr);
 
 	if ((fd = open(path, O_RDONLY)) < 0) {
 		syslog_dbg("Failed to open %s\n", path);
@@ -1455,13 +1485,12 @@ static int get_pci_attr(struct sysfs_device *sysfs_pci_device,
  * Returns:
  *   nothing
  **/
-static void get_pci_attrs(struct ipr_ioa *ioa,
-			  struct sysfs_device *sysfs_pci_device)
+static void get_pci_attrs(struct ipr_ioa *ioa, char *pci_path)
 {
-	ioa->subsystem_vendor = get_pci_attr(sysfs_pci_device, "subsystem_vendor");
-	ioa->subsystem_device = get_pci_attr(sysfs_pci_device, "subsystem_device");
-	ioa->pci_vendor = get_pci_attr(sysfs_pci_device, "vendor");
-	ioa->pci_device = get_pci_attr(sysfs_pci_device, "device");
+	ioa->subsystem_vendor = get_pci_attr(pci_path, "subsystem_vendor");
+	ioa->subsystem_device = get_pci_attr(pci_path, "subsystem_device");
+	ioa->pci_vendor = get_pci_attr(pci_path, "vendor");
+	ioa->pci_device = get_pci_attr(pci_path, "device");
 }
 
 static struct ipr_ioa *old_ioa_head;
@@ -1760,9 +1789,9 @@ static void resolve_old_config()
 }
 
 struct ipr_pci_slot {
-	char slot_name[SYSFS_PATH_MAX];
-	char physical_name[SYSFS_PATH_MAX];
-	char pci_device[SYSFS_PATH_MAX];
+	char slot_name[PATH_MAX];
+	char physical_name[PATH_MAX];
+	char pci_device[PATH_MAX];
 };
 
 static struct ipr_pci_slot *pci_slot;
@@ -1831,7 +1860,7 @@ static int read_attr_file(char *path, char *out, int size)
 static int ipr_add_slot_location(char *path, char *name)
 {
 	struct ipr_pci_slot *slot;
-	char fpath[SYSFS_PATH_MAX];
+	char fpath[PATH_MAX];
 	int rc;
 
 	sprintf(fpath, "%s%s/phy_location", path, name);
@@ -1864,7 +1893,7 @@ static int ipr_add_slot_location(char *path, char *name)
 static int ipr_add_slot_address(char *path, char *name)
 {
 	struct ipr_pci_slot *slot;
-	char fpath[SYSFS_PATH_MAX];
+	char fpath[PATH_MAX];
 	int rc;
 
 	sprintf(fpath, "%s%s/address", path, name);
@@ -1897,8 +1926,8 @@ static int ipr_add_slot_address(char *path, char *name)
  **/
 static void ipr_get_pci_slots()
 {
-	char rootslot[SYSFS_PATH_MAX], slot[SYSFS_PATH_MAX];
-	char slotpath[SYSFS_PATH_MAX], attr[SYSFS_PATH_MAX];
+	char rootslot[PATH_MAX], slot[PATH_MAX];
+	char slotpath[PATH_MAX], attr[PATH_MAX];
 	char devspec[PATH_MAX], locpath[PATH_MAX];
 	char loc_code[1024], *last_hyphen, *prev_hyphen;
 	int num_slots, i, j, rc, num_attrs;
@@ -1906,16 +1935,11 @@ static void ipr_get_pci_slots()
 	struct dirent **slotdir, **dirent;
 	struct stat statbuf;
 	struct ipr_ioa *ioa;
-	struct sysfs_bus *sysfs_bus = sysfs_open_bus("pci");
 
-	if (!sysfs_bus)
-		return;
-
-	sprintf(rootslot, "%s/slots/", sysfs_bus->path);
+	sprintf(rootslot, "/sys/bus/pci/slots/");
 
 	num_slots = scandir(rootslot, &slotdir, NULL, alphasort);
 	if (num_slots <= 0) {
-		sysfs_close_bus(sysfs_bus);
 		return;
 	}
 
@@ -1950,8 +1974,8 @@ static void ipr_get_pci_slots()
 		if (!pci_slot[i].pci_device)
 			continue;
 
-		sprintf(slotpath, "%s/"SYSFS_DEVICES_NAME"/%s/",
-			sysfs_bus->path, pci_slot[i].slot_name);
+		sprintf(slotpath, "/sys/bus/pci/devices/%s/",
+			pci_slot[i].slot_name);
 
 		num_attrs = scandir(slotpath, &slotdir, NULL, alphasort);
 		if (num_attrs <= 0)
@@ -1990,8 +2014,8 @@ static void ipr_get_pci_slots()
 			break;
 		}
 		if (!slot_found) {
-			sprintf(attr, "%s/"SYSFS_DEVICES_NAME"/%s/devspec",
-				sysfs_bus->path, ioa->pci_address);
+			sprintf(attr, "/sys/bus/pci/devices/%s/devspec",
+				ioa->pci_address);
 			rc = read_attr_file(attr, devspec, PATH_MAX);
 
 			if (rc)
@@ -2017,7 +2041,6 @@ static void ipr_get_pci_slots()
 		}
 	}
 
-	sysfs_close_bus(sysfs_bus);
 	free(pci_slot);
 	pci_slot = NULL;
 	num_pci_slots = 0;
@@ -2034,114 +2057,103 @@ void tool_init(int save_state)
 {
 	int temp, fw_type;
 	struct ipr_ioa *ipr_ioa;
-	struct sysfs_driver *sysfs_ipr_driver;
-	struct dlist *ipr_devs;
-	char *pci_address, buf[100];
-
-	struct sysfs_class *sysfs_host_class;
-	struct sysfs_class *sysfs_device_class;
-	struct dlist *class_devices;
-	struct sysfs_class_device *class_device;
-	struct sysfs_device *sysfs_device_device;
-	struct sysfs_device *sysfs_host_device;
-	struct sysfs_device *sysfs_pci_device;
-	struct sysfs_attribute *sysfs_attr;
+	DIR *dirfd, *host_dirfd;
+	struct dirent *dent, *host_dent;
+	ssize_t len;
 
 	save_old_config();
 
-	sysfs_ipr_driver = sysfs_open_driver("pci", "ipr");
-	if (sysfs_ipr_driver == NULL) {
+	dirfd = opendir("/sys/bus/pci/drivers/ipr");
+	if (!dirfd) {
 		syslog_dbg("Failed to open ipr driver bus. %m\n");
-		sysfs_ipr_driver = sysfs_open_driver("ipr", "pci");
-		if (sysfs_ipr_driver == NULL) {
+		dirfd = opendir("/sys/bus/pci/drivers/ipr");
+		if (!dirfd) {
 			syslog_dbg("Failed to open ipr driver bus on second attempt. %m\n");
 			return;
 		}
 	}
+	while ((dent = readdir(dirfd)) != NULL) {
+		int channel, bus, device, function;
+		char devpath[PATH_MAX];
+		char buff[256];
 
-	ipr_devs = sysfs_get_driver_devices(sysfs_ipr_driver);
+		if (sscanf(dent->d_name, "%x:%x:%x.%x",
+			   &channel, &bus, &device, &function) != 4)
+			continue;
 
-	if (ipr_devs != NULL) {
-		dlist_for_each_data(ipr_devs, pci_address, char) {
-			if (!strncmp(pci_address, "ipr", 3))
+		ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
+		memset(ipr_ioa,0,sizeof(struct ipr_ioa));
+
+		/* PCI address */
+		strcpy(ipr_ioa->pci_address, dent->d_name);
+		ipr_ioa->host_num = -1;
+		sprintf(devpath, "/sys/bus/pci/drivers/ipr/%s",
+			dent->d_name);
+		host_dirfd = opendir(devpath);
+		if (!host_dirfd) {
+			exit_on_error("Failed to open scsi_host class.\n");
+			continue;
+		}
+		while ((host_dent = readdir(host_dirfd)) != NULL) {
+			char scsipath[PATH_MAX];
+			char fw_str[256];
+
+			if (strncmp(host_dent->d_name, "host", 4))
 				continue;
 
-			ipr_ioa = (struct ipr_ioa*)malloc(sizeof(struct ipr_ioa));
-			memset(ipr_ioa,0,sizeof(struct ipr_ioa));
+			if (sscanf(host_dent->d_name, "host%d",
+				   &ipr_ioa->host_num) != 1)
+				continue;
 
-			/* PCI address */
-			strcpy(ipr_ioa->pci_address, pci_address);
+			strcpy(ipr_ioa->host_name, host_dent->d_name);
+			get_pci_attrs(ipr_ioa, devpath);
 
-			sysfs_host_class = sysfs_open_class("scsi_host");
-			if (!sysfs_host_class)
-				exit_on_error("Failed to open scsi_host class.\n");
-
-			class_devices = sysfs_get_class_devices(sysfs_host_class);
-			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
-				sysfs_host_device = sysfs_get_classdev_device(class_device);
-				if (!sysfs_host_device)
-					continue;
-
-				sysfs_pci_device = sysfs_get_device_parent(sysfs_host_device);
-
-				if (strcmp(pci_address, sysfs_pci_device->name) == 0) {
-					strcpy(ipr_ioa->host_name, sysfs_host_device->name);
-					sscanf(ipr_ioa->host_name, "host%d", &ipr_ioa->host_num);
-					get_pci_attrs(ipr_ioa, sysfs_pci_device);
-
-					sysfs_attr = sysfs_get_classdev_attr(class_device, "fw_type");
-					if (!sysfs_attr)
-						fw_type = 0;
-					else
-						sscanf(sysfs_attr->value, "%d", &fw_type);
-
-					if (ipr_debug)
-						syslog(LOG_INFO, "tool_init: fw_type attr = %d.\n", fw_type);
-					break;
-				}
-			}
-			sysfs_close_class(sysfs_host_class);
-
-			sysfs_device_class = sysfs_open_class("scsi_device");
-			if (!sysfs_device_class)
-				exit_on_error("Failed to open scsi_device class\n");
-
-			class_devices = sysfs_get_class_devices(sysfs_device_class);
-			dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
-				sysfs_device_device = sysfs_get_classdev_device(class_device);
-				if (!sysfs_device_device)
-					continue;
-
-				if (fw_type == IPR_SIS64) {
-					sprintf(buf, "%d:%d:0:0", ipr_ioa->host_num, IPR_IOAFP_VIRTUAL_BUS);
-					ipr_ioa->sis64 = 1;
-				} else
-					sprintf(buf, "%d:255:255:255", ipr_ioa->host_num);
-
-				if (!strcmp(buf, sysfs_device_device->name)) {
-					sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "model");
-					sscanf(sysfs_attr->value, "%4X", &temp);
-					ipr_ioa->ccin = temp;
-					setup_ioa_parms(ipr_ioa);
-					break;
-				}
-			}
-			sysfs_close_class(sysfs_device_class);
-
-			ipr_ioa->next = NULL;
-			ipr_ioa->num_raid_cmds = 0;
-
-			if (ipr_ioa_tail) {
-				ipr_ioa_tail->next = ipr_ioa;
-				ipr_ioa_tail = ipr_ioa;
-			} else
-				ipr_ioa_tail = ipr_ioa_head = ipr_ioa;
-
-			num_ioas++;
+			sprintf(scsipath, "%s/%s/scsi_host/%s", devpath,
+				ipr_ioa->host_name, ipr_ioa->host_name);
+			len = sysfs_read_attr(scsipath, "fw_type", fw_str, 256);
+			if (len < 0)
+				fw_type = 0;
+			else
+				sscanf(fw_str, "%d", &fw_type);
+			if (ipr_debug)
+				syslog(LOG_INFO, "tool_init: fw_type attr = %d.\n", fw_type);
+			break;
 		}
-	}
+		closedir(host_dirfd);
+		if (ipr_ioa->host_num < 0) {
+			exit_on_error("No SCSI Host found on IPR device %s\n",
+				      ipr_ioa->pci_address);
+			free(ipr_ioa);
+			continue;
+		}
+		if (fw_type == IPR_SIS64) {
+			sprintf(devpath, "/sys/bus/scsi/devices/%d:%d:0:0",
+				ipr_ioa->host_num, IPR_IOAFP_VIRTUAL_BUS);
+			ipr_ioa->sis64 = 1;
+		} else
+			sprintf(devpath, "/sys/bus/scsi/devices/%d:255:255:255",
+				ipr_ioa->host_num);
+		len = sysfs_read_attr(devpath, "model", buff, 16);
+		if (len < 0 || (sscanf(buff, "%4X", &temp) != 1)) {
+			exit_on_error("Cannot read SCSI device model.\n");
+			continue;
+		}
+		ipr_ioa->ccin = temp;
+		setup_ioa_parms(ipr_ioa);
 
-	sysfs_close_driver(sysfs_ipr_driver);
+		ipr_ioa->next = NULL;
+		ipr_ioa->num_raid_cmds = 0;
+
+		if (ipr_ioa_tail) {
+			ipr_ioa_tail->next = ipr_ioa;
+			ipr_ioa_tail = ipr_ioa;
+		} else
+			ipr_ioa_tail = ipr_ioa_head = ipr_ioa;
+
+		num_ioas++;
+	}
+	closedir(dirfd);
+
 	if (!save_state)
 		free_old_config();
 
@@ -2158,45 +2170,59 @@ void tool_init(int save_state)
  **/
 void ipr_reset_adapter(struct ipr_ioa *ioa)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
+	char devpath[PATH_MAX];
 
-	class_device = sysfs_open_class_device("scsi_host",
-					       ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device,
-				       "reset_host");
-	sysfs_write_attribute(attr, "1", 1);
-	sysfs_close_class_device(class_device);
+	sprintf(devpath, "/sys/class/scsi_host/%s", ioa->host_name);
+	sysfs_write_attr(devpath, "reset_host", "1", 1);
 }
 
 /**
  * ipr_read_host_attr -
  * @ioa:		ipr ioa struct
- * @name:       	stripe size for new array
- * @value:		protection (RAID) level for new array
+ * @name:		attribute name
+ * @value:		value to be set
+ * @value_len:		length of value string
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int ipr_read_host_attr(struct ipr_ioa *ioa, char *name, char *value)
+int ipr_read_host_attr(struct ipr_ioa *ioa, char *name,
+		       void *value, size_t value_len)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	int rc;
+	ssize_t len;
+	char path[PATH_MAX];
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, name);
-	rc = sysfs_read_attribute(attr);
-
-	if (rc) {
+	sprintf(path, "/sys/class/scsi_host/%s", ioa->host_name);
+	len = sysfs_read_attr(path, name, value, value_len);
+	if (len < 0) {
 		ioa_dbg(ioa, "Failed to read %s attribute. %m\n", name);
-		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
+	return 0;
+}
 
-	sprintf(value, "%s", attr->value);
-	value[strlen(value)-1] = '\0';
-	sysfs_close_class_device(class_device);
+/**
+ * ipr_write_host_attr -
+ * @ioa:		ipr ioa struct
+ * @name:		attribute to be written
+ * @value:		new value
+ * @value_len:		length of value string
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_write_host_attr(struct ipr_ioa *ioa, char *name,
+			void *value, size_t value_len)
+{
+	ssize_t len;
+	char path[PATH_MAX];
+
+	sprintf(path, "/sys/class/scsi_host/%s", ioa->host_name);
+	len = sysfs_write_attr(path, name, value, value_len);
+	if (len < 0) {
+		ioa_dbg(ioa, "Failed to write %s attribute. %m\n", name);
+		return -EIO;
+	}
 	return 0;
 }
 
@@ -2212,7 +2238,7 @@ int ipr_cmds_per_lun(struct ipr_ioa *ioa)
 	char value[100];
 	int rc;
 
-	rc = ipr_read_host_attr(ioa, "cmd_per_lun", value);
+	rc = ipr_read_host_attr(ioa, "cmd_per_lun", value, 100);
 
 	if (rc)
 		return 6;
@@ -2221,7 +2247,7 @@ int ipr_cmds_per_lun(struct ipr_ioa *ioa)
 }
 
 /**
- * ipr_scan - 
+ * ipr_scan -
  * @ioa:		ipr ioa struct
  * @bus:	        bus number
  * @id:		        id number
@@ -2232,16 +2258,22 @@ int ipr_cmds_per_lun(struct ipr_ioa *ioa)
  **/
 void ipr_scan(struct ipr_ioa *ioa, int bus, int id, int lun)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
 	char buf[100];
+	char devpath[PATH_MAX];
 
-	sprintf(buf, "%d %d %d", bus, id, lun);
-
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "scan");
-	sysfs_write_attribute(attr, buf, strlen(buf));
-	sysfs_close_class_device(class_device);
+	if (lun < 0) {
+		if (id < 0)
+			sprintf(buf, "%d - -", bus);
+		else
+			sprintf(buf, "%d %d -", bus, id);
+	} else {
+		if (id < 0)
+			sprintf(buf, "%d - %d", bus, lun);
+		else
+			sprintf(buf, "%d %d %d", bus, id, lun);
+	}
+	sprintf(devpath, "/sys/class/scsi_host/%s", ioa->host_name);
+	sysfs_write_attr(devpath, "scan", buf, 100);
 }
 
 /**
@@ -3350,25 +3382,19 @@ int ipr_start_stop_start(struct ipr_dev *dev)
  **/
 int ipr_check_allow_restart(struct ipr_dev *dev)
 {
-	struct sysfs_attribute *sysfs_attr;
-	char path[SYSFS_PATH_MAX];
-	int rc;
+	char path[PATH_MAX];
+	char value[8];
+	ssize_t len;
 
-	sprintf(path, "%s/%s/%s", "/sys/class/scsi_disk",
-		dev->scsi_dev_data->sysfs_device_name, "allow_restart");
-
-	sysfs_attr = sysfs_open_attribute(path);
-	if (!sysfs_attr) {
+	sprintf(path,"/sys/class/scsi_disk/%s",
+		dev->scsi_dev_data->sysfs_device_name);
+	len = sysfs_read_attr(path, "allow_restart", value, 8);
+	if (len < 1) {
 		syslog_dbg("Failed to open allow_restart parameter.\n");
 		return -1;
 	}
 
-	sysfs_read_attribute(sysfs_attr);
-	rc = atoi(sysfs_attr->value);
-
-	sysfs_close_attribute(sysfs_attr);
-
-	return rc;
+	return atoi(value);
 }
 
 /**
@@ -3381,38 +3407,30 @@ int ipr_check_allow_restart(struct ipr_dev *dev)
  **/
 void ipr_allow_restart(struct ipr_dev *dev, int allow)
 {
-	struct sysfs_attribute *sysfs_attr;
-	char path[SYSFS_PATH_MAX];
-	char value_str[2];
-	int value;
+	char path[PATH_MAX];
+	char value_str[8];
+	ssize_t len;
 
-	sprintf(path, "%s/%s/%s", "/sys/class/scsi_disk",
-		dev->scsi_dev_data->sysfs_device_name, "allow_restart");
-
-	sysfs_attr = sysfs_open_attribute(path);
-	if (!sysfs_attr) {
+	sprintf(path,"/sys/class/scsi_disk/%s",
+		dev->scsi_dev_data->sysfs_device_name);
+	len = sysfs_read_attr(path, "allow_restart", value_str, 8);
+	if (len < 1) {
 		syslog_dbg("Failed to open allow_restart parameter.\n");
 		return;
 	}
 
-	sysfs_read_attribute(sysfs_attr);
-	value = atoi(sysfs_attr->value);
-
-	if (value == allow) {
-		sysfs_close_attribute(sysfs_attr);
+	if (atoi(value_str) == allow) {
 		return;
 	}
 
-	snprintf(value_str, sysfs_attr->len, "%d", allow);
+	snprintf(value_str, 8, "%d", allow);
 
-	if (sysfs_write_attribute(sysfs_attr, value_str, 1))
+	if (sysfs_write_attr(path, "allow_restart", value_str, 1) < 0)
 		syslog_dbg("Failed to write allow_restart parameter.\n");
-
-	sysfs_close_attribute(sysfs_attr);
 }
 
 /**
- * ipr_start_stop_stop - 
+ * ipr_start_stop_stop -
  * @dev:		ipr dev struct
  *
  * Returns:
@@ -4154,7 +4172,7 @@ static int get_livedump_fname(struct ipr_ioa *ioa, char *fname, int max)
 #define IPR_MAX_LIVE_DUMP_SIZE (16 * 1024 * 1024)
 
 /**
- * get_scsi_max_xfer_len - 
+ * get_scsi_max_xfer_len -
  * @fd:			IOA sg file descriptor
  *
  * Returns:
@@ -4164,16 +4182,12 @@ static int get_livedump_fname(struct ipr_ioa *ioa, char *fname, int max)
 static int get_scsi_max_xfer_len(int fd)
 {
 	int rc, max_tablesize, max_scsi_len;
-	struct sysfs_attribute *sysfs_attr;
+	char elem_str[64];
+	ssize_t len;
 
-	sysfs_attr = sysfs_open_attribute("/sys/module/sg/parameters/scatter_elem_sz");
-	if (!sysfs_attr) {
-		syslog_dbg("Failed to open scatter_elem_sz parameter from sg module. %m\n");
-		return -1;
-	}
-
-	rc = sysfs_read_attribute(sysfs_attr);
-	if (rc == -1) {
+	len = sysfs_read_attr("/sys/module/sg/parameters", "scatter_elem_sz",
+			      elem_str, 64);
+	if (len < 0) {
 		syslog_dbg("Failed to read scatter_elem_sz parameter from sg module. %m\n");
 		return -1;
 	}
@@ -4184,9 +4198,7 @@ static int get_scsi_max_xfer_len(int fd)
 		return -1;
 	}
 
-	max_scsi_len = max_tablesize * atoi(sysfs_attr->value);
-
-	sysfs_close_attribute(sysfs_attr);
+	max_scsi_len = max_tablesize * atoi(elem_str);
 
 	if (max_scsi_len < IPR_MAX_LIVE_DUMP_SIZE)
 		return max_scsi_len;
@@ -5387,49 +5399,40 @@ int ipr_set_ses_mode(struct ipr_dev *dev, int mode) {
 int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 {
 	int num_devs = 0;
+	DIR *dirfd;
+	struct dirent *dent;
 	struct scsi_dev_data *scsi_dev_data;
 	struct scsi_dev_data *scsi_dev_base = *scsi_dev_ref;
-	struct sysfs_class *sysfs_device_class;
-	struct dlist *class_devices;
-	struct sysfs_class_device *class_device;
-	struct sysfs_device *sysfs_device_device;
-	struct sysfs_attribute *sysfs_attr;
 
-	sysfs_device_class = sysfs_open_class("scsi_device");
-	if (!sysfs_device_class) {
+	dirfd = opendir("/sys/class/scsi_device");
+	if (!dirfd) {
 		syslog_dbg("Failed to open scsi_device class. %m\n");
 		return 0;
 	}
+	while ((dent = readdir(dirfd)) != NULL) {
+		int host, channel, lun;
+		signed char id;
+		char devpath[PATH_MAX];
+		char buff[256];
+		ssize_t len;
 
-	class_devices = sysfs_get_class_devices(sysfs_device_class);
-	if (!class_devices) {
-		syslog_dbg("Get class devices for scsi_device failed. %m\n");
-		return 0;
-	}
+		if (sscanf(dent->d_name,"%d:%d:%hhd:%d",
+			   &host, &channel, &id, &lun) != 4)
+			continue;
 
-	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
 		scsi_dev_base = realloc(scsi_dev_base,
 					sizeof(struct scsi_dev_data) * (num_devs + 1));
 		scsi_dev_data = &scsi_dev_base[num_devs];
-
-		sysfs_device_device = sysfs_get_classdev_device(class_device);
-		if (!sysfs_device_device) {
-			*scsi_dev_ref = scsi_dev_base;
-			return -1;
-		}
-
-		sscanf(sysfs_device_device->name,"%d:%d:%hhd:%d",
-		       &scsi_dev_data->host,
-		       &scsi_dev_data->channel,
-		       &scsi_dev_data->id,
-		       &scsi_dev_data->lun);
-
-		strcpy(scsi_dev_data->sysfs_device_name,
-		       sysfs_device_device->name);
-
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "type");
-		if (sysfs_attr)
-			sscanf(sysfs_attr->value, "%d", &scsi_dev_data->type);
+		scsi_dev_data->host = host;
+		scsi_dev_data->channel = channel;
+		scsi_dev_data->id = id;
+		scsi_dev_data->lun = lun;
+		strcpy(scsi_dev_data->sysfs_device_name, dent->d_name);
+		sprintf(devpath, "/sys/class/scsi_device/%s/device",
+			dent->d_name);
+		len = sysfs_read_attr(devpath, "type", buff, 256);
+		if (len > 0)
+			sscanf(buff, "%d", &scsi_dev_data->type);
 
 		//FIXME WHERE TO GET OPENS!!!
 			/*
@@ -5437,46 +5440,44 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
 			 sscanf(sysfs_attr->value "%d", &scsi_dev_data->opens);
 			 */      scsi_dev_data->opens = 0;
 
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "online");
-		if (sysfs_attr) {
-			sscanf(sysfs_attr->value, "%d", &scsi_dev_data->online);
-		} else {
-			sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "state");
-			if (sysfs_attr && strstr(sysfs_attr->value, "offline"))
-				scsi_dev_data->online = 0;
-			else
-				scsi_dev_data->online = 1;
-		}
+		len = sysfs_read_attr(devpath, "state", buff, 256);
+		if (len > 0 && strstr(buff, "offline"))
+			scsi_dev_data->online = 0;
+		else
+			scsi_dev_data->online = 1;
 
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "queue_depth");
-		if (sysfs_attr)
-			sscanf(sysfs_attr->value, "%d", &scsi_dev_data->qdepth);
+		len = sysfs_read_attr(devpath, "queue_depth", buff, 256);
+		if (len > 0)
+			sscanf(buff, "%d", &scsi_dev_data->qdepth);
 
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "adapter_handle");
-		if (sysfs_attr)
-			sscanf(sysfs_attr->value, "%X", &scsi_dev_data->handle);
+		len = sysfs_read_attr(devpath, "adapter_handle", buff, 256);
+		if (len > 0)
+			sscanf(buff, "%X", &scsi_dev_data->handle);
 
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "vendor");
-		if (sysfs_attr)
-			ipr_strncpy_0n(scsi_dev_data->vendor_id, sysfs_attr->value, IPR_VENDOR_ID_LEN);
+		len = sysfs_read_attr(devpath, "vendor", buff, 256);
+		if (len > 0)
+			ipr_strncpy_0n(scsi_dev_data->vendor_id,
+				       buff, IPR_VENDOR_ID_LEN);
 
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "model");
-		if (sysfs_attr)
-			ipr_strncpy_0n(scsi_dev_data->product_id, sysfs_attr->value, IPR_PROD_ID_LEN);
+		len = sysfs_read_attr(devpath, "model", buff, 256);
+		if (len > 0)
+			ipr_strncpy_0n(scsi_dev_data->product_id,
+				       buff, IPR_PROD_ID_LEN);
 
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "resource_path");
-		if (sysfs_attr)
-			ipr_strncpy_0n(scsi_dev_data->res_path, sysfs_attr->value, IPR_MAX_RES_PATH_LEN);
-
-		sysfs_attr = sysfs_get_device_attr(sysfs_device_device, "device_id");
-		if (sysfs_attr)
-			sscanf(sysfs_attr->value, "%lX", &scsi_dev_data->device_id);
+		len = sysfs_read_attr(devpath, "resource_path", buff, 256);
+		if (len > 0)
+			ipr_strncpy_0n(scsi_dev_data->res_path,
+				       buff, IPR_MAX_RES_PATH_LEN);
+ 
+		len = sysfs_read_attr(devpath, "device_id", buff, 256);
+		if (len > 0)
+			sscanf(buff, "%lX", &scsi_dev_data->device_id);
 
 		strcpy(scsi_dev_data->dev_name,"");
 		strcpy(scsi_dev_data->gen_name,"");
 		num_devs++;
 	}
-	sysfs_close_class(sysfs_device_class);
+	closedir(dirfd);
 
 	*scsi_dev_ref = scsi_dev_base;
 	return num_devs;
@@ -5520,41 +5521,27 @@ static int wait_for_dev(char *name)
 static void get_sg_names(int num_devs)
 {
 	int i;
-	struct sysfs_class *sysfs_device_class;
-	struct dlist *class_devices;
-	struct sysfs_class_device *class_device;
-	struct sysfs_device *sysfs_device_device;
+	DIR *dirfd;
+	struct dirent *dent;
+	char devpath[PATH_MAX];
 
-	sysfs_device_class = sysfs_open_class("scsi_generic");
-	if (!sysfs_device_class) {
-		syslog_dbg("Failed to open scsi_generic class. %m\n");
-		return;
-	}
-
-	class_devices = sysfs_get_class_devices(sysfs_device_class);
-	if (!class_devices) {
-		syslog_dbg("Failed to get class devices for scsi_generic class. %m\n");
-		sysfs_close_class(sysfs_device_class);
-		return;
-	}
-
-	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
-		sysfs_device_device = sysfs_get_classdev_device(class_device);
-		if (!sysfs_device_device)
+	for (i = 0; i < num_devs; i++) {
+		sprintf(devpath, "/sys/class/scsi_device/%s/device/scsi_generic",
+			scsi_dev_table[i].sysfs_device_name);
+		dirfd = opendir(devpath);
+		if (!dirfd)
 			continue;
-
-		for (i = 0; i < num_devs; i++) {
-			if (!strcmp(scsi_dev_table[i].sysfs_device_name,
-				    sysfs_device_device->name)) {
-				sprintf(scsi_dev_table[i].gen_name, _PATH_DEV"%s",
-					class_device->name);
-				if (ipr_sg_required)
-					wait_for_dev(scsi_dev_table[i].gen_name);
-				break;
-			}
+		while((dent = readdir(dirfd)) != NULL) {
+			if (dent->d_name[0] == '.')
+				continue;
+			if (strncmp(dent->d_name, "sg", 2))
+				continue;
+			sprintf(scsi_dev_table[i].gen_name, "/dev/%s",
+				dent->d_name);
+			break;
 		}
+		closedir(dirfd);
 	}
-	sysfs_close_class(sysfs_device_class);
 }
 
 /**
@@ -5567,38 +5554,27 @@ static void get_sg_names(int num_devs)
 static void get_sd_names(int num_devs)
 {
 	int i;
-	struct sysfs_class *sysfs_device_class;
-	struct dlist *class_devices;
-	struct sysfs_class_device *class_device;
-	struct sysfs_device *sysfs_device_device;
+	DIR *dirfd;
+	struct dirent *dent;
+	char devpath[PATH_MAX];
 
-	sysfs_device_class = sysfs_open_class("block");
-	if (!sysfs_device_class) {
-		syslog_dbg("Failed to open block device class. %m\n");
-		return;
-	}
-
-	class_devices = sysfs_get_class_devices(sysfs_device_class);
-	if (!class_devices) {
-		syslog_dbg("Failed to get class devices for block device class. %m\n");
-		return;
-	}
-
-	dlist_for_each_data(class_devices, class_device, struct sysfs_class_device) {
-		sysfs_device_device = sysfs_get_classdev_device(class_device);
-		if (!sysfs_device_device)
+	for (i = 0; i < num_devs; i++) {
+		sprintf(devpath, "/sys/class/scsi_device/%s/device/block",
+			scsi_dev_table[i].sysfs_device_name);
+		dirfd = opendir(devpath);
+		if (!dirfd)
 			continue;
-
-		for (i = 0; i < num_devs; i++) {
-			if (!strcmp(scsi_dev_table[i].sysfs_device_name,
-				    sysfs_device_device->name)) {
-				sprintf(scsi_dev_table[i].dev_name, _PATH_DEV"%s",
-					class_device->name);
-				break;
-			}
+		while((dent = readdir(dirfd)) != NULL) {
+			if (dent->d_name[0] == '.')
+				continue;
+			if (strncmp(dent->d_name, "sd", 2))
+				continue;
+			sprintf(scsi_dev_table[i].dev_name, "/dev/%s",
+				dent->d_name);
+			break;
 		}
+		closedir(dirfd);
 	}
-	sysfs_close_class(sysfs_device_class);
 }
 
 /**
@@ -6098,24 +6074,21 @@ void ipr_debug_dump_rcd(struct ipr_common_record *rcd)
  **/
 int ipr_get_logical_block_size(struct ipr_dev *dev)
 {
-	struct sysfs_attribute *sysfs_attr;
-	char path[SYSFS_PATH_MAX], *first_hyphen;
+	char path[PATH_MAX], *first_hyphen;
+	char buff[16];
+	ssize_t len;
 	int rc;
 
 	first_hyphen = strchr(dev->dev_name, 's');
-	sprintf(path, "%s/%s/%s", "/sys/block",
-		first_hyphen, "queue/logical_block_size");
+	sprintf(path, "/sys/block/%s/queue", first_hyphen);
 
-	sysfs_attr = sysfs_open_attribute(path);
-	if (!sysfs_attr) {
+	len = sysfs_read_attr(path, "logical_block_size", buff, 16);
+	if (len < 0) {
 		syslog_dbg("Failed to open logical_block_size parameter.\n");
 		return -1;
 	}
 
-	sysfs_read_attribute(sysfs_attr);
-	rc = atoi(sysfs_attr->value);
-
-	sysfs_close_attribute(sysfs_attr);
+	rc = atoi(buff);
 
 	return rc;
 }
@@ -6779,28 +6752,28 @@ static int get_tcq_depth(struct ipr_dev *dev)
 }
 
 /**
- * is_tagged - 
+ * is_tagged -
  * @dev:		ipr dev struct
  *
  * Returns:
- *   
+ *
  **/
 static int is_tagged(struct ipr_dev *dev)
 {
 	char temp[100];
 
-	if (!ipr_read_dev_attr(dev, "tcq_enable", temp))
+	if (!ipr_read_dev_attr(dev, "tcq_enable", temp, 100))
 		return strtoul(temp, NULL, 10);
-	else if (!ipr_read_dev_attr(dev, "queue_type", temp))
+	else if (!ipr_read_dev_attr(dev, "queue_type", temp, 100))
 		return (strstr(temp, "none") ? 0 : 1);
 
 	return 0;
 }
 
 /**
- * set_tagged - 
+ * set_tagged -
  * @dev:		ipr dev struct
- * @tcq_enabled:	
+ * @tcq_enabled:
  *
  * Returns:
  *   0 if success / non-zero on failure
@@ -6809,12 +6782,12 @@ static int set_tagged(struct ipr_dev *dev, int tcq_enabled)
 {
 	char temp[100];
 
-	if (!ipr_read_dev_attr(dev, "tcq_enable", temp)) {
+	if (!ipr_read_dev_attr(dev, "tcq_enable", temp, 100)) {
 		sprintf(temp, "%d", tcq_enabled);
 		return ipr_write_dev_attr(dev, "tcq_enable", temp);
 	}
 
-	if (!ipr_read_dev_attr(dev, "queue_type", temp)) {
+	if (!ipr_read_dev_attr(dev, "queue_type", temp, 100)) {
 		if (!tcq_enabled)
 			return ipr_write_dev_attr(dev, "queue_type", "none");
 
@@ -6943,7 +6916,7 @@ static int ipr_set_dasd_timeouts(struct ipr_dev *dev, int format_timeout)
 }
 
 /**
- * ipr_get_dev_attr - 
+ * ipr_get_dev_attr -
  * @ioa:		ipr ioa struct
  * @attr:		ipr_disk_attr struct
  *
@@ -6956,7 +6929,7 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	struct ipr_mode_pages mode_pages;
 	struct ipr_ioa_mode_page *page;
 
-	if (ipr_read_dev_attr(dev, "queue_depth", temp))
+	if (ipr_read_dev_attr(dev, "queue_depth", temp, 100))
 		return -EIO;
 
 	if (ipr_is_af_dasd_device(dev)) {
@@ -7634,109 +7607,58 @@ bool is_af_blocked(struct ipr_dev *dev, int silent)
 }
 
 /**
- * ipr_read_dev_attr - 
+ * ipr_read_dev_attr -
  * @dev:		ipr dev struct
- * @attr:		
- * @value:		
+ * @attr:
+ * @value:
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
-int ipr_read_dev_attr(struct ipr_dev *dev, char *attr, char *value)
+int ipr_read_dev_attr(struct ipr_dev *dev, char *attr,
+		      char *value, size_t value_len)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *dev_attr;
-	struct sysfs_device *device;
 	char *sysfs_dev_name;
-	int rc;
+	char devpath[PATH_MAX];
+	ssize_t len;
 
 	if (!dev->scsi_dev_data) {
 		scsi_dbg(dev, "Cannot read dev attr %s. NULL scsi data\n", attr);
 		return -ENOENT;
 	}
-
 	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
-
-	class_device = sysfs_open_class_device("scsi_device",
-					       sysfs_dev_name);
-	if (!class_device) {
-		scsi_dbg(dev, "Failed to open scsi_device class device. %m\n");
-		return -EIO;
-	}
-
-	device = sysfs_get_classdev_device(class_device);
-	if (!device) {
-		scsi_dbg(dev, "Failed to get classdev device. %m\n");
-		sysfs_close_class_device(class_device);
-		return -EIO;
-	}
-
-	dev_attr = sysfs_get_device_attr(device, attr);
-	if (!dev_attr) {
-		scsi_dbg(dev, "Failed to get %s attribute. %m\n", attr);
-		sysfs_close_class_device(class_device);
-		return -EIO;
-	}
-
-	rc = sysfs_read_attribute(dev_attr);
-
-	if (rc) {
+	sprintf(devpath, "/sys/class/scsi_device/%s/device", sysfs_dev_name);
+	len = sysfs_read_attr(devpath, attr, value, value_len);
+	if (len < 0) {
 		scsi_dbg(dev, "Failed to read %s attribute. %m\n", attr);
-		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
-
-	sprintf(value, "%s", dev_attr->value);
-	value[strlen(value)-1] = '\0';
-	sysfs_close_class_device(class_device);
 	return 0;
 }
 
 /**
- * ipr_write_dev_attr - 
+ * ipr_write_dev_attr -
  * @dev:		ipr dev struct
- * @attr:		
- * @value:		
+ * @attr:
+ * @value:
  *
  * Returns:
  *   0 if success / non-zero on failure
  **/
 int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *dev_attr;
-	struct sysfs_device *device;
 	char *sysfs_dev_name;
+	char devpath[PATH_MAX];
 
 	if (!dev->scsi_dev_data)
 		return -ENOENT;
 
 	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
-
-	class_device = sysfs_open_class_device("scsi_device",
-					       sysfs_dev_name);
-
-	if (!class_device) {
-		printf("Cannot open class_device\n");
+	sprintf(devpath, "/sys/class/scsi_device/%s/device", sysfs_dev_name);
+	if (sysfs_write_attr(devpath, attr, value, strlen(value)) < 0) {
+		printf("Failed to write attribute: %s\n", attr);
 		return -EIO;
 	}
-
-	device = sysfs_get_classdev_device(class_device);
-
-	if (!device) {
-		printf("Cannot get classdev\n");
-		sysfs_close_class_device(class_device);
-		return -EIO;
-	}
-
-	dev_attr = sysfs_get_device_attr(device, attr);
-	if (sysfs_write_attribute(dev_attr, value, strlen(value))) {
-		printf("Failed to write attribute: %p\n", dev_attr);
-		sysfs_close_class_device(class_device);
-		return -EIO;
-	}
-
-	sysfs_close_class_device(class_device);
 	return 0;
 }
 
@@ -8006,14 +7928,16 @@ u32 get_dev_fw_version(struct ipr_dev *dev)
  **/
 u32 get_ioa_fw_version(struct ipr_ioa *ioa)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
+	char devpath[PATH_MAX];
+	char value[16];
+	ssize_t len;
 	u32 fw_version;
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	attr = sysfs_get_classdev_attr(class_device, "fw_version");
-	sscanf(attr->value, "%8X", &fw_version);
-	sysfs_close_class_device(class_device);
+	sprintf(devpath, "/sys/class/scsi_host/host%s", ioa->host_name);
+	len = sysfs_read_attr(devpath, "fw_version", value, 16);
+	if (len < 0)
+		return -1;
+	sscanf(value, "%8X", &fw_version);
 
 	return fw_version;
 }
@@ -8405,8 +8329,6 @@ void ipr_log_ucode_error(struct ipr_ioa *ioa)
 int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		      struct ipr_fw_images *image, int force)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
 	struct ipr_ioa_ucode_header *image_hdr;
 	struct ipr_ioa_ucode_ext_header *ext_hdr;
 	struct ipr_ioa_ucode_img_desc *img_desc;
@@ -8420,6 +8342,8 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 	DIR *dir;
 	char *img_file;
 	char cwd[200];
+	char devpath[PATH_MAX];
+	ssize_t len;
 
 	fw_version = get_ioa_fw_version(ioa);
 
@@ -8497,15 +8421,15 @@ int ipr_update_ioa_fw(struct ipr_ioa *ioa,
 		sprintf(ucode_file, "%s/.%s", hotplug_dir, tmp);
 		symlink(img_file, ucode_file);
 		sprintf(ucode_file, ".%s\n", tmp);
-		class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-		attr = sysfs_get_classdev_attr(class_device, "update_fw");
-		rc = sysfs_write_attribute(attr, ucode_file, strlen(ucode_file));
-		sysfs_close_class_device(class_device);
+		sprintf(devpath, "/sys/class/scsi_host/%s", ioa->host_name);
+		len = sysfs_write_attr(devpath, "update_fw",
+				       ucode_file, strlen(ucode_file));
 		sprintf(ucode_file, "%s/.%s", hotplug_dir, tmp);
 		unlink(ucode_file);
 
-		if (rc != 0)
-			ioa_err(ioa, "Microcode update failed. rc=%d\n", rc);
+		if (len < 0)
+			ioa_err(ioa, "Microcode update failed. rc=%d\n",
+				(int)len);
 		check_current_config(false);
 		for_each_ioa(ioa) {
 			if (ioa->host_num != host_num)
@@ -8865,7 +8789,7 @@ static void init_vset_dev(struct ipr_dev *dev)
 		depth = res_state.vset.num_devices_in_vset * 4;
 		snprintf(q_depth, sizeof(q_depth), "%d", depth);
 		q_depth[sizeof(q_depth)-1] = '\0';
-		if (ipr_read_dev_attr(dev, "queue_depth", cur_depth))
+		if (ipr_read_dev_attr(dev, "queue_depth", cur_depth, 100))
 			return;
 		rc = ipr_get_saved_dev_attr(dev, IPR_QUEUE_DEPTH, saved_depth);
 		if (rc == RC_SUCCESS) {
@@ -9418,32 +9342,28 @@ int ipr_disable_qerr(struct ipr_dev *dev)
 
 void ipr_set_manage_start_stop(struct ipr_dev *dev)
 {
-	struct sysfs_attribute *sysfs_attr;
-	char path[SYSFS_PATH_MAX];
+	char path[PATH_MAX];
+	ssize_t len;
 	char value_str[2];
 	int value;
 
-	sprintf(path, "%s/%s/%s", "/sys/class/scsi_disk",
-		dev->scsi_dev_data->sysfs_device_name, "manage_start_stop");
-
-	sysfs_attr = sysfs_open_attribute(path);
-	if (!sysfs_attr) {
+	sprintf(path, "/sys/class/scsi_disk/%s/device",
+		dev->scsi_dev_data->sysfs_device_name);
+	len = sysfs_read_attr(path, "manage_start_stop", value_str, 2);
+	if (len < 0) {
 		syslog_dbg("Failed to open manage_start_stop parameter.\n");
 		return;
 	}
 
-	sysfs_read_attribute(sysfs_attr);
-	value = atoi(sysfs_attr->value);
+	value = atoi(value_str);
 
-	snprintf(value_str, sysfs_attr->len, "%d", 1);
+	snprintf(value_str, 2, "%d", 1);
 
-	if (sysfs_write_attribute(sysfs_attr, value_str, 1))
+	if (sysfs_write_attr(path, "manage_start_stop", value_str, 1) < 0)
 		syslog_dbg("Failed to write manage_start_stop parameter.\n");
 
-	sysfs_read_attribute(sysfs_attr);
-	value = atoi(sysfs_attr->value);
-
-	sysfs_close_attribute(sysfs_attr);
+	len = sysfs_read_attr(path, "manage_start_stop", value_str, 2);
+	value = atoi(value_str);
 }
 
 /**
