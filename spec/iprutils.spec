@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.17
+Version: 2.3.18
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,15 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Feb 07 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.18
+- Release 2.3.18
+- array start enhancement patch
+- compliation fails on ununtu
+* Fri Feb 01 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.17
+- Release 2.3.17
+- creating an array fails for T2 disks.
+- Several fixes for LE system.
+- Enable actie/active by default
 * Tue Nov 05 2013 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.16
 - Release 2.3.16
 - Fixes a bug for 4K bytes/sector disks in iprutils
