@@ -190,10 +190,10 @@ static int format_flit(struct ipr_flit *flit)
 	for (i = 0, flit_entry = flit->flit_entry;
 	     (i < num_entries) && (*flit_entry->timestamp);
 	     flit_entry++, i++) {
-		snprintf(time, IPR_FLIT_TIMESTAMP_LEN, (char *)flit_entry->timestamp);
+		snprintf(time, IPR_FLIT_TIMESTAMP_LEN, "%s", (char *)flit_entry->timestamp);
 		time[IPR_FLIT_TIMESTAMP_LEN] = '\0';
 
-		snprintf(filename, IPR_FLIT_FILENAME_LEN, (char *)flit_entry->filename);
+		snprintf(filename, IPR_FLIT_FILENAME_LEN, "%s", (char *)flit_entry->filename);
 		filename[IPR_FLIT_FILENAME_LEN] = '\0';
 
 		num_args = sscanf(filename, "%184s " "%184s " "%184s "
