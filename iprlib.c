@@ -32,6 +32,7 @@ int ipr_force = 0;
 int ipr_sg_required = 0;
 int polling_mode = 0;
 int ipr_fast = 0;
+int format_done = 0;
 static int ipr_mode5_write_buffer = 0;
 
 struct sysfs_dev *head_zdev = NULL;
@@ -683,6 +684,8 @@ void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *ioa)
 {
 	struct sysfs_dev *zdev;
 	struct ipr_dev_record *dev_rcd;
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
 	int i;
 
 	if (!ioa->qac_data)
@@ -690,10 +693,37 @@ void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *ioa)
 
 	for (i = 0; i < ioa->num_devices; i++) {
 		zdev = ipr_find_zeroed_dev(&ioa->dev[i]);
-		if (zdev && ioa->dev[i].qac_entry) {
+		if (!zdev && ipr_is_af_dasd_device(&ioa->dev[i])) {
+			memset(&mode_pages, 0, sizeof(mode_pages));
+			ipr_mode_sense(&ioa->dev[i], 0x20, &mode_pages);
+
+			page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+				     mode_pages.hdr.block_desc_len +
+				     sizeof(mode_pages.hdr));
+
+			if (page->format_completed)
+				dev_rcd->known_zeroed = 1;
+		}
+		else if (zdev && ioa->dev[i].qac_entry) {
 			dev_rcd = (struct ipr_dev_record *)ioa->dev[i].qac_entry;
 			dev_rcd->known_zeroed = 1;
 		}
+	}
+}
+
+void set_devs_format_completed()
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+
+	if (format_done) {
+		for_each_ioa(ioa) {
+			for_each_dev(ioa, dev) {
+			if (ipr_is_af_dasd_device(dev) && ipr_device_is_zeroed(dev))
+				ipr_set_format_completed_bit(dev);
+			}
+		}
+		format_done = 0;
 	}
 }
 
@@ -6339,6 +6369,7 @@ void check_current_config(bool allow_rebuild_refresh)
 		}
 	}
 
+	set_devs_format_completed();
 	link_multipath_vsets();
 	ipr_cleanup_zeroed_devs();
 	resolve_old_config();
@@ -6953,6 +6984,34 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	return 0;
 }
 
+int ipr_set_format_completed_bit(struct ipr_dev *dev)
+{
+	int len;
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	if (ipr_mode_sense(dev, 0x20, &mode_pages))
+		return -EIO;
+
+	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+						     mode_pages.hdr.block_desc_len +
+						     sizeof(mode_pages.hdr));
+
+	page->format_completed = 1;
+
+	len = mode_pages.hdr.length + 1;
+	mode_pages.hdr.length = 0;
+	mode_pages.hdr.medium_type = 0;
+	mode_pages.hdr.device_spec_parms = 0;
+	page->hdr.parms_saveable = 0;
+
+	if (ipr_mode_select(dev, &mode_pages, len))
+		return -EIO;
+
+	return 0;
+}
 /**
  * get_ioa_caching -
  * @ioa:		ipr ioa struct

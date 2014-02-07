@@ -3992,6 +3992,7 @@ int raid_start_complete()
 				return RC_19_Create_Fail;
 			}
 
+			format_done = 1;
 			check_current_config(false);
 
 			/* Start Parity Protection completed successfully */
@@ -13467,6 +13468,7 @@ static int raid_create(char **args, int num_args)
 		return rc;
 
 	rc = raid_start_complete();
+	format_done = 1;
 	if (rc == RC_18_Array_Created)
 		return 0;
 	else

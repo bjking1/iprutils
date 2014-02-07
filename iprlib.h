@@ -259,6 +259,7 @@ extern int ipr_force;
 extern int ipr_sg_required;
 extern int polling_mode;
 extern int ipr_fast;
+extern int format_done;
 extern char *tool_name;
 extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
@@ -1558,6 +1559,15 @@ struct ipr_ioa_mode_page {
 	struct ipr_mode_page_hdr hdr;
 	u8 reserved;
 	u8 max_tcq_depth;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved1:1;
+	u8 format_completed:1;
+	u8 reserved2:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved2:6;
+	u8 format_completed:1;
+	u8 reserved1:1;
+#endif
 };
 
 struct ipr_mode_page24 {
@@ -2533,6 +2543,7 @@ int ipr_set_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *, int);
 int ipr_modify_ioa_attr(struct ipr_ioa *, struct ipr_ioa_attr *);
 int ipr_set_dev_attr(struct ipr_dev *, struct ipr_disk_attr *, int);
 int set_active_active_mode(struct ipr_ioa *, int);
+int ipr_set_format_completed_bit(struct ipr_dev *);
 int ipr_set_ses_mode(struct ipr_dev *, int);
 int get_ioa_caching(struct ipr_ioa *);
 int ipr_change_cache_parameters(struct ipr_ioa *, int);
