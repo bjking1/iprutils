@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.3.18
+Version: 2.4.0
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -81,6 +81,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Fri Feb 07 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.0
+- Release 2.4.0
+- Eliminate libsysfs dependency
 * Fri Feb 07 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.18
 - Release 2.3.18
 - array start enhancement patch
