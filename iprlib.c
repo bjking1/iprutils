@@ -744,7 +744,7 @@ void ipr_update_qac_with_zeroed_devs(struct ipr_ioa *ioa)
 			if (page->format_completed) {
 				dev_rcd = (struct ipr_dev_record *)ioa->dev[i].qac_entry;
 				dev_rcd->known_zeroed = 1;
-            }
+			}
 		}
 		else if (zdev && ioa->dev[i].qac_entry) {
 			dev_rcd = (struct ipr_dev_record *)ioa->dev[i].qac_entry;
