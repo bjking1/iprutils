@@ -814,7 +814,7 @@ int get_max_bus_speed(struct ipr_ioa *ioa, int bus)
 	char value[16];
 	ssize_t len;
 
-	sprintf(devpath, "/sys/class/scsi_host/host%s", ioa->host_name);
+	sprintf(devpath, "/sys/class/scsi_host/%s", ioa->host_name);
 	len = sysfs_read_attr(devpath, "fw_version", value, 16);
 	if (len < 0)
 		return -1;
@@ -1289,7 +1289,7 @@ static int ipr_uevents_supported()
 	if (!ioa)
 		return 0;
 
-	sprintf(devpath, "/sys/class/scsi_host/host%s", ioa->host_name);
+	sprintf(devpath, "/sys/class/scsi_host/%s", ioa->host_name);
 	len = sysfs_read_attr(devpath, "uevent", value, 16);
 	return len > 0;
 }
@@ -7933,7 +7933,7 @@ u32 get_ioa_fw_version(struct ipr_ioa *ioa)
 	ssize_t len;
 	u32 fw_version;
 
-	sprintf(devpath, "/sys/class/scsi_host/host%s", ioa->host_name);
+	sprintf(devpath, "/sys/class/scsi_host/%s", ioa->host_name);
 	len = sysfs_read_attr(devpath, "fw_version", value, 16);
 	if (len < 0)
 		return -1;
@@ -9347,7 +9347,7 @@ void ipr_set_manage_start_stop(struct ipr_dev *dev)
 	char value_str[2];
 	int value;
 
-	sprintf(path, "/sys/class/scsi_disk/%s/device",
+	sprintf(path, "/sys/class/scsi_disk/%s",
 		dev->scsi_dev_data->sysfs_device_name);
 	len = sysfs_read_attr(path, "manage_start_stop", value_str, 2);
 	if (len < 0) {
