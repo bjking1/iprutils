@@ -61,41 +61,13 @@ static char *disable = "0\n";
  **/
 static void enable_dump(struct ipr_ioa *ioa)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	int rc, fd;
+	int rc;
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	if (!class_device) {
-		ioa_err(ioa, "Failed to open class device. %m\n");
-		return;
-	}
-
-	attr = sysfs_get_classdev_attr(class_device, "dump");
-	if (!attr) {
-		ioa_dbg(ioa, "Failed to get class attribute. %m\n");
-		sysfs_close_class_device(class_device);
-		return;
-	}
-
-	fd = open(attr->path, O_RDWR);
-	if (fd < 0) {
-		if (errno != ENOENT)
-			ioa_err(ioa, "Failed to open dump attribute. %m\n");
-		sysfs_close_class_device(class_device);
-		return;
-	}
-
-	rc = write(fd, enable, strlen(enable));
+	rc = ipr_write_host_attr(ioa, "dump", enable, strlen(enable));
 	if (rc != strlen(enable)) {
 		ioa_err(ioa, "Failed to enable dump. rc=%d. %m\n", rc);
-		close(fd);
-		sysfs_close_class_device(class_device);
 		return;
 	}
-
-	close(fd);
-	sysfs_close_class_device(class_device);
 }
 
 /**
@@ -107,38 +79,13 @@ static void enable_dump(struct ipr_ioa *ioa)
  **/
 static void disable_dump(struct ipr_ioa *ioa)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
-	int rc, fd;
+	int rc;
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	if (!class_device) {
-		ioa_err(ioa, "Failed to open class device. %m\n");
-		return;
-	}
-
-	attr = sysfs_get_classdev_attr(class_device, "dump");
-	if (!attr) {
-		ioa_dbg(ioa, "Failed to get class attribute. %m\n");
-		sysfs_close_class_device(class_device);
-		return;
-	}
-
-	fd = open(attr->path, O_RDWR);
-	if (fd < 0) {
-		ioa_err(ioa, "Failed to open dump attribute. %m\n");
-		sysfs_close_class_device(class_device);
-		return;
-	}
-
-	rc = write(fd, disable, strlen(disable));
+	rc = ipr_write_host_attr(ioa, "dump", disable, strlen(disable));
 	if (rc != strlen(disable)) {
 		ioa_err(ioa, "Failed to disable dump. rc=%d. %m\n", rc);
-		sysfs_close_class_device(class_device);
 		return;
 	}
-
-	sysfs_close_class_device(class_device);
 }
 
 /**
@@ -150,36 +97,10 @@ static void disable_dump(struct ipr_ioa *ioa)
  **/
 static int read_dump(struct ipr_ioa *ioa)
 {
-	struct sysfs_class_device *class_device;
-	struct sysfs_attribute *attr;
 	int count = 0;
-	FILE *file;
 
-	class_device = sysfs_open_class_device("scsi_host", ioa->host_name);
-	if (!class_device) {
-		ioa_err(ioa, "Failed to open class device. %m\n");
-		return -EIO;
-	}
-
-	attr = sysfs_get_classdev_attr(class_device, "dump");
-	if (!attr) {
-		ioa_dbg(ioa, "Failed to open dump attribute. %m\n");
-		sysfs_close_class_device(class_device);
-		return -EIO;
-
-	}
-
-	file = fopen(attr->path, "r");
-	if (!file) {
-		ioa_err(ioa, "Failed to open sysfs dump file. %m\n");
-		sysfs_close_class_device(class_device);
-		return -EIO;
-	}
-
-	count = fread(&dump, 1, sizeof(dump), file);
-	fclose(file);
-	sysfs_close_class_device(class_device);
-	return count;
+	count = ipr_read_host_attr(ioa, "dump", &dump, sizeof(dump));
+	return (count < 0) ? 0: count;
 }
 
 /**

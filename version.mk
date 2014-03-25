@@ -5,8 +5,8 @@
 # Common Public License v1.0 which accompanies this distribution.
 
 IPR_MAJOR_RELEASE=2
-IPR_MINOR_RELEASE=3
-IPR_FIX_LEVEL=18
+IPR_MINOR_RELEASE=4
+IPR_FIX_LEVEL=0
 IPR_RELEASE=1
 IPR_FIX_DATE=(Feb 07, 2014)
 
