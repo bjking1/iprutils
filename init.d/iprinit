@@ -69,7 +69,7 @@ reload() {
 status() {
     echo -n "Checking for ipr initialization daemon: "
 
-    pidofproc $IPRINIT >& /dev/null
+    pidofproc $IPRINIT > /dev/null 2>&1
 
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then

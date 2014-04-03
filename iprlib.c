@@ -3546,19 +3546,19 @@ int ipr_format_unit(struct ipr_dev *dev)
 	struct ipr_dev *multipath_dev;
 
 	if (strlen(dev->dev_name) && dev->scsi_dev_data->device_id) {
-		sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" &> /dev/null", strrchr(dev->dev_name, '/') + 1);
+		sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" > /dev/null 2>&1", strrchr(dev->dev_name, '/') + 1);
 		system(cmnd);
 		sprintf(cmnd, "/bin/rm -rf %s %s%s", dev->dev_name, dev->dev_name, "[0-9]*");
 		system(cmnd);
 
 		multipath_dev = find_multipath_jbod(dev);
 		if (multipath_dev) {
-			sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" &> /dev/null", strrchr(multipath_dev->dev_name, '/') + 1);
+			sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" > /dev/null 2>&1", strrchr(multipath_dev->dev_name, '/') + 1);
 			system(cmnd);
 			sprintf(cmnd, "/bin/rm -rf %s %s%s", multipath_dev->dev_name, multipath_dev->dev_name , "[0-9]*");
 			system(cmnd);
 		}
-		system("/sbin/multipath -F &> /dev/null");
+		system("/sbin/multipath -F > /dev/null 2>&1");
 	}
 
 	if (strlen(name) == 0)

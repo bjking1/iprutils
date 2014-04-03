@@ -71,7 +71,7 @@ reload() {
 status() {
     echo -n "Checking for ipr update daemon: "
 
-    pidofproc $IPRUPDATE >& /dev/null
+    pidofproc $IPRUPDATE > /dev/null 2>&1
 
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
