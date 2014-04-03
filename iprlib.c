@@ -5471,7 +5471,7 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref)
  
 		len = sysfs_read_attr(devpath, "device_id", buff, 256);
 		if (len > 0)
-			sscanf(buff, "%lX", &scsi_dev_data->device_id);
+			sscanf(buff, "%llX", &scsi_dev_data->device_id);
 
 		strcpy(scsi_dev_data->dev_name,"");
 		strcpy(scsi_dev_data->gen_name,"");
