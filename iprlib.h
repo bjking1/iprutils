@@ -18,6 +18,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/mount.h>
@@ -40,7 +41,6 @@
 #include <ctype.h>
 #include <syslog.h>
 #include <term.h>
-#include <pci/pci.h>
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <asm/byteorder.h>
@@ -49,6 +49,11 @@
 #include <bits/sockaddr.h>
 #include <linux/netlink.h>
 #include <time.h>
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
 #define IPR_DASD_UCODE_USRLIB                0
 #define IPR_DASD_UCODE_ETC                   1
