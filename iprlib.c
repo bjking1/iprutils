@@ -7656,7 +7656,7 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 	sysfs_dev_name = dev->scsi_dev_data->sysfs_device_name;
 	sprintf(devpath, "/sys/class/scsi_device/%s/device", sysfs_dev_name);
 	if (sysfs_write_attr(devpath, attr, value, strlen(value)) < 0) {
-		printf("Failed to write attribute: %s\n", attr);
+		scsi_dbg(dev, "Failed to write attribute: %s\n", attr);
 		return -EIO;
 	}
 	return 0;
