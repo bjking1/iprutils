@@ -7731,7 +7731,7 @@ int ipr_write_dev_attr(struct ipr_dev *dev, char *attr, char *value)
 
 	dev_attr = sysfs_get_device_attr(device, attr);
 	if (sysfs_write_attribute(dev_attr, value, strlen(value))) {
-		printf("Failed to write attribute: %p\n", dev_attr);
+		scsi_dbg(dev, "Failed to write attribute: %p\n", dev_attr);
 		sysfs_close_class_device(class_device);
 		return -EIO;
 	}
