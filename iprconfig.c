@@ -2208,8 +2208,15 @@ static char *vset_array_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body, _("PCI Address"), dev->ioa->pci_address);
-	if (dev->ioa->sis64)
-		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
+
+	if (dev->ioa->sis64) {
+		if (dev->scsi_dev_data)
+			body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
+		else {
+			ipr_format_res_path(dev->dev_rcd->type3.res_path, dev->res_path_name, IPR_MAX_RES_PATH_LEN);
+			body = add_line_to_body(body,_("Resource Path"), dev->res_path_name);
+		}
+	}
 
 	if (dev->scsi_dev_data || !dev->ioa->sis64) {
 		sprintf(buffer, "%d", dev->ioa->host_num);
@@ -2422,8 +2429,15 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	body = add_line_to_body(body, "", NULL);
 	body = add_line_to_body(body, _("Physical location"), NULL);
 	body = add_line_to_body(body ,_("PCI Address"), dev->ioa->pci_address);
-	if (dev->ioa->sis64)
-		body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
+
+	if (dev->ioa->sis64) {
+		if (dev->scsi_dev_data)
+			body = add_line_to_body(body,_("Resource Path"), dev->scsi_dev_data->res_path);
+		else {
+			ipr_format_res_path(dev->dev_rcd->type3.res_path, dev->res_path_name, IPR_MAX_RES_PATH_LEN);
+			body = add_line_to_body(body,_("Resource Path"), dev->res_path_name);
+		}
+	}
 
 	sprintf(buffer, "%d", dev->ioa->host_num);
 	body = add_line_to_body(body, _("SCSI Host Number"), buffer);
@@ -2652,10 +2666,7 @@ int device_details(i_container *i_con)
 		body = ses_details(body, dev);
 	} else {
 		n_screen = &n_device_details;
-		if (dev->scsi_dev_data)
-			body = disk_details(body, dev);
-		else
-			return rc;
+		body = disk_details(body, dev);
 	}
 
 	n_screen->body = body;
@@ -16193,7 +16204,7 @@ static void show_dev_details(struct ipr_dev *dev)
 		body = vset_array_details(body, dev);
 	else if (ipr_is_ses(dev))
 		body = ses_details(body, dev);
-	else if (dev->scsi_dev_data)
+	else
 		body = disk_details(body, dev);
 
 	printf("%s\n", body);
