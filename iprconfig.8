@@ -429,13 +429,36 @@ Show the current asymmetric access mode for the given disk array.
 Show whether or not the user requested caching mode for the given IOA is set to
 default or disabled.
 .TP
-.B raid-create [-r raid_level] [-s stripe_size_in_kb] [devices...]
+.B query-array-label [label]
+.br
+Show the device name of the array with the specified label. Label must have
+been specified when creating the RAID array. See raid-create command.
+.TP
+.B query-array [location]
+.br
+Show the device name of the array of which one of the disks in the array
+has the specified platform location code. 
+.TP
+.B query-device [location]
+.br
+Show the device name of the disk that has the specified platform location code. 
+.TP
+.B query-location [device]
+.br
+The device specified can be either the device name of a disk or the device name
+of a single disk RAID 0 array. If the specified device name is a disk, the
+platform location code will be displayed. If the specified device name is a single
+device RAID 0 array, the platform location of the disk which is a member of the
+specified array will be displayed.
+.TP
+.B raid-create [-r raid_level] [-s stripe_size_in_kb] [-l label] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
 include 16, 64, and 256. If raid_level is not specified, it will default to
 RAID 5. If stripe size is not specified, it will default to the recommended
 stripe size for the selected RAID level. Devices are specified with their full
-name, either the /dev/sd name or the /dev/sg name is acceptable. Example array
+name, either the /dev/sd name or the /dev/sg name is acceptable. On some RAID
+adapters, a label can also be specified. Example array
 creation:
 .br
 .B iprconfig -c raid-create -r 5 -s 64 /dev/sda /dev/sdb /dev/sdc

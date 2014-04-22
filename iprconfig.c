@@ -16893,6 +16893,105 @@ static int query_array_label(char **args, int num_args)
 	return -ENODEV;
 }
 
+/**
+ * query_array - Display the array device name for the specified device location
+ * @args:	       argument vector
+ * @num_args:	       number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_array(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *vset;
+	struct ipr_dev *dev;
+
+	for_each_ioa(ioa) {
+		get_drive_phy_loc(ioa);
+
+		for_each_vset(ioa, vset) {
+			for_each_dev_in_vset(vset, dev) {
+				strip_trailing_whitespace(dev->physical_location);
+				if (!strcmp(dev->physical_location, args[0])) {
+					fprintf(stdout, "%s\n", vset->dev_name);
+					return 0;
+				}
+			}
+		}
+	}
+
+	return -ENODEV;
+}
+
+/**
+ * query_device - Display the device name for the specified device location
+ * @args:	       argument vector
+ * @num_args:	       number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_device(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+
+	for_each_ioa(ioa) {
+		get_drive_phy_loc(ioa);
+
+		for_each_disk(ioa, dev) {
+			strip_trailing_whitespace(dev->physical_location);
+			if (!strcmp(dev->physical_location, args[0])) {
+				if (strlen(dev->dev_name))
+					fprintf(stdout, "%s\n", dev->dev_name);
+				else
+					fprintf(stdout, "%s\n", dev->gen_name);
+				return 0;
+			}
+		}
+	}
+
+	return -ENODEV;
+}
+
+
+/**
+ * query_location - Display the physical location for the specified device name
+ * @args:	       argument vector
+ * @num_args:	       number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_location(char **args, int num_args)
+{
+	struct ipr_dev *dev, *tmp, *cdev;
+	int num_devs = 0;
+
+	dev = find_dev(args[0]);
+
+	if (!dev)
+		return -ENODEV;
+
+	get_drive_phy_loc(dev->ioa);
+
+	if (!ipr_is_volume_set(dev)){
+		fprintf(stdout, "%s\n", dev->physical_location);
+		return 0;
+	}
+
+	for_each_dev_in_vset(dev, tmp) {
+		cdev = tmp;
+		num_devs++;
+	}
+
+	if (num_devs != 1)
+		return -EINVAL;
+
+	fprintf(stdout, "%s\n", cdev->physical_location);
+	return 0;
+}
 
 /**
  * query_ioa_caching - Show whether or not user requested caching mode is set
@@ -17569,6 +17668,9 @@ static const struct {
 	{ "query-path-details",			1, 0, 1, query_path_details, "sda" },
 	{ "query-ioa-caching",			1, 0, 1, query_ioa_caching, "sg5" },
 	{ "query-array-label",			1, 0, 1, query_array_label, "mylabel" },
+	{ "query-array",				1, 0, 1, query_array, "U5886.001.P915059-P1-D1" },
+	{ "query-device",				1, 0, 1, query_device, "U5886.001.P915059-P1-D1" },
+	{ "query-location",			1, 0, 1, query_location, "sg5" },
 	{ "set-ioa-caching",			2, 0, 2, set_ioa_caching, "sg5 [Default | Disabled]" },
 	{ "primary",				1, 0, 1, set_primary, "sg5" },
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
