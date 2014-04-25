@@ -17748,9 +17748,9 @@ int check_sg_module()
 	sprintf(devpath, "%s", "/sys/module/sg");
 
 	sg_dirfd = opendir(devpath);
-	
+
 	if (!sg_dirfd) {
-		exit_on_error("Failed to open sg parameter.\n");
+		syslog_dbg("Failed to open sg parameter.\n");
 		return -1;
 	}
 
