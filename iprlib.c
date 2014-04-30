@@ -4072,7 +4072,7 @@ int ipr_query_res_redundancy_info(struct ipr_dev *dev,
 	int fd, rc;
 
 	if (scsi_dev_data)
-		res_handle = scsi_dev_data->handle;
+		res_handle = ntohl(scsi_dev_data->handle);
 	else if (ipr_is_af_dasd_device(dev)) {
 		dev_record = dev->dev_rcd;
 		if (dev_record->no_cfgte_dev) 
