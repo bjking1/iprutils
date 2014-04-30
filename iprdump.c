@@ -98,8 +98,14 @@ static void disable_dump(struct ipr_ioa *ioa)
 static int read_dump(struct ipr_ioa *ioa)
 {
 	int count = 0;
+	char path[PATH_MAX];
+	FILE *file;
 
-	count = ipr_read_host_attr(ioa, "dump", &dump, sizeof(dump));
+	sprintf(path, "/sys/class/scsi_host/%s/%s", ioa->host_name, "dump");
+	file = fopen(path, "r");
+	count = fread(&dump, 1 , sizeof(dump), file);
+	fclose(file);
+
 	return (count < 0) ? 0: count;
 }
 

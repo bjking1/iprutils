@@ -2184,7 +2184,7 @@ void ipr_reset_adapter(struct ipr_ioa *ioa)
  * @value_len:		length of value string
  *
  * Returns:
- *   0 if success / non-zero on failure
+ *   >= 0 if success / < 0 on failure
  **/
 int ipr_read_host_attr(struct ipr_ioa *ioa, char *name,
 		       void *value, size_t value_len)
@@ -2198,7 +2198,7 @@ int ipr_read_host_attr(struct ipr_ioa *ioa, char *name,
 		ioa_dbg(ioa, "Failed to read %s attribute. %m\n", name);
 		return -EIO;
 	}
-	return 0;
+	return len;
 }
 
 /**
@@ -2209,7 +2209,7 @@ int ipr_read_host_attr(struct ipr_ioa *ioa, char *name,
  * @value_len:		length of value string
  *
  * Returns:
- *   0 if success / non-zero on failure
+ *   >= 0 if success / < 0 on failure
  **/
 int ipr_write_host_attr(struct ipr_ioa *ioa, char *name,
 			void *value, size_t value_len)
@@ -2223,7 +2223,7 @@ int ipr_write_host_attr(struct ipr_ioa *ioa, char *name,
 		ioa_dbg(ioa, "Failed to write %s attribute. %m\n", name);
 		return -EIO;
 	}
-	return 0;
+	return len;
 }
 
 /**
