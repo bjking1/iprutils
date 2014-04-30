@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.1
+Version: 2.4.2
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -20,39 +20,79 @@ supported by the ipr SCSI storage device driver.
 make
 
 %install
-make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
-install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
-install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
-install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
-install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
+if [ -d %{_unitdir} ]; then
+	make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
+	install -d $RPM_BUILD_ROOT/%{_unitdir}
+	install -m 644 systemd/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
+	install -m 644 systemd/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
+	install -m 644 systemd/iprupdate.service $RPM_BUILD_ROOT/%{_unitdir}/iprupdate.service
+else
+	make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
+	install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
+	install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
+	install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
+	install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
+fi
+
 install -d $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d
 install -d $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d
 install -m 755 init.d/iprha $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d/iprha
 
 %ifarch ppc ppc64
 %post
-if [ $1 = 2 ]; then
-	echo "Restarting iprutils services"
-	%{_sysconfdir}/init.d/iprdump restart  > /dev/null 2>&1
-	%{_sysconfdir}/init.d/iprupdate restart  > /dev/null 2>&1
-	%{_sysconfdir}/init.d/iprinit restart  > /dev/null 2>&1
-elif [ -f /sbin/chkconfig ]; then
-	/sbin/chkconfig --add iprinit > /dev/null 2>&1
-	/sbin/chkconfig --add iprdump > /dev/null 2>&1
-	/sbin/chkconfig --add iprupdate > /dev/null 2>&1
-	/sbin/chkconfig iprinit on > /dev/null 2>&1
-	/sbin/chkconfig iprdump on > /dev/null 2>&1
-	/sbin/chkconfig iprupdate on > /dev/null 2>&1
+# if the system is using systemd
+if [ -d %{_unitdir} ]; then
+	if [ $1 = 2 ]; then
+		echo "Restarting iprutils services"
+		/usr/bin/systemctl restart iprinit.service > /dev/null 2>&1
+		/usr/bin/systemctl restart iprupdate.service > /dev/null 2>&1
+		/usr/bin/systemctl restart iprdump.service > /dev/null 2>&1
+	else
+		/usr/bin/systemctl daemon-reload > /dev/null 2>&1
+		/usr/bin/systemctl enable iprinit.service > /dev/null 2>&1
+		/usr/bin/systemctl enable iprdump.service > /dev/null 2>&1
+		/usr/bin/systemctl enable iprupdate.service > /dev/null 2>&1
+	fi
+
+# if the system is not using systemd
 else
-	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
-	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
-	/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
+	if [ $1 = 2 ]; then
+		echo "Restarting iprutils services"
+		%{_sysconfdir}/init.d/iprdump restart  > /dev/null 2>&1
+		%{_sysconfdir}/init.d/iprupdate restart  > /dev/null 2>&1
+		%{_sysconfdir}/init.d/iprinit restart  > /dev/null 2>&1
+	elif [ -f /sbin/chkconfig ]; then
+		/sbin/chkconfig --add iprinit > /dev/null 2>&1
+		/sbin/chkconfig --add iprdump > /dev/null 2>&1
+		/sbin/chkconfig --add iprupdate > /dev/null 2>&1
+		/sbin/chkconfig iprinit on > /dev/null 2>&1
+		/sbin/chkconfig iprdump on > /dev/null 2>&1
+		/sbin/chkconfig iprupdate on > /dev/null 2>&1
+	else
+		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
+		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
+		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
+	fi
 fi
 %endif
 
 %ifarch ppc ppc64
 %preun
-if [ $1 = 0 ]; then
+# disable services if the system is using systemd
+if [ -d %{_unitdir} ]; then
+        if [ $1 = 0 ]; then
+                echo "Restarting iprutils services"
+                /usr/bin/systemctl stop iprinit.service > /dev/null 2>&1
+                /usr/bin/systemctl stop iprupdate.service > /dev/null 2>&1
+                /usr/bin/systemctl stop iprdump.service > /dev/null 2>&1
+	else
+                /usr/bin/systemctl disable iprinit.service > /dev/null 2>&1
+                /usr/bin/systemctl disable iprdump.service > /dev/null 2>&1
+                /usr/bin/systemctl disable iprupdate.service > /dev/null 2>&1
+        fi
+
+# disable services if the system is *not* using systemd
+elif [ $1 = 0 ]; then
 	%{_sysconfdir}/init.d/iprdump stop  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprupdate stop  > /dev/null 2>&1
 	%{_sysconfdir}/init.d/iprinit stop  > /dev/null 2>&1
@@ -74,13 +114,23 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
+%if %{?_unitdir:1}%{!?_unitdir:0}
+	%{_unitdir}/*
+
+%else
+	%{_sysconfdir}/init.d/*
+%endif
 %doc README LICENSE
 /sbin/*
 %{_mandir}/man*/*
-%{_sysconfdir}/init.d/*
 %{_sysconfdir}/ha.d/resource.d/iprha
 
+
 %changelog
+* Wed Apr 30 2014 Daniel Kreling <kreling@imap.linux.ibm.com> 2.4.2
+- Release 2.4.2
+- Creation of systemd files for the ipr daemons and proper changes on the spec
+  file
 * Tue Apr 08 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.1
 - Release 2.4.1
 - Avoid bashisms

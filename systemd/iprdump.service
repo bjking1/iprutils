@@ -1,0 +1,9 @@
+[Unit]
+Description=IBM Power Raid dump daemon
+
+[Service]
+Type=forking
+ExecStart=/sbin/iprdump --daemon
+
+[Install]
+WantedBy=multi-user.target
