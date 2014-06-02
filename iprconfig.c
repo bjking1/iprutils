@@ -14793,6 +14793,11 @@ static int raid_rebuild_cmd(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	if (!ipr_is_af_dasd_device(dev)) {
+		fprintf(stderr, "%s is not an Advanced Function disk\n", args[0]);
+		return -EINVAL;
+	}
+
 	enable_af(dev);
 	dev->dev_rcd->issue_cmd = 1;
 	return ipr_rebuild_device_data(dev->ioa);
