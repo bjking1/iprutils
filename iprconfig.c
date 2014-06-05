@@ -12904,29 +12904,29 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
 				if (dev->block_dev_class & IPR_SSD)
-					sprintf(buf, "RAID %s %s SSD Disk Array",
+					sprintf(buf, "RAID %s%s SSD Disk Array",
 						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
-						is4k ? "4K" : "");
+						is4k ? " 4K" : "");
 				else
-					sprintf(buf, "RAID %s %s Disk Array",
+					sprintf(buf, "RAID %s%s Disk Array",
 						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
-						is4k ? "4K" : "");
+						is4k ? " 4K" : "");
 				len += sprintf(body + len, "%-25s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
 					if (dev->block_dev_class & IPR_SSD)
-						sprintf(raid_str,"  RAID %s %s SSD Member",
-							dev->prot_level_str, is4k ? "4K" : "");
+						sprintf(raid_str,"  RAID %s%s SSD Member",
+							dev->prot_level_str, is4k ? " 4K" : "");
 					else
-						sprintf(raid_str,"  RAID %s %s Array Member",
-							dev->prot_level_str, is4k ? "4K" : "");
+						sprintf(raid_str,"  RAID %s%s Array Member",
+							dev->prot_level_str, is4k ? " 4K" : "");
 				else
 					if (dev->block_dev_class & IPR_SSD)
-						sprintf(raid_str,"RAID %s %sSSD Member",
-							dev->prot_level_str, is4k ? "4K" : "");
+						sprintf(raid_str,"RAID %s%s SSD Member",
+							dev->prot_level_str, is4k ? " 4K" : "");
 					else
-						sprintf(raid_str,"RAID %s %s Array Member",
-							dev->prot_level_str, is4k ? "4K" : "");
+						sprintf(raid_str,"RAID %s%s Array Member",
+							dev->prot_level_str, is4k ? " 4K" : "");
 
 				len += sprintf(body + len, "%-25s ", raid_str);
 			} else if (ipr_is_af_dasd_device(dev))
@@ -12941,7 +12941,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 					len += sprintf(body + len, "%-13s ", (char *)&dev->serial_number);
 				else
 					len += sprintf(body + len, "%-25s ", "Enclosure");
-		
+
 			} else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
 				len += sprintf(body + len, "%-25s ", "Processor");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ROM)
