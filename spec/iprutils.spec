@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.1
+Version: 2.4.2
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -125,9 +125,15 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
-* Wed Apr 30 2014 Daniel Kreling <kreling@imap.linux.ibm.com> 2.4.1
+* Tue June 10 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.2
 - Creation of systemd files for the ipr daemons and proper changes on the spec
   file
+- Adds three new CLI APIs: query-array/device/location
+- Doesn't show "Redusant Paths" in dual config<LE>
+- Couldn't create iprudmp file
+- allow iprconfig to load sg module
+- Segmentation fault when rebuild an array
+- Fix blan space on array member strings
 * Tue Apr 08 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.1
 - Release 2.4.1
 - Avoid bashisms
