@@ -1931,10 +1931,45 @@ static void ipr_get_pci_slots()
 	char devspec[PATH_MAX], locpath[PATH_MAX];
 	char loc_code[1024], *last_hyphen, *prev_hyphen;
 	int num_slots, i, j, rc, num_attrs;
-	int slot_found = 0;
+	int loc_code_not_found = 0;
 	struct dirent **slotdir, **dirent;
 	struct stat statbuf;
 	struct ipr_ioa *ioa;
+
+	for_each_ioa(ioa)
+		ioa->physical_location[0] = '\0';
+
+	for_each_ioa(ioa) {
+		sprintf(attr, "/sys/bus/pci/devices/%s/devspec",
+			ioa->pci_address);
+		rc = read_attr_file(attr, devspec, PATH_MAX);
+
+		if (rc)
+			continue;
+
+		sprintf(locpath, "/proc/device-tree%s/ibm,loc-code",
+			devspec);
+		rc = read_attr_file(locpath, loc_code,
+				    sizeof(loc_code));
+
+		if (rc) {
+			loc_code_not_found = 1;
+			continue;
+		}
+
+		last_hyphen = strrchr(loc_code, '-');
+		if (last_hyphen && last_hyphen[1] == 'T') {
+			*last_hyphen = '\0';
+			prev_hyphen = strrchr(loc_code, '-');
+			if (prev_hyphen && prev_hyphen[1] != 'C')
+					*last_hyphen = '-';
+			}
+
+		strcpy(ioa->physical_location, loc_code);
+	}
+
+	if (loc_code_not_found == 0)
+		return;
 
 	sprintf(rootslot, "/sys/bus/pci/slots/");
 
@@ -1999,45 +2034,16 @@ static void ipr_get_pci_slots()
 		free(slotdir);
 	}
 
-	for_each_ioa(ioa)
-		ioa->physical_location[0] = '\0';
-
 	for_each_ioa(ioa) {
-		slot_found = 0;
-		for (i = 0; i < num_pci_slots; i++) {
-			if (strcmp(pci_slot[i].pci_device, ioa->pci_address) &&
-			    strcmp(pci_slot[i].slot_name, ioa->pci_address))
-				continue;
-			strcpy(ioa->physical_location,
-			       pci_slot[i].physical_name);
-			slot_found = 1;
-			break;
-		}
-		if (!slot_found) {
-			sprintf(attr, "/sys/bus/pci/devices/%s/devspec",
-				ioa->pci_address);
-			rc = read_attr_file(attr, devspec, PATH_MAX);
-
-			if (rc)
-				continue;
-
-			sprintf(locpath, "/proc/device-tree%s/ibm,loc-code",
-				devspec);
-			rc = read_attr_file(locpath, loc_code,
-					    sizeof(loc_code));
-
-			if (rc)
-				continue;
-
-			last_hyphen = strrchr(loc_code, '-');
-			if (last_hyphen && last_hyphen[1] == 'T') {
-				*last_hyphen = '\0';
-				prev_hyphen = strrchr(loc_code, '-');
-				if (prev_hyphen && prev_hyphen[1] != 'C')
-					*last_hyphen = '-';
+		if (strlen(ioa->physical_location) == 0) {
+			for (i = 0; i < num_pci_slots; i++) {
+				if (strcmp(pci_slot[i].pci_device, ioa->pci_address) &&
+				    strcmp(pci_slot[i].slot_name, ioa->pci_address))
+					continue;
+				strcpy(ioa->physical_location,
+				       pci_slot[i].physical_name);
+				break;
 			}
-
-			strcpy(ioa->physical_location, loc_code);
 		}
 	}
 
