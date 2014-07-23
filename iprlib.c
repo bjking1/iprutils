@@ -1940,6 +1940,7 @@ static void ipr_get_pci_slots()
 		ioa->physical_location[0] = '\0';
 
 	for_each_ioa(ioa) {
+		memset(devspec, 0, sizeof(devspec));
 		sprintf(attr, "/sys/bus/pci/devices/%s/devspec",
 			ioa->pci_address);
 		rc = read_attr_file(attr, devspec, PATH_MAX);
@@ -1947,6 +1948,7 @@ static void ipr_get_pci_slots()
 		if (rc)
 			continue;
 
+		memset(loc_code, 0, sizeof(loc_code));
 		sprintf(locpath, "/proc/device-tree%s/ibm,loc-code",
 			devspec);
 		rc = read_attr_file(locpath, loc_code,
