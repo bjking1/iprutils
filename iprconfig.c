@@ -7648,10 +7648,6 @@ static struct ipr_dev *alloc_empty_slot_64bit(struct ipr_dev *ses, int slot, int
  **/
 static int can_perform_conc_action(struct ipr_dev *dev, int action)
 {
-
-	if (dev->scsi_dev_data->type == TYPE_ROM || dev->scsi_dev_data->type==TYPE_TAPE)
-		return 0;
-
 	if (action == IPR_CONC_REMOVE) {
 		if (format_in_prog(dev))
 			return 0;
