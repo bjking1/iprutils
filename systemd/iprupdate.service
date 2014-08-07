@@ -1,0 +1,9 @@
+[Unit]
+Description=IBM Power Raid update daemon
+
+[Service]
+Type=forking
+ExecStart=/sbin/iprupdate --daemon
+
+[Install]
+WantedBy=multi-user.target

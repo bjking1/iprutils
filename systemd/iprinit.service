@@ -1,0 +1,9 @@
+[Unit]
+Description=IBM Power Raid init daemon
+
+[Service]
+Type=forking
+ExecStart=/sbin/iprinit --daemon
+
+[Install]
+WantedBy=multi-user.target
