@@ -2316,7 +2316,8 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	struct ipr_std_inq_data_long std_inq;
 	struct ipr_dev_record *device_record;
 	struct ipr_dasd_inquiry_page3 page3_inq;
-	struct ipr_read_cap read_cap;
+	struct ipr_read_cap16 read_cap16;
+	unsigned long long max_user_lba_int;
 	struct ipr_query_res_state res_state;
 	long double device_capacity; 
 	double lba_divisor;
@@ -2340,9 +2341,6 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 		scsi_id = device_record->type2.last_resource_addr.target;
 		scsi_lun = device_record->type2.last_resource_addr.lun;
 	}
-
-	read_cap.max_user_lba = 0;
-	read_cap.block_length = 0;
 
 	rc = ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
 
@@ -2392,18 +2390,25 @@ static char *disk_details(char *body, struct ipr_dev *dev)
 	if (serial_num[0] != '\0')
 		body = add_line_to_body(body, _("Serial Number"), serial_num);
 
-	memset(&read_cap, 0, sizeof(read_cap));
-	rc = ipr_read_capacity(dev, &read_cap);
+	/* Do a read capacity to determine the capacity */
+	memset(&read_cap16, 0, sizeof(read_cap16));
+	rc = ipr_read_capacity_16(dev, &read_cap16);
 
-	if (!rc && ntohl(read_cap.block_length) &&
-	    ntohl(read_cap.max_user_lba))  {
+	if (!rc && (ntohl(read_cap16.max_user_lba_hi) ||
+		    ntohl(read_cap16.max_user_lba_lo)) &&
+	    ntohl(read_cap16.block_length)) {
 
-		lba_divisor = (1000*1000*1000) /
-			ntohl(read_cap.block_length);
+		max_user_lba_int = ntohl(read_cap16.max_user_lba_hi);
+		max_user_lba_int <<= 32;
+		max_user_lba_int |= ntohl(read_cap16.max_user_lba_lo);
 
-		device_capacity = ntohl(read_cap.max_user_lba) + 1;
-		sprintf(buffer,"%.2Lf GB", device_capacity / lba_divisor);
-		body = add_line_to_body(body,_("Capacity"), buffer);
+		device_capacity = max_user_lba_int + 1;
+
+		lba_divisor  =
+			(1000*1000*1000) / ntohl(read_cap16.block_length);
+
+		sprintf(buffer, "%.2Lf GB", device_capacity / lba_divisor);
+		body = add_line_to_body(body, _("Capacity"), buffer);
 	}
 
 	if (strlen(dev->dev_name) > 0)

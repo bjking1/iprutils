@@ -3261,6 +3261,11 @@ int ipr_read_capacity_16(struct ipr_dev *dev, void *buff)
 	cdb[0] = IPR_SERVICE_ACTION_IN;
 	cdb[1] = IPR_READ_CAPACITY_16;
 
+	cdb[10] = length >> 24;
+	cdb[11] = length>> 16 & 0xff;
+	cdb[12] = length >> 8 & 0xff;
+	cdb[13] = length & 0xff;
+
 	rc = sg_ioctl(fd, cdb, buff,
 		      length, SG_DXFER_FROM_DEV,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
