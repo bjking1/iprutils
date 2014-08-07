@@ -2532,7 +2532,8 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 		if (strlen(buffer)) {
 			ipr_strncpy_0(unit_phy_loc, ses->physical_location, PHYSICAL_LOCATION_LENGTH);
 			first_hyphen = strchr(unit_phy_loc, '-');
-			*first_hyphen = '\0';
+			if (first_hyphen != NULL)
+				*first_hyphen = '\0';
 			sprintf(buf, "%s-%s", unit_phy_loc, buffer);
 		}
 		else
@@ -2542,7 +2543,8 @@ int get_drive_phy_loc_with_ses_phy_loc(struct ipr_dev *ses, struct drive_elem_de
 		if (strlen(ses->ioa->physical_location)) {
 			ipr_strncpy_0(unit_phy_loc, ses->ioa->physical_location, PHYSICAL_LOCATION_LENGTH);
 			first_hyphen = strchr(unit_phy_loc, '-');
-			*first_hyphen = '\0';
+			if (first_hyphen != NULL)
+				*first_hyphen = '\0';
 			sprintf(buf, "%s-%s", unit_phy_loc, buffer);
 		} else
 			sprintf(buf, "%s", "\0");
