@@ -6301,6 +6301,8 @@ void check_current_config(bool allow_rebuild_refresh)
 				dev->array_id = dev->dev_rcd->type2.array_id;
 				dev->resource_handle = dev->dev_rcd->type2.resource_handle;
 				dev->block_dev_class = dev->dev_rcd->type2.block_dev_class;
+				if (dev->block_dev_class & IPR_SSD)
+					dev->read_intensive = dev->dev_rcd->type2.read_intensive;
 			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD_3) {
 				dev->vendor_id = dev->dev_rcd->type3.vendor_id;
 				dev->product_id = dev->dev_rcd->type3.product_id;
@@ -6308,6 +6310,8 @@ void check_current_config(bool allow_rebuild_refresh)
 				dev->array_id = dev->dev_rcd->type3.array_id;
 				dev->resource_handle = dev->dev_rcd->type3.resource_handle;
 				dev->block_dev_class = dev->dev_rcd->type3.block_dev_class;
+				if (dev->block_dev_class & IPR_SSD)
+					dev->read_intensive = dev->dev_rcd->type3.read_intensive;
 			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD) {
 				dev->vendor_id = dev->array_rcd->type2.vendor_id;
 				dev->product_id = dev->array_rcd->type2.product_id;
@@ -6317,6 +6321,8 @@ void check_current_config(bool allow_rebuild_refresh)
 				dev->stripe_size = dev->array_rcd->type2.stripe_size;
 				dev->resource_handle = dev->array_rcd->type2.resource_handle;
 				dev->block_dev_class = dev->array_rcd->type2.block_dev_class;
+				if (dev->block_dev_class & IPR_SSD)
+					dev->read_intensive = dev->dev_rcd->type2.read_intensive;
 			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_VSET_RECORD_3) {
 				dev->vendor_id = dev->array_rcd->type3.vendor_id;
 				dev->product_id = dev->array_rcd->type3.product_id;
@@ -6326,6 +6332,8 @@ void check_current_config(bool allow_rebuild_refresh)
 				dev->stripe_size = dev->array_rcd->type3.stripe_size;
 				dev->resource_handle = dev->array_rcd->type3.resource_handle;
 				dev->block_dev_class = dev->array_rcd->type3.block_dev_class;
+				if (dev->block_dev_class & IPR_SSD)
+					dev->read_intensive = dev->dev_rcd->type3.read_intensive;
 			} else if (dev->qac_entry->record_id == IPR_RECORD_ID_ARRAY_RECORD_3) {
 				dev->vendor_id = dev->array_rcd->type3.vendor_id;
 				dev->product_id = dev->array_rcd->type3.product_id;
@@ -6335,6 +6343,8 @@ void check_current_config(bool allow_rebuild_refresh)
 				dev->stripe_size = dev->array_rcd->type3.stripe_size;
 				dev->resource_handle = dev->array_rcd->type3.resource_handle;
 				dev->block_dev_class = dev->array_rcd->type3.block_dev_class;
+				if (dev->block_dev_class & IPR_SSD)
+					dev->read_intensive = dev->dev_rcd->type3.read_intensive;
 			}
 		}
 		get_prot_levels(ioa);

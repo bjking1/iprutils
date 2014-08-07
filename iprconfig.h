@@ -1648,6 +1648,7 @@ const char *screen_status[] = {
 	/* 89 */ __("Incorrect device type specified. Please specify a valid disk enclosure to resume"),
 	/* 90 */ __("Selected disk enclosure is in Unknown state. Please check your hardware support"),
 	/* 91 */ __("Create disk array failed - can not mix 5XX and 4K disks."),
+	/* 92 */ __("Create disk array failed - can not build with read intensive disks only."),
 
       /* NOTE:  127 maximum limit */
 };
@@ -1746,6 +1747,7 @@ enum {
 	RC_89_Invalid_Dev_For_Resume,
 	RC_90_Enclosure_Is_Unknown,
 	RC_91_Mixed_Logical_Blk_Size,
+	RC_92_UNSUPT_REQ_BLK_DEV_CLASS,
 
 	/* NOTE:  127 maximum limit */
 };

@@ -269,7 +269,7 @@ static i_container *free_i_con(i_container *i_con)
  * @d:			data buffer
  *
  * Returns:
- *   i_container pointer
+ *   i_container pointen
  **/
 static i_container *add_i_con(i_container *i_con, char *f, void *d)
 {  
@@ -282,7 +282,7 @@ static i_container *add_i_con(i_container *i_con, char *f, void *d)
 	strncpy(new_i_con->field_data, f, MAX_FIELD_SIZE+1); 
 	new_i_con->field_data[strlen(f)+1] = '\0';
 
-	/* a pointer to the device information represented by the i_con */
+	/* a pointen to the device information represented by the i_con */
 	new_i_con->data = d;
 
 	if (i_con)
@@ -465,7 +465,7 @@ static void cmdline_exit_func()
  * @list_str:		
  *
  * Returns:
- *   pointer to body string
+ *   pointen to body string
  **/
 static char *ipr_list_opts(char *body, char *key, char *list_str)
 {
@@ -489,7 +489,7 @@ static char *ipr_list_opts(char *body, char *key, char *list_str)
  * @body:		
  *
  * Returns:
- *   pointer to body string
+ *   pointen to body string
  **/
 static char *ipr_end_list(char *body)
 {
@@ -888,7 +888,7 @@ static struct screen_output *screen_driver(s_node *screen, int header_lines, i_c
 						if ((temp->key[0] == '\n') && (num_fields > 0)) {
 
 							/* store field data to existing i_con (which should already
-							 contain pointers) */
+							 contain pointens) */
 							i_container *temp_i_con = i_con_head;
 							form_driver(form,REQ_VALIDATION);
 
@@ -1108,35 +1108,35 @@ leave:
 static char *status_hdr[] = {
 		/*   .        .                  .            .                           .          */
 		/*012345678901234567890123456789012345678901234567890123456789012345678901234567890 */
-		"OPT Name   Resource Path/Address      Vendor   Product ID       Status",
-		"OPT Name   PCI/SCSI Location          Description               Status",
+		"OPT Name   Resource Path/Address      Vendor   Product ID          Status",
+		"OPT Name   PCI/SCSI Location          Description                  Status",
 		"Name   Resource Path/Address      Vendor   Product ID       Status",
 		"Name   PCI/SCSI Location          Description               Status",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"OPT SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
 		"SAS Port/SAS Address   Description        Active Status            Info",
-		"OPT Name   Platform Location          Description               Status",
-		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
-		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID       Status",
-		"Name   Platform Location          Description               Status",
+		"OPT Name   Platform Location          Description                  Status",
+		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID          Status",
+		"OPT Name   SCSI Host/Resource Path      Vendor   Product ID          Status",
+		"Name   Platform Location          Description                  Status",
 		"OPT Name   PCI/Host/Resource Path                   Serial Number Status",
 		"OPT Name   Physical Location                        Production ID    Status",
 		"Name   Physical Location                        Serial Number Status"};
 
 static char *status_sep[] = {
-		"--- ------ -------------------------- -------- ---------------- -----------------",
-		"--- ------ -------------------------  ------------------------- -----------------",
+		"--- ------ -------------------------- -------- ------------------- -----------------",
+		"--- ------ -------------------------  ---------------------------- -----------------",
 		"------ -------------------------- -------- ---------------- -----------------",
 		"------ -------------------------  ------------------------- -----------------",
 		"--- --------------------- ------------------ ------ ----------------- ----------",
 		"--- ---------------------- ------------------ ------ ----------------- ----------",
 		"---------------------- ------------------ ------ ----------------- ----------",
 		"---------------------- ------------------ ------ ----------------- ----------",
-		"--- ------ -------------------------- ------------------------- -----------------",
-		"--- ------ ---------------------------- -------- ---------------- --------------",
-		"--- ------ ---------------------------- -------- ---------------- --------------",
-		"------ -------------------------- ------------------------- ------------",
+		"--- ------ -------------------------- ---------------------------- -----------------",
+		"--- ------ ---------------------------- -------- ------------------- --------------",
+		"--- ------ ---------------------------- -------- ------------------- --------------",
+		"------ -------------------------- ---------------------------- ------------",
 		"--- ------ ---------------------------------------- ------------- ------------",
 		"--- ------ ---------------------------------------- ---------------- ------------",
 		"------ ---------------------------------------- ------------- ------------",
@@ -2874,7 +2874,7 @@ int raid_stop(i_container *i_con)
 
 	processing();
 
-	/* empty the linked list that contains field pointers */
+	/* empty the linked list that contains field pointens */
 	i_con = free_i_con(i_con);
 
 	rc = RC_SUCCESS;
@@ -3168,7 +3168,7 @@ int raid_start(i_container *i_con)
 
 	processing();
 
-	/* empty the linked list that contains field pointers */
+	/* empty the linked list that contains field pointens */
 	i_con = free_i_con(i_con);
 
 	rc = RC_SUCCESS;
@@ -3648,7 +3648,7 @@ int configure_raid_parameters(i_container *i_con)
 
 				/* get appropriate memory, the text portion needs to be
 				 done up front as the new_item() function uses the
-				 passed pointer to display data */
+				 passed pointen to display data */
 				raid_item = realloc(raid_item, sizeof(ITEM **) * (index + 1));
 				raid_menu_str = realloc(raid_menu_str, sizeof(struct text_str) * (index));
 				userptr = realloc(userptr, sizeof(int) * (index + 1));
@@ -3688,7 +3688,7 @@ int configure_raid_parameters(i_container *i_con)
 
 				/* get appropriate memory, the text portion needs to be
 				 done up front as the new_item() function uses the
-				 passed pointer to display data */
+				 passed pointen to display data */
 				raid_item = realloc(raid_item, sizeof(ITEM **) * (index + 1));
 				stripe_menu_str = realloc(stripe_menu_str, sizeof(struct text_str) * (index));
 				userptr = realloc(userptr, sizeof(int) * (index + 1));
@@ -3974,6 +3974,11 @@ int raid_start_complete()
 								  "non 4K disks and 4K disks can not be mixed in an array.\n"),
 						       ioa->ioa.gen_name);
 						rc = RC_91_Mixed_Logical_Blk_Size;
+					} else  if (status_record->status == IPR_CMD_STATUS_UNSUPT_REQ_BLK_DEV_CLASS) {
+						 syslog(LOG_ERR, _("Start parity protect to %s failed.  "
+								  "These device contained a conmination of block device class filed that was not supported in an array.\n"),
+						       ioa->ioa.gen_name);
+						rc = RC_92_UNSUPT_REQ_BLK_DEV_CLASS;
 					} else {
 
 						syslog(LOG_ERR, _("Start parity protect to %s failed.  "
@@ -4001,6 +4006,11 @@ int raid_start_complete()
 			if (done_bad) {
 				if (status_record->status == IPR_CMD_STATUS_MIXED_BLK_DEV_CLASESS)
 					return RC_22_Mixed_Block_Dev_Classes;
+				if (status_record->status == IPR_CMD_STATUS_MIXED_LOG_BLK_SIZE)
+					return  RC_91_Mixed_Logical_Blk_Size;
+				if (status_record->status == IPR_CMD_STATUS_UNSUPT_REQ_BLK_DEV_CLASS)
+					return RC_92_UNSUPT_REQ_BLK_DEV_CLASS;
+
 				/* Start Parity Protection failed. */
 				return RC_19_Create_Fail;
 			}
@@ -5131,7 +5141,7 @@ int configure_raid_migrate(i_container *array_i_con)
 
 				/* get appropriate memory, the text portion
 				   needs to be done up front as the new_item()
-				   function uses the passed pointer to display data */
+				   function uses the passed pointen to display data */
 				raid_item = realloc(raid_item, sizeof(ITEM **) * (index + 1));
 				raid_menu_str = realloc(raid_menu_str, sizeof(struct text_str) * (index));
 				userptr = realloc(userptr, sizeof(int) * (index + 1));
@@ -8819,7 +8829,7 @@ int reclaim_cache(i_container* i_con)
 	int k;
 
 	processing();
-	/* empty the linked list that contains field pointers */
+	/* empty the linked list that contains field pointens */
 	i_con = free_i_con(i_con);
 
 	check_current_config(false);
@@ -10391,7 +10401,7 @@ int driver_config(i_container *i_con)
 	int toggle = 0;
 
 	processing();
-	/* empty the linked list that contains field pointers */
+	/* empty the linked list that contains field pointens */
 	i_con = free_i_con(i_con);
 
 	rc = RC_SUCCESS;
@@ -12280,9 +12290,9 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 			sprintf(buf, "Unknown");
 		else if (path_status && !rc) {
 			if (info.healthy_paths > 1)
-				sprintf(buf, "Redundant Paths");
+				sprintf(buf, "Redundant");
 			else if (info.healthy_paths)
-				sprintf(buf, "Single Path");
+				sprintf(buf, "Single");
 			else
 				sprintf(buf, "No Paths");
 		} else if (format_in_progress)
@@ -12658,7 +12668,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 	char vendor_id[IPR_VENDOR_ID_LEN + 1];
 	char product_id[IPR_PROD_ID_LEN + 1];
 	struct ipr_ioa *ioa = dev->ioa, *ioa_phy_loc;
-	bool is4k = false;
+	bool is4k = false, isri = false;
 
 	/* In cases where we're having problems with the device */
 	if (!ioa)
@@ -12777,7 +12787,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 					len += 40-loc_len;
 				}
-				len += sprintf(body + len,"%-16s ",
+				len += sprintf(body + len,"%-19s ",
 				       scsi_dev_data->product_id);
 			}
 		else { 
@@ -12794,12 +12804,12 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 				len += tab_stop;
 
-				for (i = 0; i < 26-tab_stop; i++)
+				for (i = 0; i < 29-tab_stop; i++)
 					body[len+i] = ' ';
 
-				len += 26-tab_stop;
+				len += 29-tab_stop;
 			} else 
-				len += sprintf(body + len,"%-8s %-16s ",
+				len += sprintf(body + len,"%-8s %-19s ",
 					       scsi_dev_data->vendor_id,
 					       scsi_dev_data->product_id);
 		}
@@ -12825,7 +12835,7 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				len += 29-loc_len;
 			}
 		}
-		len += sprintf(body + len, "%-8s %-16s ", " ", " ");
+		len += sprintf(body + len, "%-8s %-19s ", " ", " ");
 	} else {
 		if (serial_num) {
 			if (!res_path || !ioa->sis64) {
@@ -12884,11 +12894,11 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				}
 			}
 			if (hw_loc) {
-				len += sprintf(body + len, "%-16s ",
+				len += sprintf(body + len, "%-19s ",
 						product_id);
 			}
 			else {
-				len += sprintf(body + len, "%-8s %-16s ",
+				len += sprintf(body + len, "%-8s %-19s ",
 					       vendor_id, product_id);
 			}
 
@@ -12899,63 +12909,83 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 				is4k = false;
 
 			if (ipr_is_hot_spare(dev)) {
-				if (dev->block_dev_class & IPR_SSD)
-					sprintf(buf, "%s%s", is4k ? "4K " : "", "SSD Hot Spare");
-				else
-					sprintf(buf, "%s%s", is4k ? "4K " : "", "Hot Spare");
-				len += sprintf(body + len, "%-25s ", buf);
+				if (dev->block_dev_class & IPR_SSD) {
+					if (dev->read_intensive & IPR_RI)
+						isri = true;
+					else
+						isri = false;
+					sprintf(buf, "%s%sSSD Hot Spare", is4k ? "4K " : "", isri ? "RI " : "");
+				} else
+					sprintf(buf, "%s Hot Spare", is4k ? "4K " : "");
+				len += sprintf(body + len, "%-28s ", buf);
 			} else if (ipr_is_volume_set(dev) || ipr_is_array(dev)) {
-				if (dev->block_dev_class & IPR_SSD)
-					sprintf(buf, "RAID %s%s SSD Disk Array",
+				if (dev->block_dev_class & IPR_SSD) {
+					if (dev->read_intensive & IPR_RI)
+						isri = true;
+					else
+						isri = false;
+					sprintf(buf, "RAID %s%s%s SSD Array",
+						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
+						is4k ? " 4K" : "", isri ? " RI" : "");
+				} else
+					sprintf(buf, "RAID %s%s Array",
 						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
 						is4k ? " 4K" : "");
-				else
-					sprintf(buf, "RAID %s%s Disk Array",
-						get_prot_level_str(ioa->supported_arrays, dev->raid_level),
-						is4k ? " 4K" : "");
-				len += sprintf(body + len, "%-25s ", buf);
+				len += sprintf(body + len, "%-28s ", buf);
 			} else if (ipr_is_array_member(dev)) {
 				if (indent)
-					if (dev->block_dev_class & IPR_SSD)
-						sprintf(raid_str,"  RAID %s%s SSD Member",
-							dev->prot_level_str, is4k ? " 4K" : "");
-					else
+					if (dev->block_dev_class & IPR_SSD) {
+						if (dev->read_intensive & IPR_RI)
+							isri = true;
+						else
+							isri = false;
+						sprintf(raid_str,"  RAID %s%s%s SSD Member",
+							dev->prot_level_str, is4k ? " 4K" : "", isri ? " RI" : "");
+					} else
 						sprintf(raid_str,"  RAID %s%s Array Member",
 							dev->prot_level_str, is4k ? " 4K" : "");
 				else
-					if (dev->block_dev_class & IPR_SSD)
-						sprintf(raid_str,"RAID %s%s SSD Member",
-							dev->prot_level_str, is4k ? " 4K" : "");
-					else
+					if (dev->block_dev_class & IPR_SSD) {
+						if (dev->read_intensive & IPR_RI)
+							isri = true;
+						else
+							isri = false;
+						sprintf(raid_str,"RAID %s%s SSD %s Member",
+							dev->prot_level_str, is4k ? " 4K" : "", isri ? " RI" : "");
+					} else
 						sprintf(raid_str,"RAID %s%s Array Member",
 							dev->prot_level_str, is4k ? " 4K" : "");
 
-				len += sprintf(body + len, "%-25s ", raid_str);
+				len += sprintf(body + len, "%-28s ", raid_str);
 			} else if (ipr_is_af_dasd_device(dev))
-				if (dev->block_dev_class & IPR_SSD)
-					len += sprintf(body + len, "%-25s ", is4k ? "Advanced Function 4K SSD" :
-							"Advanced Function SSD");
-				else
-					len += sprintf(body + len, "%-25s ", is4k ? "Advanced Function 4K Disk" :
+				if (dev->block_dev_class & IPR_SSD) {
+					if (dev->read_intensive & IPR_RI)
+						len += sprintf(body + len, "%-28s ", is4k ? "Advanced Function 4K RI SSD" :
+								"Advanced Function RI SSD");
+					else
+						len += sprintf(body + len, "%-28s ", is4k ? "Advanced Function 4K SSD" :
+								"Advanced Function SSD");
+				} else
+					len += sprintf(body + len, "%-28s ", is4k ? "Advanced Function 4K Disk" :
 							"Advanced Function Disk");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ENCLOSURE) {
 				if (serial_num == 1)
 					len += sprintf(body + len, "%-13s ", (char *)&dev->serial_number);
 				else
-					len += sprintf(body + len, "%-25s ", "Enclosure");
+					len += sprintf(body + len, "%-28s ", "Enclosure");
 
 			} else if (scsi_dev_data && scsi_dev_data->type == TYPE_PROCESSOR)
-				len += sprintf(body + len, "%-25s ", "Processor");
+				len += sprintf(body + len, "%-28s ", "Processor");
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_ROM)
-				len += sprintf(body + len, "%-25s ", "CD/DVD");
+				len += sprintf(body + len, "%-28s ", "CD/DVD");
 
 			else if (scsi_dev_data && scsi_dev_data->type == TYPE_TAPE)
-				len += sprintf(body + len, "%-25s ", "Tape");
+				len += sprintf(body + len, "%-28s ", "Tape");
 
 			else if (ioa->ioa_dead)
-				len += sprintf(body + len, "%-25s ", "Unavailable Device");
+				len += sprintf(body + len, "%-28s ", "Unavailable Device");
 			else {
-				len += sprintf(body + len, "%-25s ",
+				len += sprintf(body + len, "%-28s ",
 						is4k ? "Physical 4K Disk" : "Physical Disk");
 			}
 		}
@@ -17702,7 +17732,7 @@ static const struct {
 };
 
 /**
- * non_interactive_cmd - process a command line command
+ * non_intenactive_cmd - process a command line command
  * @cmd:		command string
  * @args:		argument vector
  * @num_args:		number of arguments
@@ -17710,7 +17740,7 @@ static const struct {
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int non_interactive_cmd(char *cmd, char **args, int num_args)
+static int non_intenactive_cmd(char *cmd, char **args, int num_args)
 {
 	int rc, i;
 
@@ -17778,7 +17808,7 @@ int main(int argc, char *argv[])
 {
 	int  next_editor, next_dir, next_cmd, next_args, i, rc = 0;
 	char parm_editor[200], parm_dir[200], cmd[200];
-	int non_interactive = 0;
+	int non_intenactive = 0;
 
 	strcpy(parm_dir, DEFAULT_LOG_DIR);
 	strcpy(parm_editor, DEFAULT_EDITOR);
@@ -17811,7 +17841,7 @@ int main(int argc, char *argv[])
 				next_dir = 0;
 			} else if (next_cmd) {
 				strcpy(cmd, argv[i]);
-				non_interactive = 1;
+				non_intenactive = 1;
 				next_cmd = 0;
 				next_args = 1;
 			} else if (next_args) {
@@ -17834,8 +17864,8 @@ int main(int argc, char *argv[])
 	exit_func = tool_exit_func;
 	tool_init(0);
 
-	if (non_interactive)
-		return non_interactive_cmd(cmd, add_args, num_add_args);
+	if (non_intenactive)
+		return non_intenactive_cmd(cmd, add_args, num_add_args);
 
 	use_curses = 1;
 	curses_init();

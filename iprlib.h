@@ -226,6 +226,7 @@ typedef uint64_t u64;
 #define IPR_HDD                              0x0
 #define IPR_SSD                              0x1
 #define IPR_BLK_DEV_CLASS_4K                 0x4
+#define IPR_RI				     0x1
 
 #define IPR_ARRAY_VIRTUAL_BUS			0x1
 #define IPR_VSET_VIRTUAL_BUS			0x2
@@ -824,9 +825,13 @@ struct ipr_array_record {
 			u8  serial_number[8];
 #if defined (__BIG_ENDIAN_BITFIELD)
 			u8  block_dev_class:3;
-			u8  reserved5:5;
+			u8  reserved51:1;
+			u8  read_intensive:1;
+			u8  reserved5:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-			u8  reserved5:5;
+			u8  reserved5:3;
+			u8  read_intensive:1;
+			u8  reserved51:1;
 			u8  block_dev_class:3;
 #endif
 			u8  reserved6;
@@ -848,9 +853,13 @@ struct ipr_array_record {
 			u8  array_id;
 #if defined (__BIG_ENDIAN_BITFIELD)
 			u8  block_dev_class:3;
-			u8  reserved9:5;
+			u8  reserved91:1;
+			u8  read_intensive:1;
+			u8  reserved9:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-			u8  reserved9:5;
+			u8  reserved9:3;
+			u8  read_intensive:1;
+			u8  reserved91:1;
 			u8  block_dev_class:3;
 #endif
 			u32 resource_handle;
@@ -951,9 +960,13 @@ struct ipr_dev_record {
 
 #if defined (__BIG_ENDIAN_BITFIELD)
 			u8  block_dev_class:3;
-			u8  reserved5:5;
+			u8  reserved51:1;
+			u8  read_intensive:1;
+			u8  reserved5:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-			u8  reserved5:5;
+			u8  reserved5:3;
+			u8  read_intensive:1;
+			u8  reserved51:1;
 			u8  block_dev_class:3;
 #endif
 			u8  reserved6;
@@ -970,9 +983,13 @@ struct ipr_dev_record {
 
 #if defined (__BIG_ENDIAN_BITFIELD)
 			u8  block_dev_class:3;
-			u8  reserved8:5;
+			u8  reserved81:1;
+			u8  read_intensive:1;
+			u8  reserved8:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-			u8  reserved8:5;
+			u8  reserved8:3;
+			u8  read_intensive:1;
+			u8  reserved81:1;
 			u8  block_dev_class:3;
 #endif
 			u32 resource_handle;
@@ -1330,6 +1347,7 @@ struct ipr_dev {
 	u16 stripe_size;
 	u32 resource_handle;
 	u8  block_dev_class;
+	u8  read_intensive;
 	u32 is_reclaim_cand:1;
 	u32 should_init:1;
 	u32 init_not_allowed:1;
@@ -1709,6 +1727,7 @@ struct ipr_cmd_status_record {
 #define IPR_CMD_STATUS_INSUFF_DATA_MOVED     5
 #define IPR_CMD_STATUS_MIXED_BLK_DEV_CLASESS 6
 #define IPR_CMD_STATUS_MIXED_LOG_BLK_SIZE    7
+#define IPR_CMD_STATUS_UNSUPT_REQ_BLK_DEV_CLASS    8
 
 	u8 percent_complete;
 	struct ipr_res_addr failing_dev_res_addr;
