@@ -2129,7 +2129,7 @@ void tool_init(int save_state)
 		}
 		closedir(host_dirfd);
 		if (ipr_ioa->host_num < 0) {
-			exit_on_error("No SCSI Host found on IPR device %s\n",
+			syslog_dbg("No SCSI Host found on IPR device %s\n",
 				      ipr_ioa->pci_address);
 			free(ipr_ioa);
 			continue;
