@@ -1474,6 +1474,11 @@ struct ipr_ioa {
       for_each_dev(i, d) \
            if (ipr_is_array(d) && !d->array_rcd->start_cand)
 
+#define for_each_dvd_tape(i, d) \
+      for_each_dev(i, d) \
+           if (d->scsi_dev_data && (d->scsi_dev_data->type == TYPE_ROM || \
+		d->scsi_dev_data->type == TYPE_TAPE))
+
 #define for_each_ses(i, d) \
       for_each_dev(i, d) \
            if (d->scsi_dev_data && d->scsi_dev_data->type == TYPE_ENCLOSURE)

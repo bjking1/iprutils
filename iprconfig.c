@@ -1797,6 +1797,22 @@ static int print_ses_devices(struct ipr_ioa *ioa,
 	return num_lines;
 }
 
+static int print_dvd_tape_devices(struct ipr_ioa *ioa,
+			     i_container **i_con, char **buffer, int type)
+{
+	struct ipr_dev *dev;
+	int k;
+	int num_lines = 0;
+
+	for_each_dvd_tape(ioa, dev) {
+		print_dev(k, dev, buffer, "%1", type+k);
+		*i_con = add_i_con(*i_con, "\0", dev);  
+		num_lines++;
+	}
+
+	return num_lines;
+}
+
 /**
  * print_sas_ses_devices - 
  * @ioa:		ipr ioa struct
@@ -1901,6 +1917,7 @@ int disk_status(i_container *i_con)
 		num_lines += print_standalone_disks(ioa, &i_con, buffer, 2);
 		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 2);
 		num_lines += print_vsets(ioa, &i_con, buffer, 2);
+		num_lines += print_dvd_tape_devices(ioa, &i_con, buffer, 2);
 		num_lines += print_ses_devices(ioa, &i_con, buffer, 2);
 	}
 
