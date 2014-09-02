@@ -1927,7 +1927,7 @@ struct ipr_dev_identify_vpd {
 	u8 dev_identify_contxt[40];
 };
 
-#define IPR_IOA_MAX_SUPP_LOG_PAGES		16
+#define IPR_IOA_MAX_SUPP_LOG_PAGES		64
 struct ipr_supp_log_pages {
 	u8 page_code;
 	u8 reserved;
@@ -2144,6 +2144,40 @@ struct ipr_log_page18 {
         for (phy = (port)->phy; \
              (phy < ((port)->phy + (port)->num_phys)) && \
              (phy < ((port)->phy + IPR_IOA_MAX_PORTS)); phy++)
+
+struct ipr_dasd_perf_counters_log_page30 {
+	u8 page_code;
+	u8 reserved1;
+	u16 length;
+	u8 reserved2[3];
+	u8 param_length;
+	u16 dev_no_seeks;
+	u16 dev_seeks_2_3;
+	u16 dev_seeks_1_3;
+	u16 dev_seeks_1_6;
+	u16 dev_seeks_1_12;
+	u16 dev_seeks_0;
+	u32 reserved3;
+	u16 dev_read_buf_overruns;
+	u16 dev_write_buf_underruns;
+	u32 dev_cache_read_hits;
+	u32 dev_cache_partial_read_hits;
+	u32 dev_cache_write_hits;
+	u32 dev_cache_fast_write_hits;
+	u32 reserved4;
+	u32 reserved5;
+	u32 ioa_dev_read_ops;
+	u32 ioa_dev_write_ops;
+	u32 ioa_cache_read_hits;
+	u32 ioa_cache_partial_read_hits;
+	u32 ioa_cache_write_hits;
+	u32 ioa_cache_fast_write_hits;
+	u32 ioa_cache_emu_read_hits;
+	u32 ioa_idle_loop_count[2];
+	u32 ioa_idle_count_value;
+	u8 ioa_idle_units;
+	u8 reserved6[3];
+};
 
 struct ipr_fabric_config_element {
 	u8 type_status;

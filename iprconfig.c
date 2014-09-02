@@ -28,6 +28,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <math.h>
+
 char *tool_name = "iprconfig";
 
 struct devs_to_init_t {
@@ -17638,6 +17640,112 @@ static int query_disk_enclosure_status(char **args, int num_args)
 	return rc;
 }
 
+static char *af_dasd_perf (char *body, struct ipr_dev *dev)
+{
+	struct ipr_dasd_perf_counters_log_page30 log;
+	char buffer[200];
+	unsigned long long idle_loop_count;
+	u32 idle_count;
+
+	memset(&log, 0, sizeof(log));
+
+	body = add_line_to_body(body,"", NULL);
+	if (!ipr_is_log_page_supported(dev, 0x30)) {
+		body = add_line_to_body(body,_("Log page 30 not supported"), NULL);
+		return body;
+	}
+
+	ipr_log_sense(dev, 0x30, &log, sizeof(log));
+
+	sprintf(buffer,"%d", ntohs(log.dev_no_seeks));
+	body = add_line_to_body(body,_("Seek = 0 disk"), buffer);
+	sprintf(buffer,"%d", ntohs(log.dev_seeks_2_3));
+	body = add_line_to_body(body,_("Seek >= 2/3 disk"), buffer);
+	sprintf(buffer,"%d", ntohs(log.dev_seeks_1_3));
+	body = add_line_to_body(body,_("Seek >= 1/3 and < 2/3 disk"), buffer);
+	sprintf(buffer,"%d", ntohs(log.dev_seeks_1_6));
+	body = add_line_to_body(body,_("Seek >= 1/6 and < 1/3 disk"), buffer);
+	sprintf(buffer,"%d", ntohs(log.dev_seeks_1_12));
+	body = add_line_to_body(body,_("Seek >= 1/12 and < 1/6 disk"), buffer);
+	sprintf(buffer,"%d", ntohs(log.dev_seeks_0));
+	body = add_line_to_body(body,_("Seek > 0 and < 1/12 disk"), buffer);
+
+	body = add_line_to_body(body,"", NULL);
+
+	sprintf(buffer,"%d", ntohs(log.dev_read_buf_overruns));
+	body = add_line_to_body(body,_("Device Read Buffer Overruns"), buffer);
+	sprintf(buffer,"%d", ntohs(log.dev_write_buf_underruns));
+	body = add_line_to_body(body,_("Device Write Buffer Underruns"), buffer);
+	sprintf(buffer,"%d", ntohl(log.dev_cache_read_hits));
+	body = add_line_to_body(body,_("Device Cache Read Hits"), buffer);
+	sprintf(buffer,"%d", ntohl(log.dev_cache_partial_read_hits));
+	body = add_line_to_body(body,_("Device Partial Read Hits"), buffer);
+	sprintf(buffer,"%d", ntohl(log.dev_cache_write_hits));
+	body = add_line_to_body(body,_("Device Cache Write Hits"), buffer);
+	sprintf(buffer,"%d", ntohl(log.dev_cache_fast_write_hits));
+	body = add_line_to_body(body,_("Device Cache Fast Writes"), buffer);
+
+	body = add_line_to_body(body,"", NULL);
+
+	sprintf(buffer,"%d", ntohl(log.ioa_dev_read_ops));
+	body = add_line_to_body(body,_("IOA Issued Device Reads"), buffer);
+	sprintf(buffer,"%d", ntohl(log.ioa_dev_write_ops));
+	body = add_line_to_body(body,_("IOA Issued Device Writes"), buffer);
+	sprintf(buffer,"%d", ntohl(log.ioa_cache_read_hits));
+	body = add_line_to_body(body,_("IOA Cache Read Hits"), buffer);
+	sprintf(buffer,"%d", ntohl(log.ioa_cache_partial_read_hits));
+	body = add_line_to_body(body,_("IOA Cache Partial Read Hits"), buffer);
+	sprintf(buffer,"%d", ntohl(log.ioa_cache_write_hits));
+	body = add_line_to_body(body,_("IOA Cache Write Hits"), buffer);
+	sprintf(buffer,"%d", ntohl(log.ioa_cache_fast_write_hits));
+	body = add_line_to_body(body,_("IOA Cache Fast Writes"), buffer);
+	sprintf(buffer,"%d", ntohl(log.ioa_cache_emu_read_hits));
+	body = add_line_to_body(body,_("IOA Emulated Read Hits"), buffer);
+
+	body = add_line_to_body(body,"", NULL);
+	sprintf(buffer,"%08X%08X", ntohl(log.ioa_idle_loop_count[0]),
+			ntohl(log.ioa_idle_loop_count[1]));
+	idle_loop_count = strtoull(buffer, NULL, 16);
+	sprintf(buffer,"%llu", idle_loop_count);
+	body = add_line_to_body(body,_("IOA Idle Loop Count"), buffer);
+
+	idle_count = ntohl(log.ioa_idle_count_value);
+	sprintf(buffer,"%d", idle_count);
+	body = add_line_to_body(body,_("IOA Idle Count"), buffer);
+
+	sprintf(buffer,"%d", log.ioa_idle_units);
+	body = add_line_to_body(body,_("IOA Idle Units"), buffer);
+
+	idle_count = idle_loop_count * ( idle_count * pow(10, -log.ioa_idle_units));
+
+	sprintf(buffer,"%d seconds.", idle_count);
+	body = add_line_to_body(body,_("IOA Idle Time"), buffer);
+
+	return body;
+}
+
+
+static int show_perf (char **args, int num_args)
+{
+	char *body = NULL;
+	struct ipr_dev *dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (ipr_is_af_dasd_device(dev)) {
+		body = af_dasd_perf(body, dev);
+	} else {
+		fprintf(stderr, "%s is not a valid DASD\n", args[0]);
+		return -EINVAL;
+	}
+	printf("%s\n", body);
+	free(body);
+	return 0;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -17747,6 +17855,7 @@ static const struct {
 	{ "query-disk-enclosure-status",        0, 0, 0, query_disk_enclosure_status},
 	{ "suspend-disk-enclosure",             1, 0, 1, suspend_disk_enclosure, "sg8"},
 	{ "resume-disk-enclosure",              1, 0, 1, resume_disk_enclosure, "sg8 "},
+	{ "show-perf",                          1, 0, 1, show_perf, "sg8"},
 };
 
 /**
