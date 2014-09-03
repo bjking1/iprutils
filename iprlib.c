@@ -8011,6 +8011,20 @@ static void get_linux_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
 }
 
 /**
+ * get_linux_ioa_fw_name_capital -
+ * @ioa:		ipr ioa struct
+ * @buf:		data buffer
+ *
+ * Returns:
+ *   nothing
+ **/
+static void get_linux_ioa_fw_name_capital(struct ipr_ioa *ioa, char *buf)
+{
+	sprintf(buf, "pci.%04X%04X.%02X", ioa->pci_vendor, ioa->pci_device,
+		get_ioa_image_type(ioa));
+}
+
+/**
  * init_ioa_ucode_entry - 
  * @img:		ipr_fw_images struct
  *
@@ -8126,6 +8140,10 @@ int get_ioa_firmware_image_list(struct ipr_ioa *ioa,
 	len = scan_fw_dir(UCODE_BASE_DIR, buf, &ret, len, init_ioa_ucode_entry);
 
 	get_linux_ioa_fw_name(ioa, buf);
+
+	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len, init_ioa_ucode_entry);
+
+	get_linux_ioa_fw_name_capital(ioa, buf);
 
 	len = scan_fw_dir(LINUX_UCODE_BASE_DIR, buf, &ret, len, init_ioa_ucode_entry);
 
