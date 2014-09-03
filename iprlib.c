@@ -8006,7 +8006,7 @@ static void get_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
  **/
 static void get_linux_ioa_fw_name(struct ipr_ioa *ioa, char *buf)
 {
-	sprintf(buf, "pci.%04X%04X.%02X", ioa->pci_vendor, ioa->pci_device,
+	sprintf(buf, "pci.%04x%04x.%02x", ioa->pci_vendor, ioa->pci_device,
 		get_ioa_image_type(ioa));
 }
 
