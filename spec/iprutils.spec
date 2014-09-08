@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.3
+Version: 2.4.4
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -125,6 +125,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Sep 8 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.4
+- Add support to catch cache hit
+- Change the filesnameof firmware to be case insentive.
 * Tue Sep 2 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.3
 - On PowerNV, some of IOAs showed the wrong physical location
 - Read Intensive SDs are not showed up in iprconifg
@@ -132,7 +135,7 @@ rm -rf $RPM_BUILD_ROOT
 - Add code for supporting DVD/Tape hotplug
 - allow systemd dameons to be activated laster during boot
 - add DVD/Tape support in dispaly hardware staut menu
-* Tue June 10 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.2
+* Tue Jun 10 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.2
 - Creation of systemd files for the ipr daemons and proper changes on the spec
   file
 - Adds three new CLI APIs: query-array/device/location
