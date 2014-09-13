@@ -5231,7 +5231,7 @@ int configure_raid_migrate(i_container *array_i_con)
 
 			/* set up qac and send command to adapter */
 			rc = do_ipr_migrate_array_protection(array_i_con, ioa, &qac,
-				       			     dev->stripe_size,
+				       			     ntohs(dev->stripe_size),
 							     cur_raid_cmd->prot_level,
 							     cur_raid_cmd->array_id);
 
