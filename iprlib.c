@@ -34,6 +34,7 @@ int polling_mode = 0;
 int ipr_fast = 0;
 int format_done = 0;
 static int ipr_mode5_write_buffer = 0;
+static int first_time_check_zeroed_dev = 0;
 
 struct sysfs_dev *head_zdev = NULL;
 struct sysfs_dev *tail_zdev = NULL;
@@ -6129,6 +6130,8 @@ void check_current_config(bool allow_rebuild_refresh)
 	int *qac_entry_ref;
 	struct ipr_dev_identify_vpd di_vpd;
 	char *pchr;
+        struct ipr_mode_pages mode_pages;
+        struct ipr_ioa_mode_page *page;
 
 	if (ipr_qac_data == NULL) {
 		ipr_qac_data =
@@ -6371,6 +6374,25 @@ void check_current_config(bool allow_rebuild_refresh)
 	link_multipath_vsets();
 	ipr_cleanup_zeroed_devs();
 	resolve_old_config();
+
+        if (!first_time_check_zeroed_dev) {
+                for_each_ioa(ioa) {
+                        for_each_dev(ioa, dev) {
+                                if (ipr_is_af_dasd_device(dev)) {
+                                        memset(&mode_pages, 0, sizeof(mode_pages));
+                                        ipr_mode_sense(dev, 0x20, &mode_pages);
+
+                                        page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+                                                     mode_pages.hdr.block_desc_len +
+                                                     sizeof(mode_pages.hdr));
+
+                                        if (page->format_completed)
+                                                ipr_add_zeroed_dev(dev);
+                                }
+                        }
+                }
+                first_time_check_zeroed_dev = 1;
+        }
 }
 
 /**
