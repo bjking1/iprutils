@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.4
+Version: 2.4.5
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -125,6 +125,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog
+* Tue Nov 7 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.5
+- Raid migration fails on LE systems
+- Set known zeroed after format
 * Tue Sep 8 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.4
 - Add support to catch cache hit
 - Change the filesnameof firmware to be case insentive.
