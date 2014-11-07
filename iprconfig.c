@@ -8633,6 +8633,9 @@ static int dev_init_complete(u8 num_devs)
 				return 51 | EXIT_FLAG;
 			}
 
+                        format_done = 1;
+                        check_current_config(false);
+
 			if (!pid)
 				exit(0);
 
