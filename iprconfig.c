@@ -16902,6 +16902,22 @@ static int set_array_asymmetric_access(char **args, int num_args)
 	return ipr_set_array_asym_access(array->ioa);
 }
 
+static int __query_array_label(struct ipr_ioa *ioa, char *name)
+{
+	struct ipr_dev *vset;
+
+	if (ioa->sis64) {
+		for_each_vset(ioa, vset) {
+			if (!strcmp((char *)vset->array_rcd->type3.desc, name)) {
+				fprintf(stdout, "%s\n", vset->dev_name);
+				return 0;
+			}
+		}
+	}
+
+	return -ENODEV;
+}
+
 /**
  * query_array_label - Display the device name for the specified label
  * @args:	       argument vector
@@ -16913,14 +16929,31 @@ static int set_array_asymmetric_access(char **args, int num_args)
 static int query_array_label(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
+
+	for_each_primary_ioa(ioa) {
+		if (!__query_array_label(ioa, args[0]))
+			return 0;
+	}
+
+	for_each_secondary_ioa(ioa) {
+		if (!__query_array_label(ioa, args[0]))
+			return 0;
+	}
+
+	return -ENODEV;
+}
+
+static int __query_array(struct ipr_ioa *ioa, char *name)
+{
 	struct ipr_dev *vset;
+	struct ipr_dev *dev;
 
-	for_each_ioa(ioa) {
-		if (!ioa->sis64)
-			continue;
+	get_drive_phy_loc(ioa);
 
-		for_each_vset(ioa, vset) {
-			if (!strcmp((char *)vset->array_rcd->type3.desc, args[0])) {
+	for_each_vset(ioa, vset) {
+		for_each_dev_in_vset(vset, dev) {
+			strip_trailing_whitespace(dev->physical_location);
+			if (!strcmp(dev->physical_location, name)) {
 				fprintf(stdout, "%s\n", vset->dev_name);
 				return 0;
 			}
@@ -16941,20 +16974,34 @@ static int query_array_label(char **args, int num_args)
 static int query_array(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
-	struct ipr_dev *vset;
+
+	for_each_primary_ioa(ioa) {
+		if (!__query_array(ioa, args[0]))
+			return 0;
+	}
+
+	for_each_secondary_ioa(ioa) {
+		if (!__query_array(ioa, args[0]))
+			return 0;
+	}
+
+	return -ENODEV;
+}
+
+static int __query_device(struct ipr_ioa *ioa, char *name)
+{
 	struct ipr_dev *dev;
 
-	for_each_ioa(ioa) {
-		get_drive_phy_loc(ioa);
+	get_drive_phy_loc(ioa);
 
-		for_each_vset(ioa, vset) {
-			for_each_dev_in_vset(vset, dev) {
-				strip_trailing_whitespace(dev->physical_location);
-				if (!strcmp(dev->physical_location, args[0])) {
-					fprintf(stdout, "%s\n", vset->dev_name);
-					return 0;
-				}
-			}
+	for_each_disk(ioa, dev) {
+		strip_trailing_whitespace(dev->physical_location);
+		if (!strcmp(dev->physical_location, name)) {
+			if (strlen(dev->dev_name))
+				fprintf(stdout, "%s\n", dev->dev_name);
+			else
+				fprintf(stdout, "%s\n", dev->gen_name);
+			return 0;
 		}
 	}
 
@@ -16972,21 +17019,15 @@ static int query_array(char **args, int num_args)
 static int query_device(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
-	struct ipr_dev *dev;
 
-	for_each_ioa(ioa) {
-		get_drive_phy_loc(ioa);
+	for_each_primary_ioa(ioa) {
+		if (!__query_device(ioa, args[0]))
+			return 0;
+	}
 
-		for_each_disk(ioa, dev) {
-			strip_trailing_whitespace(dev->physical_location);
-			if (!strcmp(dev->physical_location, args[0])) {
-				if (strlen(dev->dev_name))
-					fprintf(stdout, "%s\n", dev->dev_name);
-				else
-					fprintf(stdout, "%s\n", dev->gen_name);
-				return 0;
-			}
-		}
+	for_each_secondary_ioa(ioa) {
+		if (!__query_device(ioa, args[0]))
+			return 0;
 	}
 
 	return -ENODEV;
