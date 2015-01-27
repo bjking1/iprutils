@@ -571,6 +571,7 @@ s_node n_raid_include_fail = {
 		__("o Not all disks attached to an advanced function IOA have"
 		   "reported to the system. Retry the operation.\n"),
 		__("o The disks are missing.\n"),
+		__("o IO adapter does not support add function.\n"),
 		"" }
 };
 
