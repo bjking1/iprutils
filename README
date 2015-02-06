@@ -4,16 +4,34 @@
 # materials are made available under the terms of the
 # Common Public License v1.0 which accompanies this distribution.
 
-This directory contains user space tools required by the ipr device driver.
-To install them, type 'make' and then 'make install'.  You will need pciutils-devel,
-ncurses, ncurses-devel, and sysfsutils packages installed to perform the 'make'.  
+This directory contains user space tools required by the ipr device
+driver.
 
 For more detailed information about ipr and iprutils, refer to the man pages
 and the Linux reference guide (SA23-1327), which is available here:
 
 http://publib16.boulder.ibm.com/pseries/en_US/infocenter/base/HW_scsi_adapters.htm
 
+# INSTALL
+Make sure your system has the following packages installed:
 
+     - pciutils-devel
+     - ncurses,
+     - ncurses-devel
+     - sysfsutils
+
+Enter the root directory and type the following commands:
+
+      $ ./configure
+      $ make
+      $ make install
+
+If the configure script is not available in your package, you can
+generate it by running, on the root directory:
+
+      $ ./bootstrap.sh			(requires Autoconf <= 2.69)
+
+# TOOLS
 iprdump - A user program meant to be run in the background to gather debug
 information should an IOA failure occur.  Ideally, this program should be
 started during boot time after file systems are loaded when the ipr
