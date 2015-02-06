@@ -30,5 +30,5 @@ iprdbg_LDADD= libipr.la
 
 dist_man_MANS = iprconfig.8 iprdump.8 iprinit.8 iprupdate.8
 
-SUBDIRS = . systemd init.d
+SUBDIRS = . systemd init.d spec
 

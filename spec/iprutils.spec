@@ -6,7 +6,7 @@ License: CPL
 Group: System Environment/Base
 Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
-Source0: iprutils-%{version}-src.tgz
+Source0: iprutils-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
 
 %description
@@ -14,29 +14,26 @@ Provides a suite of utilities to manage and configure SCSI devices
 supported by the ipr SCSI storage device driver.
 
 %prep
-%setup -q -n %{name}
+%setup -q -n %{name}-%{version}
 
 %build
+%configure --sbindir=%{_sbindir} --libdir=%{_libdir}
 make
 
 %install
-if [ -d %{_unitdir} ]; then
-	make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
-	install -d $RPM_BUILD_ROOT/%{_unitdir}
-	install -m 644 systemd/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
-	install -m 644 systemd/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
-	install -m 644 systemd/iprupdate.service $RPM_BUILD_ROOT/%{_unitdir}/iprupdate.service
-else
-	make INSTALL_MOD_PATH=$RPM_BUILD_ROOT install
-	install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
-	install -m 755 init.d/iprinit $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprinit
-	install -m 755 init.d/iprdump $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprdump
-	install -m 755 init.d/iprupdate $RPM_BUILD_ROOT/%{_sysconfdir}/init.d/iprupdate
-fi
+%make_install
 
-install -d $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d
-install -d $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d
-install -m 755 init.d/iprha $RPM_BUILD_ROOT/%{_sysconfdir}/ha.d/resource.d/iprha
+if [ -d %{_unitdir} ]; then
+	install -d $RPM_BUILD_ROOT/%{_unitdir}
+	ln -s /usr/share/iprutils/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
+	ln -s /usr/share/iprutils/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
+	ln -s /usr/share/iprutils/iprupdate.service $RPM_BUILD_ROOT/%{_unitdir}/iprupdate.service
+else
+	install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
+	ln -s /usr/share/iprutils/iprinit ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprinit
+	ln -s /usr/share/iprutils/iprdump ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprdump
+	ln -s /usr/share/iprutils/iprupdate ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprupdate
+fi
 
 %ifarch ppc ppc64
 %post
@@ -49,9 +46,9 @@ if [ -d %{_unitdir} ]; then
 		/usr/bin/systemctl restart iprdump.service > /dev/null 2>&1
 	else
 		/usr/bin/systemctl daemon-reload > /dev/null 2>&1
-		/usr/bin/systemctl enable iprinit.service > /dev/null 2>&1
-		/usr/bin/systemctl enable iprdump.service > /dev/null 2>&1
-		/usr/bin/systemctl enable iprupdate.service > /dev/null 2>&1
+		/usr/bin/systemctl start iprinit.service > /dev/null 2>&1
+		/usr/bin/systemctl start iprdump.service > /dev/null 2>&1
+		/usr/bin/systemctl start iprupdate.service > /dev/null 2>&1
 	fi
 
 # if the system is not using systemd
@@ -110,18 +107,18 @@ fi
 %endif
 
 %clean
+rm -rf %{buildroot}
 rm -rf $RPM_BUILD_ROOT
+rm -rf %{_tmppath}/%{name}
+rm -rf %{_topdir}/BUILD%{name}
 
 %files
-%defattr(-,root,root,-)
-%if %{?_unitdir:1}%{!?_unitdir:0}
-	%{_unitdir}/*
-%else
-	%{_sysconfdir}/init.d/*
-%endif
-%doc README LICENSE
-/sbin/*
-%{_mandir}/man*/*
+%{_sbindir}/*
+%{_mandir}/man8/*
+%{_includedir}/*
+%{_libdir}/*
+/usr/share/iprutils/*
+%{_unitdir}/*
 %{_sysconfdir}/ha.d/resource.d/iprha
 
 %changelog

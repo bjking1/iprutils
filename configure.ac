@@ -48,5 +48,5 @@ AC_CHECK_FUNCS([getcwd isascii memset mkdir munmap pow setenv setlocale \
 	       socket strcasecmp strchr strncasecmp strrchr strstr \
 	       strtol strtoul strtoull])
 
-AC_CONFIG_FILES([Makefile systemd/Makefile init.d/Makefile])
+AC_CONFIG_FILES([Makefile systemd/Makefile init.d/Makefile spec/Makefile])
 AC_OUTPUT
