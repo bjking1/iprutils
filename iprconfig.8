@@ -434,6 +434,10 @@ default or disabled.
 Show the device name of the array with the specified label. Label must have
 been specified when creating the RAID array. See raid-create command.
 .TP
+.B query-array-rebuild-rate [IOA]
+Show the array rebuild rate for the given IOA.
+.br
+.TP
 .B query-array [location]
 .br
 Show the device name of the array of which one of the disks in the array
@@ -733,6 +737,15 @@ Used to set the requested caching mode of the IOA.
 Example:
 .br
 .B iprconfig -c set-ioa-caching sg5 Disabled
+.TP
+.B set-array-rebuild-rate [IOA] [Rebuild Rate | default]
+Used to set the rebuilt rate ratio of the IOA. [Rebuild Rate] must be in
+range 0..100. If 'default' is used, the IOA will reset to the
+implementation default rate.
+.br
+Example:
+.br
+.B iprconfig -c set-array-rebuild-rate sg5 10
 .TP
 .B get-live-dump [IOA]
 Dump the IOA's implementation unique critical information. The dump data

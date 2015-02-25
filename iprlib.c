@@ -5433,6 +5433,51 @@ int set_ha_mode(struct ipr_ioa *ioa, int gscsi_only)
 }
 
 /**
+ * ipr_set_array_rebuild_rate
+ * @ioa:		ipr ioa struct
+ * @check_rate		checkrate policy
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_set_array_rebuild_rate(struct ipr_ioa *ioa, u8 rebuild_rate)
+{
+	int len, rc;
+	struct ipr_mode_pages mode_pages;
+	struct ipr_mode_page24 *page24;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
+	if (rc)
+		return rc;
+
+	page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
+					     mode_pages.hdr.block_desc_len +
+					     sizeof(mode_pages.hdr));
+
+	len = mode_pages.hdr.length + 1;
+	mode_pages.hdr.length = 0;
+	page24->rebuild_rate = rebuild_rate;
+
+	rc = ipr_mode_select(&ioa->ioa, &mode_pages, len);
+	if (rc)
+		return rc;
+
+	/* Verify if rebuild rate value was correctly set */
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
+	if (rc)
+		return rc;
+
+	if (rebuild_rate != page24->rebuild_rate)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
  * ipr_set_active_active_mode -
  * @ioa:		ipr ioa struct
  * @mode:		enable or disable
@@ -5924,6 +5969,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 			page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
 							     mode_pages.hdr.block_desc_len +
 							     sizeof(mode_pages.hdr));
+
+			ioa->rebuild_rate = page24->rebuild_rate;
 
 			if (ioa_cap.dual_ioa_raid && page24->dual_adapter_af == ENABLE_DUAL_IOA_AF)
 				ioa->dual_raid_support = 1;
@@ -7218,6 +7265,7 @@ int ipr_get_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr)
 	attr->gscsi_only_ha = ioa->in_gscsi_only_ha;
 	attr->active_active = ioa->asymmetric_access_enabled;
 	attr->caching = get_ioa_caching(ioa);
+	attr->rebuild_rate = ioa->rebuild_rate;
 
 	if (!ioa->dual_raid_support)
 		return 0;
@@ -7358,6 +7406,7 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	struct ipr_ioa_attr old_attr;
 	char temp[100];
 	int mode;
+	int rc;
 
 	if (ipr_get_ioa_attr(ioa, &old_attr))
 		return -EIO;
@@ -7408,6 +7457,17 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 		else
 			mode = IPR_IOA_SET_CACHING_DISABLED;
 		ipr_change_cache_parameters(ioa, mode);
+	}
+
+	if (attr->rebuild_rate != old_attr.rebuild_rate) {
+		rc = ipr_set_array_rebuild_rate(ioa, attr->rebuild_rate);
+		if (rc)
+			return rc;
+
+		if (save) {
+			sprintf(temp, "%d", attr->rebuild_rate);
+			ipr_save_ioa_attr(ioa, IPR_ARRAY_REBUILD_RATE, temp, 1);
+		}
 	}
 
 	get_dual_ioa_state(ioa);	/* for preferred_primary */

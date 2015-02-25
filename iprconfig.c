@@ -17278,6 +17278,116 @@ static int set_ioa_caching(char **args, int num_args)
 	return rc;
 }
 
+
+/**
+ * set_array_rebuild_rate - Set the Array Rebuild Rate for every array of an IOA.
+ * @args:	     IOA
+ * @num_args:	     Array Rebuild Rate in range [0-100]
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int set_array_rebuild_rate(char**args, int num_args)
+{
+	int rebuild_rate = 0;
+	int rc;
+	struct ipr_ioa_attr attr;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+
+	dev = find_dev(args[0]);
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev != &dev->ioa->ioa) {
+		fprintf(stderr, "%s is not an IOA.\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (strncmp(args[1], "default", 7) == 0) {
+		rebuild_rate = 0;
+	} else {
+		char *endptr = NULL;
+		rebuild_rate = strtol(args[1], &endptr, 10);
+		if (endptr == args[1]
+		    || rebuild_rate < 0 || rebuild_rate > 100) {
+			scsi_err(dev,
+				 "'%s' is not a valid rebuild rate value.\n"
+				 "Supported values are in the range 0-100.\n"
+				 "Higher values may affect performance but "
+				 "decrease the total rebuild time.\n", args[1]);
+			return -EINVAL;
+		}
+		rebuild_rate = (rebuild_rate * 15) / 100;
+	}
+
+	ioa = dev->ioa;
+	if (!ioa->sis64) {
+		scsi_err(dev,
+			 "Adapter doesn't support modifying Array Rebuild Rate\n.");
+		return -EINVAL;
+	}
+
+	if (ipr_get_ioa_attr(ioa, &attr))
+		return -EIO;
+
+	attr.rebuild_rate = rebuild_rate;
+
+	rc = ipr_set_ioa_attr(ioa, &attr, 1);
+	if (rc) {
+		scsi_err(ioa->dev, "Unable to set rebuild rate value %d",
+			 rebuild_rate);
+		return rc;
+	}
+	return 0;
+}
+
+/**
+ * query_array_rebuild_rate - Fetch the Array Rebuild Rate of an IOA.
+ * @args:	     IOA
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_array_rebuild_rate(char**args, int num_args)
+{
+	struct ipr_ioa_attr attr;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int rebuild_rate = 0;
+
+	dev = find_dev(args[0]);
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev != &dev->ioa->ioa) {
+		fprintf(stderr, "%s is not an IOA.\n", args[0]);
+		return -EINVAL;
+	}
+
+	ioa = dev->ioa;
+	if (!ioa->sis64) {
+		scsi_err(dev,
+			 "Adapter doesn't support modifying Array Rebuild Rate\n.");
+		return -EINVAL;
+	}
+
+	if (ipr_get_ioa_attr(ioa, &attr))
+		return -EIO;
+
+	rebuild_rate = (attr.rebuild_rate * 100) / 15;
+
+	if (rebuild_rate == 0)
+		printf("default\n");
+	else
+		printf("%d\n", rebuild_rate);
+
+	return 0;
+}
+
 /**
  * get_live_dump - 
  * @args:	     argument vector
@@ -18045,7 +18155,9 @@ static const struct {
 	{ "query-array",				1, 0, 1, query_array, "U5886.001.P915059-P1-D1" },
 	{ "query-device",				1, 0, 1, query_device, "U5886.001.P915059-P1-D1" },
 	{ "query-location",			1, 0, 1, query_location, "sg5" },
+	{ "query-array-rebuild-rate",		1, 0, 1, query_array_rebuild_rate, "sg5"},
 	{ "set-ioa-caching",			2, 0, 2, set_ioa_caching, "sg5 [Default | Disabled]" },
+	{ "set-array-rebuild-rate",		2, 0, 2, set_array_rebuild_rate, "sg5 10"},
 	{ "primary",				1, 0, 1, set_primary, "sg5" },
 	{ "secondary",				1, 0, 1, set_secondary, "sg5" },
 	{ "set-all-primary",			0, 0, 0, set_all_primary, "" },
