@@ -1419,7 +1419,7 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 int parse_option(char *opt)
 {
 	if (strcmp(opt, "--version") == 0) {
-		printf("%s: %s\n", tool_name, IPR_VERSION_STR);
+		printf("%s: %s\n", tool_name, PACKAGE_VERSION);
 		exit(0);
 	}
 
