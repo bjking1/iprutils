@@ -6638,10 +6638,15 @@ static void ipr_save_bus_attr(struct ipr_ioa *ioa, int bus,
 static void ipr_save_dev_attr(struct ipr_dev *dev, char *field,
 			     char *value, int update)
 {
-	char category[16];
-	sprintf(category,"[%s %d:%d:%d]", IPR_CATEGORY_DISK,
-		dev->scsi_dev_data->channel, dev->scsi_dev_data->id,
-		dev->scsi_dev_data->lun);
+	char category[100];
+	if (dev->scsi_dev_data->device_id)
+		sprintf(category,"[%s %lx]", IPR_CATEGORY_DEVICE,
+			dev->scsi_dev_data->device_id);
+	else
+		sprintf(category,"[%s %d:%d:%d]", IPR_CATEGORY_DISK,
+			dev->scsi_dev_data->channel, dev->scsi_dev_data->id,
+			dev->scsi_dev_data->lun);
+
 	ipr_save_attr(dev->ioa, category, field, value, update);
 }
 
@@ -6677,7 +6682,7 @@ static int ipr_get_saved_attr(struct ipr_ioa *ioa, char *category,
 				  char *field, char *value)
 {
 	FILE *fd;
-	char fname[64], line[64], *str_ptr;
+	char fname[100], line[100], *str_ptr;
 	int bus_found = 0;
 
 	sprintf(fname, "%s%x_%s", IPR_CONFIG_DIR, ioa->ccin, ioa->pci_address);
@@ -6686,7 +6691,7 @@ static int ipr_get_saved_attr(struct ipr_ioa *ioa, char *category,
 	if (fd == NULL)
 		return RC_FAILED;
 
-	while (NULL != fgets(line, 64, fd)) {
+	while (NULL != fgets(line, 100, fd)) {
 		if (line[0] != '#') {
 			if (strstr(line, category))
 				bus_found = 1;
@@ -6740,15 +6745,27 @@ static int ipr_get_saved_bus_attr(struct ipr_ioa *ioa, int bus,
 static int ipr_get_saved_dev_attr(struct ipr_dev *dev,
 				  char *field, char *value)
 {
-	char category[30];
+	char category[100];
+	int rc = RC_FAILED;
 
 	if (!dev->scsi_dev_data)
 		return -ENXIO;
 
-	sprintf(category,"[%s %d:%d:%d]", IPR_CATEGORY_DISK,
-		dev->scsi_dev_data->channel, dev->scsi_dev_data->id,
-		dev->scsi_dev_data->lun);
-	return ipr_get_saved_attr(dev->ioa, category, field, value);
+	if (dev->scsi_dev_data->device_id) {
+		sprintf(category,"[%s %lx]", IPR_CATEGORY_DEVICE,
+			dev->scsi_dev_data->device_id);
+
+		rc = ipr_get_saved_attr(dev->ioa, category, field, value);
+	}
+
+	if (rc) {
+		sprintf(category,"[%s %d:%d:%d]", IPR_CATEGORY_DISK,
+			dev->scsi_dev_data->channel, dev->scsi_dev_data->id,
+			dev->scsi_dev_data->lun);
+		rc = ipr_get_saved_attr(dev->ioa, category, field, value);
+	}
+
+	return rc;
 }
 
 /**

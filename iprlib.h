@@ -1199,7 +1199,10 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_MAX_XFER_RATE_STR "MAX_BUS_SPEED"
 #define IPR_MIN_TIME_DELAY "MIN_TIME_DELAY"
 
+/* Disk is the old format which is only here for backwards compatibility */
 #define IPR_CATEGORY_DISK "Disk"
+/* Device is the new format which should be used for all new attributes */
+#define IPR_CATEGORY_DEVICE "Device"
 #define IPR_QUEUE_DEPTH "QUEUE_DEPTH"
 #define IPR_TCQ_ENABLED "TCQ_ENABLED"
 #define IPR_FORMAT_TIMEOUT "FORMAT_UNIT_TIMEOUT"
