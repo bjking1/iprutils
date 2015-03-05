@@ -13336,7 +13336,7 @@ static int format_for_raid(char **args, int num_args)
 }
 
 /**
- * raid_create -
+ * raid_create 
  * @args:		argument vector
  * @num_args:		number of arguments
  *
@@ -17790,6 +17790,85 @@ static int show_perf (char **args, int num_args)
 	return 0;
 }
 
+static int dump (char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+
+	if (!ipr_ioa_head)
+		return 0;
+
+	printf("\n === Running 'show-config' ===\n");
+	show_config(NULL,0);
+
+	printf("\n === Running 'show-alt-config' ===\n");
+	show_alt_config(NULL,0);
+
+	printf("\n === Running 'show-ioas' ===\n");
+	show_ioas(NULL, 0);
+
+	printf("\n === Running 'show-arrays' ===\n");
+	show_arrays(NULL,0);
+
+	printf("\n === Running 'show-hot-spares' ===\n");
+	show_hot_spares(NULL, 0);
+
+	printf("\n === Running 'show-af-disks' ===\n");
+	show_af_disks(NULL, 0);
+
+	printf("\n === Running 'show-all-af-disks' ===\n");
+	show_all_af_disks(NULL, 0);
+
+	printf("\n === Running 'show-jbod-disks' ===\n");
+	show_jbod_disks(NULL, 0);
+
+	printf("\n === Running show-details ===\n");
+	for_each_ioa(ioa){
+		for_each_dev(ioa, dev){
+			printf("Device %s:\n", dev->gen_name);
+			show_dev_details(dev);
+		}
+	}
+
+	printf("\n === Running show-battery-info ===\n");
+	for_each_ioa(ioa){
+		char *array[] = { ioa->ioa.gen_name };
+		printf("Device %s:\n", ioa->ioa.gen_name);
+		battery_info(array, 1);
+	}
+
+	printf("\n === Running 'query-path-status' ===\n");
+	for_each_primary_ioa(ioa){
+		for_each_dev(ioa, dev){
+			char *array[] = { dev->gen_name };
+			printf("\nDevice %s:\n", dev->gen_name);
+			query_path_status(array, 1);
+		}
+	}
+
+	printf("\n\n === Running 'query-path-details' ===\n");
+	for_each_primary_ioa(ioa){
+		for_each_dev(ioa, dev){
+			char *array[] = { dev->gen_name };
+			printf("\nDevice: %s\n", dev->gen_name);
+			query_path_details(array, 1);
+		}
+	}
+
+	printf("\n === Running 'show-perf' ===\n");
+	for_each_ioa(ioa){
+		for_each_dev(ioa, dev){
+			if (ipr_is_af_dasd_device(dev)) {
+				char *array[] = { dev->gen_name };
+				printf("\nDevice: %s\n", dev->gen_name);
+				show_perf(array, 1);
+			}
+		}
+	}
+
+	return 0;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -17900,6 +17979,7 @@ static const struct {
 	{ "suspend-disk-enclosure",             1, 0, 1, suspend_disk_enclosure, "sg8"},
 	{ "resume-disk-enclosure",              1, 0, 1, resume_disk_enclosure, "sg8 "},
 	{ "show-perf",                          1, 0, 1, show_perf, "sg8"},
+	{ "dump",				0, 0, 0, dump, "" },
 };
 
 /**

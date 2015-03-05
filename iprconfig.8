@@ -730,6 +730,17 @@ ipr-CCIN-PCI_ADDRESS-dump-TIMESTAMP.
 Example:
 .br
 .B iprconfig -c get-live-dump sg5
+.br
+.TP
+.B dump
+Display detailed hardware and system information on standard output.
+In case a report file is needed, the iprsos command will create one at
+/var/log/iprsos.log.
+.br
+Example:
+.br
+.B iprconfig -c dump
+.br
 .RE
 .TP
 .B \-\-version

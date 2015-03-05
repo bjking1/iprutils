@@ -72,8 +72,10 @@ install: all
 	install --mode=755 iprdump $(INSTALL_MOD_PATH)/sbin/iprdump
 	install --mode=755 iprinit $(INSTALL_MOD_PATH)/sbin/iprinit
 	install --mode=700 iprdbg $(INSTALL_MOD_PATH)/sbin/iprdbg
+	install --mode=755 iprsos $(INSTALL_MOD_PATH)/sbin/iprsos
 	install -d $(INSTALL_MOD_PATH)/usr/share/man/man8
 	install iprconfig.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprconfig.8.gz
+	install iprsos.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprsos.8.gz
 	install iprupdate.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprupdate.8.gz
 	install iprdump.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprdump.8.gz
 	install iprinit.8.gz $(INSTALL_MOD_PATH)/usr/share/man/man8/iprinit.8.gz

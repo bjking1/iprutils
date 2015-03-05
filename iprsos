@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# This script creates an sos report with iprutils information at $dir
+
+dir="/var/log/iprsos.log"
+
+echo Creating a new file `echo $dir` ...
+if [ -f $dir ]; then
+	rm -f $dir
+fi
+
+echo === Running 'iprconfig -c dump' === >> $dir
+/sbin/iprconfig -c dump >> $dir
+
+echo >> $dir
+echo "=== Running 'lspci' ===" >> $dir
+/sbin/lspci >> $dir
+
+echo >> $dir
+echo "=== Running 'lsscsi' ===" >> $dir
+/usr/bin/lsscsi >> $dir
+
+echo >> $dir
+echo "=== Running 'lsscsi -H' ===" >> $dir
+/usr/bin/lsscsi -H >> $dir
+
+if [ -d "/usr/lib/systemd/system" ]; then
+	echo >> $dir
+	echo === IPR daemons: Running 'systemctl status ipr{init,dump,update}.service' === >> $dir
+	/usr/bin/systemctl status iprdump.service >> $dir
+	/usr/bin/systemctl status iprinit.service >> $dir
+	/usr/bin/systemctl status iprupdate.service >> $dir
+else
+	echo >> $dir
+	echo === IPR daemons: Running 'service ipr* status' === >> $dir
+	/sbin/service iprinit status >> $dir
+	/sbin/service iprdump status >> $dir
+	/sbin/service iprupdate status >> $dir
+
+fi
+
+echo >> $dir
+echo "=== Contents of '/etc/ipr/ ' ===" >> $dir
+if [ -d /etc/ipr ]; then
+	/bin/ls /etc/ipr/ >> $dir
+else
+	echo "No files at /etc/ipr/" >> $dir
+fi
+
+echo >> $dir
+echo "=== Contents of '/var/log/iprdump*' ===" >> $dir
+if [ -f /var/log/iprdump.? ]; then
+	/bin/ls -lh /var/log/iprdump* >> $dir
+else
+	echo "No iprdump files found at /var/log." >> $dir
+fi
+
+echo >> $dir
+echo "=== Contents of '/var/log/messages' ===" >> $dir
+/bin/cat /var/log/messages >> $dir

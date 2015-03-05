@@ -1,0 +1,28 @@
+.\" (C) Copyright 2015
+.\" International Business Machines Corporation and others.
+.\" All Rights Reserved. This program and the accompanying
+.\" materials are made available under the terms of the
+.\" Common Public License v1.0 which accompanies this distribution.
+.TH IPRSOS 8 "December 2014"
+.SH NAME
+iprsos \- IBM Power RAID report generator
+.SH SYNOPSIS
+.BI "iprsos"
+.sp
+.SH DESCRIPTION
+.B iprsos
+is used to generate an sosreport-like report by collecting hardware 
+information from the system, along with other system calls such
+as lspci, lscsi, and others. The information is collected from 'iprconfig'
+commands and appended to the /var/log/iprsos.log file
+.br
+.SH FILES
+.br
+A detailed report file is created at /var/log/iprsos.log with the
+information collected from the hardware and system information.
+.br
+.SH AUTHORS
+Daniel B. Kreling <kreling@linux.vnet.ibm.com>
+.br
+Brian King <brking@us.ibm.com>
+
