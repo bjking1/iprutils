@@ -1130,9 +1130,9 @@ struct ipr_std_inq_data_long {
 	u8 as400_service_level;
 	u8 z4_term[IPR_STD_INQ_Z4_TERM_LEN];
 	u8 z5_term[IPR_STD_INQ_Z5_TERM_LEN];
-	u8 part_number[IPR_STD_INQ_PART_NUM_LEN];
-	u8 ec_level[IPR_STD_INQ_EC_LEVEL_LEN];
 	u8 fru_number[IPR_STD_INQ_FRU_NUM_LEN];
+	u8 ec_level[IPR_STD_INQ_EC_LEVEL_LEN];
+	u8 part_number[IPR_STD_INQ_PART_NUM_LEN];
 	u8 z6_term[IPR_STD_INQ_Z6_TERM_LEN];
 };
 
