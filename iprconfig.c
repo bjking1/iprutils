@@ -3502,7 +3502,7 @@ int configure_raid_parameters(i_container *i_con)
 	char raid_str[16], stripe_str[16], qdepth_str[4];
 	int ch, start_row;
 	int cur_field_index;
-	int selected_count = 0;
+	int selected_count = 0, ssd_num = 0, hdd_num = 0;
 	int stripe_sz, stripe_sz_mask, stripe_sz_list[16];
 	struct prot_level *prot_level_list;
 	int *userptr = NULL;
@@ -3521,8 +3521,13 @@ int configure_raid_parameters(i_container *i_con)
 
 	/* determine number of devices selected for this parity set */
 	for_each_af_dasd(ioa, dev) {
-		if (dev->dev_rcd->issue_cmd)
+		if (dev->dev_rcd->issue_cmd) {
 			selected_count++;
+			if (dev->block_dev_class & IPR_SSD)
+				ssd_num++;
+			else
+				hdd_num++;
+		}
 	}
 
 	if (ioa->sis64)
@@ -3541,6 +3546,11 @@ int configure_raid_parameters(i_container *i_con)
 		if (selected_count <= cap_entry->max_num_array_devices &&
 		    selected_count >= cap_entry->min_num_array_devices &&
 		    ((selected_count % cap_entry->min_mult_array_devices) == 0)) {
+			if (cap_entry->min_num_per_tier &&
+                            (ssd_num < cap_entry->min_num_per_tier ||
+                             hdd_num < cap_entry->min_num_per_tier))
+                                continue;
+
 			prot_level_list[raid_index].array_cap_entry = cap_entry;
 			prot_level_list[raid_index].is_valid = 1;
 			if (raid_index_default == -1 &&

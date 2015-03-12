@@ -749,7 +749,8 @@ struct ipr_array_cap_entry {
 	u8   max_num_array_devices;
 	u8   min_num_array_devices;
 	u8   min_mult_array_devices;
-	u16  reserved4;
+	u8   min_num_per_tier;
+	u8   reserved4;
 	u16  supported_stripe_sizes;
 	u16  reserved5;
 	u16  recommended_stripe_size;
