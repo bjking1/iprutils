@@ -10322,6 +10322,7 @@ int display_menu(ITEM **menu_item,
 	box1_win = newwin(menu_rows + 2, menu_cols + 2, menu_start_row - 1, 54);
 	field_win = newwin(menu_rows, menu_cols, menu_start_row, 55);
 	set_menu_win(menu, field_win);
+	set_menu_sub(menu, derwin(field_win, menu_rows, menu_cols, 0, 0));
 	post_menu(menu);
 	box(box1_win,ACS_VLINE,ACS_HLINE);
 	if (use_box2) {
