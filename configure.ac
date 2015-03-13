@@ -8,7 +8,7 @@
 # Common Public License v1.0 which accompanies this distribution.
 
 AC_PREREQ([2.63])
-AC_INIT([iprutils], [2.4.5], [iprdd-devel@lists.sourceforge.net])
+AC_INIT([iprutils], [2.4.6], [iprdd-devel@lists.sourceforge.net])
 
 AM_INIT_AUTOMAKE([1.9 foreign])
 AC_CONFIG_MACRO_DIR([build-aux])

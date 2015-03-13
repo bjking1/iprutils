@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.5
+Version: 2.4.6
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -131,6 +131,14 @@ rm -rf %{_topdir}/BUILD%{name}
 
 
 %changelog
+* Fri Mar 13 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.6
+- Build with autotools
+- Fix bug causing iprutils daemons to die
+- Add easy tier prerequisite checking
+- Fixup FRU and PN swap in iprconfig
+- Add dump iprconfig CLI command, including a sosreport plugin
+- Improve device attribute binding algorithm for new adapters
+- Misc fixes
 * Tue Nov 7 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.5
 - Raid migration fails on LE systems
 - Set known zeroed after format
