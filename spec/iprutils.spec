@@ -33,6 +33,10 @@ else
 	ln -s /usr/share/iprutils/iprinit ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprinit
 	ln -s /usr/share/iprutils/iprdump ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprdump
 	ln -s /usr/share/iprutils/iprupdate ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprupdate
+	chmod +x ${RPM_BUILD_ROOT}/usr/share/iprutils/iprinit
+	chmod +x ${RPM_BUILD_ROOT}/usr/share/iprutils/iprdump
+	chmod +x ${RPM_BUILD_ROOT}/usr/share/iprutils/iprupdate
+
 fi
 
 %ifarch ppc ppc64
@@ -118,8 +122,13 @@ rm -rf %{_topdir}/BUILD%{name}
 %{_includedir}/*
 %{_libdir}/*
 /usr/share/iprutils/*
-%{_unitdir}/*
 %{_sysconfdir}/ha.d/resource.d/iprha
+%if %{?_unitdir:1}%{!?_unitdir:0}
+       %{_unitdir}/*
+%else
+       %{_sysconfdir}/init.d/*
+%endif
+
 
 %changelog
 * Tue Nov 7 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.5
