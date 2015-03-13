@@ -18,6 +18,11 @@ AC_PROG_CC
 AC_PROG_INSTALL
 LT_INIT
 
+ncurses_include=$(ncurses5-config --cflags)
+if test -n ${ncurses_include}; then
+  CFLAGS="${CFLAGS} ${ncurses_include}"
+fi
+
 # Check for Libraries.
 AC_CHECK_LIB([form], [free_form], [], [AC_ERROR("libform not found.")])
 AC_CHECK_LIB([m], [matherr], [], [AC_ERROR("libm not found.")])
@@ -30,10 +35,10 @@ AC_CHECK_LIB([ncurses], [curses_version], [],
 AC_CHECK_HEADERS([fcntl.h libintl.h locale.h netinet/in.h nl_types.h \
 		 paths.h stddef.h stdint.h stdlib.h string.h sys/file.h \
 		 sys/ioctl.h sys/mount.h sys/socket.h syslog.h \
-		 unistd.h ncurses.h])
+		 unistd.h ncurses.h form.h menu.h], [],
+		 [AC_ERROR(["Missing headers."])])
 
 # Checks for typedefs, structures, and compiler characteristics.
-AC_CHECK_HEADER_STDBOOL
 AC_C_INLINE
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
