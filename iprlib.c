@@ -2062,7 +2062,7 @@ static void ipr_get_pci_slots()
  * Returns:
  *   nothing
  **/
-void tool_init(int save_state)
+static int __tool_init(int save_state)
 {
 	int temp, fw_type;
 	struct ipr_ioa *ipr_ioa;
@@ -2078,7 +2078,7 @@ void tool_init(int save_state)
 		dirfd = opendir("/sys/bus/pci/drivers/ipr");
 		if (!dirfd) {
 			syslog_dbg("Failed to open ipr driver bus on second attempt. %m\n");
-			return;
+			return -EAGAIN;
 		}
 	}
 	while ((dent = readdir(dirfd)) != NULL) {
@@ -2100,8 +2100,8 @@ void tool_init(int save_state)
 			dent->d_name);
 		host_dirfd = opendir(devpath);
 		if (!host_dirfd) {
-			exit_on_error("Failed to open scsi_host class.\n");
-			continue;
+			syslog_dbg("Failed to open scsi_host class.\n");
+			return -EAGAIN;
 		}
 		while ((host_dent = readdir(host_dirfd)) != NULL) {
 			char scsipath[PATH_MAX];
@@ -2144,8 +2144,8 @@ void tool_init(int save_state)
 				ipr_ioa->host_num);
 		len = sysfs_read_attr(devpath, "model", buff, 16);
 		if (len < 0 || (sscanf(buff, "%4X", &temp) != 1)) {
-			exit_on_error("Cannot read SCSI device model.\n");
-			continue;
+			syslog_dbg("Cannot read SCSI device model.\n");
+			return -EAGAIN;
 		}
 		ipr_ioa->ccin = temp;
 		setup_ioa_parms(ipr_ioa);
@@ -2167,7 +2167,25 @@ void tool_init(int save_state)
 		free_old_config();
 
 	ipr_get_pci_slots();
-	return;
+	return 0;
+}
+
+int tool_init(int save_state)
+{
+	int i, rc_err = -EAGAIN;
+
+	for (i = 0; i < 4 && rc_err == -EAGAIN; i++) {
+		rc_err = __tool_init(save_state);
+		if (rc_err == 0)
+			break;
+		sleep(2);
+	}
+	if (rc_err) {
+		syslog_dbg("Failed to initialize adapters. Timeout reached");
+		return rc_err;
+	}
+
+	return 0;
 }
 
 /**

@@ -312,14 +312,8 @@ static void kevent_handler(char *buf)
 	} else
 		return;
 
-	for (i = 0; i < 10; i++) {
-		tool_init(0);
-		ioa = find_ioa(host);
-		if (ioa)
-			break;
-		sleep(2);
-	}
-
+	tool_init(0);
+	ioa = find_ioa(host);
 	if (!ioa) {
 		syslog(LOG_ERR, "Failed to find ipr ioa %d for iprdump\n", host);
 		return;

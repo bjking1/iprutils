@@ -2537,7 +2537,7 @@ int set_preferred_primary(struct ipr_ioa *, int);
 void check_current_config(bool);
 int num_device_opens(int, int, int, int);
 int open_and_lock(char *);
-void tool_init(int);
+int tool_init(int);
 void exit_on_error(char *, ...);
 bool is_af_blocked(struct ipr_dev *, int);
 int ipr_query_array_config(struct ipr_ioa *, bool, bool, bool, int, struct ipr_array_query_data *);

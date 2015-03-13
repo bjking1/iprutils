@@ -31,7 +31,8 @@ static void init_all()
 {
 	struct ipr_ioa *ioa;
 
-	tool_init(1);
+	if(tool_init(1))
+		syslog(LOG_ERR, "Run iprinit manually to ensure all ipr RAID adapters are running optimally.\n");
 	check_current_config(false);
 	for_each_ioa(ioa)
 		ipr_init_ioa(ioa);
