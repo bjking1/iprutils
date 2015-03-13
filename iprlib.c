@@ -2078,7 +2078,7 @@ static int __tool_init(int save_state)
 		dirfd = opendir("/sys/bus/pci/drivers/ipr");
 		if (!dirfd) {
 			syslog_dbg("Failed to open ipr driver bus on second attempt. %m\n");
-			return -EAGAIN;
+			return -ENXIO;
 		}
 	}
 	while ((dent = readdir(dirfd)) != NULL) {
@@ -2176,9 +2176,8 @@ int tool_init(int save_state)
 
 	for (i = 0; i < 4 && rc_err == -EAGAIN; i++) {
 		rc_err = __tool_init(save_state);
-		if (rc_err == 0)
-			break;
-		sleep(2);
+		if (rc_err == -EAGAIN)
+			sleep(2);
 	}
 	if (rc_err) {
 		syslog_dbg("Failed to initialize adapters. Timeout reached");
