@@ -23,7 +23,7 @@
 #       availability configuration for improved ipr disk performance.
 ### END INIT INFO
 
-IPRCONFIG=/sbin/iprconfig
+IPRCONFIG=@sbindir@/iprconfig
 test -x $IPRCONFIG || exit 5
 . /lib/lsb/init-functions
 

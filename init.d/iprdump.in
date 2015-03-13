@@ -21,7 +21,7 @@
 # Description:       Start the ipr dump daemon
 ### END INIT INFO
 
-IPRDUMP=/sbin/iprdump
+IPRDUMP=@sbindir@/iprdump
 test -x $IPRDUMP || exit 5
 . /lib/lsb/init-functions
 

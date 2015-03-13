@@ -6,46 +6,44 @@
 #
 # Author: Brian King <brking@us.ibm.com>
 #
-# iprupdate
+# iprinit
 #
-# System startup script for the ipr microcode update facility
+# System startup script for the ipr init facility
 #
 ### BEGIN INIT INFO
-# Provides: iprupdate
+# Provides: iprinit
 # Required-Start:    $local_fs
 # Should-Start:      $remote_fs $syslog
 # Required-Stop:     $local_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Start the iprupdate utility
-# Description:       Start the iprupdate utility
+# Short-Description: Start the ipr init daemon
+# Description:       Start the ipr initialization daemon
 ### END INIT INFO
 
-IPRUPDATE=/sbin/iprupdate
-test -x $IPRUPDATE || exit 5
+IPRINIT=@sbindir@/iprinit
+test -x $IPRINIT || exit 5
 . /lib/lsb/init-functions
 
 start() {
-	echo "Checking ipr microcode levels"
-	if [ ! -d /sys/class/scsi_generic ] ; then
-	    modprobe sg
-	fi
-	start_daemon $IPRUPDATE --daemon
+    echo -n "Starting ipr initialization daemon"
+    if [ ! -d /sys/class/scsi_generic ] ; then
+        modprobe sg
+    fi
+    start_daemon $IPRINIT --daemon
 
-	RETVAL=$?
-	if [ $RETVAL -eq 0 ]; then
-	    echo -n "Completed ipr microcode updates"
-	    log_success_msg " "
-	else
-	    echo -n "Completed ipr microcode updates"
-	    log_failure_msg " "
-	fi
-        return $RETVAL
+    RETVAL=$?
+    if [ $RETVAL -eq 0 ]; then
+	log_success_msg " "
+    else
+	log_failure_msg " "
+    fi
+    return $RETVAL
 }
 
 stop() {
-    echo -n "Shutting down ipr update daemon"
-    killproc $IPRUPDATE
+    echo -n "Shutting down ipr initialization daemon"
+    killproc $IPRINIT
     
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
@@ -63,15 +61,15 @@ restart() {
 }
 
 reload() {
-    $0 stop
-    $0 start
+    echo -n "Reload ipr initialization daemon"
+    $0 stop  &&  $0 start
     return $RETVAL
 }
 
 status() {
-    echo -n "Checking for ipr update daemon: "
+    echo -n "Checking for ipr initialization daemon: "
 
-    pidofproc $IPRUPDATE > /dev/null 2>&1
+    pidofproc $IPRINIT > /dev/null 2>&1
 
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
@@ -83,23 +81,23 @@ status() {
 }
 
 case "$1" in
-	start)
-		start
+    start)
+	start
 	;;
-	stop)
-		stop
+    stop)
+	stop
 	;;
-	restart)
-		restart
+    restart)
+	restart
 	;;
-	reload)
-		reload
+    reload)
+	reload
 	;;
-	status)
-		status
+    status)
+	status
 	;;
-	*)
-		echo "Usage: $0 {start|stop|status|restart|reload}"
-		exit 1
+    *)
+	echo "Usage: $0 {start|stop|status|restart|reload}"
+	exit 1
 	;;
 esac

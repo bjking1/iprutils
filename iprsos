@@ -10,7 +10,7 @@ if [ -f $dir ]; then
 fi
 
 echo === Running 'iprconfig -c dump' === >> $dir
-/sbin/iprconfig -c dump >> $dir
+iprconfig -c dump >> $dir
 
 echo >> $dir
 echo "=== Running 'lspci' ===" >> $dir

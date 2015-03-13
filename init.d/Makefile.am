@@ -7,7 +7,14 @@
 # Common Public License v1.0 which accompanies this distribution.
 #
 
-dist_pkgdata_DATA = iprdump iprinit iprupdate
+%: %.in
+	sed -e 's,[@]sbindir[@],$(sbindir),g' < $< > $@
+
+nodist_pkgdata_DATA = iprdump iprinit iprupdate
+dist_pkgdata_DATA = iprdump.in iprinit.in iprupdate.in
+
+clean-local:
+	rm iprdump iprinit iprupdate
 
 sysconfdir=@sysconfdir@/ha.d/resource.d
 dist_sysconf_DATA = iprha
