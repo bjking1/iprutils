@@ -8,6 +8,7 @@ Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
 Source0: iprutils-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
+BuildRequires: ncurses-devel
 
 %description
 Provides a suite of utilities to manage and configure SCSI devices
@@ -25,34 +26,36 @@ make
 
 if [ -d %{_unitdir} ]; then
 	install -d $RPM_BUILD_ROOT/%{_unitdir}
-	ln -s /usr/share/iprutils/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
-	ln -s /usr/share/iprutils/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
-	ln -s /usr/share/iprutils/iprupdate.service $RPM_BUILD_ROOT/%{_unitdir}/iprupdate.service
+	ln -s %{_datadir}/iprutils/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
+	ln -s %{_datadir}/iprutils/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
+	ln -s %{_datadir}/iprutils/iprupdate.service $RPM_BUILD_ROOT/%{_unitdir}/iprupdate.service
 else
 	install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
-	ln -s /usr/share/iprutils/iprinit ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprinit
-	ln -s /usr/share/iprutils/iprdump ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprdump
-	ln -s /usr/share/iprutils/iprupdate ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprupdate
-	chmod +x ${RPM_BUILD_ROOT}/usr/share/iprutils/iprinit
-	chmod +x ${RPM_BUILD_ROOT}/usr/share/iprutils/iprdump
-	chmod +x ${RPM_BUILD_ROOT}/usr/share/iprutils/iprupdate
+	ln -s %{_datadir}/iprutils/iprinit ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprinit
+	ln -s %{_datadir}/iprutils/iprdump ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprdump
+	ln -s %{_datadir}/iprutils/iprupdate ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprupdate
+	chmod +x ${RPM_BUILD_ROOT}/%{_datadir}/iprutils/iprinit
+	chmod +x ${RPM_BUILD_ROOT}/%{_datadir}/iprutils/iprdump
+	chmod +x ${RPM_BUILD_ROOT}/%{_datadir}/iprutils/iprupdate
 
 fi
 
-%ifarch ppc ppc64
+%ifarch ppc ppc64 ppc64le
 %post
 # if the system is using systemd
 if [ -d %{_unitdir} ]; then
-	if [ $1 = 2 ]; then
-		echo "Restarting iprutils services"
-		/usr/bin/systemctl restart iprinit.service > /dev/null 2>&1
-		/usr/bin/systemctl restart iprupdate.service > /dev/null 2>&1
-		/usr/bin/systemctl restart iprdump.service > /dev/null 2>&1
-	else
-		/usr/bin/systemctl daemon-reload > /dev/null 2>&1
-		/usr/bin/systemctl start iprinit.service > /dev/null 2>&1
-		/usr/bin/systemctl start iprdump.service > /dev/null 2>&1
-		/usr/bin/systemctl start iprupdate.service > /dev/null 2>&1
+	if [ -f /usr/bin/systemctl ]; then
+		if [ $1 = 2 ]; then
+			echo "Restarting iprutils services"
+			/usr/bin/systemctl restart iprinit.service > /dev/null 2>&1
+			/usr/bin/systemctl restart iprupdate.service > /dev/null 2>&1
+			/usr/bin/systemctl restart iprdump.service > /dev/null 2>&1
+		else
+			/usr/bin/systemctl daemon-reload > /dev/null 2>&1
+			/usr/bin/systemctl start iprinit.service > /dev/null 2>&1
+			/usr/bin/systemctl start iprdump.service > /dev/null 2>&1
+			/usr/bin/systemctl start iprupdate.service > /dev/null 2>&1
+		fi
 	fi
 
 # if the system is not using systemd
@@ -77,20 +80,22 @@ else
 fi
 %endif
 
-%ifarch ppc ppc64
+%ifarch ppc ppc64 ppc64le
 %preun
 # disable services if the system is using systemd
 if [ -d %{_unitdir} ]; then
-        if [ $1 = 0 ]; then
-                echo "Restarting iprutils services"
-                /usr/bin/systemctl stop iprinit.service > /dev/null 2>&1
-                /usr/bin/systemctl stop iprupdate.service > /dev/null 2>&1
-                /usr/bin/systemctl stop iprdump.service > /dev/null 2>&1
-	else
-                /usr/bin/systemctl disable iprinit.service > /dev/null 2>&1
-                /usr/bin/systemctl disable iprdump.service > /dev/null 2>&1
-                /usr/bin/systemctl disable iprupdate.service > /dev/null 2>&1
-        fi
+	if [ -f /usr/bin/systemctl ]; then
+      		if [ $1 = 0 ]; then
+        		echo "Restarting iprutils services"
+                	/usr/bin/systemctl stop iprinit.service > /dev/null 2>&1
+                	/usr/bin/systemctl stop iprupdate.service > /dev/null 2>&1
+                	/usr/bin/systemctl stop iprdump.service > /dev/null 2>&1
+		else
+                	/usr/bin/systemctl disable iprinit.service > /dev/null 2>&1
+                	/usr/bin/systemctl disable iprdump.service > /dev/null 2>&1
+                	/usr/bin/systemctl disable iprupdate.service > /dev/null 2>&1
+        	fi
+	fi
 
 # disable services if the system is *not* using systemd
 elif [ $1 = 0 ]; then
@@ -117,16 +122,22 @@ rm -rf %{_tmppath}/%{name}
 rm -rf %{_topdir}/BUILD%{name}
 
 %files
+%defattr(-,root,root)
 %{_sbindir}/*
-%{_mandir}/man8/*
 %{_includedir}/*
 %{_libdir}/*
-/usr/share/iprutils/*
+%{_mandir}/man8/*
+%{_datadir}/iprutils
+%{_datadir}/iprutils/*
+%{_sysconfdir}/ha.d
+%{_sysconfdir}/ha.d/resource.d
 %{_sysconfdir}/ha.d/resource.d/iprha
 %if %{?_unitdir:1}%{!?_unitdir:0}
        %{_unitdir}/*
 %else
-       %{_sysconfdir}/init.d/*
+       %{_sysconfdir}/init.d/iprinit
+       %{_sysconfdir}/init.d/iprdump
+       %{_sysconfdir}/init.d/iprupdate
 %endif
 
 
@@ -139,20 +150,20 @@ rm -rf %{_topdir}/BUILD%{name}
 - Add dump iprconfig CLI command, including a sosreport plugin
 - Improve device attribute binding algorithm for new adapters
 - Misc fixes
-* Tue Nov 7 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.5
+* Fri Nov 7 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.5
 - Raid migration fails on LE systems
 - Set known zeroed after format
-* Tue Sep 8 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.4
+* Mon Sep 8 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.4
 - Add support to catch cache hit
 - Change the filesnameof firmware to be case insentive.
-* Tue Sep 2 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.3
+* Tue Sep 2 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.3
 - On PowerNV, some of IOAs showed the wrong physical location
 - Read Intensive SDs are not showed up in iprconifg
 - Capacity is not reported for JBOD disk greater than 2TB
 - Add code for supporting DVD/Tape hotplug
 - allow systemd dameons to be activated laster during boot
 - add DVD/Tape support in dispaly hardware staut menu
-* Tue Jun 10 2014 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.2
+* Tue Jun 10 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.4.2
 - Creation of systemd files for the ipr daemons and proper changes on the spec
   file
 - Adds three new CLI APIs: query-array/device/location
@@ -174,7 +185,7 @@ rm -rf %{_topdir}/BUILD%{name}
 - Release 2.3.18
 - array start enhancement patch
 - compliation fails on ununtu
-* Fri Feb 01 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.17
+* Sat Feb 01 2014 Wen Xiong<wenxionglinux.vnet.ibm.com> 2.3.17
 - Release 2.3.17
 - creating an array fails for T2 disks.
 - Several fixes for LE system.
@@ -197,7 +208,7 @@ rm -rf %{_topdir}/BUILD%{name}
 - Fixes platform location for disks.
 - Changes %post and %preun sections of spec file.
 - Fixes release date on the spec file.
-* Fri Sep 05 2012 Wen Xiong <wenxiong@linux.vnet.ibm.com> 2.3.12
+* Wed Sep 05 2012 Wen Xiong <wenxiong@linux.vnet.ibm.com> 2.3.12
 - Release 2.3.12
 - Addes supporting suspend/resume utility for BlueHawk.
 - Fixes raid array delete error.
@@ -281,7 +292,7 @@ rm -rf %{_topdir}/BUILD%{name}
 - Adds support for the new live dump functionality.
 - Fixes mode sense page24 for little endian architectures.
 - Fixes battery info for little endian architectures.
-* Fri Aug 12 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.0
+* Thu Aug 12 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.3.0
 - Release 2.3.0
 - Fixes type of pointers provided to scandir.
 - Fixes buffer overflow when the SCSI Host ID is equal or greater than 1000.
@@ -297,7 +308,7 @@ rm -rf %{_topdir}/BUILD%{name}
 - Changes IOA DRAM size display from hex to decimal base.
 - Handles SG_IO ioctl error with older distros which caused disk microcode
   download to fail with JBOD's.
-* Tue Apr 07 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.20
+* Wed Apr 07 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.20
 - Release 2.2.20
 - Adds resource address parsing based on encoding format flag.
 * Fri Mar 19 2010 Kleber Sacilotto de Souza <klebers@linux.vnet.ibm.com> 2.2.19
@@ -353,7 +364,7 @@ rm -rf %{_topdir}/BUILD%{name}
   may get -ENOMEM SG_IO ioctl. Change to use /dev/sdX. Fall back
   to /dev/sgX if: (1) /dev/sdX does not exist or (2) max_sectors_kb
   is not set large enough for microcode download.
-* Thu Apr 09 2008 Tseng-Hui Lin <tsenglin@us.ibm.com> 2.2.9
+* Wed Apr 09 2008 Tseng-Hui Lin <tsenglin@us.ibm.com> 2.2.9
 - Release 2.2.9
 - Do not save preferred primary attribute to fix an infinite failover
   problem in HA two system RAID configuration.
@@ -462,7 +473,7 @@ rm -rf %{_topdir}/BUILD%{name}
 * Thu Mar 2 2006 Brian King <brking@us.ibm.com>
 - Fixup status of RAID 10 arrays to print a better status
   under multiple failure scenarios.
-* Thu Feb 24 2006 Brian King <brking@us.ibm.com> 2.1.3
+* Fri Feb 24 2006 Brian King <brking@us.ibm.com> 2.1.3
 - Prevent duplicate mode sense commands from being issued.
 - More uevent handling improvements.
 - Automatically create hotplug directory if it doesn't
@@ -488,7 +499,7 @@ rm -rf %{_topdir}/BUILD%{name}
 - Concurrent maintenance fix for 7031-D24/T24.
 * Tue Dec 20 2005 Brian King <brking@us.ibm.com> 2.1.1
 - Fix compile error in iprconfig
-* Thu Dec 18 2005 Brian King <brking@us.ibm.com> 2.1.0
+* Sun Dec 18 2005 Brian King <brking@us.ibm.com> 2.1.0
 - Updates for aux cache IOAs
 - Updates for SAS adapters
 - Misc fixes for new iprconfig command line options
@@ -532,14 +543,14 @@ rm -rf %{_topdir}/BUILD%{name}
 - Fixed bug preventing disk microcode update from working.
 * Mon Apr 4 2005 Brian King <brking@us.ibm.com>
 - Add ability to force RAID consistency check
-* Mon Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1
+* Fri Mar 25 2005 Brian King <brking@us.ibm.com> 2.0.14.1
 - Removed mention of primary/secondary adapters in some error
   screens since multi-initiator RAID is not supported and the
   messages will just cause confusion.
-* Mon Mar 24 2005 Brian King <brking@us.ibm.com>
+* Thu Mar 24 2005 Brian King <brking@us.ibm.com>
 - iprconfig: During disk hotplug, wait for sd devices to show
   up. Fixes errors getting logged by iprconfig during hotplug.
-* Mon Mar 23 2005 Brian King <brking@us.ibm.com>
+* Wed Mar 23 2005 Brian King <brking@us.ibm.com>
 - iprconfig: Fix cancel path on concurrent add/remove of disks
 - Don't display current bus width and speed for SAS disks
 * Mon Mar 21 2005 Brian King <brking@us.ibm.com>
@@ -593,25 +604,25 @@ rm -rf %{_topdir}/BUILD%{name}
   failure of microcode update to disks. The microcode update would
   fail, but no error would be logged. The seg fault was in a child
   process, so the parent process kept running.
-* Thu May 23 2004 Brian King <brking@us.ibm.com> 2.0.10
+* Sun May 23 2004 Brian King <brking@us.ibm.com> 2.0.10
 - Don't let iprdbg sg ioctls be retried.
 - Add --force flag to iprconfig to allow user to workaround buggy
   drive firmware.
 - Don't initialize read/write protected disks
 - Fix some reclaim cache bugs
 - Don't setup Mode Page 0x0A if test unit ready fails
-* Thu May 2 2004 Brian King <brking@us.ibm.com> 2.0.9
+* Sun May 2 2004 Brian King <brking@us.ibm.com> 2.0.9
 - Add --debug option to all utilities
 - Make utilities behave better when ipr is not loaded
 - Fix dependencies in init.d scripts
 - Only enable init.d scripts on ppc
 - Don't log an error if ipr is not loaded
-* Mon Apr 28 2004 Brian King <brking@us.ibm.com> 2.0.8
+* Wed Apr 28 2004 Brian King <brking@us.ibm.com> 2.0.8
 - Fix to properly enable init.d scripts when the rpm is installed
 - Fix memory leak in code download path
 - Increase size of page 0 inquiry buffer so that extended vpd is displayed
 - Decrease write buffer timeout to 2 minutes
-* Wed Apr 16 2004 Brian King <brking@us.ibm.com> 2.0.7
+* Fri Apr 16 2004 Brian King <brking@us.ibm.com> 2.0.7
 - Load sg module in init.d scripts if not loaded
 - Load sg module in iprconfig if not loaded
 * Wed Apr 14 2004 Brian King <brking@us.ibm.com> 2.0.6
@@ -622,7 +633,7 @@ rm -rf %{_topdir}/BUILD%{name}
 - Fix init.d scripts to work properly with yast runlevel editor.
 - Fix device details screen in iprconfig for Failed array members
 - Allow formatting devices even if qerr cannot be disabled 
-* Tue Mar 29 2004 Brian King <brking@us.ibm.com> 2.0.4
+* Mon Mar 29 2004 Brian King <brking@us.ibm.com> 2.0.4
 - Fixed some sysfs calls that changed their calling interfaces
-* Tue Mar 17 2004 Brian King <brking@us.ibm.com> 2.0.2-3
+* Wed Mar 17 2004 Brian King <brking@us.ibm.com> 2.0.2-3
 - Fixed 
