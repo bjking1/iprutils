@@ -11668,11 +11668,15 @@ int ibm_storage_log_tail(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
 	int rc, len;
+	int log_fd;
+	char *logfile;
+
+	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(logfile);
 
 	def_prog_mode();
-	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
 
-	if (rc != 0) {
+	if (log_fd == -1) {
 		len = sprintf(cmnd, "cd %s; zcat -f messages", log_root_dir);
 
 		len += sprintf(cmnd + len," | grep ipr | ");
@@ -11694,13 +11698,16 @@ int ibm_storage_log_tail(i_container *i_con)
 		len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr//g\"");
 		len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr//g\"");
 		len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
-		len += sprintf(cmnd + len, ">> "_PATH_TMP".ipr.err/errors");
+		len += sprintf(cmnd + len, ">> %s", logfile);
 		system(cmnd);
 
-		sprintf(cmnd, "%s "_PATH_TMP".ipr.err/errors", editor);
+		sprintf(cmnd, "%s %s", editor, logfile);
 	}
 
 	rc = system(cmnd);
+
+	if (log_fd != -1)
+		close(log_fd);
 
 	if ((rc != 0) && (rc != 127)) {
 		/* "Editor returned %d. Try setting the default editor" */
@@ -11770,11 +11777,16 @@ static int compare_log_file(const struct dirent **first_dir, const struct dirent
 int ibm_storage_log(i_container *i_con)
 {
 	char cmnd[MAX_CMD_LENGTH];
-	int rc, i;
+	int i;
 	struct dirent **log_files;
 	struct dirent **dirent;
 	int num_dir_entries;
-	int len;
+	int rc, len;
+	int log_fd;
+	char *logfile;
+
+	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(logfile);
 
 	def_prog_mode();
 
@@ -11784,11 +11796,10 @@ int ibm_storage_log(i_container *i_con)
 		return 75;
 	}
 
-	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
 	if (num_dir_entries)
 		dirent = log_files;
 
-	if (rc != 0) {
+	if (log_fd == -1) {
 		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
 
 		/* Probably have a read-only root file system */
@@ -11817,15 +11828,18 @@ int ibm_storage_log(i_container *i_con)
 			len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr//g\"");
 			len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr//g\"");
 			len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
-			len += sprintf(cmnd + len, ">> "_PATH_TMP".ipr.err/errors");
+			len += sprintf(cmnd + len, ">> %s", logfile);
 			system(cmnd);
 			dirent++;
 		}
 
-		sprintf(cmnd, "%s "_PATH_TMP".ipr.err/errors", editor);
+		sprintf(cmnd, "%s %s", editor, logfile);
 	}
 
 	rc = system(cmnd);
+
+	if (log_fd != -1)
+		close(log_fd);
 
 	if (num_dir_entries) {
 		while (num_dir_entries--)
@@ -11857,6 +11871,11 @@ int kernel_log(i_container *i_con)
 	struct dirent **dirent;
 	int num_dir_entries;
 	int len;
+	int log_fd;
+	char *logfile;
+
+	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(logfile);
 
 	def_prog_mode();
 
@@ -11869,9 +11888,7 @@ int kernel_log(i_container *i_con)
 	if (num_dir_entries)
 		dirent = log_files;
 
-	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
-
-	if (rc != 0) {
+	if (log_fd == -1) {
 		/* Probably have a read-only root file system */
 		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
 
@@ -11892,16 +11909,20 @@ int kernel_log(i_container *i_con)
 	} else {
 		for (i = 0; i < num_dir_entries; i++) {
 			sprintf(cmnd,
-				"cd %s; zcat -f %s | sed \"s/\\^M//g\" >> "_PATH_TMP".ipr.err/errors",
-				log_root_dir, (*dirent)->d_name);
+				"cd %s; zcat -f %s | sed \"s/\\^M//g\" >> %s",
+				log_root_dir, (*dirent)->d_name, logfile);
 			system(cmnd);
 			dirent++;
 		}
 
-		sprintf(cmnd, "%s "_PATH_TMP".ipr.err/errors", editor);
+		sprintf(cmnd, "%s %s", editor, logfile);
 	}
 
 	rc = system(cmnd);
+
+	if (log_fd != -1)
+		close(log_fd);
+
 	if (num_dir_entries > 0) {
 		while (num_dir_entries--)
 			free(log_files[num_dir_entries]);
@@ -11933,6 +11954,11 @@ int iprconfig_log(i_container *i_con)
 	struct dirent **dirent;
 	int num_dir_entries;
 	int len;
+	int log_fd;
+	char *logfile;
+
+	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(logfile);
 
 	def_prog_mode();
 
@@ -11942,11 +11968,10 @@ int iprconfig_log(i_container *i_con)
 		return 75;
 	}
 
-	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
 	if (num_dir_entries)
 		dirent = log_files;
 
-	if (rc != 0) {
+	if (log_fd == -1) {
 		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
 
 		/* Probably have a read-only root file system */
@@ -11966,15 +11991,19 @@ int iprconfig_log(i_container *i_con)
 	} else {
 		for (i = 0; i < num_dir_entries; i++) {
 			len = sprintf(cmnd,"cd %s; zcat -f %s | grep iprconfig ", log_root_dir, (*dirent)->d_name);
-			len += sprintf(cmnd + len, ">> "_PATH_TMP".ipr.err/errors");
+			len += sprintf(cmnd + len, ">> %s", logfile);
 			system(cmnd);
 			dirent++;
 		}
 
-		sprintf(cmnd, "%s "_PATH_TMP".ipr.err/errors", editor);
+		sprintf(cmnd, "%s %s", editor, logfile);
 	}
 
 	rc = system(cmnd);
+
+	if (log_fd != -1)
+		close(log_fd);
+
 	if (num_dir_entries) {
 		while (num_dir_entries--)
 			free(log_files[num_dir_entries]);
@@ -12183,16 +12212,21 @@ int ibm_boot_log(i_container *i_con)
 	int rc;
 	int len;
 	struct stat file_stat;
+	int log_fd;
+	char *logfile;
+
 
 	sprintf(cmnd,"%s/boot.msg",log_root_dir);
 	rc = stat(cmnd, &file_stat);
 	if (rc)
 		return 2; /* "Invalid option specified" */
 
-	def_prog_mode();
-	rc = system("rm -rf "_PATH_TMP".ipr.err; mkdir "_PATH_TMP".ipr.err");
+	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(logfile);
 
-	if (rc != 0) {
+	def_prog_mode();
+
+	if (log_fd == -1) {
 		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
 
 		/* Probably have a read-only root file system */
@@ -12210,11 +12244,14 @@ int ibm_boot_log(i_container *i_con)
 		len = sprintf(cmnd,"cd %s; zcat -f boot.msg | grep ipr  | "
 			      "sed 's/<[0-9]>ipr-err: //g' | sed 's/<[0-9]>ipr: //g'",
 			      log_root_dir);
-		len += sprintf(cmnd + len, ">> "_PATH_TMP".ipr.err/errors");
+		len += sprintf(cmnd + len, ">> %s", logfile);
 		system(cmnd);
-		sprintf(cmnd, "%s "_PATH_TMP".ipr.err/errors", editor);
+		sprintf(cmnd, "%s %s", editor, logfile);
 	}
 	rc = system(cmnd);
+
+	if (log_fd != -1)
+		close(log_fd);
 
 	if ((rc != 0) && (rc != 127)) {
 		s_status.num = rc;
