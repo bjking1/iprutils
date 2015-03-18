@@ -1366,7 +1366,11 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 	}
 
 	while (1) {
-		len = recv(sock, &buf, sizeof(buf), 0);
+		struct sockaddr_nl src_addr;
+		socklen_t addrlen = sizeof(struct sockaddr_nl);
+
+		len = recvfrom(sock, &buf, sizeof(buf), 0,
+			       (struct sockaddr *) &src_addr, &addrlen);
 
 		if (!uevent_rcvd && len < 0) {
 			poll_func();
@@ -1376,6 +1380,14 @@ int handle_events(void (*poll_func) (void), int poll_delay,
 
 		if (len < 0) {
 			syslog_dbg("kevent recv failed.\n");
+			poll_func();
+			sleep(poll_delay);
+			continue;
+		}
+
+		if (src_addr.nl_pid != 0) {
+			syslog_dbg("received packet from unknown pid %d.\n",
+				   src_addr.nl_pid);
 			poll_func();
 			sleep(poll_delay);
 			continue;
