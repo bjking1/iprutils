@@ -14741,6 +14741,106 @@ static int set_format_timeout(char **args, int num_args)
 }
 
 /**
+ * set_device_write_cache_policy
+ *
+ * Sets the write cache policy for a device.  The aruments are the
+ * device (sd*, sg*) and the new policy (writeback,writethrough).
+ *
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int set_device_write_cache_policy(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_disk_attr attr;
+	char *policy = args[1];
+	int ipolicy;
+	int rc;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (!ipr_is_gscsi(dev)) {
+		scsi_err(dev, "Unable to set cache policy.\n");
+		return -EINVAL;
+	}
+
+	if (strncmp(policy, "writethrough", sizeof ("writethrough") - 1) == 0)
+		ipolicy = IPR_DEV_CACHE_WRITE_THROUGH;
+	else if (strncmp(policy, "writeback", sizeof ("writeback") - 1) == 0)
+		ipolicy = IPR_DEV_CACHE_WRITE_BACK;
+	else {
+		fprintf(stderr, "Invalid cache policy.\n");
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+	if (rc)
+		return rc;
+
+	attr.write_cache_policy = ipolicy;
+	rc = ipr_set_dev_attr(dev, &attr, 1);
+
+	if (rc) {
+		scsi_err(dev, "Unable to set cache policy.\n");
+		return rc;
+	}
+	return 0;
+}
+
+/**
+ * query_device_write_cache_policy
+ *
+ * Query the write cache policy for a device.  User passes the
+ * device (sd*, sg*) to be queried.
+ *
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int query_device_write_cache_policy(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	struct ipr_disk_attr attr;
+	char *policy;
+	int rc;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+	if (dev->scsi_dev_data->type != TYPE_DISK) {
+		scsi_err(dev, "Cannot query write back policy.\n");
+		return -EINVAL;
+	}
+
+	rc = ipr_get_dev_attr(dev, &attr);
+	if (rc)
+		return rc;
+
+	switch (attr.write_cache_policy) {
+	case IPR_DEV_CACHE_WRITE_THROUGH:
+		policy = "write through";
+		break;
+	case IPR_DEV_CACHE_WRITE_BACK:
+		policy = "write back";
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	printf("%s\n", policy);
+	return 0;
+}
+
+/**
  * update_ioa_ucode -
  * @ioa:		ipr ioa struct
  * @file:		file name
@@ -17974,6 +18074,8 @@ static const struct {
 	{ "set-qdepth",				2, 0, 2, set_qdepth, "sda 16" },
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable, "sda 0" },
 	{ "set-log-level",			2, 0, 2, set_log_level_cmd, "sg5 2" },
+	{ "set-write-cache-policy",		2, 0, 2, set_device_write_cache_policy, "sg5 [writeback|writethrough]" },
+	{ "query-write-cache-policy",		1, 0, 1, query_device_write_cache_policy, "sg5" },
 	{ "identify-disk",			2, 0, 2, identify_disk, "sda 1" },
 	{ "identify-slot",			2, 0, 2, identify_slot, "U5886.001.P915059-P1-D1 1" },
 	{ "remove-disk",			2, 0, 2, remove_disk, "sda 1" },

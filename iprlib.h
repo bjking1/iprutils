@@ -232,6 +232,9 @@ typedef uint64_t u64;
 #define IPR_VSET_VIRTUAL_BUS			0x2
 #define IPR_IOAFP_VIRTUAL_BUS			0x3
 
+/* Device write cache policies. */
+enum {IPR_DEV_CACHE_WRITE_THROUGH = 0, IPR_DEV_CACHE_WRITE_BACK};
+
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
 
@@ -1207,6 +1210,7 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_QUEUE_DEPTH "QUEUE_DEPTH"
 #define IPR_TCQ_ENABLED "TCQ_ENABLED"
 #define IPR_FORMAT_TIMEOUT "FORMAT_UNIT_TIMEOUT"
+#define IPR_WRITE_CACHE_POLICY "WRITE_CACHE_POLICY"
 
 #define IPR_MAX_XFER_RATE 320
 #define IPR_SAFE_XFER_RATE 160
@@ -1325,6 +1329,7 @@ struct ipr_disk_attr {
 	int queue_depth;
 	int tcq_enabled;
 	int format_timeout;
+	int write_cache_policy;
 };
 
 struct ipr_vset_attr {
@@ -1360,6 +1365,7 @@ struct ipr_dev {
 	u8 active_suspend;
 	u32 is_suspend_cand:1;
 	u32 is_resume_cand:1;
+	u8 write_cache_policy:1;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];

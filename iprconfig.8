@@ -451,6 +451,10 @@ platform location code will be displayed. If the specified device name is a sing
 device RAID 0 array, the platform location of the disk which is a member of the
 specified array will be displayed.
 .TP
+.B query-write-cache-policy [device]
+.br
+Show the current write cache policy for [device].
+.TP
 .B raid-create [-r raid_level] [-s stripe_size_in_kb] [-l label] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
@@ -572,6 +576,14 @@ Enable/disable tagged command queueing for the specified device.
 .br
 Set the error logging verbosity to use for the specified IOA.
 Default is 2.
+.TP
+.B set-write-cache-policy [device] [writeback|writethrough]
+.br
+Set the write cache policy for [device]. Available policies are
+writeback and writethrough.  This feature is only supported by JBOD
+disks.  Example:
+.br
+.B iprconfig -c set-write-cache-policy sdp writeback
 .TP
 .B identify-disk [disk] [0 = turn off identify LED, 1 = turn on identify LED]
 .br

@@ -3473,6 +3473,92 @@ int ipr_start_stop_stop(struct ipr_dev *dev)
 }
 
 /**
+ * ipr_set_dev_cache_policy
+ *
+ * Set the default cache policy for a device.
+ *
+ * @ipr_dev:            Device to change policy.
+ * @policy:	        New policy
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int ipr_set_dev_wcache_policy (const struct ipr_dev *dev, int policy)
+{
+	char path[PATH_MAX];
+	char *cache_type;
+	char current_type[100];
+
+	sprintf(path, "/sys/class/scsi_disk/%s",
+		dev->scsi_dev_data->sysfs_device_name);
+
+	switch (policy) {
+	case IPR_DEV_CACHE_WRITE_THROUGH:
+		cache_type = "write through\n";
+		break;
+	case IPR_DEV_CACHE_WRITE_BACK:
+		cache_type = "write back\n";
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (sysfs_write_attr(path, "cache_type", cache_type,
+			     strlen(cache_type)) < 0) {
+		syslog_dbg("Failed to write cache_type parameter of %s",
+			   dev->dev_name);
+		return -EINVAL;
+	}
+
+	if (sysfs_read_attr(path, "cache_type", current_type, 100) < 0) {
+		syslog_dbg("Failed to read cache_type parameter of %s",
+			   dev->dev_name);
+		return -EINVAL;
+	}
+
+	if (strncmp (current_type, cache_type, 100) != 0) {
+		syslog_dbg("Failed to set cache_type parameter of %s",
+			   dev->dev_name);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+/**
+ * ipr_dev_wcache_policy
+ *
+ * Check the default cache policy of a device.
+ *
+ * @ipr_dev:            Device to change policy.
+ * @policy:	        Returned value.  New policy.
+ *
+ * Returns:
+ *   policy = [0, 1]  / < 0 if failure.
+ **/
+static int ipr_dev_wcache_policy (const struct ipr_dev *dev)
+{
+	char path[PATH_MAX];
+	char cache_type[100];
+
+	sprintf(path, "/sys/class/scsi_disk/%s",
+		dev->scsi_dev_data->sysfs_device_name);
+
+	memset(cache_type, '\0', ARRAY_SIZE(cache_type));
+
+	if (sysfs_read_attr(path, "cache_type", cache_type, 100) < 0) {
+		syslog_dbg("Failed to read cache_type parameter of %s",
+			   dev->dev_name);
+		return -EINVAL;
+	}
+
+	if (strncmp (cache_type, "write through\n", 100) == 0)
+		return IPR_DEV_CACHE_WRITE_THROUGH;
+	else if (strncmp (cache_type, "write back\n", 100) == 0)
+		return IPR_DEV_CACHE_WRITE_BACK;
+	return -EINVAL;
+}
+
+/**
  * __ipr_test_unit_ready - issue a test unit ready command
  * @dev:		ipr dev struct
  * @sense_data:		sense data struct
@@ -6213,6 +6299,15 @@ void check_current_config(bool allow_rebuild_refresh)
 				strcpy(ioa->dev[device_count].gen_name,
 				       scsi_dev_data->gen_name);
 
+				if (scsi_dev_data->type == TYPE_DISK) {
+					if (ipr_dev_wcache_policy(&(ioa->dev[device_count])) == IPR_DEV_CACHE_WRITE_BACK)
+						ioa->dev[device_count].write_cache_policy =
+							IPR_DEV_CACHE_WRITE_BACK;
+					else
+						ioa->dev[device_count].write_cache_policy =
+							IPR_DEV_CACHE_WRITE_THROUGH;
+				}
+
 				if (ioa->support_4k && scsi_dev_data->type == TYPE_DISK) {
 					if (ipr_get_logical_block_size(&ioa->dev[device_count]) == IPR_JBOD_4K_BLOCK_SIZE)
 						ioa->dev[device_count].block_dev_class |= IPR_BLK_DEV_CLASS_4K;
@@ -7034,6 +7129,7 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 		attr->tcq_enabled = is_tagged(dev);
 
 	attr->format_timeout = get_format_timeout(dev);
+	attr->write_cache_policy = dev->write_cache_policy;
 
 	return 0;
 }
@@ -7156,6 +7252,10 @@ int ipr_modify_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &attr->format_timeout);
 
+	rc = ipr_get_saved_dev_attr(dev, IPR_WRITE_CACHE_POLICY, temp);
+	if (rc == RC_SUCCESS)
+		sscanf(temp, "%d", &attr->write_cache_policy);
+
 	return 0;
 }
 
@@ -7230,6 +7330,14 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 			sprintf(temp, "%d", attr->tcq_enabled);
 			if (save)
 				ipr_save_dev_attr(dev, IPR_TCQ_ENABLED, temp, 1);
+		}
+	}
+
+	if (attr->write_cache_policy != old_attr.write_cache_policy) {
+		ipr_set_dev_wcache_policy(dev, attr->write_cache_policy);
+		if (save) {
+			sprintf(temp, "%d", attr->write_cache_policy);
+			ipr_save_dev_attr(dev, IPR_WRITE_CACHE_POLICY, temp, 1);
 		}
 	}
 
