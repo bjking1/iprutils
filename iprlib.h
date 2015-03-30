@@ -496,6 +496,60 @@ struct ipr_vendor_mode_page {
 #endif
 };
 
+struct ipr_caching_parameters_page {
+	/* Mode page 0x08 */
+	struct ipr_mode_page_hdr hdr;
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 ic:1;
+	u8 abpf:1;
+	u8 cap:1;
+	u8 disc:1;
+	u8 size:1;
+	u8 wce:1;
+	u8 mf:1;
+	u8 rcd:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 rcd:1;
+	u8 mf:1;
+	u8 wce:1;
+	u8 size:1;
+	u8 disc:1;
+	u8 cap:1;
+	u8 abpf:1;
+	u8 ic:1;
+#endif
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 demand_read_retention_priority:4;
+	u8 write_retention_priority:4;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 write_retention_priority:4;
+	u8 demand_read_retention_priority:4;
+#endif
+
+	u16 disable_prefetch_transfer_length;
+	u16 minimum_prefetch;
+	u16 maximum_prefetch;
+	u16 maximum_prefetch_ceiling;
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 fsw:1;
+	u8 lbcss:1;
+	u8 dra:1;
+	u8 reserved:5;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 reserved:5;
+	u8 dra:1;
+	u8 lbcss:1;
+	u8 fsw:1;
+#endif
+
+	u8 cache_segments;
+	u16 cache_segment_size;
+	u8 reserved1;
+	u8 non_cache_segment_size[3];
+};
+
 struct ipr_control_mode_page {
 	/* Mode page 0x0A */
 	struct ipr_mode_page_hdr hdr;

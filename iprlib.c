@@ -8889,6 +8889,66 @@ error:
 }
 
 /**
+ * setup_page0x08 - Perform initial configuration for mode page 0x8 of
+ * vset devices.
+ *
+ * This disables the Write Cache for vsets.
+ *
+ * @dev:		ipr dev struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int setup_page0x08(struct ipr_dev *dev)
+{
+	struct ipr_mode_pages mode_pages;
+	struct ipr_caching_parameters_page *page;
+	int len;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	if (ipr_mode_sense(dev, 0x08, &mode_pages))
+		return -EIO;
+
+	page = ((struct ipr_caching_parameters_page *)
+		(((u8 *)&mode_pages)
+		 + mode_pages.hdr.block_desc_len
+		 + sizeof(mode_pages.hdr)));
+
+	if (page->wce == 0) {
+		/* Write cache is already disabled */
+		return 0;
+	}
+
+	page->wce = 0;
+
+	len = mode_pages.hdr.length + 1;
+	mode_pages.hdr.length = 0;
+	mode_pages.hdr.medium_type = 0;
+	mode_pages.hdr.device_spec_parms = 0;
+	page->hdr.parms_saveable = 0;
+
+	if (mode_select(dev, &mode_pages, len)) {
+		scsi_err(dev, "Failed to disable write cache.\n");
+		return -EIO;
+	}
+
+	if (ipr_mode_sense(dev, 0x08, &mode_pages))
+		return -EIO;
+
+	page = ((struct ipr_caching_parameters_page *)
+		(((u8 *)&mode_pages)
+		 + mode_pages.hdr.block_desc_len
+		 + sizeof(mode_pages.hdr)));
+
+	if (page->wce != 0) {
+		scsi_err(dev, "Failed to disable write cache.\n");
+		return -EIO;
+	}
+	return 0;
+}
+
+/**
  * setup_page0x0a - 
  * @dev:		ipr dev struct
  *
@@ -9088,6 +9148,8 @@ static void init_af_dev(struct ipr_dev *dev)
 	if (setup_page0x00(dev))
 		return;
 	if (setup_page0x01(dev))
+		return;
+	if (setup_page0x08(dev))
 		return;
 	if (enable_af(dev))
 		return;
