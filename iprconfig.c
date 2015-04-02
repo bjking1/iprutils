@@ -10935,6 +10935,7 @@ struct ioa_config_attr {
 	int gscsi_only_ha;
 	int active_active;
 	int caching;
+	int verify_array_rebuild;
 };
 
 /**
@@ -10963,7 +10964,8 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 	start_row += 2; /* for title */  /* FIXME */
 
 	if (ioa_config_attr->option == 1 || ioa_config_attr->option == 2
-	    || ioa_config_attr->option == 3 || ioa_config_attr->option == 4) {
+	    || ioa_config_attr->option == 3 || ioa_config_attr->option == 4
+	    || ioa_config_attr->option == 5) {
 		num_menu_items = 4;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
 		userptr = malloc(sizeof(int) * num_menu_items);
@@ -10975,6 +10977,8 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 			menu_item[menu_index] = new_item("RAID","");
 		else if (ioa_config_attr->option == 3)
 			menu_item[menu_index] = new_item("Disabled","");
+		else if (ioa_config_attr->option == 5)
+			menu_item[menu_index] = new_item("Enabled","");
 		else
 			menu_item[menu_index] = new_item("Default","");
 
@@ -10990,6 +10994,8 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 			menu_item[menu_index] = new_item("JBOD","");
 		else if (ioa_config_attr->option == 3)
 			menu_item[menu_index] = new_item("Enabled","");
+		else if (ioa_config_attr->option == 5)
+			menu_item[menu_index] = new_item("Disabled","");
 		else
 			menu_item[menu_index] = new_item("Disabled","");
 
@@ -11007,6 +11013,8 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 				ioa_config_attr->gscsi_only_ha = *retptr;
 			else if (ioa_config_attr->option == 3)
 				ioa_config_attr->active_active = *retptr;
+			else if (ioa_config_attr->option == 5)
+				ioa_config_attr->verify_array_rebuild = *retptr;
 			else
 				ioa_config_attr->caching = *retptr;
 		}
@@ -11118,7 +11126,22 @@ int change_ioa_config(i_container * i_con)
 			sprintf(pref_str, "Disabled");
 		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
 	}
+	if (dev->ioa->configure_rebuild_verify) {
+		body = add_line_to_body(body,
+					_("Verify data during array rebuild"),
+					"%13");
+		ioa_config_attr[index].option = 5;
+		ioa_config_attr[index].verify_array_rebuild
+			= ioa_attr.disable_rebuild_verify;
 
+		if (ioa_attr.disable_rebuild_verify == 1)
+			sprintf(pref_str, "Disabled");
+		else
+			sprintf(pref_str, "Enabled");
+
+		i_con = add_i_con(i_con, pref_str,
+				  &ioa_config_attr[index++]);
+	}
 
 	n_change_ioa_config.body = body;
 	while (1) {
@@ -11159,6 +11182,15 @@ int change_ioa_config(i_container * i_con)
 					else
 						sprintf(temp_i_con->field_data, "Disabled");
 					ioa_attr.caching = config_attr->caching;
+				} else if (config_attr->option == 5) {
+					if (config_attr->verify_array_rebuild == 0) {
+						sprintf(temp_i_con->field_data, "Enabled");
+						ioa_attr.disable_rebuild_verify = 0;
+					}
+					else {
+						sprintf(temp_i_con->field_data, "Disabled");
+						ioa_attr.disable_rebuild_verify = 1;
+					}
 				}
 				found++;
 				break;
@@ -11213,6 +11245,8 @@ int ioa_config(i_container * i_con)
 		if (ioa->ioa.scsi_dev_data == NULL)
 			continue;
 		if (!ioa->dual_raid_support && !ioa->gscsi_only_ha)
+			continue;
+		if (!ioa->configure_rebuild_verify)
 			continue;
 
 		print_dev(k, &ioa->ioa, buffer, "%1", k);
