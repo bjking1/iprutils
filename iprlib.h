@@ -1250,6 +1250,7 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_GSCSI_HA_ONLY "JBOD_ONLY_HA"
 #define IPR_DUAL_ADAPTER_ACTIVE_ACTIVE "DUAL_ADAPTER_ACTIVE_ACTIVE"
 #define IPR_ARRAY_REBUILD_RATE "ARRAY_REBUILD_RATE"
+#define IPR_ARRAY_DISABLE_REBUILD_VERIFY "DISABLE_ARRAY_REBUILD_VERIFY"
 
 #define IPR_CATEGORY_BUS "Bus"
 #define IPR_QAS_CAPABILITY "QAS_CAPABILITY"
@@ -1397,6 +1398,7 @@ struct ipr_ioa_attr {
 	int active_active;
 	int caching;
 	int rebuild_rate;
+	int disable_rebuild_verify;
 };
 
 #define IPR_DEV_MAX_PATHS	2
@@ -1476,6 +1478,8 @@ struct ipr_ioa {
 	u8 has_cache:1;
 	u8 sis64:1;
 	u8 rebuild_rate:4;
+	u8 disable_rebuild_verify:1;
+	u8 configure_rebuild_verify:1;
 #define IPR_SIS32		0x00
 #define IPR_SIS64		0x01
 	u8 support_4k:1;
@@ -1676,11 +1680,13 @@ struct ipr_mode_page24 {
 #endif
 
 #if defined (__BIG_ENDIAN_BITFIELD)
-	u8 reserved1:4;
+	u8 rebuild_without_verify:1;
+	u8 reserved1:3;
 	u8 rebuild_rate:4;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 rebuild_rate:4;
-	u8 reserved1:4;
+	u8 reserved1:3;
+	u8 rebuild_without_verify:1;
 #endif
 
 #define DISABLE_DUAL_IOA_AF		0x00
@@ -1864,7 +1870,9 @@ struct ipr_inquiry_ioa_cap {
 	u8 dual_ioa_raid:1;
 	u8 dual_ioa_wcache:1;
 	u8 dual_ioa_asymmetric_access:1;
-	u8 reserved:5;
+	u8 reserved:2;
+	u8 disable_array_rebuild_verify:1;
+	u8 reserved7:2;
 
 	u8 can_attach_to_aux_cache:1;
 	u8 is_aux_cache:1;
@@ -1880,7 +1888,9 @@ struct ipr_inquiry_ioa_cap {
 	u8 ra_id_encoding:3;
 	u8 sis_format:2;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 reserved:5;
+	u8 reserved7:2;
+	u8 disable_array_rebuild_verify:1;
+	u8 reserved:2;
 	u8 dual_ioa_asymmetric_access:1;
 	u8 dual_ioa_wcache:1;
 	u8 dual_ioa_raid:1;
