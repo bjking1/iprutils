@@ -9323,6 +9323,8 @@ static void init_ioa_dev(struct ipr_dev *dev)
 		return;
 	if (dev->ioa->asymmetric_access && dev->ioa->sis64)
 		attr.active_active = 1;
+	if (dev->ioa->configure_rebuild_verify)
+		attr.disable_rebuild_verify = 1;
 	ipr_modify_ioa_attr(dev->ioa, &attr);
 	if (ipr_set_ioa_attr(dev->ioa, &attr, 0))
 		return;

@@ -17311,10 +17311,10 @@ static int set_array_rebuild_verify(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (strncasecmp(args[1], "enable", 6) == 0
-	    || strncasecmp(args[1], "default", 7) == 0)
+	if (strncasecmp(args[1], "enable", 6) == 0)
 		disable_rebuild_verify = 0;
-	else if (strncasecmp(args[1], "disable", 7) == 0)
+	else if (strncasecmp(args[1], "disable", 7) == 0
+		 || strncasecmp(args[1], "default", 7) == 0)
 		disable_rebuild_verify = 1;
 	else {
 		scsi_err(dev, "'%s' is not a valid value.\n"
