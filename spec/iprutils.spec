@@ -85,16 +85,16 @@ fi
 # disable services if the system is using systemd
 if [ -d %{_unitdir} ]; then
 	if [ -f /usr/bin/systemctl ]; then
-      		if [ $1 = 0 ]; then
-        		echo "Restarting iprutils services"
-                	/usr/bin/systemctl stop iprinit.service > /dev/null 2>&1
-                	/usr/bin/systemctl stop iprupdate.service > /dev/null 2>&1
-                	/usr/bin/systemctl stop iprdump.service > /dev/null 2>&1
+		if [ $1 = 0 ]; then
+			echo "Restarting iprutils services"
+			/usr/bin/systemctl stop iprinit.service > /dev/null 2>&1
+			/usr/bin/systemctl stop iprupdate.service > /dev/null 2>&1
+			/usr/bin/systemctl stop iprdump.service > /dev/null 2>&1
 		else
-                	/usr/bin/systemctl disable iprinit.service > /dev/null 2>&1
-                	/usr/bin/systemctl disable iprdump.service > /dev/null 2>&1
-                	/usr/bin/systemctl disable iprupdate.service > /dev/null 2>&1
-        	fi
+			/usr/bin/systemctl disable iprinit.service > /dev/null 2>&1
+			/usr/bin/systemctl disable iprdump.service > /dev/null 2>&1
+			/usr/bin/systemctl disable iprupdate.service > /dev/null 2>&1
+		fi
 	fi
 
 # disable services if the system is *not* using systemd
@@ -133,11 +133,11 @@ rm -rf %{_topdir}/BUILD%{name}
 %{_sysconfdir}/ha.d/resource.d
 %{_sysconfdir}/ha.d/resource.d/iprha
 %if %{?_unitdir:1}%{!?_unitdir:0}
-       %{_unitdir}/*
+	%{_unitdir}/*
 %else
-       %{_sysconfdir}/init.d/iprinit
-       %{_sysconfdir}/init.d/iprdump
-       %{_sysconfdir}/init.d/iprupdate
+	%{_sysconfdir}/init.d/iprinit
+	%{_sysconfdir}/init.d/iprdump
+	%{_sysconfdir}/init.d/iprupdate
 %endif
 
 
