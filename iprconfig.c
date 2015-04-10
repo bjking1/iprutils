@@ -10771,7 +10771,7 @@ int change_disk_config(i_container * i_con)
 	i_container *i_con_head_saved;
 	struct ipr_dev *dev;
 	char qdepth_str[4];
-	char format_timeout_str[5];
+	char format_timeout_str[8];
 	char buffer[128];
 	i_container *temp_i_con;
 	int found = 0;
@@ -10863,7 +10863,10 @@ int change_disk_config(i_container * i_con)
 		disk_config_attr[1].option = 2;
 		disk_config_attr[1].format_timeout = disk_attr.format_timeout / (60 * 60);
 		body = add_line_to_body(body,_("Format Timeout"), "%4");
-		sprintf(format_timeout_str,"%d hr",disk_config_attr[1].format_timeout);
+
+		snprintf(format_timeout_str, sizeof(format_timeout_str), "%d hr",
+			 disk_config_attr[1].format_timeout);
+
 		i_con = add_i_con(i_con, format_timeout_str, &disk_config_attr[1]);
 	} else if (!tcq_blocked) {
 		disk_config_attr[2].option = 3;
