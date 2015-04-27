@@ -24,7 +24,7 @@ make
 %install
 %make_install
 
-if [ -d %{_unitdir} ]; then
+if [ -f /usr/bin/systemctl ]; then
 	install -d $RPM_BUILD_ROOT/%{_unitdir}
 	ln -s %{_datadir}/iprutils/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
 	ln -s %{_datadir}/iprutils/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
@@ -43,35 +43,39 @@ fi
 %ifarch ppc ppc64 ppc64le
 %post
 # if the system is using systemd
-if [ -d %{_unitdir} ]; then
-	if [ -f /usr/bin/systemctl ]; then
-		if [ $1 = 2 ]; then
-			echo "Restarting iprutils services"
-			/usr/bin/systemctl restart iprinit.service > /dev/null 2>&1
-			/usr/bin/systemctl restart iprupdate.service > /dev/null 2>&1
-			/usr/bin/systemctl restart iprdump.service > /dev/null 2>&1
-		else
-			/usr/bin/systemctl daemon-reload > /dev/null 2>&1
-			/usr/bin/systemctl start iprinit.service > /dev/null 2>&1
-			/usr/bin/systemctl start iprdump.service > /dev/null 2>&1
-			/usr/bin/systemctl start iprupdate.service > /dev/null 2>&1
-		fi
+if [ -f /usr/bin/systemctl ]; then
+	if [ $1 = 2 ]; then
+		echo "Restarting iprutils services"
+		/usr/bin/systemctl restart iprinit.service
+		/usr/bin/systemctl restart iprupdate.service
+		/usr/bin/systemctl restart iprdump.service
+	else
+		echo "Starting iprutils services..."
+		/usr/bin/systemctl daemon-reload
+		/usr/bin/systemctl start iprinit.service
+		/usr/bin/systemctl start iprdump.service
+		/usr/bin/systemctl start iprupdate.service
 	fi
 
 # if the system is not using systemd
 else
 	if [ $1 = 2 ]; then
 		echo "Restarting iprutils services"
-		%{_sysconfdir}/init.d/iprdump restart  > /dev/null 2>&1
-		%{_sysconfdir}/init.d/iprupdate restart  > /dev/null 2>&1
-		%{_sysconfdir}/init.d/iprinit restart  > /dev/null 2>&1
-	elif [ -f /sbin/chkconfig ]; then
-		/sbin/chkconfig --add iprinit > /dev/null 2>&1
-		/sbin/chkconfig --add iprdump > /dev/null 2>&1
-		/sbin/chkconfig --add iprupdate > /dev/null 2>&1
-		/sbin/chkconfig iprinit on > /dev/null 2>&1
-		/sbin/chkconfig iprdump on > /dev/null 2>&1
-		/sbin/chkconfig iprupdate on > /dev/null 2>&1
+		%{_sysconfdir}/init.d/iprdump restart
+		%{_sysconfdir}/init.d/iprupdate restart
+		%{_sysconfdir}/init.d/iprinit restart
+	else
+		echo "Starting iprutils services..."
+		%{_sysconfdir}/init.d/iprdump start
+		%{_sysconfdir}/init.d/iprupdate start
+		%{_sysconfdir}/init.d/iprinit start
+	fi
+
+	if [ -f /sbin/chkconfig ]; then
+		echo "Starting iprutils services..."
+		/sbin/chkconfig --add iprinit
+		/sbin/chkconfig --add iprdump
+		/sbin/chkconfig --add iprupdate
 	else
 		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
 		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
@@ -83,36 +87,34 @@ fi
 %ifarch ppc ppc64 ppc64le
 %preun
 # disable services if the system is using systemd
-if [ -d %{_unitdir} ]; then
-	if [ -f /usr/bin/systemctl ]; then
-		if [ $1 = 0 ]; then
-			echo "Restarting iprutils services"
-			/usr/bin/systemctl stop iprinit.service > /dev/null 2>&1
-			/usr/bin/systemctl stop iprupdate.service > /dev/null 2>&1
-			/usr/bin/systemctl stop iprdump.service > /dev/null 2>&1
-		else
-			/usr/bin/systemctl disable iprinit.service > /dev/null 2>&1
-			/usr/bin/systemctl disable iprdump.service > /dev/null 2>&1
-			/usr/bin/systemctl disable iprupdate.service > /dev/null 2>&1
-		fi
+if [ -f /usr/bin/systemctl ]; then
+	if [ $1 = 0 ]; then
+		echo "Stopping iprutils services"
+		/usr/bin/systemctl stop iprinit.service
+		/usr/bin/systemctl stop iprupdate.service
+		/usr/bin/systemctl stop iprdump.service
+	else
+		/usr/bin/systemctl disable iprinit.service
+		/usr/bin/systemctl disable iprdump.service
+		/usr/bin/systemctl disable iprupdate.service
 	fi
+fi
 
 # disable services if the system is *not* using systemd
 elif [ $1 = 0 ]; then
-	%{_sysconfdir}/init.d/iprdump stop  > /dev/null 2>&1
-	%{_sysconfdir}/init.d/iprupdate stop  > /dev/null 2>&1
-	%{_sysconfdir}/init.d/iprinit stop  > /dev/null 2>&1
+	%{_sysconfdir}/init.d/iprdump stop
+	%{_sysconfdir}/init.d/iprupdate stop
+	%{_sysconfdir}/init.d/iprinit stop
 
 	if [ -f /sbin/chkconfig ]; then
-		/sbin/chkconfig --del iprinit > /dev/null 2>&1
-		/sbin/chkconfig --del iprdump > /dev/null 2>&1
-		/sbin/chkconfig --del iprupdate > /dev/null 2>&1
+		/sbin/chkconfig --del iprinit
+		/sbin/chkconfig --del iprdump
+		/sbin/chkconfig --del iprupdate
 	else
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
 	fi
-fi
 %endif
 
 %clean
