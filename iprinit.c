@@ -30,9 +30,14 @@ char *tool_name = "iprinit";
 static void init_all()
 {
 	struct ipr_ioa *ioa;
+	int rc = tool_init(1);
 
-	if(tool_init(1))
-		syslog(LOG_ERR, "Run iprinit manually to ensure all ipr RAID adapters are running optimally.\n");
+	if(rc) {
+		if (daemonize)
+			syslog(LOG_ERR, "Run iprinit manually to ensure all ipr RAID adapters are running optimally.\n");
+		else
+			syslog(LOG_ERR, "Error initializing adapters. Perhaps run with sudo?\n");
+	}
 	check_current_config(false);
 	for_each_ioa(ioa)
 		ipr_init_ioa(ioa);
