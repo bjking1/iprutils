@@ -72,7 +72,6 @@ else
 	fi
 
 	if [ -f /sbin/chkconfig ]; then
-		echo "Starting iprutils services..."
 		/sbin/chkconfig --add iprinit
 		/sbin/chkconfig --add iprdump
 		/sbin/chkconfig --add iprupdate
