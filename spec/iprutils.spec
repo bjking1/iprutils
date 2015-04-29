@@ -97,7 +97,6 @@ if [ -f /usr/bin/systemctl ]; then
 		/usr/bin/systemctl disable iprdump.service
 		/usr/bin/systemctl disable iprupdate.service
 	fi
-fi
 
 # disable services if the system is *not* using systemd
 elif [ $1 = 0 ]; then
@@ -114,6 +113,7 @@ elif [ $1 = 0 ]; then
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
 		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
 	fi
+fi
 %endif
 
 %clean
