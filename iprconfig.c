@@ -15614,6 +15614,19 @@ static int query_add_device(char **args, int num_args)
 }
 
 /**
+ * show_slots -
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int show_slots(char **args, int num_args)
+{
+	return query_add_remove(IPR_CONC_IDENTIFY);
+}
+
+/**
  * query_log_level -
  * @args:		argument vector
  * @num_args:		number of arguments
@@ -18215,6 +18228,9 @@ static int dump (char **args, int num_args)
 	printf("\n === Running 'show-jbod-disks' ===\n");
 	show_jbod_disks(NULL, 0);
 
+	printf("\n === Running 'show-slots' ===\n");
+	show_slots(NULL, 0);
+
 	printf("\n === Running show-details ===\n");
 	for_each_ioa(ioa){
 		for_each_dev(ioa, dev){
@@ -18280,6 +18296,7 @@ static const struct {
 	{ "show-af-disks",			0, 0, 0, show_af_disks, "" },
 	{ "show-all-af-disks",			0, 0, 0, show_all_af_disks, "" },
 	{ "show-jbod-disks",			0, 0, 0, show_jbod_disks, "" },
+	{ "show-slots",				0, 0, 0, show_slots, "" },
 	{ "status",				1, 0, 1, print_status, "sda" },
 	{ "alt-status",				1, 0, 1, print_alt_status, "sda" },
 	{ "query-raid-create",			1, 0, 1, query_raid_create, "sg5" },
