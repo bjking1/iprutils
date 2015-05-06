@@ -8,7 +8,7 @@ Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
 Source0: iprutils-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
-BuildRequires: ncurses-devel
+BuildRequires: ncurses-devel python
 
 %description
 Provides a suite of utilities to manage and configure SCSI devices
@@ -127,6 +127,7 @@ rm -rf %{_topdir}/BUILD%{name}
 %{_sbindir}/*
 %{_includedir}/*
 %{_libdir}/*
+%{python_sitelib}/sos/plugins/*
 %{_mandir}/man8/*
 %{_datadir}/iprutils
 %{_datadir}/iprutils/*

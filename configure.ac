@@ -17,6 +17,7 @@ AC_CONFIG_MACRO_DIR([build-aux])
 AC_PROG_CC
 AC_PROG_INSTALL
 LT_INIT
+AM_PATH_PYTHON([2.6])
 
 ncurses_include=$(ncurses5-config --cflags)
 if test -n ${ncurses_include}; then
