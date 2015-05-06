@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.6
+Version: 2.4.7
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -144,6 +144,14 @@ rm -rf %{_topdir}/BUILD%{name}
 
 
 %changelog
+* Wed May 6 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.6
+- Add iprutils plugin for sosreport
+- Fix to ensure daemons are enabled by default
+- Add new set-write-cache-policy and query-write-cache-policy
+  CLI commands for JBOD devices to enable drive write cache
+- Add CLI support for configurable rebuild rate
+- Add support to speed up array rebuilds
+- Misc fixes
 * Fri Mar 13 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.6
 - Build with autotools
 - Fix bug causing iprutils daemons to die
