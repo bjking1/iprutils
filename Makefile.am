@@ -31,6 +31,9 @@ iprdbg_LDADD= libipr.la
 
 dist_man_MANS = iprconfig.8 iprdump.8 iprinit.8 iprupdate.8 iprsos.8
 
+bashcompdir = ${sysconfdir}/bash_completion.d
+dist_bashcomp_DATA = iprconfig-bash-completion.sh
+
 SUBDIRS = . systemd init.d spec
 
 sosreportdir = @pythondir@/sos/plugins

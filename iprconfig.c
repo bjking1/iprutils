@@ -18485,6 +18485,13 @@ int check_sg_module()
 	return 0;
 }
 
+void list_options()
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(command); i++)
+		printf ("%s\n", command[i].cmd);
+}
+
 /**
  * main - program entry point
  * @argc:		number of arguments
@@ -18522,6 +18529,10 @@ int main(int argc, char *argv[])
 				next_dir = 1;
 			else if (strcmp(argv[i], "-c") == 0)
 				next_cmd = 1;
+			else if (strcmp(argv[i], "-l") == 0) {
+				list_options();
+				exit(1);
+			}
 			else if (next_editor)	{
 				strcpy(parm_editor, argv[i]);
 				next_editor = 0;

@@ -134,6 +134,7 @@ rm -rf %{_topdir}/BUILD%{name}
 %{_sysconfdir}/ha.d
 %{_sysconfdir}/ha.d/resource.d
 %{_sysconfdir}/ha.d/resource.d/iprha
+%{_sysconfdir}/bash_completion.d/*
 %if %{?_unitdir:1}%{!?_unitdir:0}
 	%{_unitdir}/*
 %else
