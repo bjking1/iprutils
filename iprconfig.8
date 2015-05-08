@@ -467,7 +467,7 @@ specified array will be displayed.
 .br
 Show the current write cache policy for [device].
 .TP
-.B raid-create [-r raid_level] [-s stripe_size_in_kb] [-l label] [devices...]
+.B raid-create [-r raid_level] [-s stripe_size_in_kb] [-l label] [--skip-format] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
 include 16, 64, and 256. If raid_level is not specified, it will default to

@@ -13235,7 +13235,7 @@ static struct ipr_dev *find_and_add_dev(char *name)
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int raid_create_add_dev(char *name)
+static int raid_create_add_dev(char *name, const char *raid_level, int skip_format)
 {
 	struct ipr_dev *dev = find_and_add_dev(name);
 
@@ -13247,6 +13247,15 @@ static int raid_create_add_dev(char *name)
 			return -EINVAL;
 		if (!is_format_allowed(dev))
 			return -EIO;
+	} else if (ipr_is_af_dasd_device(dev)) {
+		/* We always skip formatting for SIS32 if we are building
+		 * a RAID0 */
+		if (!dev->ioa->sis64 && strcmp (raid_level, "0") == 0)
+			skip_format = 1;
+	}
+
+	if (!skip_format) {
+		/* Format device */
 		if (dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K)
 			add_format_device(dev, IPR_AF_4K_BLOCK_SIZE);
 		else
@@ -13435,12 +13444,12 @@ static int format_for_raid(char **args, int num_args)
  **/
 static int raid_create(char **args, int num_args)
 {
-	int i, num_devs = 0, rc;
+	int i, num_devs = 0, rc, prot_level;
 	int non_4k_count = 0, is_4k_count = 0;
 	int next_raid_level, next_stripe_size, next_qdepth, next_label;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
 	char label[8];
-	int stripe_size, qdepth, zeroed_devs;
+	int stripe_size, qdepth, zeroed_devs, skip_format;
 	struct ipr_dev *dev;
 	struct sysfs_dev *sdev;
 	struct ipr_ioa *ioa = NULL;
@@ -13455,6 +13464,7 @@ static int raid_create(char **args, int num_args)
 	stripe_size = 0;
 	qdepth = 0;
 	zeroed_devs = 0;
+	skip_format = 0;
 
 	for (i = 0; i < num_args; i++) {
 		if (strcmp(args[i], "-z") == 0)
@@ -13467,6 +13477,8 @@ static int raid_create(char **args, int num_args)
 			next_qdepth = 1;
 		else if (strcmp(args[i], "-l") == 0)
 			next_label = 1;
+		else if (strcmp(args[i], "--skip-format") == 0)
+			skip_format = 1;
 		else if (next_raid_level) {
 			next_raid_level = 0;
 			raid_level = args[i];
@@ -13489,7 +13501,7 @@ static int raid_create(char **args, int num_args)
 			num_devs++;
 			if (zeroed_devs)
 				ipr_add_zeroed_dev(dev);
-			if (raid_create_add_dev(args[i]))
+			if (raid_create_add_dev(args[i], raid_level, skip_format))
 				return -EIO;
 		}
 	}
@@ -13528,6 +13540,16 @@ static int raid_create(char **args, int num_args)
 
 	if (!cap) {
 		syslog(LOG_ERR, _("Invalid RAID level for selected adapter. %s\n"), raid_level);
+		return -EINVAL;
+	}
+
+	prot_level = cap->prot_level >> 4;
+	if (dev->block_dev_class == IPR_HDD
+	    && (prot_level == 0x5 || prot_level == 0x6)
+	    && !ioa->has_cache && !ipr_force) {
+		fprintf(stderr,"\
+Warning: Performance may be suboptimal for this RAID level without an \
+IOA write cache.  Use --force to force creation.\n");
 		return -EINVAL;
 	}
 
