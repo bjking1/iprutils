@@ -29,6 +29,14 @@ iprinit_LDADD= libipr.la
 iprdbg_SOURCES = iprdbg.c
 iprdbg_LDADD= libipr.la
 
+if STATIC_BUILD
+sbin_PROGRAMS += iprconfig-static
+
+iprconfig_static_SOURCES = iprconfig.c iprconfig.h
+iprconfig_static_LDADD= libipr.la
+iprconfig_static_LDFLAGS=-all-static
+endif
+
 dist_man_MANS = iprconfig.8 iprdump.8 iprinit.8 iprupdate.8 iprsos.8
 
 bashcompdir = ${sysconfdir}/bash_completion.d

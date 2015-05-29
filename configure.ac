@@ -24,7 +24,31 @@ if test -n ${ncurses_include}; then
   CFLAGS="${CFLAGS} ${ncurses_include}"
 fi
 
+AC_ARG_ENABLE([build_static],
+              [--enable-build-static Generate statically linked binaries],
+[case "${enableval}" in
+  yes)
+     build_static=true
+     CFLAGS="-static ${CFLAGS}"
+     ;;
+  no)
+     build_static=false
+     ;;
+  *)
+    AC_MSG_ERROR([bad value ${enableval} for --static])
+    ;;
+ esac], [build_static=false])
+AM_CONDITIONAL([STATIC_BUILD], [test "x${build_static}" = xtrue])
+
 # Check for Libraries.
+if test "x${STATIC_BUILD_TRUE}" = "x"; then
+ AC_CHECK_LIB(dl, dlopen, [],
+	      [AC_ERROR("glibc-static required")])
+ AC_CHECK_LIB(tinfo, tgetent, [],
+	      [AC_ERROR("libtinfo not found.
+	      It should be provided by ncurses")])
+fi
+
 AC_CHECK_LIB([ncurses], [curses_version], [],
 	     [AC_ERROR("libncurses not found.")])
 AC_CHECK_LIB([form], [free_form], [], [AC_ERROR("libform not found.")])

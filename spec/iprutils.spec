@@ -10,15 +10,37 @@ Source0: iprutils-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
 BuildRequires: ncurses-devel python
 
+# Predicate whether we want to build -static package.
+%bcond_with static
+
 %description
 Provides a suite of utilities to manage and configure SCSI devices
 supported by the ipr SCSI storage device driver.
+
+%if %{with static}
+%package static
+Summary: Static version of iprutils.
+%if 0%{?suse_version}
+BuildRequires: glibc-static
+%else
+BuildRequires: glibc-static ncurses-static
+%endif
+
+%description static
+Static version of some tools of iprutils.
+%endif # with_static
 
 %prep
 %setup -q -n %{name}-%{version}
 
 %build
-%configure --sbindir=%{_sbindir} --libdir=%{_libdir}
+%configure --sbindir=%{_sbindir} --libdir=%{_libdir} \
+%if 0%{with static}
+	   --enable-build-static=yes
+%else
+	   --enable-build-static=no
+%endif #!with_static
+
 make
 
 %install
@@ -124,7 +146,12 @@ rm -rf %{_topdir}/BUILD%{name}
 
 %files
 %defattr(-,root,root)
-%{_sbindir}/*
+%{_sbindir}/iprconfig
+%{_sbindir}/iprdump
+%{_sbindir}/iprupdate
+%{_sbindir}/iprinit
+%{_sbindir}/iprdbg
+%{_sbindir}/iprsos
 %{_includedir}/*
 %{_libdir}/*
 %{python_sitelib}/sos/plugins/*
@@ -143,6 +170,13 @@ rm -rf %{_topdir}/BUILD%{name}
 	%{_sysconfdir}/init.d/iprupdate
 %endif
 
+%if 0%{with static}
+%files static
+
+%defattr(-,root,root)
+%{_sbindir}/iprconfig-static
+
+%endif #with_static
 
 %changelog
 * Wed May 6 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.6
