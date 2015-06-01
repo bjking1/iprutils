@@ -17,4 +17,5 @@ clean-local:
 	rm iprdump iprinit iprupdate
 
 sysconfdir=@sysconfdir@/ha.d/resource.d
-dist_sysconf_DATA = iprha
+nodist_sysconf_DATA = iprha
+dist_sysconf_DATA = iprha.in
