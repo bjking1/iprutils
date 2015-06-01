@@ -49,12 +49,16 @@ if test "x${STATIC_BUILD_TRUE}" = "x"; then
 	      It should be provided by ncurses")])
 fi
 
+save_LIBS="$LIBS"
 AC_CHECK_LIB([ncurses], [curses_version], [],
 	     [AC_ERROR("libncurses not found.")])
 AC_CHECK_LIB([form], [free_form], [], [AC_ERROR("libform not found.")])
 AC_CHECK_LIB([m], [matherr], [], [AC_ERROR("libm not found.")])
 AC_CHECK_LIB([menu], [new_menu], [], [AC_ERROR("libmenu not found.")])
 AC_CHECK_LIB([panel], [show_panel], [], [AC_ERROR("libpanel not found.")])
+IPRCONFIG_LIBS="$LIBS"
+AC_SUBST([IPRCONFIG_LIBS])
+LIBS="$save_LIBS"
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h libintl.h locale.h netinet/in.h nl_types.h \

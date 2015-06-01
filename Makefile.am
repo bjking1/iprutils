@@ -15,7 +15,7 @@ sbin_PROGRAMS = iprconfig iprdump iprupdate iprinit iprdbg
 dist_sbin_SCRIPTS = iprsos
 
 iprconfig_SOURCES = iprconfig.c iprconfig.h
-iprconfig_LDADD= libipr.la
+iprconfig_LDADD= libipr.la $(IPRCONFIG_LIBS)
 
 iprdump_SOURCES = iprdump.c
 iprdump_LDADD= libipr.la
