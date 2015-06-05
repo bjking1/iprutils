@@ -17496,6 +17496,7 @@ static int query_array_rebuild_verify(char **args, int num_args)
  **/
 static int set_array_rebuild_rate(char**args, int num_args)
 {
+	int err_rebuild_rate = 0;
 	int rebuild_rate = 0;
 	int rc;
 	struct ipr_ioa_attr attr;
@@ -17527,6 +17528,7 @@ static int set_array_rebuild_rate(char**args, int num_args)
 				 "decrease the total rebuild time.\n", args[1]);
 			return -EINVAL;
 		}
+		err_rebuild_rate = rebuild_rate;
 		rebuild_rate = (rebuild_rate * 15) / 100;
 	}
 
@@ -17545,7 +17547,7 @@ static int set_array_rebuild_rate(char**args, int num_args)
 	rc = ipr_set_ioa_attr(ioa, &attr, 1);
 	if (rc) {
 		scsi_err(ioa->dev, "Unable to set rebuild rate value %d",
-			 rebuild_rate);
+			 err_rebuild_rate);
 		return rc;
 	}
 	return 0;
