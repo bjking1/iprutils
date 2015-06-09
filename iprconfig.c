@@ -10644,6 +10644,7 @@ struct disk_config_attr {
 	int queue_depth;
 	int format_timeout;
 	int tcq_enabled;
+	int write_cache_policy;
 };
 
 /**
@@ -10753,6 +10754,37 @@ static int disk_config_menu(struct disk_config_attr *disk_config_attr,
 		free(menu_item);
 		free(userptr);
 		menu_item = NULL;
+	} else if (disk_config_attr->option == 4) {  /* write cache policy.*/
+		num_menu_items = 2;
+		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
+		userptr = malloc(sizeof(int) * num_menu_items);
+
+		menu_index = 0;
+		menu_item[menu_index] = new_item("Write Through","");
+		userptr[menu_index] = IPR_DEV_CACHE_WRITE_THROUGH;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+
+		menu_index++;
+
+		menu_item[menu_index] = new_item("Write Back","");
+		userptr[menu_index] = IPR_DEV_CACHE_WRITE_BACK;
+		set_item_userptr(menu_item[menu_index],
+				 (char *)&userptr[menu_index]);
+		menu_index++;
+
+		menu_item[menu_index] = (ITEM *)NULL;
+		rc = display_menu(menu_item, start_row, menu_index, &retptr);
+		if (rc == RC_SUCCESS) {
+			disk_config_attr->write_cache_policy = *retptr;
+		}
+
+		i=0;
+		while (menu_item[i] != NULL)
+			free_item(menu_item[i++]);
+		free(menu_item);
+		free(userptr);
+		menu_item = NULL;
 	}
 
 	return rc;
@@ -10776,7 +10808,7 @@ int change_disk_config(i_container * i_con)
 	i_container *temp_i_con;
 	int found = 0;
 	char *input;
-	struct disk_config_attr disk_config_attr[3];
+	struct disk_config_attr disk_config_attr[4];
 	struct disk_config_attr *config_attr = NULL;
 	struct ipr_disk_attr disk_attr;
 	int header_lines = 0;
@@ -10879,6 +10911,22 @@ int change_disk_config(i_container * i_con)
 			i_con = add_i_con(i_con,_("No"),&disk_config_attr[2]);
 	}
 
+	if (ipr_is_gscsi(dev)) {
+		disk_config_attr[3].option = 4;
+		disk_config_attr[3].write_cache_policy =
+						disk_attr.write_cache_policy;
+		body = add_line_to_body(body,_("Device Write Cache Policy"), "%14");
+
+		if (disk_config_attr[3].write_cache_policy ==
+						IPR_DEV_CACHE_WRITE_THROUGH)
+			i_con = add_i_con(i_con,_("Write Through"),
+							&disk_config_attr[3]);
+
+		else
+			i_con = add_i_con(i_con,_("Write Back"),
+							&disk_config_attr[3]);
+	}
+
 	n_change_disk_config.body = body;
 	while (1) {
 		s_out = screen_driver(&n_change_disk_config, header_lines, i_con);
@@ -10910,6 +10958,17 @@ int change_disk_config(i_container * i_con)
 						sprintf(temp_i_con->field_data,_("No"));
 					disk_attr.tcq_enabled = config_attr->tcq_enabled;
 				}
+				else if (config_attr->option == 4) {
+					if (config_attr->write_cache_policy == IPR_DEV_CACHE_WRITE_THROUGH)
+						sprintf(temp_i_con->field_data,
+									_("Write Through"));
+					else
+						sprintf(temp_i_con->field_data,
+									_("Write Back"));
+
+					disk_attr.write_cache_policy =
+						config_attr->write_cache_policy;
+				}
 				found++;
 				break;
 			}
@@ -10923,6 +10982,7 @@ int change_disk_config(i_container * i_con)
 	}
 
 	ipr_set_dev_attr(dev, &disk_attr, 1);
+	check_current_config(false);
 
 leave:
 	free(n_change_disk_config.body);
