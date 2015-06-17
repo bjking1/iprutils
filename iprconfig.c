@@ -10999,6 +10999,7 @@ struct ioa_config_attr {
 	int active_active;
 	int caching;
 	int verify_array_rebuild;
+	int rebuild_rate;
 };
 
 /**
@@ -11088,6 +11089,23 @@ int ioa_config_menu(struct ioa_config_attr *ioa_config_attr,
 		free(menu_item);
 		free(userptr);
 		menu_item = NULL;
+	} else if (ioa_config_attr->option == 6) {
+		rc = display_input(start_row + 1,
+						&ioa_config_attr->rebuild_rate);
+		/* (start_row + 1) to correct window location */
+
+		if (ioa_config_attr->rebuild_rate > 100)
+			ioa_config_attr->rebuild_rate = 100;
+
+		if (ioa_config_attr->rebuild_rate < 0)
+			ioa_config_attr->rebuild_rate = 0;
+
+			ioa_config_attr->rebuild_rate =
+				(ioa_config_attr->rebuild_rate * 15) / 100;
+		/*
+		 * this constant multiplication *(15/100) it's only used to
+		 * give the user values 0-100 even though IOA only knows 0-15
+		*/
 	}
 
 	return rc;
@@ -11110,7 +11128,11 @@ int change_ioa_config(i_container * i_con)
 	i_container *temp_i_con;
 	int found = 0;
 	char *input;
-	struct ioa_config_attr ioa_config_attr[3];
+	struct ioa_config_attr ioa_config_attr[6];
+	/*
+	 * For now, the above 6 is a magic number - it means the maximum
+	 * number of options showed at screen. It should be more generic...
+	*/
 	struct ioa_config_attr *config_attr = NULL;
 	struct ipr_ioa_attr ioa_attr;
 	int header_lines = 0, index = 0;
@@ -11206,6 +11228,16 @@ int change_ioa_config(i_container * i_con)
 				  &ioa_config_attr[index++]);
 	}
 
+	if (dev->ioa->sis64) {
+		body = add_line_to_body(body, _("Array rebuild rate"), "%3");
+		ioa_config_attr[index].option = 6;
+		ioa_config_attr[index].rebuild_rate = ioa_attr.rebuild_rate;
+
+		sprintf(pref_str, "%d",
+			(ioa_config_attr[index].rebuild_rate* 100) / 15);
+
+		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
+	}
 	n_change_ioa_config.body = body;
 	while (1) {
 		s_out = screen_driver(&n_change_ioa_config, header_lines, i_con);
@@ -11254,6 +11286,11 @@ int change_ioa_config(i_container * i_con)
 						sprintf(temp_i_con->field_data, "Disabled");
 						ioa_attr.disable_rebuild_verify = 1;
 					}
+				} else if (config_attr->option == 6) {
+						sprintf( temp_i_con->field_data, "%d",
+							(config_attr->rebuild_rate * 100) / 15 );
+						ioa_attr.rebuild_rate =
+							config_attr->rebuild_rate;
 				}
 				found++;
 				break;
