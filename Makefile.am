@@ -7,9 +7,8 @@
 # Common Public License v1.0 which accompanies this distribution.
 #
 
-lib_LTLIBRARIES = libipr.la
-libipr_la_SOURCES = iprlib.c
-include_HEADERS = iprlib.h
+noinst_LTLIBRARIES = libipr.la
+libipr_la_SOURCES = iprlib.c iprlib.h
 
 sbin_PROGRAMS = iprconfig iprdump iprupdate iprinit iprdbg
 dist_sbin_SCRIPTS = iprsos
