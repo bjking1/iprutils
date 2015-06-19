@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.7
+Version: 2.4.8
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -152,8 +152,6 @@ rm -rf %{_topdir}/BUILD%{name}
 %{_sbindir}/iprinit
 %{_sbindir}/iprdbg
 %{_sbindir}/iprsos
-%{_includedir}/*
-%{_libdir}/*
 %{python_sitelib}/sos/plugins/*
 %{_mandir}/man8/*
 %{_datadir}/iprutils
@@ -179,7 +177,13 @@ rm -rf %{_topdir}/BUILD%{name}
 %endif #with_static
 
 %changelog
-* Wed May 6 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.6
+* Fri Jun 19 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.8
+- Add RAID creation warnings when creating arrays with non zeroed disks
+- Add bash smart completion
+- Misc build fixes
+- Add support for optional static linking of iprconfig
+- Add device write cache attribute in iprconfig for JBOD disks
+* Wed May 6 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.7
 - Add iprutils plugin for sosreport
 - Fix to ensure daemons are enabled by default
 - Add new set-write-cache-policy and query-write-cache-policy
