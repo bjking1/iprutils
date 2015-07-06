@@ -11344,7 +11344,7 @@ int ioa_config(i_container * i_con)
 	for_each_ioa(ioa) {
 		if (ioa->ioa.scsi_dev_data == NULL)
 			continue;
-		if (!ioa->dual_raid_support && !ioa->gscsi_only_ha && !ioa->configure_rebuild_verify)
+		if (!ioa->dual_raid_support && !ioa->gscsi_only_ha && !ioa->sis64)
 			continue;
 
 		print_dev(k, &ioa->ioa, buffer, "%1", k);
