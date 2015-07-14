@@ -14,7 +14,7 @@ nodist_pkgdata_DATA = iprdump iprinit iprupdate
 dist_pkgdata_DATA = iprdump.in iprinit.in iprupdate.in
 
 clean-local:
-	rm iprdump iprinit iprupdate
+	rm iprdump iprinit iprupdate iprha
 
 sysconfdir=@sysconfdir@/ha.d/resource.d
 nodist_sysconf_DATA = iprha
