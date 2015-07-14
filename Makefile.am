@@ -43,7 +43,11 @@ dist_noinst_DATA = LICENSE
 bashcompdir = ${sysconfdir}/bash_completion.d
 dist_bashcomp_DATA = iprconfig-bash-completion.sh
 
-SUBDIRS = . systemd init.d spec
+SUBDIRS = . init.d spec
+
+if SYSTEMD
+SUBDIRS += systemd
+endif
 
 if SOSREPORT
 sosreportdir = @pythondir@/sos/plugins

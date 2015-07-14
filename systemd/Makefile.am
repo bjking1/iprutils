@@ -11,10 +11,12 @@
 %.service: %.service.in
 	sed -e 's,[@]sbindir[@],$(sbindir),g' < $< > $@
 
-nodist_pkgdata_DATA = iprdump.service \
+systemdunitdir = @systemdunitdir@
+
+nodist_systemdunit_DATA = iprdump.service \
 	iprinit.service iprupdate.service
-dist_pkgdata_DATA = iprdump.service.in \
+EXTRA_DIST = iprdump.service.in \
 	iprinit.service.in iprupdate.service.in
 
 clean-local:
-	rm iprdump.service iprinit.service iprupdate.service
+	-rm iprdump.service iprinit.service iprupdate.service

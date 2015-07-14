@@ -55,6 +55,25 @@ AC_ARG_ENABLE([sosreport],
  esac], [sosreport=true])
 AM_CONDITIONAL([SOSREPORT], [test "x${sosreport}" = xtrue])
 
+# --with-systemd
+systemdunitdir='${exec_prefix}/usr/lib/systemd/system/'
+AC_ARG_WITH([systemd],
+	    [--without-systemd Disable systemd service files.],
+[case $withval in
+     yes)
+        systemd=true;
+	;;
+     no)
+	systemd=false;
+	;;
+     *)
+	systemd=true;
+	systemdunitdir="$withval"
+	;;
+ esac], [systemd=true])
+AM_CONDITIONAL([SYSTEMD], [test "x${systemd}" = xtrue])
+AC_SUBST(systemdunitdir, ${systemdunitdir})
+
 ## Check for python if building with sosreport.
 if test "x${SOSREPORT_TRUE}" = "x"; then
    AM_PATH_PYTHON([2.6])
