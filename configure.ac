@@ -17,7 +17,6 @@ AC_CONFIG_MACRO_DIR([build-aux])
 AC_PROG_CC
 AC_PROG_INSTALL
 LT_INIT
-AM_PATH_PYTHON([2.6])
 
 ncurses_include=$(ncurses5-config --cflags)
 if test -n ${ncurses_include}; then
@@ -39,6 +38,27 @@ AC_ARG_ENABLE([build_static],
     ;;
  esac], [build_static=false])
 AM_CONDITIONAL([STATIC_BUILD], [test "x${build_static}" = xtrue])
+
+# --enable-sosreport.
+AC_ARG_ENABLE([sosreport],
+              [--enable-sosreport Install sosreport plugin],
+[case "${enableval}" in
+  yes)
+     sosreport=true
+     ;;
+  no)
+     sosreport=false
+     ;;
+  *)
+    AC_MSG_ERROR([bad value ${enableval} for --enable-sosreport])
+    ;;
+ esac], [sosreport=true])
+AM_CONDITIONAL([SOSREPORT], [test "x${sosreport}" = xtrue])
+
+## Check for python if building with sosreport.
+if test "x${SOSREPORT_TRUE}" = "x"; then
+   AM_PATH_PYTHON([2.6])
+fi
 
 # Check for Libraries.
 if test "x${STATIC_BUILD_TRUE}" = "x"; then

@@ -45,5 +45,7 @@ dist_bashcomp_DATA = iprconfig-bash-completion.sh
 
 SUBDIRS = . systemd init.d spec
 
+if SOSREPORT
 sosreportdir = @pythondir@/sos/plugins
 sosreport_PYTHON = iprutils.py
+endif
