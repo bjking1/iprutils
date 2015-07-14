@@ -32,7 +32,7 @@ if STATIC_BUILD
 sbin_PROGRAMS += iprconfig-static
 
 iprconfig_static_SOURCES = iprconfig.c iprconfig.h
-iprconfig_static_LDADD= libipr.la
+iprconfig_static_LDADD= libipr.la $(IPRCONFIG_LIBS)
 iprconfig_static_LDFLAGS=-all-static
 endif
 
