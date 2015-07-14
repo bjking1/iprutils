@@ -8,4 +8,4 @@
 #
 #
 
-dist_pkgdata_DATA = iprutils.spec
+EXTRA_DIST = iprutils.spec
