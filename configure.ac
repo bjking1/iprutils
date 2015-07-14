@@ -74,6 +74,25 @@ AC_ARG_WITH([systemd],
 AM_CONDITIONAL([SYSTEMD], [test "x${systemd}" = xtrue])
 AC_SUBST(systemdunitdir, ${systemdunitdir})
 
+# --with-initd
+initddir="${prefix}/etc/init.d/"
+AC_ARG_WITH([initscripts],
+	    [--with-initscripts Enable initd files.],
+[case $withval in
+     yes)
+        initd=true;
+	;;
+     no)
+	initd=false;
+	;;
+     *)
+	initd=true;
+	initddir="$withval"
+	;;
+ esac], [initd=false])
+AM_CONDITIONAL([INITD], [test "x${initd}" = xtrue])
+AC_SUBST(initddir, ${initddir})
+
 ## Check for python if building with sosreport.
 if test "x${SOSREPORT_TRUE}" = "x"; then
    AM_PATH_PYTHON([2.6])
