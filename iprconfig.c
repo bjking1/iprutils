@@ -18322,8 +18322,10 @@ static int dump (char **args, int num_args)
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
 
-	if (!ipr_ioa_head)
+	if (!ipr_ioa_head) {
+		printf("There are no IPR adapters in the system. No dump collected...\n");
 		return 0;
+	}
 
 	printf("\n === Running 'show-config' ===\n");
 	show_config(NULL,0);
