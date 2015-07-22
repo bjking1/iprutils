@@ -14,12 +14,15 @@ iprsos \- IBM Power RAID report generator
 is used to generate an sosreport-like report by collecting hardware 
 information from the system, along with other system calls such
 as lspci, lscsi, and others. The information is collected from 'iprconfig'
-commands and appended to the /var/log/iprsos.log file
+commands and printed on stdin by default. User can specify the log file
+by -o /path/to/report/file of his/her choice.
 .br
 .SH FILES
 .br
-A detailed report file is created at /var/log/iprsos.log with the
-information collected from the hardware and system information.
+A detailed report file is printed both at stdin and the /path/to/report/file 
+specified by the user, with the information collected from the hardware and 
+system information. If no files are used, the information will be only displayed 
+at stdin.
 .br
 .SH AUTHORS
 Daniel B. Kreling <kreling@linux.vnet.ibm.com>
