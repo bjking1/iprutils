@@ -135,6 +135,7 @@ int disk_config(i_container * i_con);
 int ioa_config(i_container * i_con);
 int change_disk_config(i_container *);
 int change_ioa_config(i_container *);
+int ucode_screen(i_container *i_con);
 int download_ucode(i_container *);
 int choose_ucode(i_container *);
 int log_menu(i_container *);
@@ -194,7 +195,7 @@ struct screen_opts main_menu_opt[] = {
 	{driver_config,      "5", __("Work with driver configuration")},
 	{disk_config,        "6", __("Work with disk configuration")},
 	{ioa_config,         "7", __("Work with adapter configuration")},
-	{download_ucode,     "8", __("Download microcode")},
+	{ucode_screen,	     "8", __("Work with Microcode updates")},
 	{log_menu,           "9", __("Analyze log")},
 };
 
@@ -1554,6 +1555,19 @@ s_node n_confirm_set_default_editor = {
 		__("To return to the log menu without "
 		   "changing the editor, choose 'q'.\n\n"),
 		"" }
+};
+
+
+struct screen_opts ucode_screen_opt[] = {
+	{download_ucode,      "1", __("Download microcode")},
+};
+
+s_node n_ucode_screen = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG),
+	.num_opts = NUM_OPTS(ucode_screen_opt),
+	.options  = &ucode_screen_opt[0],
+	.title    = __("Work with microcode update")
 };
 
 const char *screen_status[] = {

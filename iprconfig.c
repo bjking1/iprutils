@@ -11717,6 +11717,36 @@ int choose_ucode(i_container * i_con)
 	return 0;
 }
 
+/**
+* ucode_screen - Configure microcode screen
+* @i_con:            i_container struct
+*
+* Returns:
+*   0 if success / non-zero on failure
+**/
+int ucode_screen(i_container *i_con)
+{
+	int rc;
+	struct screen_output *s_out;
+	int loop;
+
+	for (loop = 0; loop < n_ucode_screen.num_opts; loop++) {
+		n_ucode_screen.body =
+			ipr_list_opts(n_ucode_screen.body,
+				      n_ucode_screen.options[loop].key,
+				      n_ucode_screen.options[loop].list_str);
+	}
+
+	n_ucode_screen.body = ipr_end_list(n_ucode_screen.body);
+
+	s_out = screen_driver(&n_ucode_screen, 0, NULL);
+	free(n_ucode_screen.body);
+	n_ucode_screen.body = NULL;
+	rc = s_out->rc;
+	free(s_out);
+	return rc;
+}
+
 #define MAX_CMD_LENGTH 1000
 
 /**
