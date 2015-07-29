@@ -8,19 +8,68 @@ Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
 Source0: iprutils-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
-BuildRequires: ncurses-devel python
+BuildRequires: ncurses-devel
 
 # Predicate whether we want to build -static package.
 %bcond_with static
+
+##
+## Distro specific dependencies.
+##
+
+## SUSE
+%if 0%{?suse_version}
+
+%if 0%{?suse_version} >= 1210
+BuildRequires: systemd-rpm-macros systemd
+%{?systemd_requires}
+%endif
+
+%if %{?suse_version:1} < 1210
+Requires(pre): %insserv_prereq %fillup_prereq
+%endif
+
+%endif #SUSE
+
+##RHEL
+%if 0%{?rhel}
+
+%if 0%{rhel} >= 7
+BuildRequires: systemd
+%endif
+
+%if 0%{?rhel} <= 6
+Requires(post): chkconfig
+Requires(preun): chkconfig
+Requires(preun): initscripts
+Requires(postun): initscripts
+%endif
+
+# Rhel uses sosreport plugin.
+BuildRequires: python python-devel
+Requires: python
+
+%endif # RHEL
+
+#
+# Compilation parameters.
+%{?rhel:%define WITH_SOSREPORT 1}
+%{?_unitdir:%define WITH_SYSTEMD 1}
+%{!?_unitdir:%define WITH_INITD 1}
+%{?with static:%define WITH_STATIC 1}
 
 %description
 Provides a suite of utilities to manage and configure SCSI devices
 supported by the ipr SCSI storage device driver.
 
-%if %{with static}
+##
+## -static package
+##
+%if 0%{?WITH_STATIC:1}
 %package static
 Summary: Static version of iprutils.
-%if 0%{?suse_version}
+Group: System Environment/Base
+%if 0%{?suse_version:1}
 BuildRequires: glibc-static
 %else
 BuildRequires: glibc-static ncurses-static
@@ -30,120 +79,175 @@ BuildRequires: glibc-static ncurses-static
 Static version of some tools of iprutils.
 %endif # with_static
 
+##
+## prep
+##
 %prep
 %setup -q -n %{name}-%{version}
 
+##
+## build
+##
 %build
 %configure --sbindir=%{_sbindir} --libdir=%{_libdir} \
-%if 0%{with static}
-	   --enable-build-static=yes
-%else
-	   --enable-build-static=no
-%endif #!with_static
+	   --enable-sosreport=%{?WITH_SOSREPORT:yes}%{!?WITH_SOSREPORT:no} \
+	   --enable-build-static=%{?WITH_STATIC:yes}%{!?WITH_STATIC:no} \
+	   --with-initscripts=%{?WITH_INITD:%{_initrddir}}%{!?WITH_INITD:no} \
+	   --with-systemd=%{?WITH_SYSTEMD:%{_unitdir}}%{!?WITH_SYSTEMD:no}
 
-make
+%{__make} %{?_smp_mflags}
 
+##
+## install
+##
 %install
-%make_install
+%{__make} DESTDIR=%{buildroot} install
 
-if [ -f /usr/bin/systemctl ]; then
-	install -d $RPM_BUILD_ROOT/%{_unitdir}
-	ln -s %{_datadir}/iprutils/iprinit.service $RPM_BUILD_ROOT/%{_unitdir}/iprinit.service
-	ln -s %{_datadir}/iprutils/iprdump.service $RPM_BUILD_ROOT/%{_unitdir}/iprdump.service
-	ln -s %{_datadir}/iprutils/iprupdate.service $RPM_BUILD_ROOT/%{_unitdir}/iprupdate.service
-else
-	install -d $RPM_BUILD_ROOT/%{_sysconfdir}/init.d
-	ln -s %{_datadir}/iprutils/iprinit ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprinit
-	ln -s %{_datadir}/iprutils/iprdump ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprdump
-	ln -s %{_datadir}/iprutils/iprupdate ${RPM_BUILD_ROOT}%{_sysconfdir}/init.d/iprupdate
-	chmod +x ${RPM_BUILD_ROOT}/%{_datadir}/iprutils/iprinit
-	chmod +x ${RPM_BUILD_ROOT}/%{_datadir}/iprutils/iprdump
-	chmod +x ${RPM_BUILD_ROOT}/%{_datadir}/iprutils/iprupdate
-
-fi
-
-%ifarch ppc ppc64 ppc64le
+##
+## post
+##
 %post
-# if the system is using systemd
-if [ -f /usr/bin/systemctl ]; then
-	if [ $1 = 2 ]; then
-		echo "Restarting iprutils services"
-		/usr/bin/systemctl restart iprinit.service
-		/usr/bin/systemctl restart iprupdate.service
-		/usr/bin/systemctl restart iprdump.service
-	else
-		echo "Starting iprutils services..."
-		/usr/bin/systemctl daemon-reload
-		/usr/bin/systemctl start iprinit.service
-		/usr/bin/systemctl start iprdump.service
-		/usr/bin/systemctl start iprupdate.service
-	fi
 
-# if the system is not using systemd
-else
-	if [ $1 = 2 ]; then
-		echo "Restarting iprutils services"
-		%{_sysconfdir}/init.d/iprdump restart
-		%{_sysconfdir}/init.d/iprupdate restart
-		%{_sysconfdir}/init.d/iprinit restart
-	else
-		echo "Starting iprutils services..."
-		%{_sysconfdir}/init.d/iprdump start
-		%{_sysconfdir}/init.d/iprupdate start
-		%{_sysconfdir}/init.d/iprinit start
-	fi
+%if 0%{?suse_version}
 
-	if [ -f /sbin/chkconfig ]; then
-		/sbin/chkconfig --add iprinit
-		/sbin/chkconfig --add iprdump
-		/sbin/chkconfig --add iprupdate
-	else
-		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprinit
-		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprdump
-		/usr/lib/lsb/install_initd %{_sysconfdir}/init.d/iprupdate
-	fi
-fi
+# SLES > 12
+%if 0%{?suse_version} >= 1210
+%service_add_post iprinit.service
+%service_add_post iprupdate.service
+%service_add_post iprdump.service
 %endif
 
-%ifarch ppc ppc64 ppc64le
+# SLES <= 11
+%if 0%{!?_unitdir:1}
+%fillup_and_insserv -f -Y iprinit
+%fillup_and_insserv -f -Y iprupdate
+%fillup_and_insserv -f -Y iprdump
+%endif
+
+%endif #SUSE
+
+%if 0%{?rhel}
+
+%if 0%{?rhel} >= 7
+# FIXME: We should be able to use systemd_post macro here, but ipr is
+# not in the preset list for RHEL.
+/usr/bin/systemctl enable iprinit.service 2>&1 1>/dev/null
+/usr/bin/systemctl enable iprupdate.service 2>&1 1>/dev/null
+/usr/bin/systemctl enable iprdump.service 2>&1 1>/dev/null
+%endif
+
+%if 0%{!?_unitdir:1} && 0%{?rhel}
+/sbin/chkconfig --add iprinit
+/sbin/chkconfig --add iprupdate
+/sbin/chkconfig --add iprdump
+%endif
+%endif #RHEL
+
+# Start daemons.
+%if 0%{?_unitdir:1}%{!?_unitdir:0}
+/usr/bin/systemctl start iprinit.service || :
+/usr/bin/systemctl start iprupdate.service  || :
+/usr/bin/systemctl start iprdump.service || :
+%else
+service iprinit start  || :
+service iprupdate start  || :
+service iprdump start  || :
+%endif
+
+##
+## preun
+##
 %preun
-# disable services if the system is using systemd
-if [ -f /usr/bin/systemctl ]; then
-	if [ $1 = 0 ]; then
-		echo "Stopping iprutils services"
-		/usr/bin/systemctl stop iprinit.service
-		/usr/bin/systemctl stop iprupdate.service
-		/usr/bin/systemctl stop iprdump.service
-	else
-		/usr/bin/systemctl disable iprinit.service
-		/usr/bin/systemctl disable iprdump.service
-		/usr/bin/systemctl disable iprupdate.service
-	fi
 
-# disable services if the system is *not* using systemd
-elif [ $1 = 0 ]; then
-	%{_sysconfdir}/init.d/iprdump stop
-	%{_sysconfdir}/init.d/iprupdate stop
-	%{_sysconfdir}/init.d/iprinit stop
+%if 0%{?suse_version}
 
-	if [ -f /sbin/chkconfig ]; then
-		/sbin/chkconfig --del iprinit
-		/sbin/chkconfig --del iprdump
-		/sbin/chkconfig --del iprupdate
-	else
-		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprdump
-		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprupdate
-		/usr/lib/lsb/remove_initd %{_sysconfdir}/init.d/iprinit
-	fi
+# SLES > 12
+%if 0%{?suse_version} >= 1210
+%service_del_preun iprinit.service
+%service_del_preun iprupdate.service
+%service_del_preun iprdump.service
+%endif
+
+# SLES <= 11
+%if 0%{!?_unitdir:1}
+%stop_on_removal iprinit
+%stop_on_removal iprupdate
+%stop_on_removal iprdump
+%endif
+
+%endif #SUSE
+
+# RHEL
+%if 0%{?rhel}
+
+%if 0%{?rhel} >= 7
+%systemd_preun iprinit.service
+%systemd_preun iprupdate.service
+%systemd_preun iprdump.service
+%endif
+
+# RHEL <= 6
+%if 0%{!?_unitdir:1}
+if [ $1 -eq 0 ] ; then
+    /sbin/service iprinit stop >/dev/null 2>&1
+    /sbin/service iprupdate stop >/dev/null 2>&1
+    /sbin/service iprdump stop >/dev/null 2>&1
+
+    /sbin/chkconfig --del iprinit
+    /sbin/chkconfig --del iprupdate
+    /sbin/chkconfig --del iprdump
 fi
 %endif
 
-%clean
-rm -rf %{buildroot}
-rm -rf $RPM_BUILD_ROOT
-rm -rf %{_tmppath}/%{name}
-rm -rf %{_topdir}/BUILD%{name}
+%endif # RHEL
 
+##
+## postun
+##
+%postun
+
+# SLES > 12
+%if 0%{?suse_version} >= 1210
+%service_del_postun iprinit.service
+%service_del_postun iprupdate.service
+%service_del_postun iprdump.service
+%endif
+
+# SLES <= 11
+%if 0%{?suse_version}
+
+%if 0%{!?_unitdir:1}
+%restart_on_update iprinit
+%restart_on_update iprupdate
+%restart_on_update iprdump
+%insserv_cleanup
+%endif
+
+%endif # SUSE
+
+# RHEL
+%if 0%{?rhel}
+
+%if 0%{?rhel} >= 7
+%systemd_postun_with_restart iprinit.service
+%systemd_postun_with_restart iprupdate.service
+%systemd_postun_with_restart iprdump.service
+%endif
+
+# RHEL <= 6
+%if 0%{!?_unitdir:1}
+if [ "$1" -ge "1" ] ; then
+    /sbin/service iprinit condrestart >/dev/null 2>&1 || :
+    /sbin/service iprupdate condrestart >/dev/null 2>&1 || :
+    /sbin/service iprdump condrestart >/dev/null 2>&1 || :
+fi
+%endif
+
+%endif #RHEL
+
+##
+## files
+##
 %files
 %defattr(-,root,root)
 %{_sbindir}/iprconfig
@@ -152,29 +256,34 @@ rm -rf %{_topdir}/BUILD%{name}
 %{_sbindir}/iprinit
 %{_sbindir}/iprdbg
 %{_sbindir}/iprsos
+
+%if 0%{?rhel}
 %{python_sitelib}/sos/plugins/*
+%endif
+
 %{_mandir}/man8/*
-%{_datadir}/iprutils
-%{_datadir}/iprutils/*
 %{_sysconfdir}/ha.d
 %{_sysconfdir}/ha.d/resource.d
 %{_sysconfdir}/ha.d/resource.d/iprha
 %{_sysconfdir}/bash_completion.d/*
-%if %{?_unitdir:1}%{!?_unitdir:0}
-	%{_unitdir}/*
-%else
-	%{_sysconfdir}/init.d/iprinit
-	%{_sysconfdir}/init.d/iprdump
-	%{_sysconfdir}/init.d/iprupdate
-%endif
 
-%if 0%{with static}
+%if 0%{?_unitdir:1}%{!?_unitdir:0}
+%{_unitdir}/iprinit.service
+%{_unitdir}/iprupdate.service
+%{_unitdir}/iprdump.service
+%else
+%{_initrddir}/iprinit
+%{_initrddir}/iprupdate
+%{_initrddir}/iprdump
+%endif # WITH_SYSTEMD
+
+%if 0%{?WITH_STATIC}
 %files static
 
 %defattr(-,root,root)
 %{_sbindir}/iprconfig-static
 
-%endif #with_static
+%endif #WITH_STATIC
 
 %changelog
 * Fri Jun 19 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.8
