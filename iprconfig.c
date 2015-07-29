@@ -125,7 +125,7 @@ struct special_status {
 
 char *print_device(struct ipr_dev *, char *, char *, int);
 int display_menu(ITEM **, int, int, int **);
-char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int, int, int, int, int);
+char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int);
 static char *print_path_details(struct ipr_dev *, char *);
 static int get_drive_phy_loc(struct ipr_ioa *ioa);
 
@@ -1124,7 +1124,10 @@ static char *status_hdr[] = {
 		"Name   Platform Location          Description                  Status",
 		"OPT Name   PCI/Host/Resource Path                   Serial Number Status",
 		"OPT Name   Physical Location                        Production ID    Status",
-		"Name   Physical Location                        Serial Number Status"};
+		"Name   Physical Location                        Serial Number Status",
+		"Name   PCI/SCSI Location          Vendor   Product ID          Current    Available",
+		"OPT Name   PCI/SCSI Location          Vendor   Product ID          Current    Available",
+};
 
 static char *status_sep[] = {
 		"--- ------ -------------------------- -------- ------------------- -----------------",
@@ -1142,6 +1145,8 @@ static char *status_sep[] = {
 		"--- ------ ---------------------------------------- ------------- ------------",
 		"--- ------ ---------------------------------------- ---------------- ------------",
 		"------ ---------------------------------------- ------------- ------------",
+		"-----  ----------------------     -------- ----------------    ---------  ----------",
+		"--- -----  ----------------------     -------- ----------------    ---------  ----------",
 };
 
 /**
@@ -8286,8 +8291,8 @@ int path_status(i_container * i_con)
 			continue;
 
 		for_each_disk(ioa, dev) {
-			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1, 0 ,0, 0, 0);
-			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1, 0 ,0, 0, 0);
+			buffer[0] = __print_device(dev, buffer[0], "%1", 1, 1, 1, 0, 0, 1, 0, 1, 0 ,0, 0, 0, 0, 0, 0);
+			buffer[1] = __print_device(dev, buffer[1], "%1", 1, 1, 0, 0, 0, 0, 0, 1, 0 ,0, 0, 0, 0, 0, 0);
 			i_con = add_i_con(i_con, "\0", dev);
 			num_devs++;
 		}
@@ -12864,7 +12869,8 @@ static char *print_path_details(struct ipr_dev *dev, char *body)
 char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		     int sd, int sg, int vpd, int percent, int indent,
 		     int res_path, int ra, int path_status,
-		     int hw_loc, int conc_main, int ioa_flag, int serial_num)
+		     int hw_loc, int conc_main, int ioa_flag, int serial_num,
+		     int ucode, int skip_status, int skip_vset)
 {
 	u16 len = 0;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
@@ -12882,6 +12888,9 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 
 	/* In cases where we're having problems with the device */
 	if (!ioa)
+		return body;
+
+	if (skip_vset && ipr_is_volume_set (dev))
 		return body;
 
 	if (ioa_flag)
@@ -13201,8 +13210,23 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
 		}
 	}
 
-	get_status(dev, buf, percent, path_status);
-	sprintf(body + len, "%s\n", buf);
+	if (ucode) {
+		int cur_ulevel = get_fw_version(dev);
+		int newest_ulevel = get_latest_fw_image_version(dev);
+		char updatable;
+		newest_ulevel = (newest_ulevel < 0) ?
+			cur_ulevel:newest_ulevel;
+		updatable = (cur_ulevel < newest_ulevel) ? '*':' ';
+		len +=  sprintf(body + len, "%-10X %X%c", cur_ulevel,
+				newest_ulevel, updatable);
+	}
+
+	if (!skip_status) {
+		get_status(dev, buf, percent, path_status);
+		len += sprintf(body + len, "%s", buf);
+	}
+	sprintf(body + len, "\n");
+
 	return body;
 }
 
@@ -13230,10 +13254,14 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
  * 7: print sd, the second resource adress(sis32)/resource path(sis64), dev VPD
  * 8: print sg, pci/host/resource path, serial number, status
  * 9: print sg, physical location, production id, status
+ * 10: print sd, pci/host/resource vendor, product id, ucode version, available ucode
  */
 char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 {
 	int sd, sg, vpd, percent, indent, res_path, hw_loc, conc_main, ioa_flag, serial_num;
+	int ucode = 0;
+	int skip_status = 0;
+	int skip_vset = 0;
 
 	sd = sg = vpd = percent = indent = res_path = hw_loc = conc_main = ioa_flag = serial_num = 0;
 
@@ -13282,8 +13310,18 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 			res_path = 0;
 		vpd = 1;
 	}
+	if (type == 10) {
+		ucode = 1;
+		sg = 1;
+		vpd = 1;
+		skip_status = 1;
+		skip_vset = 1;
+	}
 
-	return __print_device(dev, body, option, sd, sg, vpd, percent, indent, res_path, type&1, 0, hw_loc, conc_main, ioa_flag, serial_num);
+	return __print_device(dev, body, option, sd, sg, vpd, percent,
+			      indent, res_path, type&1, 0, hw_loc,
+			      conc_main, ioa_flag, serial_num, ucode,
+			      skip_status, skip_vset);
 }
 
 /**
@@ -13935,7 +13973,7 @@ static void printf_device(struct ipr_dev *dev, int type)
 static void __printf_device(struct ipr_dev *dev, int sd, int sg, int vpd,
 			    int percent, int indent, int res_path)
 {
-	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0, 0, 0, 0, 0);
+	char *buf = __print_device(dev, NULL, NULL, sd, sg, vpd, percent, indent, res_path, 0, 0, 0, 0, 0, 0, 0, 0 ,0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -15116,6 +15154,23 @@ static int update_ucode_cmd(char **args, int num_args)
 }
 
 /**
+ * show_ucode_levels - List microcode level of every device and adapter
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int show_ucode_levels(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	printf("%s\n%s\n", status_hdr[15], status_sep[15]);
+	for_each_ioa(ioa)
+		printf_ioa(ioa, 10);
+	return 0;
+}
+
+/**
  * disrupt_device_cmd -
  * @args:		argument vector
  * @num_args:		number of arguments
@@ -15272,7 +15327,7 @@ static int query_path_details(char **args, int num_args)
  **/
 static void printf_path_status(struct ipr_dev *dev)
 {
-	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0);
+	char *buf = __print_device(dev, NULL, NULL, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0);
 	if (buf) {
 		printf("%s", buf);
 		free(buf);
@@ -18496,6 +18551,7 @@ static const struct {
 	{ "raid-rebuild",			1, 0, 1, raid_rebuild_cmd, "sg6" },
 	{ "disrupt-device",			1, 0, 1, disrupt_device_cmd, "sg6" },
 	{ "update-ucode",			2, 0, 2, update_ucode_cmd, "sg5 /root/ucode.bin" },
+	{ "show-ucode-levels",			0, 0, 0, show_ucode_levels, "" },
 	{ "set-format-timeout",			2, 0, 2, set_format_timeout, "sg6 4" },
 	{ "set-qdepth",				2, 0, 2, set_qdepth, "sda 16" },
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable, "sda 0" },
