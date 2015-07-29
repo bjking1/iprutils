@@ -1127,6 +1127,7 @@ static char *status_hdr[] = {
 		"Name   Physical Location                        Serial Number Status",
 		"Name   PCI/SCSI Location          Vendor   Product ID          Current    Available",
 		"OPT Name   PCI/SCSI Location          Vendor   Product ID          Current    Available",
+		"OPT Name   Resource Path/Address      Vendor   Product ID          Current    Available",
 };
 
 static char *status_sep[] = {
@@ -1146,6 +1147,7 @@ static char *status_sep[] = {
 		"--- ------ ---------------------------------------- ---------------- ------------",
 		"------ ---------------------------------------- ------------- ------------",
 		"-----  ----------------------     -------- ----------------    ---------  ----------",
+		"--- -----  ----------------------     -------- ----------------    ---------  ----------",
 		"--- -----  ----------------------     -------- ----------------    ---------  ----------",
 };
 
@@ -1357,6 +1359,15 @@ static void body_init_status(char *buffer[2], char **header, int *num_lines)
 
 	for (z = 0; z < 2; z++)
 		buffer[z] = __body_init_status(header, num_lines, z);
+}
+
+static void body_init_status2(char *buffer[2], char **header, int *num_lines,
+			      int type)
+{
+	int z;
+
+	for (z = 0; z < 2; z++)
+		buffer[z] = __body_init_status(header, num_lines, type+z);
 }
 
 /**
@@ -11398,7 +11409,7 @@ int download_ucode(i_container * i_con)
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev, *vset;
 	struct screen_output *s_out;
-	int header_lines;
+	int header_lines = 0;
 	char *buffer[2];
 	int toggle = 0;
 
@@ -11408,13 +11419,13 @@ int download_ucode(i_container * i_con)
 	i_con = free_i_con(i_con);
 
 	check_current_config(false);
-	body_init_status(buffer, n_download_ucode.header, &header_lines);
+	body_init_status2(buffer, n_download_ucode.header, &header_lines, 16);
 
 	for_each_ioa(ioa) {
 		if (!ioa->ioa.scsi_dev_data || ioa->ioa_dead)
 			continue;
 
-		print_dev(k, &ioa->ioa, buffer, "%1", k);
+		print_dev(k, &ioa->ioa, buffer, "%1", 10);
 		i_con = add_i_con(i_con, "\0", &ioa->ioa);
 
 		num_lines++;
@@ -11422,16 +11433,16 @@ int download_ucode(i_container * i_con)
 		if (ioa->is_secondary)
 			continue;
 
-		num_lines += print_standalone_disks(ioa, &i_con, buffer, 0);
-		num_lines += print_sas_ses_devices(ioa, &i_con, buffer, 0);
-		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 0);
+		num_lines += print_standalone_disks(ioa, &i_con, buffer, 10);
+		num_lines += print_sas_ses_devices(ioa, &i_con, buffer, 10);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 10);
 
 		/* print volume set associated devices*/
 		for_each_vset(ioa, vset) {
 			num_lines++;
 
 			for_each_dev_in_vset(vset, dev) {
-				print_dev(k, dev, buffer, "%1", k);
+				print_dev(k, dev, buffer, "%1", 10);
 				i_con = add_i_con(i_con, "\0", dev);
 				num_lines++;
 			}
@@ -13284,7 +13295,8 @@ char *__print_device(struct ipr_dev *dev, char *body, char *option,
  * 7: print sd, the second resource adress(sis32)/resource path(sis64), dev VPD
  * 8: print sg, pci/host/resource path, serial number, status
  * 9: print sg, physical location, production id, status
- * 10: print sd, pci/host/resource vendor, product id, ucode version, available ucode
+ * 10: print sg, pci/host/resource vendor, product id, ucode version, available ucode
+ * 11: print sd, resource address (sis32)/resource path (sis64), vendor, product id, ucode version, available ucode
  */
 char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 {
@@ -13342,10 +13354,20 @@ char *print_device(struct ipr_dev *dev, char *body, char *option, int type)
 	}
 	if (type == 10) {
 		ucode = 1;
+		sd = 1;
 		sg = 1;
 		vpd = 1;
 		skip_status = 1;
 		skip_vset = 1;
+	}
+	if (type == 11) {
+		ucode = 1;
+		sg = 1;
+		vpd = 1;
+		skip_status = 1;
+		skip_vset = 1;
+		res_path = 1;
+		percent =1;
 	}
 
 	return __print_device(dev, body, option, sd, sg, vpd, percent,
@@ -15195,8 +15217,14 @@ static int show_ucode_levels(char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
 	printf("%s\n%s\n", status_hdr[15], status_sep[15]);
-	for_each_ioa(ioa)
+	for_each_ioa(ioa) {
+		if (ioa->is_secondary){
+			printf_device(&ioa->ioa, 10);
+			continue;
+		}
+
 		printf_ioa(ioa, 10);
+	}
 	return 0;
 }
 
