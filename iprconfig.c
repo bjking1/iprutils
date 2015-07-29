@@ -2056,7 +2056,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 
 	ipr_inquiry(dev, 2, &dram_vpd, sizeof(dram_vpd));
 
-	fw_level = get_ioa_fw_version(dev->ioa);
+	fw_level = get_fw_version(&dev->ioa->ioa);
 
 	body = add_line_to_body(body,"", NULL);
 	ipr_strncpy_0(buffer, scsi_dev_data->vendor_id, IPR_VENDOR_ID_LEN);
@@ -15057,7 +15057,7 @@ static int update_ioa_ucode(struct ipr_ioa *ioa, char *file)
 
 	rc = ipr_update_ioa_fw(ioa, &image, 1);
 
-	if (image.version != get_ioa_fw_version(ioa))
+	if (image.version != get_fw_version(&ioa->ioa))
 		return -EIO;
 	return rc;
 }
@@ -15087,7 +15087,7 @@ static int update_dev_ucode(struct ipr_dev *dev, char *file)
 
 	rc = ipr_update_disk_fw(dev, &image, 1);
 
-	if (image.version != get_dev_fw_version(dev))
+	if (image.version != get_fw_version(dev))
 		return -EIO;
 	return rc;
 }
@@ -15880,9 +15880,9 @@ static int query_ucode_level(char **args, int num_args)
 	}
 
 	if (&dev->ioa->ioa == dev)
-		printf("%08X\n", get_ioa_fw_version(dev->ioa));
+		printf("%08X\n", get_fw_version(dev));
 	else {
-		level = get_dev_fw_version(dev);
+		level = get_fw_version(dev);
 		level_sw = htonl(level);
 		asc = (char *)&level_sw;
 		if (isprint(asc[0]) && isprint(asc[1]) &&

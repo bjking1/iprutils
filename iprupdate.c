@@ -31,7 +31,7 @@ static int force_ioas;
 
 static int ioa_needs_update(struct ipr_ioa *ioa, int silent)
 {
-	u32 fw_version = get_ioa_fw_version(ioa);
+	u32 fw_version = get_fw_version(&ioa->ioa);
 
 	if (fw_version >= ioa->msl)
 		return 0;

@@ -8253,7 +8253,7 @@ u32 get_dev_fw_version(struct ipr_dev *dev)
  * Returns:
  *   ioa firmware version
  **/
-u32 get_ioa_fw_version(struct ipr_ioa *ioa)
+static u32 get_ioa_fw_version(struct ipr_ioa *ioa)
 {
 	char devpath[PATH_MAX];
 	char value[16];
@@ -8267,6 +8267,31 @@ u32 get_ioa_fw_version(struct ipr_ioa *ioa)
 	sscanf(value, "%8X", &fw_version);
 
 	return fw_version;
+}
+
+/**
+ * get_fw_version - Get microcode version of device.
+ *
+ * @dev:		Device
+ *
+ * Returns:
+ *   ucode version if success / 0 on failure
+ **/
+u32 get_fw_version(struct ipr_dev *dev)
+{
+	if (!dev) {
+		/* FIXME: We should return -ENODEV here but old API
+		returns 0 on failure and any uint > 0 can be a firmware
+		level. A viable option would be writting the fw level to
+		a pointer received as argument, but lets hold to the
+		current API for now. */
+		return 0;
+	}
+
+	if (&dev->ioa->ioa == dev)
+		return get_ioa_fw_version(dev->ioa);
+
+	return get_dev_fw_version(dev);
 }
 
 /**
