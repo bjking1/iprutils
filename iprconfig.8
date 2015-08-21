@@ -340,7 +340,9 @@ in which case the IOA's microcode level will be shown.
 .B show-ucode-levels
 .br
 Show the microcode level that is currently loaded for every device and
-adapter in the system.
+adapter in the system. If newer microcode is available on the filesystem
+than what is loaded on the device, an * chararacter will be displayed next
+to the device.
 .TP
 .B query-format-timeout [device]
 .br

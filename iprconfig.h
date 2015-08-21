@@ -195,7 +195,7 @@ struct screen_opts main_menu_opt[] = {
 	{driver_config,      "5", __("Work with driver configuration")},
 	{disk_config,        "6", __("Work with disk configuration")},
 	{ioa_config,         "7", __("Work with adapter configuration")},
-	{ucode_screen,	     "8", __("Work with Microcode updates")},
+	{ucode_screen,	     "8", __("Work with microcode updates")},
 	{log_menu,           "9", __("Analyze log")},
 };
 
@@ -1567,7 +1567,7 @@ s_node n_ucode_screen = {
 	.f_flags  = (EXIT_FLAG | CANCEL_FLAG),
 	.num_opts = NUM_OPTS(ucode_screen_opt),
 	.options  = &ucode_screen_opt[0],
-	.title    = __("Work with microcode update")
+	.title    = __("Work with microcode updates")
 };
 
 const char *screen_status[] = {
