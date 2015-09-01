@@ -102,6 +102,10 @@ Static version of some tools of iprutils.
 ##
 %install
 %{__make} DESTDIR=%{buildroot} install
+%if 0%{?suse_version}
+%{__mkdir} -p %{buildroot}/usr/lib/supportconfig/plugins
+%{__cp} %{buildroot}/%{_sbindir}/iprsos %{buildroot}/usr/lib/supportconfig/plugins
+%endif
 
 ##
 ## post
@@ -259,6 +263,10 @@ fi
 
 %if 0%{?rhel}
 %{python_sitelib}/sos/plugins/*
+%endif
+
+%if 0%{?suse_version}
+/usr/lib/supportconfig/plugins/iprsos
 %endif
 
 %{_mandir}/man8/*
