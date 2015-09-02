@@ -137,6 +137,7 @@ int change_disk_config(i_container *);
 int change_ioa_config(i_container *);
 int ucode_screen(i_container *i_con);
 int download_ucode(i_container *);
+int download_all_ucode(i_container *);
 int choose_ucode(i_container *);
 int log_menu(i_container *);
 int ibm_storage_log_tail(i_container *);
@@ -1450,6 +1451,24 @@ s_node n_confirm_download_ucode = {
 		"" }
 };
 
+s_node n_confirm_download_all_ucode = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (CANCEL_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(null_opt),
+	.options  = &null_opt[0],
+	.title    = __("Confirm Microcode Download"),
+	.header   = {
+		__("The following devices are going to be updated.\n\n"
+		   "ATTENTION:  System performance may be affected during "
+		   "the microcode download process. "
+		   "Download may take some time.\n\n"),
+		__("Press Enter to continue.\n"),
+		__("  q=Cancel to return and change your choice.\n\n"),
+		"Name   Version    Date       Image File\n",
+		"------ ---------  ---------  -----------------------------\n",
+		"" }
+};
+
 s_node n_download_ucode_in_progress = {
 	.rc_flags = (CANCEL_FLAG),
 	.f_flags  = (CANCEL_FLAG | FWD_FLAG),
@@ -1560,6 +1579,7 @@ s_node n_confirm_set_default_editor = {
 
 struct screen_opts ucode_screen_opt[] = {
 	{download_ucode,      "1", __("Download microcode")},
+	{download_all_ucode,  "2", __("Download latest microcode to all devices")},
 };
 
 s_node n_ucode_screen = {

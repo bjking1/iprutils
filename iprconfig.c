@@ -11550,6 +11550,83 @@ static int update_ucode(struct ipr_dev *dev, struct ipr_fw_images *fw_image)
 	return rc;
 }
 
+struct download_ucode_elem {
+	struct ipr_dev* dev;
+	struct ipr_fw_images *lfw;
+	struct download_ucode_elem *next;
+};
+
+/**
+ * download_all_ucode -
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure FIXME
+ **/
+int download_all_ucode(i_container *i_con)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	struct ipr_fw_images *lfw;
+	struct screen_output *s_out;
+	struct download_ucode_elem *elem, *update_list = NULL;
+	int header_lines;
+	char line[BUFSIZ];
+	char *body;
+
+	processing();
+	i_con = free_i_con(i_con);
+	check_current_config(false);
+	body = body_init(n_confirm_download_all_ucode.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		if (!ioa->ioa.scsi_dev_data || ioa->ioa_dead)
+			continue;
+
+		for_each_dev (ioa, dev) {
+			if (ipr_is_volume_set(dev))
+				continue;
+
+			lfw = get_latest_fw_image(dev);
+			if (!lfw || lfw->version <= get_fw_version(dev))
+				continue;
+
+			if (ioa->is_secondary)
+				continue;
+
+			sprintf(line, "%-6s %-10X %-10s %s\n",
+				basename(dev->gen_name), lfw->version,
+				lfw->date, lfw->file);
+
+			body = add_string_to_body(body, line, "", &header_lines);
+
+			/*  Add device to update list */
+			elem = malloc(sizeof(struct download_ucode_elem));
+			elem->dev = dev;
+			elem->lfw = lfw;
+			elem->next = update_list;
+			update_list = elem;
+		}
+	}
+
+	n_confirm_download_all_ucode.body = body;
+	s_out = screen_driver(&n_confirm_download_all_ucode, header_lines, i_con);
+
+	if (s_out && s_out->rc != CANCEL_FLAG) {
+		while (update_list) {
+			elem = update_list;
+			update_list = elem->next;
+			update_ucode(elem->dev, elem->lfw);
+			free(elem);
+		}
+	}
+
+	if (s_out)
+		free(s_out);
+
+	return 0;
+}
+
 /**
  * process_choose_ucode -
  * @dev:		ipr dev struct
