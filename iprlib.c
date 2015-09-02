@@ -8669,6 +8669,34 @@ int get_ses_firmware_image_list(struct ipr_dev *dev,
 	return len;
 }
 
+/**
+ * get_fw_image - Common interface to find version of the latest
+ * microcode image found in the filesystem.
+ *
+ * @dev:		Device
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+struct ipr_fw_images *get_latest_fw_image(struct ipr_dev *dev)
+{
+	struct ipr_fw_images *fw = NULL;
+
+	if (!dev)
+		return NULL;
+
+	if (dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+		get_ioa_firmware_image_list(dev->ioa, &fw);
+	else if (ipr_is_ses(dev))
+		get_ses_firmware_image_list(dev, &fw);
+	else if (ipr_is_gscsi(dev) || ipr_is_af_dasd_device(dev))
+		get_dasd_firmware_image_list(dev, &fw);
+
+	if (!fw)
+		return NULL;
+
+	return fw;
+}
 
 /**
  * get_firmware_image_list - Common interface to find version of the

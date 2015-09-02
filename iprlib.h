@@ -2719,6 +2719,7 @@ int get_ioa_firmware_image_list(struct ipr_ioa *, struct ipr_fw_images **);
 int get_dasd_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 int get_ses_firmware_image_list(struct ipr_dev *, struct ipr_fw_images **);
 int get_latest_fw_image_version(struct ipr_dev *);
+struct ipr_fw_images *get_latest_fw_image(struct ipr_dev *);
 int ipr_update_ioa_fw(struct ipr_ioa *, struct ipr_fw_images *, int);
 int ipr_update_disk_fw(struct ipr_dev *, struct ipr_fw_images *, int);
 int ipr_init_dev(struct ipr_dev *);

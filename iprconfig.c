@@ -15257,6 +15257,53 @@ static int update_ucode_cmd(char **args, int num_args)
 }
 
 /**
+ * update_all_ucodes - update-all-ucodes Command line interface.
+ * @args:		argument vector
+ * @num_args:		number of arguments
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+static int update_all_ucodes(char **args, int num_args)
+{
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	int failed_count = 0;
+	struct ipr_fw_images *lfw;
+	int rc;
+
+	for_each_ioa(ioa) {
+		if (!ioa->ioa.scsi_dev_data)
+			return;
+		for_each_dev(ioa, dev) {
+			if (ipr_is_volume_set(dev))
+				continue;
+
+			lfw = get_latest_fw_image(dev);
+			if (!lfw || lfw->version <= get_fw_version(dev))
+				continue;
+
+			if (&dev->ioa->ioa == dev)
+				rc = update_ioa_ucode(dev->ioa, lfw->file);
+			else
+				rc = update_dev_ucode(dev, lfw->file);
+
+			free(lfw);
+
+			if (rc)
+				failed_count++;
+		}
+	}
+
+	if (failed_count)
+		fprintf(stderr, "\
+Failed to update %d devices. Run dmesg for more information.\n",
+			failed_count);
+
+	return 0;
+}
+
+/**
  * show_ucode_levels - List microcode level of every device and adapter
  * @args:		argument vector
  * @num_args:		number of arguments
@@ -18670,6 +18717,7 @@ static const struct {
 	{ "disrupt-device",			1, 0, 1, disrupt_device_cmd, "sg6" },
 	{ "update-ucode",			2, 0, 2, update_ucode_cmd, "sg5 /root/ucode.bin" },
 	{ "show-ucode-levels",			0, 0, 0, show_ucode_levels, "" },
+	{ "update-all-ucodes",			0, 0, 0, update_all_ucodes, "" },
 	{ "set-format-timeout",			2, 0, 2, set_format_timeout, "sg6 4" },
 	{ "set-qdepth",				2, 0, 2, set_qdepth, "sda 16" },
 	{ "set-tcq-enable",			2, 0, 2, set_tcq_enable, "sda 0" },
