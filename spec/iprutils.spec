@@ -51,6 +51,10 @@ Requires: python
 
 %endif # RHEL
 
+%if "%{?dist}" == "pkvm3_1"
+BuildRequires: systemd
+%endif
+
 #
 # Compilation parameters.
 %{?rhel:%define WITH_SOSREPORT 1}
@@ -147,6 +151,14 @@ Static version of some tools of iprutils.
 %endif
 %endif #RHEL
 
+%if "%{?dist}" == "pkvm3_1"
+# FIXME: We should be able to use systemd_post macro here, but ipr is
+# not in the preset list for pkvm.
+/usr/bin/systemctl enable iprinit.service 2>&1 1>/dev/null
+/usr/bin/systemctl enable iprupdate.service 2>&1 1>/dev/null
+/usr/bin/systemctl enable iprdump.service 2>&1 1>/dev/null
+%endif
+
 # Start daemons.
 %if 0%{?_unitdir:1}%{!?_unitdir:0}
 /usr/bin/systemctl start iprinit.service || :
@@ -205,6 +217,12 @@ fi
 
 %endif # RHEL
 
+%if "%{?dist}" == "pkvm3_1"
+%systemd_preun iprinit.service
+%systemd_preun iprupdate.service
+%systemd_preun iprdump.service
+%endif
+
 ##
 ## postun
 ##
@@ -248,6 +266,12 @@ fi
 %endif
 
 %endif #RHEL
+
+%if "%{?dist}" == "pkvm3_1"
+%systemd_postun iprinit.service
+%systemd_postun iprupdate.service
+%systemd_postun iprdump.service
+%endif
 
 ##
 ## files
