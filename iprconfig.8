@@ -601,8 +601,8 @@ Default is 2.
 .B set-write-cache-policy [device] [writeback|writethrough]
 .br
 Set the write cache policy for [device]. Available policies are
-writeback and writethrough.  This feature is only supported by JBOD
-disks.  Example:
+writeback and writethrough.  This command supports JBOD disk (write
+cache) and Volume Sets (vset write cache).  Example:
 .br
 .B iprconfig -c set-write-cache-policy sdp writeback
 .TP

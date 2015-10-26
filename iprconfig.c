@@ -10950,7 +10950,8 @@ int change_disk_config(i_container * i_con)
 			i_con = add_i_con(i_con,_("No"),&disk_config_attr[2]);
 	}
 
-	if (ipr_is_gscsi(dev)) {
+	if (ipr_is_gscsi(dev) ||
+	    (dev->ioa->vset_write_cache && ipr_is_volume_set(dev))) {
 		disk_config_attr[3].option = 4;
 		disk_config_attr[3].write_cache_policy =
 						disk_attr.write_cache_policy;
@@ -15102,7 +15103,8 @@ static int set_device_write_cache_policy(char **args, int num_args)
 		return -EINVAL;
 	}
 
-	if (!ipr_is_gscsi(dev)) {
+	if (!ipr_is_gscsi(dev) &&
+	    (!ipr_is_volume_set(dev) || !dev->ioa->vset_write_cache)) {
 		scsi_err(dev, "Unable to set cache policy.\n");
 		return -EINVAL;
 	}
@@ -15153,7 +15155,7 @@ static int query_device_write_cache_policy(char **args, int num_args)
 		fprintf(stderr, "Cannot find %s\n", args[0]);
 		return -EINVAL;
 	}
-	if (dev->scsi_dev_data->type != TYPE_DISK) {
+	if (!ipr_is_gscsi(dev) && !ipr_is_volume_set(dev)) {
 		scsi_err(dev, "Cannot query write back policy.\n");
 		return -EINVAL;
 	}
