@@ -18738,16 +18738,6 @@ int main(int argc, char *argv[])
 		for (i = 1; i < argc; i++) {
 			if (parse_option(argv[i]))
 				continue;
-			else if (strcmp(argv[i], "-e") == 0)
-				next_editor = 1;
-			else if (strcmp(argv[i], "-k") == 0)
-				next_dir = 1;
-			else if (strcmp(argv[i], "-c") == 0)
-				next_cmd = 1;
-			else if (strcmp(argv[i], "-l") == 0) {
-				list_options();
-				exit(1);
-			}
 			else if (next_editor)	{
 				strcpy(parm_editor, argv[i]);
 				next_editor = 0;
@@ -18764,7 +18754,17 @@ int main(int argc, char *argv[])
 				add_args[num_add_args] = malloc(strlen(argv[i]) + 1);
 				strcpy(add_args[num_add_args], argv[i]);
 				num_add_args++;
-			} else {
+			} else if (strcmp(argv[i], "-e") == 0) {
+				next_editor = 1;
+			} else if (strcmp(argv[i], "-k") == 0) {
+				next_dir = 1;
+			} else if (strcmp(argv[i], "-c") == 0) {
+				next_cmd = 1;
+			} else if (strcmp(argv[i], "-l") == 0) {
+				list_options();
+				exit(1);
+			}
+			else {
 				usage();
 				exit(1);
 			}
