@@ -474,12 +474,14 @@ specified array will be displayed.
 .br
 Show the current write cache policy for [device].
 .TP
-.B raid-create [-r raid_level] [-s stripe_size_in_kb] [-l label] [--skip-format] [devices...]
+.B raid-create [-r raid_level] [-s stripe_size_in_kb] [-l label] [--skip-format] [-c cache_policy] [devices...]
 Create a RAID array. RAID level can be any supported RAID level for the given
 adapter, such as 0, 10, 5, 6. Currently supported stripe sizes in kb 
 include 16, 64, and 256. If raid_level is not specified, it will default to
 RAID 5. If stripe size is not specified, it will default to the recommended
-stripe size for the selected RAID level. Devices are specified with their full
+stripe size for the selected RAID level.  Available cache policies are the
+same that can be passed to set-write-cache-policy command.  If none is
+specified, write back is assumed.  Devices are specified with their full
 name, either the /dev/sd name or the /dev/sg name is acceptable. On some RAID
 adapters, a label can also be specified. Example array
 creation:

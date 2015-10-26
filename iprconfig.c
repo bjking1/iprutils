@@ -59,6 +59,7 @@ struct array_cmd_data {
 	u16 stripe_size;
 	int qdepth;
 	u32 do_cmd;
+	int vset_cache;
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
 	struct ipr_array_query_data *qac;
@@ -4023,11 +4024,14 @@ int raid_start_complete()
 							} else
 								retry = 0;
 							if (ipr_get_dev_attr(dev, &attr)) {
-								syslog(LOG_ERR, _("Unable to read queue_depth"));
+								syslog(LOG_ERR,
+								       _("Unable to read attributes when creating arrays"));
 							} else {
 								attr.queue_depth = cur_raid_cmd->qdepth;
+								attr.write_cache_policy = cur_raid_cmd->vset_cache;
 								if (ipr_set_dev_attr(dev, &attr, 1))
-									syslog(LOG_ERR, _("Unable to set queue_depth"));
+									syslog(LOG_ERR,
+									       _("Unable to set attributes when creating arrays"));
 							}
 						} else
 							break;
@@ -13656,6 +13660,7 @@ static int raid_create(char **args, int num_args)
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
 	char label[8];
 	int stripe_size, qdepth, zeroed_devs, skip_format;
+	int next_vcache, vcache = -1;
 	struct ipr_dev *dev;
 	struct sysfs_dev *sdev;
 	struct ipr_ioa *ioa = NULL;
@@ -13667,6 +13672,7 @@ static int raid_create(char **args, int num_args)
 	next_stripe_size = 0;
 	next_qdepth = 0;
 	next_label = 0;
+	next_vcache = 0;
 	stripe_size = 0;
 	qdepth = 0;
 	zeroed_devs = 0;
@@ -13683,6 +13689,8 @@ static int raid_create(char **args, int num_args)
 			next_qdepth = 1;
 		else if (strcmp(args[i], "-l") == 0)
 			next_label = 1;
+		else if (strcmp(args[i], "-c") == 0)
+			 next_vcache = 1;
 		else if (strcmp(args[i], "--skip-format") == 0)
 			skip_format = 1;
 		else if (next_raid_level) {
@@ -13694,6 +13702,17 @@ static int raid_create(char **args, int num_args)
 		} else if (next_qdepth) {
 			next_qdepth = 0;
 			qdepth = strtoul(args[i], NULL, 10);
+		} else if (next_vcache) {
+			next_vcache = 0;
+			if (strcmp(args[i], "writethrough") == 0)
+			    vcache = IPR_DEV_CACHE_WRITE_THROUGH;
+			else if (strcmp(args[i], "writeback") == 0)
+				vcache = IPR_DEV_CACHE_WRITE_BACK;
+			else {
+				syslog(LOG_ERR,
+				       _("Invalid value passed to -c."));
+				return -EINVAL;
+			}
 		} else if (next_label) {
 			next_label = 0;
 			if (strlen(args[i]) > (sizeof(label) - 1)) {
@@ -13778,6 +13797,16 @@ IOA write cache.  Use --force to force creation.\n");
 			qdepth = num_devs * 4;
 	}
 
+	if (vcache == IPR_DEV_CACHE_WRITE_BACK && !ioa->vset_write_cache)
+		syslog(LOG_ERR,
+		       _("Cannot set requested caching mode, using default.\n"));
+	else if(ioa->vset_write_cache && vcache < 0) {
+		/* For performance reasons Writeback is the default
+		  Vset Cache policy. Users can override this setting
+		  by passing option '-c writethrough' to raid create */
+		vcache = IPR_DEV_CACHE_WRITE_BACK;
+	}
+
 	if (dev_init_head) {
 		rc = send_dev_inits(NULL);
 		free_devs_to_init();
@@ -13818,6 +13847,7 @@ IOA write cache.  Use --force to force creation.\n");
 	add_raid_cmd_tail(ioa, &ioa->ioa, array_id);
 	raid_cmd_tail->qdepth = qdepth;
 	raid_cmd_tail->do_cmd = 1;
+	raid_cmd_tail->vset_cache = vcache;
 
 	rc = ipr_start_array_protection(ioa, stripe_size, cap->prot_level);
 
