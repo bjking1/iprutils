@@ -6406,6 +6406,10 @@ void check_current_config(bool allow_rebuild_refresh)
 		get_dual_ioa_state(ioa);
 		get_subsys_config(ioa);
 
+		if (ioa->has_vset_write_cache == 1 &&
+		    get_ioa_caching(ioa) == IPR_IOA_VSET_CACHE_ENABLED)
+			ioa->vset_write_cache = 1;
+
 		/* Get Query Array Config Data */
 		rc = ipr_query_array_config(ioa, allow_rebuild_refresh, 0, 0, 0, qac_data);
 
@@ -7338,7 +7342,9 @@ int get_ioa_caching(struct ipr_ioa *ioa)
 				return IPR_IOA_CACHING_DISABLED_DUAL_ENABLED;
 			else
 				return IPR_IOA_CACHING_DEFAULT_DUAL_ENABLED;
-		else 
+		else if (term->vset_write_cache_enabled)
+			return IPR_IOA_VSET_CACHE_ENABLED;
+		else
 			if (term->disable_caching_requested == IPR_IOA_REQUESTED_CACHING_DISABLED)
 				return IPR_IOA_REQUESTED_CACHING_DISABLED;
 			else

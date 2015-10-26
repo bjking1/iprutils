@@ -216,6 +216,8 @@ typedef uint64_t u64;
 #define IPR_IOA_CACHING_DEFAULT_DUAL_ENABLED   0x2
 #define IPR_IOA_CACHING_DISABLED_DUAL_ENABLED  0x3
 
+#define IPR_IOA_VSET_CACHE_ENABLED		0x4
+
 #define IPR_IOA_SET_CACHING_DEFAULT          0x0
 #define IPR_IOA_SET_CACHING_DISABLED         0x10
 #define IPR_IOA_SET_CACHING_DUAL_DISABLED    0x20
@@ -1485,6 +1487,7 @@ struct ipr_ioa {
 	u8 disable_rebuild_verify:1;
 	u8 configure_rebuild_verify:1;
 	u8 has_vset_write_cache:1;
+	u8 vset_write_cache:1;
 
 #define IPR_SIS32		0x00
 #define IPR_SIS64		0x01
@@ -2197,13 +2200,17 @@ struct ipr_global_cache_params_term {
 #if defined (__BIG_ENDIAN_BITFIELD)
 	u8 enable_caching_dual_ioa_failure:1;
 	u8 disable_caching_requested:1;
-	u8 reserved1:6;
+	u8 reserved1:2;
+	u8 vset_write_cache_enabled:1;
+	u8 reserved2:3;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
-	u8 reserved1:6;
+	u8 reserved2:3;
+	u8 vset_write_cache_enabled:1;
+	u8 reserved1:2;
 	u8 disable_caching_requested:1;
 	u8 enable_caching_dual_ioa_failure:1;
 #endif
-	u8 reserved2;
+	u8 reserved3;
 };
 
 struct ipr_query_ioa_caching_info {

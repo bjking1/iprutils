@@ -2046,8 +2046,10 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	struct ipr_inquiry_page0 page0_inq;
 	struct scsi_dev_data *scsi_dev_data = dev->scsi_dev_data;
 	struct ipr_dual_ioa_entry *ioa_entry;
+	struct ipr_reclaim_query_data reclaim_data;
 	int rc, i;
 	char buffer[200];
+	char *dynbuf;
 	int cache_size, dram_size;
 	u32 fw_level;
 
@@ -2055,6 +2057,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	memset(&cfc_vpd, 0, sizeof(cfc_vpd));
 	memset(&cc_vpd, 0, sizeof(cc_vpd));
 	memset(&dram_vpd, 0, sizeof(dram_vpd));
+	memset(&reclaim_data, 0, sizeof(reclaim_data));
 
 	ipr_inquiry(dev, IPR_STD_INQUIRY, &ioa_vpd, sizeof(ioa_vpd));
 
@@ -2166,6 +2169,22 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 			body = add_line_to_body(body,_("Current Requested Caching Mode"), _("Default"));
 	}
 
+	if (dev->ioa->has_cache) {
+		if (dev->ioa->vset_write_cache) {
+			dynbuf = "Synchronize Cache";
+		} else {
+			if (ipr_reclaim_cache_store(dev->ioa,
+						    IPR_RECLAIM_QUERY,
+						    &reclaim_data))
+				goto out;
+
+			dynbuf = (reclaim_data.rechargeable_battery_type ?
+				  "Battery Backed" : "Supercap Protected");
+		}
+		body = add_line_to_body(body, _("Cache Protection"), dynbuf);
+	}
+
+	out:
 	return body;
 }
 
