@@ -222,6 +222,8 @@ typedef uint64_t u64;
 #define IPR_IOA_SET_CACHING_DISABLED         0x10
 #define IPR_IOA_SET_CACHING_DUAL_DISABLED    0x20
 #define IPR_IOA_SET_CACHING_DUAL_ENABLED     0x30
+#define IPR_IOA_SET_VSET_CACHE_ENABLED	     0x40
+#define IPR_IOA_SET_VSET_CACHE_DISABLED      0x50
 
 #define PHYSICAL_LOCATION_LENGTH	1024
 
@@ -1405,6 +1407,7 @@ struct ipr_ioa_attr {
 	int caching;
 	int rebuild_rate;
 	int disable_rebuild_verify;
+	int vset_write_cache;
 };
 
 #define IPR_DEV_MAX_PATHS	2

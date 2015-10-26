@@ -7586,6 +7586,14 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 		}
 	}
 
+	if (ioa->has_vset_write_cache && attr->vset_write_cache &&
+	    power_cur_mode != POWER_BAREMETAL) {
+		/* vset cache should not be disabled adapter-wide
+		   for any reason.  So we don't save the parameter here. */
+		ipr_change_cache_parameters(ioa,
+					    IPR_IOA_SET_VSET_CACHE_ENABLED);
+	}
+
 	get_dual_ioa_state(ioa);	/* for preferred_primary */
 	get_subsys_config(ioa);		/* for gscsi_only_ha */
 	return 0;
@@ -9445,6 +9453,8 @@ static void init_ioa_dev(struct ipr_dev *dev)
 		attr.active_active = 1;
 	if (dev->ioa->configure_rebuild_verify)
 		attr.disable_rebuild_verify = 1;
+	if (dev->ioa->has_vset_write_cache)
+		attr.vset_write_cache = 1;
 	ipr_modify_ioa_attr(dev->ioa, &attr);
 	if (ipr_set_ioa_attr(dev->ioa, &attr, 0))
 		return;
