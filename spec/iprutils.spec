@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.8
+Version: 2.4.9
 Release: 1
 License: CPL
 Group: System Environment/Base
@@ -318,6 +318,17 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Mon Oct 26 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.9
+* Mon Oct 26 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
+- Add support for sync cache managed array write cache on supported adapters
+* Tue Sep 1 2015 Daniel Kreling <dbkreling@linux.vnet.ibm.com>
+- Add supportconfig plugin
+* Fri Aug 21 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
+- Misc build cleanups and fixes
+- Microcode download UI enhancements
+- Add new show-ucode-levels to list all microcode levels for all ipr devices
+* Mon Jul 6 2015 Guilherme G. Piccoli <gpiccoli@linux.vnet.ibm.com>
+- Add support to change rebuild rate from ncurses
 * Fri Jun 19 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.8
 - Add RAID creation warnings when creating arrays with non zeroed disks
 - Add bash smart completion
