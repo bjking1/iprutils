@@ -1480,6 +1480,8 @@ struct ipr_ioa {
 	u8 rebuild_rate:4;
 	u8 disable_rebuild_verify:1;
 	u8 configure_rebuild_verify:1;
+	u8 has_vset_write_cache:1;
+
 #define IPR_SIS32		0x00
 #define IPR_SIS64		0x01
 	u8 support_4k:1;
@@ -1992,6 +1994,7 @@ struct ipr_dram_vpd {
 };
 
 struct ipr_cache_cap_vpd {
+#define IPR_CACHE_CAP_VSET_WRITE_CACHE	0x08000000
 	u8 peri_dev_type;
 	u8 page_code;
 	u8 reserved1;

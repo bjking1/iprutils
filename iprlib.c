@@ -5976,6 +5976,7 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 	struct ipr_inquiry_ioa_cap ioa_cap;
 	struct ipr_mode_page24 *page24;
 	struct ipr_mode_pages mode_pages;
+	struct ipr_cache_cap_vpd cc_vpd;
 
 	ioa->af_block_size = IPR_DEFAULT_AF_BLOCK_SIZE;
 	ioa->tcq_mode = ioa_get_tcq_mode(ioa);
@@ -5994,6 +5995,13 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 		}
 		if (page0_inq.supported_page_codes[j] == 0xC4) {
 			ioa->has_cache = 1;
+
+			memset(&cc_vpd, 0, sizeof(cc_vpd));
+			ipr_inquiry(&ioa->ioa, 0xC4, &cc_vpd, sizeof(cc_vpd));
+
+			if (htonl(cc_vpd.cache_cap) &
+			    IPR_CACHE_CAP_VSET_WRITE_CACHE)
+				ioa->has_vset_write_cache = 1;
 			continue;
 		}
 		if (page0_inq.supported_page_codes[j] != 0xD0)
