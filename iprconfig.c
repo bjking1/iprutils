@@ -18483,6 +18483,7 @@ static int dump (char **args, int num_args)
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
+	struct ipr_disk_attr attr;
 
 	if (!ipr_ioa_head) {
 		printf("There are no IPR adapters in the system. No dump collected...\n");
@@ -18521,6 +18522,14 @@ static int dump (char **args, int num_args)
 		for_each_dev(ioa, dev){
 			printf("Device %s:\n", dev->gen_name);
 			show_dev_details(dev);
+
+			if (ipr_is_volume_set(dev) || ipr_is_gscsi(dev)) {
+				if (ipr_get_dev_attr(dev, &attr))
+					continue;
+				printf("Write cache mode: %s\n\n",
+				       attr.write_cache_policy ?
+				       "write back" : "write through");
+			}
 		}
 	}
 
