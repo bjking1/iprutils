@@ -9575,10 +9575,11 @@ int ipr_init_ioa(struct ipr_ioa *ioa)
 	if (fixup_improper_devs(ioa))
 		return -EAGAIN;
 
+	init_ioa_dev(&ioa->ioa);
+
 	for_each_dev(ioa, dev)
 		ipr_init_dev(dev);
 
-	init_ioa_dev(&ioa->ioa);
 	return 0;
 }
 
