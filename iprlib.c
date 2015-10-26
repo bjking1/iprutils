@@ -44,6 +44,9 @@ static int ipr_force_uevents = 0;
 static char *hotplug_dir = NULL;
 static struct scsi_dev_data *scsi_dev_table = NULL;
 
+/* Current state of this machine. */
+enum system_p_mode power_cur_mode = POWER_BAREMETAL;
+
 /* This table includes both unsupported 522 disks and disks that support 
  being formatted to 522, but require a minimum microcode level. The disks
  that require a minimum level of microcode will be marked by the 
@@ -2068,6 +2071,23 @@ static void ipr_get_pci_slots()
 }
 
 /**
+ * load_system_p_oper_mode
+ *
+ * Discover and load current operating mode.
+ **/
+void load_system_p_oper_mode()
+{
+	struct stat st;
+
+	if (stat("/proc/ppc64/lparcfg", &st) == 0)
+		power_cur_mode = POWER_VM;
+	else if (stat("/etc/ibm_powerkvm-release", &st) == 0)
+		power_cur_mode = POWER_KVM;
+	else
+		power_cur_mode = POWER_BAREMETAL;
+}
+
+/**
  * tool_init -
  * @save_state:		integer flag - whether or not to save the old config
  *
@@ -2174,6 +2194,8 @@ static int __tool_init(int save_state)
 		num_ioas++;
 	}
 	closedir(dirfd);
+
+	load_system_p_oper_mode();
 
 	if (!save_state)
 		free_old_config();

@@ -235,6 +235,9 @@ typedef uint64_t u64;
 /* Device write cache policies. */
 enum {IPR_DEV_CACHE_WRITE_THROUGH = 0, IPR_DEV_CACHE_WRITE_BACK};
 
+/* System P Operating modes */
+enum system_p_mode {POWER_VM, POWER_KVM, POWER_BAREMETAL} ;
+
 #define  IPR_IS_DASD_DEVICE(std_inq_data) \
 ((((std_inq_data).peri_dev_type) == TYPE_DISK) && !((std_inq_data).removeable_medium))
 
@@ -272,6 +275,7 @@ extern int format_done;
 extern char *tool_name;
 extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
+extern enum system_p_mode power_cur_mode;
 
 struct sysfs_dev {
 	char sysfs_device_name[PATH_MAX];
