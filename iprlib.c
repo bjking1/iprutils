@@ -9279,6 +9279,7 @@ static void init_vset_dev(struct ipr_dev *dev)
 	char q_depth[100];
 	char cur_depth[100], saved_depth[100];
 	int depth, rc;
+	char saved_cache[100];
 
 	memset(&res_state, 0, sizeof(res_state));
 
@@ -9304,6 +9305,18 @@ static void init_vset_dev(struct ipr_dev *dev)
 			return;
 		if (ipr_write_dev_attr(dev, "queue_depth", q_depth))
 			return;
+	}
+
+	if (dev->ioa->has_vset_write_cache) {
+		int pol;
+		rc = ipr_get_saved_dev_attr(dev, IPR_WRITE_CACHE_POLICY,
+					    saved_cache);
+
+		pol = (rc || strtoul (saved_cache, NULL, 10)) ?
+			IPR_DEV_CACHE_WRITE_BACK : IPR_DEV_CACHE_WRITE_THROUGH;
+
+		ipr_set_dev_wcache_policy(dev, pol);
+
 	}
 }
 
