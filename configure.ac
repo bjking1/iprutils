@@ -52,7 +52,7 @@ AC_ARG_ENABLE([sosreport],
   *)
     AC_MSG_ERROR([bad value ${enableval} for --enable-sosreport])
     ;;
- esac], [sosreport=true])
+ esac], [sosreport=false])
 AM_CONDITIONAL([SOSREPORT], [test "x${sosreport}" = xtrue])
 
 # --with-systemd
