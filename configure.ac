@@ -56,7 +56,7 @@ AC_ARG_ENABLE([sosreport],
 AM_CONDITIONAL([SOSREPORT], [test "x${sosreport}" = xtrue])
 
 # --with-systemd
-systemdunitdir='${exec_prefix}/usr/lib/systemd/system/'
+systemdunitdir='${exec_prefix}/lib/systemd/system/'
 AC_ARG_WITH([systemd],
 	    [--without-systemd Disable systemd service files.],
 [case $withval in
