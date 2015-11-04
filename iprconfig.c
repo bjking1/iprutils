@@ -11568,11 +11568,12 @@ int download_all_ucode(i_container *i_con)
 	struct ipr_ioa *ioa;
 	struct ipr_dev *dev;
 	struct ipr_fw_images *lfw;
-	struct screen_output *s_out;
+	struct screen_output *s_out = NULL;
 	struct download_ucode_elem *elem, *update_list = NULL;
 	int header_lines;
 	char line[BUFSIZ];
 	char *body;
+	int rc = RC_93_All_Up_To_Date;
 
 	processing();
 	i_con = free_i_con(i_con);
@@ -11588,11 +11589,15 @@ int download_all_ucode(i_container *i_con)
 				continue;
 
 			lfw = get_latest_fw_image(dev);
-			if (!lfw || lfw->version <= get_fw_version(dev))
+			if (!lfw || lfw->version <= get_fw_version(dev)) {
+				free(lfw);
 				continue;
+			}
 
-			if (ioa->is_secondary)
+			if (ioa->is_secondary) {
+				free(lfw);
 				continue;
+			}
 
 			sprintf(line, "%-6s %-10X %-10s %s\n",
 				basename(dev->gen_name), lfw->version,
@@ -11609,22 +11614,27 @@ int download_all_ucode(i_container *i_con)
 		}
 	}
 
-	n_confirm_download_all_ucode.body = body;
-	s_out = screen_driver(&n_confirm_download_all_ucode, header_lines, i_con);
+	if (update_list) {
+		n_confirm_download_all_ucode.body = body;
+		s_out = screen_driver(&n_confirm_download_all_ucode, header_lines, i_con);
+	}
 
-	if (s_out && s_out->rc != CANCEL_FLAG) {
+	if (!s_out || s_out->rc != CANCEL_FLAG) {
 		while (update_list) {
 			elem = update_list;
 			update_list = elem->next;
 			update_ucode(elem->dev, elem->lfw);
+			free(elem->lfw);
 			free(elem);
 		}
 	}
 
-	if (s_out)
+	if (s_out) {
+		rc = s_out->rc;
 		free(s_out);
+	}
 
-	return 0;
+	return rc;
 }
 
 /**
