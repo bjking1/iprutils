@@ -17675,7 +17675,10 @@ static int query_location(char **args, int num_args)
 	get_drive_phy_loc(dev->ioa);
 
 	if (!ipr_is_volume_set(dev)){
-		fprintf(stdout, "%s\n", dev->physical_location);
+		if (&dev->ioa->ioa == dev)
+			fprintf(stdout, "%s\n", dev->ioa->physical_location);
+		else
+			fprintf(stdout, "%s\n", dev->physical_location);
 		return 0;
 	}
 
