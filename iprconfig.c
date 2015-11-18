@@ -11241,7 +11241,7 @@ int change_ioa_config(i_container * i_con)
 			sprintf(pref_str, "Disabled");
 		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
 	}
-	if (dev->ioa->has_cache) {
+	if (dev->ioa->has_cache && !dev->ioa->vset_write_cache) {
 		body = add_line_to_body(body,_("IOA Caching Mode"), "%13");
 		ioa_config_attr[index].option = 4;
 		ioa_config_attr[index].caching = ioa_attr.caching;
