@@ -3038,6 +3038,51 @@ int ipr_is_log_page_supported(struct ipr_dev *dev, u8 page)
 	return 0;
 }
 
+/** ipr_sas_log_get_param - Fetch parameter from log page.
+ *
+ * Iterate over an already fetched log page pointed by page and return a
+ * pointer to the beginning of the parameter.
+ *
+ * @page: An already fetched log page.
+ * @param: to be fetched
+ *
+ * Returns: @dst: A pointer to the original page area starting at the
+ * parameter. NULL if parameter was not found.
+ * @entries_cnt: output parameter, the number of entries found in the
+ * page.
+ **/
+void *ipr_sas_log_get_param(const struct ipr_sas_log_page *page,
+			    u32 param_code, int *entries_cntr)
+{
+	int page_length;
+	int i;
+	const u8 *raw_data = page->raw_data;
+	u32 cur_code;
+	struct log_parameter_hdr *hdr;
+	void *ret = NULL;
+
+	if (entries_cntr)
+		*entries_cntr = 0;
+
+	page_length = (page->page_length[0] << 8) | page->page_length[1];
+
+	for(i = 0; i < page_length && i < IPR_SAS_LOG_MAX_ENTRIES;
+	    i += hdr->length + sizeof(*hdr)) {
+		hdr = (struct log_parameter_hdr *) &raw_data[i];
+		cur_code = (hdr->parameter_code[0] << 8) | hdr->parameter_code[1];
+
+		if (cur_code == param_code) {
+			ret = hdr;
+			if (!entries_cntr)
+				break;
+		}
+
+		if (entries_cntr)
+			*entries_cntr += 1;
+	}
+	return ret;
+}
+
 /**
  * ipr_get_blk_size - return the block size for the given device
  * @dev:		ipr dev struct

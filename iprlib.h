@@ -236,6 +236,18 @@ typedef uint64_t u64;
 #define IPR_VSET_VIRTUAL_BUS			0x2
 #define IPR_IOAFP_VIRTUAL_BUS			0x3
 
+#define IPR_SAS_STD_INQ_UCODE_ID		12
+#define IPR_SAS_STD_INQ_VENDOR_UNIQ		40
+#define IPR_SAS_STD_INQ_PLANT_MAN		4
+#define IPR_SAS_STD_INQ_DATE_MAN		5
+#define IPR_SAS_STD_INQ_FRU_COUNT		4
+#define IPR_SAS_STD_INQ_FRU_FIELD_LEN		2
+#define IPR_SAS_STD_INQ_FRU_PN			12
+#define IPR_SAS_STD_INQ_ASM_EC_LVL		10
+#define IPR_SAS_STD_INQ_ASM_PART_NUM		12
+#define IPR_SAS_STD_INQ_FRU_ASM_EC		10
+#define IPR_SAS_INQ_BYTES_WARRANTY_LEN		3
+
 /* Device write cache policies. */
 enum {IPR_DEV_CACHE_WRITE_THROUGH = 0, IPR_DEV_CACHE_WRITE_BACK};
 
@@ -1200,6 +1212,36 @@ struct ipr_std_inq_data_long {
 	u8 ec_level[IPR_STD_INQ_EC_LEVEL_LEN];
 	u8 part_number[IPR_STD_INQ_PART_NUM_LEN];
 	u8 z6_term[IPR_STD_INQ_Z6_TERM_LEN];
+};
+
+struct ipr_sas_std_inq_data {
+	struct ipr_std_inq_data std_inq_data;
+	u8 microcode_id[IPR_SAS_STD_INQ_UCODE_ID];
+	u8 reserved1;
+	u8 vendor_unique[IPR_SAS_STD_INQ_VENDOR_UNIQ];
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved2:5;
+	u8 is_ssd:1;
+	u8 near_line:1;
+	u8 unlock:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 unlock:1;
+	u8 near_line:1;
+	u8 is_ssd:1;
+	u8 reserved2:5;
+#endif
+
+	u8 plant_manufacture[IPR_SAS_STD_INQ_PLANT_MAN];
+	u8 date_manufacture[IPR_SAS_STD_INQ_DATE_MAN];
+	u8 vendor_unique_pn;
+	u8 fru_count[IPR_SAS_STD_INQ_FRU_COUNT];
+	u8 fru_field_len[IPR_SAS_STD_INQ_FRU_FIELD_LEN];
+	u8 fru_pn[IPR_SAS_STD_INQ_FRU_PN];
+	u8 asm_ec_level[IPR_SAS_STD_INQ_ASM_EC_LVL];
+	u8 asm_part_num[IPR_SAS_STD_INQ_ASM_PART_NUM];
+	u8 fru_asm_ec[IPR_SAS_STD_INQ_FRU_ASM_EC];
+	u8 reserved3[6];
 };
 
 struct ipr_mode_page_28_scsi_dev_bus_attr {
@@ -2216,6 +2258,65 @@ struct ipr_global_cache_params_term {
 	u8 reserved3;
 };
 
+struct log_parameter_hdr {
+	u8 parameter_code[2];
+
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 du:1;
+	u8 reserved1:1;
+	u8 tsd:1;
+	u8 etc:1;
+	u8 tmc:2;
+	u8 lbin:1;
+	u8 lp:1;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 lp:1;
+	u8 lbin:1;
+	u8 tmc:2;
+	u8 etc:1;
+	u8 tsd:1;
+	u8 reserved1:1;
+	u8 du:1;
+#endif
+	u8 length;
+};
+
+/* Log Parameter: Log Page = 0x34. Attribute template */
+struct ipr_sas_log_smart_attr {
+	struct log_parameter_hdr hdr;
+	u8 norm_threshold_val;
+	int8_t norm_worst_val;
+	u8 raw_data[10];
+};
+
+/* Log Parameter: Log Page = 0x2F. Attribute Code = 0x0 */
+struct ipr_sas_log_inf_except_attr {
+	struct log_parameter_hdr param_hdr;
+	u8 inf_except_add_sense_code;
+	u8 inf_except_add_sense_code_qual;
+	u8 last_temp_read;
+};
+
+struct ipr_sas_log_write_err_cnt_attr {
+	struct log_parameter_hdr param_hdr;
+	u8 counter;
+};
+
+struct ipr_sas_log_page {
+#if defined (__BIG_ENDIAN_BITFIELD)
+	u8 reserved1:2;
+	u8 page_code:6;
+#elif defined (__LITTLE_ENDIAN_BITFIELD)
+	u8 page_code:6;
+	u8 reserved1:2;
+#endif
+	u8 reserved2;
+	u8 page_length[2];
+
+#define IPR_SAS_LOG_MAX_ENTRIES		256
+	u8 raw_data[IPR_SAS_LOG_MAX_ENTRIES];
+};
+
 struct ipr_query_ioa_caching_info {
 	u16 len;
 	u8 reserved[2];
@@ -2540,6 +2641,34 @@ struct ipr_ses_inquiry_pageC3 {
 	u8 reserved2;
 };
 
+struct ipr_sas_inquiry_pageC4 {
+	u8 peri_qual_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length;
+#define IPR_SAS_ENDURANCE_HIGH_HDD 0x20
+#define IPR_SAS_ENDURANCE_LOW_EZ   0x31
+#define IPR_SAS_ENDURANCE_LOW3	   0x32
+#define IPR_SAS_ENDURANCE_LOW1	   0x33
+	u8 endurance;
+	u8 reserved[6];
+	u8 revision;
+	u8 serial_num_11s[8];
+	u8 serial_num_supplier[8];
+	u8 master_drive_part[12];
+};
+
+struct ipr_sas_inquiry_pageC7 {
+	u8 peri_qual_dev_type;
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length;
+	u8 ascii_len;
+	u8 reserved2[109];
+	u8 total_bytes_warranty[IPR_SAS_INQ_BYTES_WARRANTY_LEN];
+	u8 reserved3[43];
+};
+
 static inline int ipr_elem_offset(struct ipr_ses_config_pg *ses_cfg, u8 type)
 {
 	int i, off;
@@ -2646,6 +2775,8 @@ int ipr_mode_sense(struct ipr_dev *, u8, void *);
 int ipr_mode_select(struct ipr_dev *, void *, int);
 int ipr_log_sense(struct ipr_dev *, u8, void *, u16);
 int ipr_is_log_page_supported(struct ipr_dev *, u8);
+void *ipr_sas_log_get_param(const struct ipr_sas_log_page *page, u32 param,
+			    int *entries_cnt);
 int ipr_reset_device(struct ipr_dev *);
 int ipr_re_read_partition(struct ipr_dev *);
 int ipr_read_capacity(struct ipr_dev *, void *);

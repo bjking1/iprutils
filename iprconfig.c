@@ -18711,6 +18711,168 @@ static int dump (char **args, int num_args)
 	return 0;
 }
 
+static char *print_ssd_report(struct ipr_dev *dev, char *body)
+{
+	struct ipr_inquiry_page0 page0_inq;
+	struct ipr_dasd_inquiry_page3 page3_inq;
+	struct ipr_sas_std_inq_data std_inq;
+	struct ipr_sas_inquiry_pageC4 pageC4_inq;
+	struct ipr_sas_inquiry_pageC7 pageC7_inq;
+	struct ipr_sas_log_page page34_log;
+	struct ipr_sas_log_page page2F_log;
+	struct ipr_sas_log_page page02_log;
+
+	struct ipr_sas_log_smart_attr *smart_attr;
+	struct ipr_sas_log_inf_except_attr *inf_except_attr;
+	struct ipr_sas_log_write_err_cnt_attr *bytes_counter;
+
+	char buffer[BUFSIZ];
+	int rc, len, nentries = 0;
+	u64 aux;
+	u64 total_gb_writ = 0;
+	u32 uptime = 0;
+	u32 life_remain = 0;
+	int pfa_trip = 0;
+
+	memset(&std_inq, 0, sizeof(std_inq));
+	memset(&pageC4_inq, 0, sizeof(pageC4_inq));
+	memset(&pageC7_inq, 0, sizeof(pageC7_inq));
+	memset(&page0_inq, 0, sizeof(page0_inq));
+	memset(&page3_inq, 0, sizeof(page3_inq));
+	memset(&page34_log, 0, sizeof(page34_log));
+	memset(&page2F_log, 0, sizeof(page2F_log));
+	memset(&page02_log, 0, sizeof(page02_log));
+
+	rc = ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
+	if (rc)
+		return NULL;
+
+	if (!std_inq.is_ssd) {
+		scsi_err(dev, "%s is not a SSD.\n", dev->gen_name);
+		return NULL;
+	}
+
+	rc = ipr_inquiry(dev, 0xC4, &pageC4_inq, sizeof(pageC4_inq));
+	if (rc)
+		return NULL;
+
+	if (pageC4_inq.endurance != IPR_SAS_ENDURANCE_LOW_EZ &&
+	    pageC4_inq.endurance != IPR_SAS_ENDURANCE_LOW3 &&
+	    pageC4_inq.endurance != IPR_SAS_ENDURANCE_LOW1) {
+		scsi_err(dev, "%s is not a Read Intensive SSD.\n",
+			 dev->gen_name);
+		return NULL;
+	}
+
+	rc = ipr_inquiry(dev, 0x3, &page3_inq, sizeof(page3_inq));
+	if (rc)
+		return NULL;
+
+	rc = ipr_inquiry(dev, 0xC7, &pageC7_inq, sizeof(pageC7_inq));
+	if (rc)
+		return NULL;
+
+	rc = ipr_log_sense(dev, 0x34, &page34_log, sizeof(page34_log));
+	if (rc)
+		return NULL;
+
+	smart_attr = ipr_sas_log_get_param(&page34_log, 0xE7, NULL);
+	if (smart_attr && smart_attr->norm_worst_val > 0)
+		life_remain = smart_attr->norm_worst_val;
+
+	smart_attr = ipr_sas_log_get_param(&page34_log, 0x09, NULL);
+	if (smart_attr)
+		uptime = ntohl(*((u32 *) smart_attr->raw_data));
+
+	rc = ipr_log_sense(dev, 0x02, &page02_log, sizeof(page02_log));
+	if (rc)
+		return NULL;
+
+	bytes_counter = ipr_sas_log_get_param(&page02_log, 0x05, NULL);
+	if (bytes_counter)
+		total_gb_writ = be64toh(*(u64 *) &bytes_counter->counter) >> 14;
+
+	rc = ipr_log_sense(dev, 0x2F, &page2F_log, sizeof(page2F_log));
+	if (rc)
+		return NULL;
+
+	inf_except_attr = ipr_sas_log_get_param(&page2F_log, 0x0, &nentries);
+	if (inf_except_attr)
+		pfa_trip = inf_except_attr->inf_except_add_sense_code;
+	if (nentries > 1)
+		pfa_trip = 1;
+
+	body = add_line_to_body(body, "", NULL);
+	/* FRU Number */
+	ipr_strncpy_0(buffer, std_inq.asm_part_num,
+		      IPR_SAS_STD_INQ_ASM_PART_NUM);
+	body = add_line_to_body(body, _("FRU Number"), buffer);
+
+	/* Serial number */
+	ipr_strncpy_0(buffer, (char *)std_inq.std_inq_data.serial_num,
+		      IPR_SERIAL_NUM_LEN);
+	body = add_line_to_body(body, _("Serial Number"), buffer);
+
+	/* FW level */
+	len = sprintf(buffer, "%X%X%X%X", page3_inq.release_level[0],
+		      page3_inq.release_level[1], page3_inq.release_level[2],
+		      page3_inq.release_level[3]);
+
+	if (isalnum(page3_inq.release_level[0]) &&
+	    isalnum(page3_inq.release_level[1]) &&
+	    isalnum(page3_inq.release_level[2]) &&
+	    isalnum(page3_inq.release_level[3]))
+		sprintf(buffer + len, " (%c%c%c%c)", page3_inq.release_level[0],
+			page3_inq.release_level[1], page3_inq.release_level[2],
+			page3_inq.release_level[3]);
+
+	body = add_line_to_body(body, _("Firmware Version"), buffer);
+
+	/* Bytes written */
+	snprintf(buffer, BUFSIZ, "%ld GB", total_gb_writ);
+	body = add_line_to_body(body, _("Total Bytes Written"), buffer);
+
+	/* Max bytes. */
+	aux = ntohl(*((u32 *) pageC7_inq.total_bytes_warranty)) >> 8;
+	snprintf(buffer, BUFSIZ, "%ld GB", aux * 1024L);
+	body = add_line_to_body(body, _("Number of Bytes reported by Warranty"),
+				buffer);
+
+	/* Life remaining */
+	snprintf(buffer, BUFSIZ, "%hhd %%", life_remain);
+	body = add_line_to_body(body, _("Life Remaining Gauge"), buffer);
+
+	/* PFA Trip */
+	body = add_line_to_body(body, _("PFA Trip"), pfa_trip? "yes": "no");
+
+	/* Power-on days */
+	snprintf (buffer, 4, "%d", uptime / 24);
+	body = add_line_to_body(body, _("Power-on Days"), buffer);
+
+	return body;
+}
+
+static int ssd_report(char **args, int num_args)
+{
+	struct ipr_dev *dev = find_dev(args[0]);
+	char *body;
+
+	if (!dev) {
+		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	body = print_ssd_report(dev, NULL);
+	if (!body) {
+		scsi_err(dev, "Device inquiry failed.\n");
+		return -EIO;
+	}
+
+	printf("%s", body);
+
+	return 0;
+}
+
 static const struct {
 	char *cmd;
 	int min_args;
@@ -18814,6 +18976,7 @@ static const struct {
 	{ "set-log-level",			2, 0, 2, set_log_level_cmd, "sg5 2" },
 	{ "set-write-cache-policy",		2, 0, 2, set_device_write_cache_policy, "sg5 [writeback|writethrough]" },
 	{ "query-write-cache-policy",		1, 0, 1, query_device_write_cache_policy, "sg5" },
+	{ "ssd-report",				1, 0, 1, ssd_report, "sg5" },
 	{ "identify-disk",			2, 0, 2, identify_disk, "sda 1" },
 	{ "identify-slot",			2, 0, 2, identify_slot, "U5886.001.P915059-P1-D1 1" },
 	{ "remove-disk",			2, 0, 2, remove_disk, "sda 1" },
