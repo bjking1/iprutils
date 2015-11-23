@@ -1,0 +1,33 @@
+.\" (C) Copyright 2015
+.\" International Business Machines Corporation and others.
+.\" All Rights Reserved. This program and the accompanying
+.\" materials are made available under the terms of the
+.\" Common Public License v1.0 which accompanies this distribution.
+.TH IPRDUMPFMT 8 "November 2015"
+.SH NAME
+iprdumpfmt \- IBM Power RAID dump formatting utility
+.SH SYNOPSIS
+.BI "iprdumpfmt [options] dump_file"
+.sp
+.BI "iprdumpfmt -o <report_file> --verbose dump_file"
+.sp
+.SH DESCRIPTION
+.B iprdumpfmt
+is used to strip out driver information from iprdump.XX files. This includes
+driver type and version and the driver trace ordered by jiffies. There is a
+verbose option that also prints timestamps and SCSI command for each driver
+trace entry. The information is stored in a file that can be optionally
+specified by the user. If no output file is specified, the information is
+printed to a new 'iprdump.XX.report' file.
+.br
+.SH OPTIONS
+.TP
+.B \-\-verbose
+Print detailed driver trace information.
+.TP
+.B \-\-output file
+Specify a different output file to store formatted information. If no file is
+chosen, a new one is created by appending '.report' to the input dump file.
+.br
+.SH AUTHOR
+Heitor R. A. de Siqueira <halves@linux.vnet.ibm.com>

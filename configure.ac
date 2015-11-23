@@ -55,6 +55,22 @@ AC_ARG_ENABLE([sosreport],
  esac], [sosreport=false])
 AM_CONDITIONAL([SOSREPORT], [test "x${sosreport}" = xtrue])
 
+# --enable-iprdumpfmt.
+AC_ARG_ENABLE([iprdumpfmt],
+              [--enable-iprdumpfmt Install iprdumpfmt tool],
+[case "${enableval}" in
+  yes)
+     iprdumpfmt=true
+     ;;
+  no)
+     iprdumpfmt=false
+     ;;
+  *)
+    AC_MSG_ERROR([bad value ${enableval} for --enable-iprdumpfmt])
+    ;;
+ esac], [iprdumpfmt=false])
+AM_CONDITIONAL([IPRDUMPFMT], [test "x${iprdumpfmt}" = xtrue])
+
 # --with-systemd
 systemdunitdir='${exec_prefix}/lib/systemd/system/'
 AC_ARG_WITH([systemd],

@@ -53,3 +53,10 @@ if SOSREPORT
 sosreportdir = @pythondir@/sos/plugins
 sosreport_PYTHON = iprutils.py
 endif
+
+if IPRDUMPFMT
+sbin_PROGRAMS += iprdumpfmt
+iprdumpfmt_SOURCES = iprdumpfmt.c
+iprdumpfmt_LDADD= libipr.la
+dist_man_MANS += iprdumpfmt.8
+endif
