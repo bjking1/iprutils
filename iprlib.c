@@ -10031,3 +10031,51 @@ int ipr_query_io_dev_port(struct ipr_dev *dev, struct ipr_query_io_port *io_port
 	return rc;
 }
 
+/**
+ * ipr_jbod_sysfs_bind -
+ * @dev:		ipr dev struct
+ * @op:			sysfs operation
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int ipr_jbod_sysfs_bind(struct ipr_dev *dev, u8 op)
+{
+	struct ipr_dev *mp_dev;
+	int rc, fd, size;
+	char *sysfs_device_name;
+
+	sysfs_device_name = dev->scsi_dev_data->sysfs_device_name;
+	size = strnlen(sysfs_device_name, sizeof(sysfs_device_name));
+
+	if (op == IPR_JBOD_SYSFS_BIND) {
+		fd = open("/sys/bus/scsi/drivers/sd/bind", O_WRONLY);
+	} else if (op == IPR_JBOD_SYSFS_UNBIND) {
+		fd = open("/sys/bus/scsi/drivers/sd/unbind", O_WRONLY);
+	} else {
+		fd = -1;
+		errno = ENOTSUP;
+	}
+	if (fd < 0)
+		return errno;
+
+	rc = write(fd, sysfs_device_name, size);
+	if (rc < 0) {
+		close(fd);
+		return errno;
+	}
+
+	mp_dev = find_multipath_jbod(dev);
+	if (mp_dev) {
+		sysfs_device_name = mp_dev->scsi_dev_data->sysfs_device_name;
+		size = strnlen(sysfs_device_name, sizeof(sysfs_device_name));
+		rc = write(fd, sysfs_device_name, size);
+		if (rc < 0) {
+			close(fd);
+			return errno;
+		}
+	}
+
+	close(fd);
+	return 0;
+}

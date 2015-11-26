@@ -8862,12 +8862,23 @@ int send_dev_inits(i_container *i_con)
 				continue;
 			}
 
+			/* unbind device */
+			if (ipr_jbod_sysfs_bind(cur_dev_init->dev,
+						IPR_JBOD_SYSFS_UNBIND))
+				syslog(LOG_ERR, "Could not unbind %s: %m\n",
+				       cur_dev_init->dev->dev_name);
+
 			/* Issue format */
 			status = ipr_format_unit(cur_dev_init->dev);  /* FIXME  Mandatory lock? */   
 
 			if (status) {
 				/* Send a device reset to cleanup any old state */
 				rc = ipr_reset_device(cur_dev_init->dev);
+				if (ipr_jbod_sysfs_bind(cur_dev_init->dev,
+							IPR_JBOD_SYSFS_BIND))
+					syslog(LOG_ERR,
+					       "Could not bind %s: %m\n",
+					       cur_dev_init->dev->dev_name);
 
 				cur_dev_init->do_init = 0;
 				num_devs--;

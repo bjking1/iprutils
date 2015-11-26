@@ -1321,6 +1321,9 @@ struct ipr_mode_page_28_scsi_dev_bus_attr {
 #define IPR_MAX_XFER_RATE 320
 #define IPR_SAFE_XFER_RATE 160
 
+#define IPR_JBOD_SYSFS_UNBIND 0
+#define IPR_JBOD_SYSFS_BIND   1
+
 /* Internal return codes */
 #define RC_SUCCESS          0
 #define RC_FAILED          -1
