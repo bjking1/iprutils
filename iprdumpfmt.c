@@ -16,10 +16,8 @@
 #define EYE_CATCHER_LE 0xF2E3D4C5
 
 #define OS_LINUX 0x4C4E5558
-#define OS_I5OS  0x69354F53
 
 #define DRV_IPR2 0x49505232
-#define DRV_V5R4 0x56355234
 
 #define TYPE_ASCII 0x41534349
 #define TYPE_BIN   0x42494E41
@@ -43,24 +41,14 @@ static const struct {
 	const char *name;
 } scsi_cmnds[] = {
 	{ 0xc1, "IPR_CANCEL_REQUEST" },
-	{ 0x01, "IPR_CANCEL_64BIT_IOARCB" },
 	{ 0xc2, "IPR_QUERY_RSRC_STATE" },
 	{ 0xc3, "IPR_RESET_DEVICE" },
-	{ 0x80, "IPR_RESET_TYPE_SELECT" },
-	{ 0x40, "IPR_LUN_RESET" },
-	{ 0x20, "IPR_TARGET_RESET" },
-	{ 0x10, "IPR_BUS_RESET" },
-	{ 0x80, "IPR_ATA_PHY_RESET" },
 	{ 0xc4, "IPR_ID_HOST_RR_Q" },
 	{ 0xc5, "IPR_QUERY_IOA_CONFIG" },
 	{ 0xce, "IPR_CANCEL_ALL_REQUESTS" },
 	{ 0xcf, "IPR_HOST_CONTROLLED_ASYNC" },
-	{ 0x01, "IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE" },
-	{ 0x02, "IPR_HCAM_CDB_OP_CODE_LOG_DATA" },
 	{ 0xfb, "IPR_SET_SUPPORTED_DEVICES" },
-	{ 0x80, "IPR_SET_ALL_SUPPORTED_DEVICES" },
 	{ 0xf7, "IPR_IOA_SHUTDOWN" },
-	{ 0x05, "IPR_WR_BUF_DOWNLOAD_AND_SAVE" },
 
 	{ 0x00, "TEST_UNIT_READY" },
 	{ 0x01, "REZERO_UNIT" },
@@ -301,9 +289,6 @@ static void print_dump_header(struct ipr_dump_header *hdr)
 	case OS_LINUX:
 		fprintf(out_fp, "Linux\n");
 		break;
-	case OS_I5OS:
-		fprintf(out_fp, "i5OS\n");
-		break;
 	default:
 		fprintf(out_fp, "unknown\n");
 	}
@@ -312,9 +297,6 @@ static void print_dump_header(struct ipr_dump_header *hdr)
 	switch (hdr->driver_name) {
 	case DRV_IPR2:
 		fprintf(out_fp, "ipr2\n");
-		break;
-	case DRV_V5R4:
-		fprintf(out_fp, "V5R4\n");
 		break;
 	default:
 		fprintf(out_fp, "unknown\n");
