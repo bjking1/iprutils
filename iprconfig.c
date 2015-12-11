@@ -2163,7 +2163,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 			body = add_line_to_body(body,_("Current Asymmetric Access State"), _("Disabled"));
 	}
 
-	if (dev->ioa->has_cache) {
+	if (dev->ioa->has_cache && !dev->ioa->has_vset_write_cache) {
 		if (get_ioa_caching(dev->ioa) == IPR_IOA_REQUESTED_CACHING_DISABLED)
 			body = add_line_to_body(body,_("Current Requested Caching Mode"), _("Disabled"));
 		else
@@ -2173,7 +2173,7 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 	if (dev->ioa->has_cache) {
 		if (dev->ioa->vset_write_cache) {
 			dynbuf = "Synchronize Cache";
-		} else {
+		} else if (!dev->ioa->has_vset_write_cache) {
 			if (ipr_reclaim_cache_store(dev->ioa,
 						    IPR_RECLAIM_QUERY,
 						    &reclaim_data))
@@ -2181,6 +2181,14 @@ static char *ioa_details(char *body, struct ipr_dev *dev)
 
 			dynbuf = (reclaim_data.rechargeable_battery_type ?
 				  "Battery Backed" : "Supercap Protected");
+		} else {
+			/* This is the case where adapters even support
+			   Sync cache, but it is disabled. This should
+			   never happen... unless it is an old Bare
+			   Metal system. Let's handle this here so
+			   people don't get confused.  */
+			   goto out;
+
 		}
 		body = add_line_to_body(body, _("Cache Protection"), dynbuf);
 	}
@@ -11252,7 +11260,7 @@ int change_ioa_config(i_container * i_con)
 			sprintf(pref_str, "Disabled");
 		i_con = add_i_con(i_con, pref_str, &ioa_config_attr[index++]);
 	}
-	if (dev->ioa->has_cache && !dev->ioa->vset_write_cache) {
+	if (dev->ioa->has_cache && !dev->ioa->has_vset_write_cache) {
 		body = add_line_to_body(body,_("IOA Caching Mode"), "%13");
 		ioa_config_attr[index].option = 4;
 		ioa_config_attr[index].caching = ioa_attr.caching;
