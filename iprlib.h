@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <ctype.h>
 #include <syslog.h>
 #include <term.h>
@@ -2906,6 +2907,7 @@ u32 get_ioa_ucode_version(char *);
 int ipr_improper_device_type(struct ipr_dev *);
 int ipr_get_fw_version(struct ipr_dev *, u8 release_level[4]);
 int ipr_get_live_dump(struct ipr_ioa *);
+int ipr_jbod_sysfs_bind(struct ipr_dev *, u8);
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {

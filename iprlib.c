@@ -3738,23 +3738,18 @@ int ipr_format_unit(struct ipr_dev *dev)
 	u8 *defect_list_hdr;
 	int length = IPR_DEFECT_LIST_HDR_LEN;
 	char *name = dev->gen_name;
-	char cmnd[1000];
-	struct ipr_dev *multipath_dev;
 
 	if (strlen(dev->dev_name) && dev->scsi_dev_data->device_id) {
-		sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" > /dev/null 2>&1", strrchr(dev->dev_name, '/') + 1);
-		system(cmnd);
-		sprintf(cmnd, "/bin/rm -rf %s %s%s", dev->dev_name, dev->dev_name, "[0-9]*");
-		system(cmnd);
+		int pid, status;
 
-		multipath_dev = find_multipath_jbod(dev);
-		if (multipath_dev) {
-			sprintf(cmnd, "/sbin/multipathd -k\"del path %s\" > /dev/null 2>&1", strrchr(multipath_dev->dev_name, '/') + 1);
-			system(cmnd);
-			sprintf(cmnd, "/bin/rm -rf %s %s%s", multipath_dev->dev_name, multipath_dev->dev_name , "[0-9]*");
-			system(cmnd);
+		/* flush unused multipath device maps */
+		pid = fork();
+		if (pid == 0) {
+			execlp("multipath", "-F", NULL);
+			_exit(errno);
+		} else {
+			waitpid(pid, &status, 0);
 		}
-		system("/sbin/multipath -F > /dev/null 2>&1");
 	}
 
 	if (strlen(name) == 0)
