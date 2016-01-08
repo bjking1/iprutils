@@ -4570,9 +4570,9 @@ int do_raid_migrate(struct ipr_ioa *ioa, struct ipr_array_query_data *qac_data,
 	} else
 		/* get current stripe size */
 		if (ioa->sis64)
-			stripe_size = array_rcd->type3.stripe_size;
+			stripe_size = ntohs(array_rcd->type3.stripe_size);
 		else
-			stripe_size = array_rcd->type2.stripe_size;
+			stripe_size = ntohs(array_rcd->type2.stripe_size);
 
 	/* if adding devices, check that there are a valid number of them */
 	if (cap->format_overlay_type == IPR_FORMAT_ADD_DEVICES) {
