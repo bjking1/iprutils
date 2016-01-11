@@ -157,6 +157,9 @@ int restore_log_defaults(i_container *);
 int ibm_boot_log(i_container *);
 int exit_confirmed(i_container *);
 
+int statistics_menu(i_container *);
+int device_stats(i_container *);
+
 static int raid_create_check_num_devs(struct ipr_array_cap_entry *, int, int);
 
 /* constant strings */
@@ -195,7 +198,8 @@ struct screen_opts main_menu_opt[] = {
 	{disk_unit_recovery, "3", __("Work with disk unit recovery")},
 	{config_menu,        "4", __("Work with configuration options")},
 	{ucode_screen,	     "5", __("Work with microcode updates")},
-	{log_menu,           "6", __("Analyze log")},
+	{statistics_menu,    "6", __("Devices Statistics")},
+	{log_menu,           "7", __("Analyze log")}
 };
 
 s_node n_main_menu = {
@@ -247,6 +251,22 @@ s_node n_disk_status = {
 	.num_opts = NUM_OPTS(disk_status_opt),
 	.options  = &disk_status_opt[0],
 	.title    = __("Display Hardware Status"),
+	.header   = {
+		__("Type option, press Enter.\n"),
+		__("  1=Display hardware resource information details\n\n"),
+		"" }
+};
+
+struct screen_opts device_stats_opt[] = {
+	{device_stats, "\n"}
+};
+
+s_node n_device_stats = {
+	.rc_flags = (CANCEL_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG | TOGGLE_FLAG | FWD_FLAG),
+	.num_opts = NUM_OPTS(device_stats_opt),
+	.options  = &device_stats_opt[0],
+	.title    = __("Display Device Statistics"),
 	.header   = {
 		__("Type option, press Enter.\n"),
 		__("  1=Display hardware resource information details\n\n"),

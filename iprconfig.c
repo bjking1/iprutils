@@ -131,6 +131,8 @@ int display_menu(ITEM **, int, int, int **);
 char *__print_device(struct ipr_dev *, char *, char *, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int);
 static char *print_path_details(struct ipr_dev *, char *);
 static int get_drive_phy_loc(struct ipr_ioa *ioa);
+static char *print_ssd_report(struct ipr_dev *dev, char *body);
+static char *af_dasd_perf (char *body, struct ipr_dev *dev);
 
 #define print_dev(i, dev, buf, fmt, type) \
         for (i = 0; i < 2; i++) \
@@ -2777,6 +2779,102 @@ int device_details(i_container *i_con)
 	free(s_out);
 	return rc;
 }
+
+int device_stats(i_container *i_con)
+{
+	int rc;
+	struct ipr_dev *dev;
+	char *body = NULL;
+	char *tmp;
+	s_node *n_screen = &n_device_stats;
+	struct screen_output *s_out;
+
+	processing();
+	if ((rc = device_details_get_device(i_con, &dev)))
+		return rc;
+
+	body = print_ssd_report(dev, body);
+
+	if (ipr_is_af_dasd_device(dev)) {
+		body = af_dasd_perf(body, dev);
+	}
+
+	if (!body)
+		return rc;
+
+	n_screen->body = body;
+	s_out = screen_driver(n_screen, 0, i_con);
+	free(n_screen->body);
+	n_screen->body = NULL;
+	rc = s_out->rc;
+	free(s_out);
+	return rc;
+}
+
+int statistics_menu(i_container *i_con)
+{
+	int rc, k;
+	int len = 0;
+	int num_lines = 0;
+	struct ipr_ioa *ioa;
+	struct ipr_dev *dev;
+	struct screen_output *s_out;
+	int header_lines;
+	char *buffer[2];
+	int toggle = 1;
+	struct ipr_dev *vset;
+	processing();
+
+	rc = RC_SUCCESS;
+	i_con = free_i_con(i_con);
+
+	check_current_config(false);
+	body_init_status(buffer, n_device_stats.header, &header_lines);
+
+	for_each_ioa(ioa) {
+		if (!ioa->ioa.scsi_dev_data)
+			continue;
+
+		num_lines += print_standalone_disks(ioa, &i_con, buffer, 2);
+		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 2);
+
+		for_each_vset(ioa, vset) {
+			for_each_dev_in_vset(vset, dev) {
+				print_dev(k, dev, buffer, "%1", k);
+				i_con = add_i_con(i_con, "\0", dev);
+				num_lines++;
+			}
+		}
+	}
+
+	if (num_lines == 0) {
+		for (k = 0; k < 2; k++) {
+			len = strlen(buffer[k]);
+			buffer[k] = realloc(buffer[k], len +
+						strlen(_(no_dev_found)) + 8);
+			sprintf(buffer[k] + len, "\n%s", _(no_dev_found));
+		}
+	}
+
+	do {
+		n_device_stats.body = buffer[toggle&1];
+		s_out = screen_driver(&n_device_stats, header_lines,
+				      i_con);
+		rc = s_out->rc;
+		free(s_out);
+		toggle++;
+	} while (rc == TOGGLE_SCREEN);
+
+	for (k = 0; k < 2; k++) {
+		free(buffer[k]);
+		buffer[k] = NULL;
+	}
+	n_device_stats.body = NULL;
+
+	return rc;
+}
+
+
 
 #define IPR_INCLUDE 0
 #define IPR_REMOVE  1
