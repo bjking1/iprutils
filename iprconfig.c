@@ -3732,12 +3732,12 @@ int configure_raid_parameters(i_container *i_con)
 				 0,                    /* number of buffer to alter */
 				 qdepth_str);          /* string value to set */
 
-		cache_prot_str = cache_pols[cache_prot];
-
-		if (ioa->vset_write_cache)
+		if (ioa->vset_write_cache) {
+			cache_prot_str = cache_pols[cache_prot];
 			set_field_buffer(input_fields[4],   /* field to alter */
 					 0,                 /* number of buffer to alter */
 					 cache_prot_str);   /* string value to set */
+		}
 
 		refresh();
 		ch = getch();
