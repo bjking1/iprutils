@@ -7529,7 +7529,8 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 		}
 	}
 
-	if (attr->write_cache_policy != old_attr.write_cache_policy) {
+	if (attr->write_cache_policy != old_attr.write_cache_policy
+	    || !attr->write_cache_policy) {
 		ipr_set_dev_wcache_policy(dev, attr->write_cache_policy);
 		if (save) {
 			sprintf(temp, "%d", attr->write_cache_policy);

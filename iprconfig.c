@@ -3532,7 +3532,7 @@ int display_input(int field_start_row, int *userptr)
  **/
 int configure_raid_parameters(i_container *i_con)
 {
-	FIELD *input_fields[5];
+	FIELD *input_fields[6];
 	FIELD *cur_field;
 	FORM *form;
 	ITEM **raid_item = NULL;
@@ -3550,7 +3550,9 @@ int configure_raid_parameters(i_container *i_con)
 	{
 		char line[16];
 	} *raid_menu_str = NULL, *stripe_menu_str = NULL;
-	char raid_str[16], stripe_str[16], qdepth_str[4];
+	char *cache_pols[] = {"Write Through", "Write Back"};
+	ITEM *cache_prot_item[ARRAY_SIZE(cache_pols) + 1];
+	char raid_str[16], stripe_str[16], qdepth_str[4], *cache_prot_str;
 	int ch, start_row;
 	int cur_field_index;
 	int selected_count = 0, ssd_num = 0, hdd_num = 0;
@@ -3560,6 +3562,7 @@ int configure_raid_parameters(i_container *i_con)
 	int *retptr;
 	int max_x,max_y,start_y,start_x;
 	int qdepth, new_qdepth;
+	int cache_prot;
 
 	getmaxyx(stdscr,max_y,max_x);
 	getbegyx(stdscr,start_y,start_x);
@@ -3646,7 +3649,22 @@ int configure_raid_parameters(i_container *i_con)
 				    0,           /* number of offscreen rows */
 				    0);          /* number of working buffers */
 
-	input_fields[4] = NULL;
+
+	if (ioa->vset_write_cache) {
+		/* Sync Cache protection */
+		input_fields[4] = new_field(1, 13,  /* new field size */
+					    11, 44,     /*  */
+					    0,          /* number of offscreen rows */
+					    0);         /* number of working buffers */
+		cache_prot = IPR_DEV_CACHE_WRITE_BACK;
+
+		set_field_just(input_fields[4], JUSTIFY_LEFT);
+		field_opts_off(input_fields[4], O_EDIT);
+	} else {
+		input_fields [4] = NULL;
+	}
+
+	input_fields[5] = NULL;
 
 	raid_index = raid_index_default;
 	cap_entry = prot_level_list[raid_index].array_cap_entry;
@@ -3685,6 +3703,8 @@ int configure_raid_parameters(i_container *i_con)
 	mvaddstr(8, 0,  "Protection Level . . . . . . . . . . . . :");
 	mvaddstr(9, 0,  "Stripe Size  . . . . . . . . . . . . . . :");
 	mvprintw(10, 0, "Queue Depth (default = %3d). . . . . . . :", qdepth);
+	if (ioa->vset_write_cache)
+		mvprintw(11, 0, "Array Write Cache Policy . . . . . . . . :");
 	mvaddstr(max_y - 4, 0, _("Press Enter to Continue"));
 	mvaddstr(max_y - 2, 0, EXIT_KEY_LABEL CANCEL_KEY_LABEL);
 
@@ -3711,6 +3731,13 @@ int configure_raid_parameters(i_container *i_con)
 		set_field_buffer(input_fields[3],     /* field to alter */
 				 0,                    /* number of buffer to alter */
 				 qdepth_str);          /* string value to set */
+
+		cache_prot_str = cache_pols[cache_prot];
+
+		if (ioa->vset_write_cache)
+			set_field_buffer(input_fields[4],   /* field to alter */
+					 0,                 /* number of buffer to alter */
+					 cache_prot_str);   /* string value to set */
 
 		refresh();
 		ch = getch();
@@ -3822,6 +3849,33 @@ int configure_raid_parameters(i_container *i_con)
 				else
 					qdepth = new_qdepth;
 				continue;
+			} else if (cur_field_index == 4 && ioa->vset_write_cache) {
+				userptr = realloc(userptr,
+						  (sizeof(int) *
+						   (ARRAY_SIZE(cache_pols) + 1)));
+
+				for (index = 0; index < ARRAY_SIZE(cache_pols);
+				     index++) {
+					cache_prot_item[index] =
+						new_item(cache_pols[index], "");
+					userptr[index] = index;
+					set_item_userptr(cache_prot_item[index],
+							 (char *)&userptr[index]);
+				}
+				cache_prot_item[index] = (ITEM *) NULL;
+
+				start_row = 8;
+				rc = display_menu(cache_prot_item, start_row,
+						  index, &retptr);
+				if (rc == RC_SUCCESS) {
+					cache_prot = *retptr;
+				}
+				for (index = 0; index < ARRAY_SIZE(cache_pols);
+				     index++)
+					free_item(cache_prot_item[index]);
+				if (rc == EXIT_FLAG)
+					goto leave;
+				continue;
 			} else
 				continue;
 
@@ -3838,6 +3892,8 @@ int configure_raid_parameters(i_container *i_con)
 			cur_raid_cmd->prot_level = cap_entry->prot_level;
 			cur_raid_cmd->stripe_size = stripe_sz;
 			cur_raid_cmd->qdepth = qdepth;
+			if (ioa->vset_write_cache)
+				cur_raid_cmd->vset_cache = cache_prot;
 			goto leave;
 		} else if (ch == KEY_RIGHT)
 			form_driver(form, REQ_NEXT_CHAR);
