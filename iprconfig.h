@@ -65,6 +65,7 @@ struct function_output {
 };
 
 int main_menu(i_container * i_con);
+int config_menu(i_container *i_con);
 
 int disk_status(i_container * i_con);
 int device_details(i_container * i_con);
@@ -192,12 +193,9 @@ struct screen_opts main_menu_opt[] = {
 	{disk_status,        "1", __("Display hardware status")},
 	{raid_screen,        "2", __("Work with disk arrays")},
 	{disk_unit_recovery, "3", __("Work with disk unit recovery")},
-	{bus_config,         "4", __("Work with SCSI bus configuration")},
-	{driver_config,      "5", __("Work with driver configuration")},
-	{disk_config,        "6", __("Work with disk configuration")},
-	{ioa_config,         "7", __("Work with adapter configuration")},
-	{ucode_screen,	     "8", __("Work with microcode updates")},
-	{log_menu,           "9", __("Analyze log")},
+	{config_menu,        "4", __("Work with configuration options")},
+	{ucode_screen,	     "5", __("Work with microcode updates")},
+	{log_menu,           "6", __("Analyze log")},
 };
 
 s_node n_main_menu = {
@@ -223,6 +221,21 @@ s_node n_exit_confirm = {
 		"" }
 };
 
+
+struct screen_opts config_menu_opt[] = {
+	{bus_config,         "1", __("Work with SCSI bus configuration")},
+	{driver_config,      "2", __("Work with driver configuration")},
+	{disk_config,        "3", __("Work with disk configuration")},
+	{ioa_config,         "4", __("Work with adapter configuration")},
+};
+
+s_node n_config_menu = {
+	.rc_flags = (EXIT_FLAG | CANCEL_FLAG | REFRESH_FLAG),
+	.f_flags  = (EXIT_FLAG | CANCEL_FLAG),
+	.num_opts = NUM_OPTS(config_menu_opt),
+	.options  = &config_menu_opt[0],
+	.title    =  __("IBM Power RAID Configuration Utility")
+};
 
 struct screen_opts disk_status_opt[] = {
 	{device_details, "\n"}

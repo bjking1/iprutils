@@ -32,6 +32,8 @@
 
 char *tool_name = "iprconfig";
 
+#define MAX_CMD_LENGTH 1000
+
 struct devs_to_init_t {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
@@ -1693,6 +1695,31 @@ static void processing()
 	refresh();
 }
 
+int display_features_menu(i_container *i_con, s_node *menu)
+{
+	char cmnd[MAX_CMD_LENGTH];
+	int rc, loop;
+	struct stat file_stat;
+	struct screen_output *s_out;
+	int offset = 0;
+
+	for (loop = 0; loop < (menu->num_opts); loop++) {
+		menu->body = ipr_list_opts(menu->body,
+					   menu->options[loop].key,
+					   menu->options[loop].list_str);
+	}
+	menu->body = ipr_end_list(menu->body);
+
+	s_out = screen_driver(menu, 0, NULL);
+	free(menu->body);
+	menu->body = NULL;
+	rc = s_out->rc;
+	i_con = s_out->i_con;
+	i_con = free_i_con(i_con);
+	free(s_out);
+	return rc;
+}
+
 /**
  * main_menu - Main menu
  * @i_con:		i_container struct
@@ -1702,10 +1729,8 @@ static void processing()
  **/
 int main_menu(i_container *i_con)
 {
-	int rc;
 	int j;
 	struct ipr_ioa *ioa;
-	struct screen_output *s_out;
 	struct scsi_dev_data *scsi_dev_data;
 
 	processing();
@@ -1720,23 +1745,21 @@ int main_menu(i_container *i_con)
 		}
 	}
 
-	for (j = 0; j < n_main_menu.num_opts; j++) {
-		n_main_menu.body = ipr_list_opts(n_main_menu.body,
-						 n_main_menu.options[j].key,
-						 n_main_menu.options[j].list_str);
-	}
-
-	n_main_menu.body = ipr_end_list(n_main_menu.body);
-
-	s_out = screen_driver(&n_main_menu, 0, NULL);
-	free(n_main_menu.body);
-	n_main_menu.body = NULL;
-	rc = s_out->rc;
-	i_con = s_out->i_con;
-	i_con = free_i_con(i_con);
-	free(s_out);
-	return rc;
+	return display_features_menu(i_con, &n_main_menu);
 }
+
+/**
+ * conf_menu - Config menu
+ * @i_con:		i_container struct
+ *
+ * Returns:
+ *   0 if success / non-zero on failure
+ **/
+int config_menu(i_container *i_con)
+{
+	return display_features_menu(i_con, &n_config_menu);
+}
+
 
 /**
  * print_standalone_disks - 
@@ -2771,31 +2794,11 @@ int device_details(i_container *i_con)
 **/
 int hot_spare_screen(i_container *i_con)
 {
-	int rc;
-	struct screen_output *s_out;
-	int loop;
-
-	free_raid_cmds();
-
-	for (loop = 0; loop < n_hot_spare_screen.num_opts; loop++) {
-		n_hot_spare_screen.body =
-			ipr_list_opts(n_hot_spare_screen.body,
-				      n_hot_spare_screen.options[loop].key,
-				      n_hot_spare_screen.options[loop].list_str);
-	}
-
-	n_hot_spare_screen.body = ipr_end_list(n_hot_spare_screen.body);
-
-	s_out = screen_driver(&n_hot_spare_screen, 0, NULL);
-	free(n_hot_spare_screen.body);
-	n_hot_spare_screen.body = NULL;
-	rc = s_out->rc;
-	free(s_out);
-	return rc;
+	return display_features_menu(i_con, &n_hot_spare_screen);
 }
 
 /**
-* raid_screen - 
+* raid_screen -
 * @i_con:            i_container struct
 *
 * Returns:
@@ -2803,27 +2806,7 @@ int hot_spare_screen(i_container *i_con)
 **/
 int raid_screen(i_container *i_con)
 {
-	int rc;
-	struct screen_output *s_out;
-	int loop;
-
-	free_raid_cmds();
-
-	for (loop = 0; loop < n_raid_screen.num_opts; loop++) {
-		n_raid_screen.body =
-			ipr_list_opts(n_raid_screen.body,
-				      n_raid_screen.options[loop].key,
-				      n_raid_screen.options[loop].list_str);
-	}
-
-	n_raid_screen.body = ipr_end_list(n_raid_screen.body);
-
-	s_out = screen_driver(&n_raid_screen, 0, NULL);
-	free(n_raid_screen.body);
-	n_raid_screen.body = NULL;
-	rc = s_out->rc;
-	free(s_out);
-	return rc;
+	return display_features_menu(i_con, &n_raid_screen);
 }
 
 /**
@@ -11923,28 +11906,8 @@ int choose_ucode(i_container * i_con)
 **/
 int ucode_screen(i_container *i_con)
 {
-	int rc;
-	struct screen_output *s_out;
-	int loop;
-
-	for (loop = 0; loop < n_ucode_screen.num_opts; loop++) {
-		n_ucode_screen.body =
-			ipr_list_opts(n_ucode_screen.body,
-				      n_ucode_screen.options[loop].key,
-				      n_ucode_screen.options[loop].list_str);
-	}
-
-	n_ucode_screen.body = ipr_end_list(n_ucode_screen.body);
-
-	s_out = screen_driver(&n_ucode_screen, 0, NULL);
-	free(n_ucode_screen.body);
-	n_ucode_screen.body = NULL;
-	rc = s_out->rc;
-	free(s_out);
-	return rc;
+	return display_features_menu(i_con, &n_ucode_screen);
 }
-
-#define MAX_CMD_LENGTH 1000
 
 /**
 * log_menu -
