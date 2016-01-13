@@ -269,7 +269,7 @@ s_node n_device_stats = {
 	.title    = __("Display Device Statistics"),
 	.header   = {
 		__("Type option, press Enter.\n"),
-		__("  1=Display hardware resource information details\n\n"),
+		__("  1=Display device statistics\n\n"),
 		"" }
 };
 
