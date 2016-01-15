@@ -1,12 +1,14 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.9
-Release: 1
+Version: 2.4.10
+%define release_prefix .0.rc1
+Release: %%{?release_prefix}.1
+#Release: 1
 License: CPL
 Group: System Environment/Base
 Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
-Source0: iprutils-%{version}.tar.gz
+Source0: iprutils-%{version}%%{?release_prefix}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
 BuildRequires: ncurses-devel
 
@@ -87,7 +89,7 @@ Static version of some tools of iprutils.
 ## prep
 ##
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n %{name}-%{version}%%{?release_prefix}
 
 ##
 ## build
@@ -290,6 +292,8 @@ fi
 %endif
 
 %if 0%{?suse_version}
+/usr/lib/supportconfig
+/usr/lib/supportconfig/plugins
 /usr/lib/supportconfig/plugins/iprsos
 %endif
 
@@ -318,6 +322,16 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Wed Jan 13 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
+- Add Device Statistics menu to ncurses interface
+* Mon Jan 11 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
+- Fix RAID Migration failure on Little Endian systems
+* Wed Dec 02 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
+- Implement ssd_report command to display SSD usage statistics
+* Wed Dec 02 2015 Heitor Ricardo Alves de Siqueira <halves@linux.vnet.ibm.com>
+- Implement ipr dump formatting tool
+* Wed Nov 04 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
+- Add a command to update all devices to the latst microcode levels.
 * Mon Oct 26 2015 Brian King <brking@linux.vnet.ibm.com> 2.4.9
 * Mon Oct 26 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
 - Add support for sync cache managed array write cache on supported adapters
