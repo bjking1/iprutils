@@ -1,14 +1,15 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
 Version: 2.4.10
-%define release_prefix .0.rc1
-Release: %%{?release_prefix}.1
-#Release: 1
+# For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
+# For GA releases, release_prefix should be set to 1, 2, 3, etc.
+%define release_prefix 1
+Release: %{release_prefix}.1
 License: CPL
 Group: System Environment/Base
 Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
-Source0: iprutils-%{version}%%{?release_prefix}.tar.gz
+Source0: iprutils-%{version}.%{release_prefix}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
 BuildRequires: ncurses-devel
 
@@ -89,7 +90,7 @@ Static version of some tools of iprutils.
 ## prep
 ##
 %prep
-%setup -q -n %{name}-%{version}%%{?release_prefix}
+%setup -q -n %{name}-%{version}.%{release_prefix}
 
 ##
 ## build
@@ -322,6 +323,8 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Tue Jan 19 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.10
+- Released iprutils 2.4.10
 * Wed Jan 13 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
 - Add Device Statistics menu to ncurses interface
 * Mon Jan 11 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
