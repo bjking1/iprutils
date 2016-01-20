@@ -96,8 +96,7 @@ static int use_curses;
 #define for_each_raid_cmd(cmd) for (cmd = raid_cmd_head; cmd; cmd = cmd->next)
 
 #define DEFAULT_LOG_DIR "/var/log"
-#define DEFAULT_EDITOR "vi -R"
-#define FAILSAFE_EDITOR "vi -R -"
+#define DEFAULT_EDITOR "less"
 
 #define IS_CANCEL_KEY(c) ((c == KEY_F(12)) || (c == 'q') || (c == 'Q'))
 #define CANCEL_KEY_LABEL "q=Cancel   "
@@ -12046,66 +12045,158 @@ int log_menu(i_container *i_con)
 	return rc;
 }
 
+static int invoke_pager(char *filename)
+{
+	int pid, status;
+	char *argv[] = {
+		DEFAULT_EDITOR, "-c",
+		filename, NULL
+	};
+
+	pid = fork();
+	if (pid) {
+		waitpid(pid, &status, 0);
+	} else {
+		/* disable insecure pager features */
+		putenv("LESSSECURE=1");
+		execvp(argv[0], argv);
+		_exit(errno);
+	}
+	return WEXITSTATUS(status);
+}
+
+#define EDITOR_MAX_ARGS 32
+static int invoke_editor(char* filename)
+{
+	int i;
+	int rc, pid, status;
+
+	/* if editor not set, use secure pager */
+	if (strcmp(editor, DEFAULT_EDITOR) == 0) {
+		rc = invoke_pager(filename);
+		return rc;
+	}
+
+	pid = fork();
+	if (pid == 0) {
+		char *tok;
+		char *argv[EDITOR_MAX_ARGS];
+		char cmnd[MAX_CMD_LENGTH];
+
+		/* copy editor name to argv[0] */
+		strncpy(cmnd, editor, sizeof(cmnd) - 1);
+		tok = strtok(cmnd, " ");
+		argv[0] = malloc(strlen(tok));
+		strcpy(argv[0], tok);
+
+		/* handle editor arguments, if any */
+		for (i = 1; i < EDITOR_MAX_ARGS - 2; ++i) {
+			tok = strtok(NULL, " ");
+			if (tok == NULL)
+				break;
+			argv[i] = malloc(strlen(tok));
+			strcpy(argv[i], tok);
+		}
+		argv[i] = filename;
+		argv[i+1] = NULL;
+
+		execvp(argv[0], argv);
+		_exit(errno);
+	} else {
+		waitpid(pid, &status, 0);
+	}
+
+	return WEXITSTATUS(status);
+}
+
 /**
  * ibm_storage_log_tail -
  * @i_con:		i_container struct
  *
  * Returns:
- *   1 if no status / 65 on failure
+ *   0 on success / non-zero on failure
  **/
-
 int ibm_storage_log_tail(i_container *i_con)
 {
-	char cmnd[MAX_CMD_LENGTH];
 	int rc, len;
 	int log_fd;
-	char *logfile;
+	char line[MAX_CMD_LENGTH];
+	char logfile[MAX_CMD_LENGTH];
+	char *tmp_log;
+	FILE *logsource_fp;
 
-	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
-	log_fd = mkstemp(logfile);
+	/* aux variables for erasing unnecessary log info */
+	const char *local_s = "localhost kernel: ipr";
+	const char *kernel_s = "kernel: ipr";
+	char prefix[256];
+	char host[256];
+	char *dot;
 
-	def_prog_mode();
-
-	if (log_fd == -1) {
-		len = sprintf(cmnd, "cd %s; zcat -f messages", log_root_dir);
-
-		len += sprintf(cmnd + len," | grep ipr | ");
-		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ localhost kernel: ipr//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ kernel: ipr//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/\\^M//g\" | ");
-		len += sprintf(cmnd + len, FAILSAFE_EDITOR);
-		closelog();
-		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-		syslog(LOG_ERR, "Error encountered concatenating log files...\n");
-		syslog(LOG_ERR, "Using failsafe editor...\n");
-		closelog();
-		openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
-		sleep(3);
-	} else {
-		len = sprintf(cmnd,"cd %s; zcat -f messages | grep ipr |", log_root_dir);
-		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\"");
-		len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr//g\"");
-		len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr//g\"");
-		len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
-		len += sprintf(cmnd + len, ">> %s", logfile);
-		system(cmnd);
-
-		sprintf(cmnd, "%s %s", editor, logfile);
+	tmp_log = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(tmp_log);
+	if (log_fd < 0) {
+		s_status.str = strerror(errno);
+		syslog(LOG_ERR, "Could not create tmp log file: %m\n");
+		free(tmp_log);
+		return RC_94_Tmp_Log_Fail;
 	}
 
-	rc = system(cmnd);
+	def_prog_mode();
+	endwin();
 
-	if (log_fd != -1)
+	snprintf(logfile, sizeof(logfile), "%s/messages", log_root_dir);
+	logsource_fp = fopen(logfile, "r");
+	if (logsource_fp < 0) {
+		syslog(LOG_ERR, "Could not open %s: %m\n", logfile);
+		free(tmp_log);
 		close(log_fd);
+		return RC_75_Failed_Read_Err_Log;
+	}
+
+	while (fgets(line, sizeof(line), logsource_fp)) {
+		/* ignore lines that dont contain 'ipr' */
+		if (strstr(line, "ipr") == NULL)
+			continue;
+
+		/* build prefix using current hostname */
+		gethostname(host, sizeof(host));
+		dot = strchr(host, '.');
+		if (dot)
+			*dot = '\0';
+		snprintf(prefix, sizeof(prefix), "%s kernel: ipr", host);
+
+		/* erase prefix, local_s and kernel_s from line:
+		 * dot+strlen points to beginning of prefix
+		 * strlen(dot) - strlen(prefix) + 1 == size of the rest of line
+		 *
+		 * code below moves 'rest of line' on top of prefix et al. */
+		if (dot = strstr(line, prefix)) {
+			memmove(dot, dot + strlen(prefix),
+				strlen(dot) - strlen(prefix) + 1);
+		} else if (dot = strstr(line, local_s)) {
+			memmove(dot, dot+strlen(local_s),
+				strlen(dot) - strlen(local_s) + 1);
+		} else if (dot = strstr(line, kernel_s)) {
+			memmove(dot, dot+strlen(kernel_s),
+				strlen(dot) - strlen(kernel_s) + 1);
+		}
+
+		write(log_fd, line, strlen(line));
+	}
+
+	fclose(logsource_fp);
+	close(log_fd);
+	rc = invoke_editor(tmp_log);
+	free(tmp_log);
 
 	if ((rc != 0) && (rc != 127)) {
 		/* "Editor returned %d. Try setting the default editor" */
 		s_status.num = rc;
-		return 65; 
-	} else
-		/* return with no status */
-		return 1; 
+		return RC_65_Set_Default_Editor;
+	} else {
+		/* return with success */
+		return RC_0_Success;
+	}
 }
 
 /**
@@ -12162,74 +12253,97 @@ static int compare_log_file(const struct dirent **first_dir, const struct dirent
  * @i_con:		i_container struct
  *
  * Returns:
- *   0 if success / non-zero on failure FIXME
+ *   0 on success / non-zero on failure FIXME
  **/
 int ibm_storage_log(i_container *i_con)
 {
-	char cmnd[MAX_CMD_LENGTH];
+	char line[MAX_CMD_LENGTH];
+	char logfile[MAX_CMD_LENGTH];
 	int i;
 	struct dirent **log_files;
 	struct dirent **dirent;
 	int num_dir_entries;
 	int rc, len;
 	int log_fd;
-	char *logfile;
+	char *tmp_log;
+	gzFile logsource_fp;
 
-	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
-	log_fd = mkstemp(logfile);
+	/* aux variables for erasing unnecessary log info */
+	const char *local_s = "localhost kernel: ipr";
+	const char *kernel_s = "kernel: ipr";
+	char prefix[256];
+	char host[256];
+	char *dot;
+
+	tmp_log = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(tmp_log);
+	if (log_fd < 0) {
+		s_status.str = strerror(errno);
+		syslog(LOG_ERR, "Could not create tmp log file: %m\n");
+		free(tmp_log);
+		return RC_94_Tmp_Log_Fail;
+	}
 
 	def_prog_mode();
+	endwin();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
 	if (num_dir_entries < 0) {
 		s_status.num = 75;
-		return 75;
+		return RC_75_Failed_Read_Err_Log;
 	}
 
 	if (num_dir_entries)
 		dirent = log_files;
 
-	if (log_fd == -1) {
-		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
-
-		/* Probably have a read-only root file system */
-		for (i = 0; i < num_dir_entries; i++) {
-			len += sprintf(cmnd + len, "%s ", (*dirent)->d_name);
-			dirent++;
+	for (i = 0; i < num_dir_entries; ++i) {
+		snprintf(logfile, sizeof(logfile), "%s/%s", log_root_dir,
+			 (*dirent)->d_name);
+		logsource_fp = gzopen(logfile, "r");
+		if (logsource_fp == NULL) {
+			syslog(LOG_ERR, "Could not open %s: %m\n", line);
+			close(log_fd);
+			continue; /* proceed to next log file */
 		}
 
-		len += sprintf(cmnd + len," | grep ipr-err | ");
-		len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ localhost kernel: ipr//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/ kernel: ipr//g\" | ");
-		len += sprintf(cmnd + len, "sed \"s/\\^M//g\" | ");
-		len += sprintf(cmnd + len, FAILSAFE_EDITOR);
-		closelog();
-		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-		syslog(LOG_ERR, "Error encountered concatenating log files...\n");
-		syslog(LOG_ERR, "Using failsafe editor...\n");
-		closelog();
-		openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
-		sleep(3);
-	} else {
-		for (i = 0; i < num_dir_entries; i++) {
-			len = sprintf(cmnd,"cd %s; zcat -f %s | grep ipr |", log_root_dir, (*dirent)->d_name);
-			len += sprintf(cmnd + len, "sed \"s/ `hostname -s` kernel: ipr//g\"");
-			len += sprintf(cmnd + len, " | sed \"s/ localhost kernel: ipr//g\"");
-			len += sprintf(cmnd + len, " | sed \"s/ kernel: ipr//g\"");
-			len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
-			len += sprintf(cmnd + len, ">> %s", logfile);
-			system(cmnd);
-			dirent++;
-		}
+		while (gzgets(logsource_fp, line, sizeof(line))) {
+			/* ignore lines that dont contain 'ipr' */
+			if (strstr(line, "ipr") == NULL)
+				continue;
 
-		sprintf(cmnd, "%s %s", editor, logfile);
+			gethostname(host, sizeof(host));
+			dot = strchr(host, '.');
+			if (dot)
+				*dot = '\0';
+			snprintf(prefix, sizeof(prefix), "%s kernel: ipr",
+				 host);
+
+			/* erase prefix, local_s and kernel_s from line:
+			 * dot+strlen points to beginning of prefix
+			 * strlen(dot) - strlen(prefix) + 1 ==
+			 *             size of the rest of line
+			 *
+			 * code below moves 'rest of line' on top of prefix */
+			if (dot = strstr(line, prefix)) {
+				memmove(dot, dot + strlen(prefix),
+					strlen(dot) - strlen(prefix) + 1);
+			} else if (dot = strstr(line, local_s)) {
+				memmove(dot, dot + strlen(local_s),
+					strlen(dot) - strlen(local_s) + 1);
+			} else if (dot = strstr(line, kernel_s)) {
+				memmove(dot, dot + strlen(kernel_s),
+					strlen(dot) - strlen(kernel_s) + 1);
+			}
+
+			write(log_fd, line, strlen(line));
+		}
+		gzclose_r(logsource_fp);
+		dirent++;
 	}
 
-	rc = system(cmnd);
-
-	if (log_fd != -1)
-		close(log_fd);
+	close(log_fd);
+	rc = invoke_editor(tmp_log);
+	free(tmp_log);
 
 	if (num_dir_entries) {
 		while (num_dir_entries--)
@@ -12240,10 +12354,11 @@ int ibm_storage_log(i_container *i_con)
 	if ((rc != 0) && (rc != 127)) {
 		/* "Editor returned %d. Try setting the default editor" */
 		s_status.num = rc;
-		return 65; 
-	} else
-		/* return with no status */
-		return 1; 
+		return RC_65_Set_Default_Editor;
+	} else {
+		/* return with success */
+		return RC_0_Success;
+	}
 }
 
 /**
@@ -12255,63 +12370,57 @@ int ibm_storage_log(i_container *i_con)
  **/
 int kernel_log(i_container *i_con)
 {
-	char cmnd[MAX_CMD_LENGTH];
+	char line[MAX_CMD_LENGTH];
+	char logfile[MAX_CMD_LENGTH];
 	int rc, i;
 	struct dirent **log_files;
 	struct dirent **dirent;
 	int num_dir_entries;
 	int len;
 	int log_fd;
-	char *logfile;
+	char *tmp_log;
+	gzFile logsource_fp;
 
-	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
-	log_fd = mkstemp(logfile);
+	tmp_log = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(tmp_log);
+	if (log_fd < 0) {
+		s_status.str = strerror(errno);
+		syslog(LOG_ERR, "Could not create tmp log file: %m\n");
+		free(tmp_log);
+		return RC_94_Tmp_Log_Fail;
+	}
 
 	def_prog_mode();
+	endwin();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
 	if (num_dir_entries < 0) {
 		s_status.num = 75;
-		return 75;
+		return RC_75_Failed_Read_Err_Log;
 	}
 
 	if (num_dir_entries)
 		dirent = log_files;
 
-	if (log_fd == -1) {
-		/* Probably have a read-only root file system */
-		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
-
-		/* Probably have a read-only root file system */
-		for (i = 0; i < num_dir_entries; i++) {
-			len += sprintf(cmnd + len, "%s ", (*dirent)->d_name);
-			dirent++;
+	for (i = 0; i < num_dir_entries; ++i) {
+		snprintf(logfile, sizeof(logfile), "%s/%s", log_root_dir,
+			 (*dirent)->d_name);
+		logsource_fp = gzopen(logfile, "r");
+		if (logsource_fp == NULL) {
+			syslog(LOG_ERR, "Could not open %s: %m\n", line);
+			close(log_fd);
+			continue; /* proceed to next log file */
 		}
 
-		len += sprintf(cmnd + len, " | sed \"s/\\^M//g\" ");
-		len += sprintf(cmnd + len, "| %s", FAILSAFE_EDITOR);
-		closelog();
-		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-		syslog(LOG_ERR, "Error encountered concatenating log files...\n");
-		syslog(LOG_ERR, "Using failsafe editor...\n");
-		openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
-		sleep(3);
-	} else {
-		for (i = 0; i < num_dir_entries; i++) {
-			sprintf(cmnd,
-				"cd %s; zcat -f %s | sed \"s/\\^M//g\" >> %s",
-				log_root_dir, (*dirent)->d_name, logfile);
-			system(cmnd);
-			dirent++;
-		}
-
-		sprintf(cmnd, "%s %s", editor, logfile);
+		while (gzgets(logsource_fp, line, sizeof(line)))
+			write(log_fd, line, strlen(line));
+		gzclose_r(logsource_fp);
+		dirent++;
 	}
 
-	rc = system(cmnd);
-
-	if (log_fd != -1)
-		close(log_fd);
+	close(log_fd);
+	rc = invoke_editor(tmp_log);
+	free(tmp_log);
 
 	if (num_dir_entries > 0) {
 		while (num_dir_entries--)
@@ -12322,11 +12431,12 @@ int kernel_log(i_container *i_con)
 	if ((rc != 0) && (rc != 127))	{
 		/* "Editor returned %d. Try setting the default editor" */
 		s_status.num = rc;
-		return 65; 
+		return RC_65_Set_Default_Editor;
 	}
-	else
-		/* return with no status */
-		return 1; 
+	else {
+		/* return with success */
+		return RC_0_Success;
+	}
 }
 
 /**
@@ -12338,61 +12448,61 @@ int kernel_log(i_container *i_con)
  **/
 int iprconfig_log(i_container *i_con)
 {
-	char cmnd[MAX_CMD_LENGTH];
+	char line[MAX_CMD_LENGTH];
+	char logfile[MAX_CMD_LENGTH];
 	int rc, i;
 	struct dirent **log_files;
 	struct dirent **dirent;
 	int num_dir_entries;
 	int len;
 	int log_fd;
-	char *logfile;
+	char *tmp_log;
+	gzFile logsource_fp;
 
-	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
-	log_fd = mkstemp(logfile);
+	tmp_log = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(tmp_log);
+	if (log_fd < 0) {
+		s_status.str = strerror(errno);
+		syslog(LOG_ERR, "Could not create tmp log file: %m\n");
+		free(tmp_log);
+		return RC_94_Tmp_Log_Fail;
+	}
 
 	def_prog_mode();
+	endwin();
 
 	num_dir_entries = scandir(log_root_dir, &log_files, select_log_file, compare_log_file);
 	if (num_dir_entries < 0) {
 		s_status.num = 75;
-		return 75;
+		return RC_75_Failed_Read_Err_Log;
 	}
 
 	if (num_dir_entries)
 		dirent = log_files;
 
-	if (log_fd == -1) {
-		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
-
-		/* Probably have a read-only root file system */
-		for (i = 0; i < num_dir_entries; i++) {
-			len += sprintf(cmnd + len, "%s ", (*dirent)->d_name);
-			dirent++;
+	for (i = 0; i < num_dir_entries; ++i) {
+		snprintf(logfile, sizeof(logfile), "%s/%s", log_root_dir,
+			 (*dirent)->d_name);
+		logsource_fp = gzopen(logfile, "r");
+		if (logsource_fp == NULL) {
+			syslog(LOG_ERR, "Could not open %s: %m\n", line);
+			close(log_fd);
+			continue; /* proceed to next log file */
 		}
 
-		len += sprintf(cmnd + len," | grep iprconfig | ");
-		len += sprintf(cmnd + len, FAILSAFE_EDITOR);
-		closelog();
-		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-		syslog(LOG_ERR, "Error encountered concatenating log files...\n");
-		syslog(LOG_ERR, "Using failsafe editor...\n");
-		openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
-		sleep(3);
-	} else {
-		for (i = 0; i < num_dir_entries; i++) {
-			len = sprintf(cmnd,"cd %s; zcat -f %s | grep iprconfig ", log_root_dir, (*dirent)->d_name);
-			len += sprintf(cmnd + len, ">> %s", logfile);
-			system(cmnd);
-			dirent++;
+		while (gzgets(logsource_fp, line, sizeof(line))) {
+			/* ignore lines that dont contain 'iprconfig' */
+			if (strstr(line, "iprconfig") == NULL)
+				continue;
+			write(log_fd, line, strlen(line));
 		}
-
-		sprintf(cmnd, "%s %s", editor, logfile);
+		gzclose_r(logsource_fp);
+		dirent++;
 	}
 
-	rc = system(cmnd);
-
-	if (log_fd != -1)
-		close(log_fd);
+	close(log_fd);
+	rc = invoke_editor(tmp_log);
+	free(tmp_log);
 
 	if (num_dir_entries) {
 		while (num_dir_entries--)
@@ -12403,10 +12513,11 @@ int iprconfig_log(i_container *i_con)
 	if ((rc != 0) && (rc != 127))	{
 		/* "Editor returned %d. Try setting the default editor" */
 		s_status.num = rc;
-		return 65; 
-	} else
-		/* return with no status */
-		return 1; 
+		return RC_65_Set_Default_Editor;
+	} else {
+		/* return with success */
+		return RC_0_Success;
+	}
 }
 
 /**
@@ -12598,56 +12709,62 @@ int restore_log_defaults(i_container *i_con)
  **/
 int ibm_boot_log(i_container *i_con)
 {
-	char cmnd[MAX_CMD_LENGTH];
+	char line[MAX_CMD_LENGTH];
+	char logfile[MAX_CMD_LENGTH];
 	int rc;
 	int len;
 	struct stat file_stat;
 	int log_fd;
-	char *logfile;
+	char *tmp_log;
+	FILE *logsource_fp;
 
-
-	sprintf(cmnd,"%s/boot.msg",log_root_dir);
-	rc = stat(cmnd, &file_stat);
+	sprintf(line,"%s/boot.msg",log_root_dir);
+	rc = stat(line, &file_stat);
 	if (rc)
 		return 2; /* "Invalid option specified" */
 
-	logfile = strdup(_PATH_TMP"iprerror-XXXXXX");
-	log_fd = mkstemp(logfile);
+	tmp_log = strdup(_PATH_TMP"iprerror-XXXXXX");
+	log_fd = mkstemp(tmp_log);
+	if (log_fd < 0) {
+		s_status.str = strerror(errno);
+		syslog(LOG_ERR, "Could not create temp log file: %m\n");
+		free(tmp_log);
+		return RC_94_Tmp_Log_Fail;
+	}
 
 	def_prog_mode();
+	endwin();
 
-	if (log_fd == -1) {
-		len = sprintf(cmnd, "cd %s; zcat -f ", log_root_dir);
-
-		/* Probably have a read-only root file system */
-		len += sprintf(cmnd + len, "boot.msg");
-		len += sprintf(cmnd + len," | grep ipr |");
-		len += sprintf(cmnd + len, FAILSAFE_EDITOR);
-		closelog();
-		openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-		syslog(LOG_ERR, "Error encountered concatenating log files...\n");
-		syslog(LOG_ERR, "Using failsafe editor...\n");
-		closelog();
-		openlog("iprconfig", LOG_PID | LOG_CONS, LOG_USER);
-		sleep(3);
-	} else {
-		len = sprintf(cmnd,"cd %s; zcat -f boot.msg | grep ipr  | "
-			      "sed 's/<[0-9]>ipr-err: //g' | sed 's/<[0-9]>ipr: //g'",
-			      log_root_dir);
-		len += sprintf(cmnd + len, ">> %s", logfile);
-		system(cmnd);
-		sprintf(cmnd, "%s %s", editor, logfile);
-	}
-	rc = system(cmnd);
-
-	if (log_fd != -1)
+	snprintf(logfile, sizeof(logfile), "%s/boot.msg", log_root_dir);
+	logsource_fp = fopen(logfile, "r");
+	if (logsource_fp < 0) {
+		syslog(LOG_ERR, "Could not open %s: %m\n", line);
+		free(tmp_log);
 		close(log_fd);
+		return RC_75_Failed_Read_Err_Log;
+	}
+
+	while (fgets(line, sizeof(line), logsource_fp)) {
+		/* ignore lines that dont contain 'ipr' */
+		if (strstr(line, "ipr") == NULL)
+			continue;
+
+		write(log_fd, line, strlen(line));
+	}
+
+	fclose(logsource_fp);
+	close(log_fd);
+	rc = invoke_editor(tmp_log);
+	free(tmp_log);
 
 	if ((rc != 0) && (rc != 127)) {
+		/* "Editor returned %d. Try setting the default editor" */
 		s_status.num = rc;
-		return 65; /* "Editor returned %d. Try setting the default editor" */
-	} else
-		return 1; /* return with no status */
+		return RC_65_Set_Default_Editor;
+	} else {
+		/* return with no status */
+		return RC_0_Success;
+	}
 }
 
 int get_ses_ioport_status(struct ipr_dev *ses)
