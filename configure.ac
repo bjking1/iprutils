@@ -132,6 +132,7 @@ AC_CHECK_LIB([form], [free_form], [], [AC_ERROR("libform not found.")])
 AC_CHECK_LIB([m], [pow], [], [AC_ERROR("libm not found.")])
 AC_CHECK_LIB([menu], [new_menu], [], [AC_ERROR("libmenu not found.")])
 AC_CHECK_LIB([panel], [show_panel], [], [AC_ERROR("libpanel not found.")])
+AC_CHECK_LIB([z], [zlibVersion], [], [AC_ERROR("zlib not found.")])
 IPRCONFIG_LIBS="$LIBS"
 AC_SUBST([IPRCONFIG_LIBS])
 LIBS="$save_LIBS"
@@ -140,7 +141,7 @@ LIBS="$save_LIBS"
 AC_CHECK_HEADERS([fcntl.h locale.h netinet/in.h nl_types.h \
 		 paths.h stddef.h stdint.h stdlib.h string.h sys/file.h \
 		 sys/ioctl.h sys/mount.h sys/socket.h syslog.h \
-		 unistd.h ncurses.h form.h menu.h], [],
+		 unistd.h ncurses.h form.h menu.h zlib.h], [],
 		 [AC_ERROR(["Missing headers."])])
 
 # Checks for typedefs, structures, and compiler characteristics.
