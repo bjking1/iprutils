@@ -32,7 +32,7 @@ static void init_all()
 	struct ipr_ioa *ioa;
 	int rc = tool_init(1);
 
-	if(rc) {
+	if (rc && rc != -ENXIO) {
 		if (daemonize)
 			syslog(LOG_ERR, "Run iprinit manually to ensure all ipr RAID adapters are running optimally.\n");
 		else
