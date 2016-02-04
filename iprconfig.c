@@ -16672,6 +16672,11 @@ static int query_raid_levels_raid_migrate(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	if (!dev->array_rcd->migrate_cand) {
+		scsi_err(dev, "%s is not a candidate for array migration.\n");
+		return -EINVAL;
+	}
+
 	/* query array config for volume set migrate status */
 	rc = ipr_query_array_config(dev->ioa, 0, 0, 1, dev->array_id, &qac_data);
 	if (rc)
