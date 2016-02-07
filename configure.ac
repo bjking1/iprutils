@@ -137,7 +137,7 @@ AC_SUBST([IPRCONFIG_LIBS])
 LIBS="$save_LIBS"
 
 # Checks for header files.
-AC_CHECK_HEADERS([fcntl.h libintl.h locale.h netinet/in.h nl_types.h \
+AC_CHECK_HEADERS([fcntl.h locale.h netinet/in.h nl_types.h \
 		 paths.h stddef.h stdint.h stdlib.h string.h sys/file.h \
 		 sys/ioctl.h sys/mount.h sys/socket.h syslog.h \
 		 unistd.h ncurses.h form.h menu.h], [],

@@ -11,9 +11,7 @@
  *
  **/
 
-#include <libintl.h>
-
-#define _(string) gettext(string)
+#define _(string) (string)
 #define __(string) (string)
 #define EXIT_FLAG		0x8000	/* stops at given screen on exit call */
 #define CANCEL_FLAG		0x4000	/* stops at given screen on quit call */
