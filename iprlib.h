@@ -47,9 +47,9 @@
 #include <asm/byteorder.h>
 #include <sys/mman.h>
 #include <paths.h>
-#include <bits/sockaddr.h>
 #include <linux/netlink.h>
 #include <time.h>
+#include <limits.h>
 
 typedef uint8_t u8;
 typedef uint16_t u16;
