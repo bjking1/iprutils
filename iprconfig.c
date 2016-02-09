@@ -12689,6 +12689,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 	int percent_cmplt = 0;
 	int format_in_progress = 0;
 	int resync_in_progress = 0;
+	int initialization_in_progress = 0;
 	struct ipr_res_redundancy_info info;
 
 	if (scsi_dev_data && scsi_dev_data->type == IPR_TYPE_ADAPTER && dev == &ioa->ioa) {
@@ -12714,6 +12715,8 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 						continue;
 					if (status_record->command_code == IPR_RESYNC_ARRAY_PROTECTION)
 						resync_in_progress = 1;
+					if (status_record->command_code == IPR_START_ARRAY_PROTECTION)
+						initialization_in_progress = 1;
 					percent_cmplt = status_record->percent_complete;
 				}
 			}
@@ -12836,6 +12839,11 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 					sprintf(buf, "Checking");
 				else
 					sprintf(buf, "%d%% Checked", percent_cmplt);
+			} else if (initialization_in_progress) {
+				if ((!percent || (percent_cmplt == 0)))
+					sprintf(buf, "Initializing");
+				else
+					sprintf(buf, "%d%% Initializing", percent_cmplt);
 			} else if (res_state.prot_suspended)
 				sprintf(buf, "Degraded");
 			else if (res_state.degraded_oper || res_state.service_req)
