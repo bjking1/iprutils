@@ -14420,6 +14420,11 @@ static int query_raid_create(char **args, int num_args)
 		return -EINVAL;
 	}
 
+	if (&dev->ioa->ioa != dev) {
+		fprintf(stderr, "Device is not an IOA\n");
+		return -EINVAL;
+	}
+
 	ioa = dev->ioa;
 
 	if (!ioa->qac_data->num_records)
@@ -14460,6 +14465,11 @@ static int query_raid_delete(char **args, int num_args)
 	dev = find_dev(args[0]);
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
+		return -EINVAL;
+	}
+
+	if (&dev->ioa->ioa != dev) {
+		fprintf(stderr, "Device is not an IOA\n");
 		return -EINVAL;
 	}
 
