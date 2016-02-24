@@ -3768,7 +3768,6 @@ int ipr_format_unit(struct ipr_dev *dev)
 
 	cdb[0] = FORMAT_UNIT;
 	cdb[1] = IPR_FORMAT_DATA; /* lun = 0, fmtdata = 1, cmplst = 0, defect list format = 0 */
-	cdb[4] = 1;
 
 	defect_list_hdr[1] = IPR_FORMAT_IMMED; /* FOV = 0, DPRY = 0, DCRT = 0, STPF = 0, IP = 0, DSP = 0, Immed = 1, VS = 0 */
 
