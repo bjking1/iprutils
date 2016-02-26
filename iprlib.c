@@ -3709,14 +3709,17 @@ static struct ipr_dev *find_multipath_jbod(struct ipr_dev *dev)
 {
 	struct ipr_ioa *ioa;
 	struct ipr_dev *multipath_dev;
+	u64 id = dev->scsi_dev_data->device_id;
 
 	for_each_sas_ioa(ioa) {
 		if (ioa == dev->ioa)
 			continue;
 
 		for_each_dev(ioa, multipath_dev) {
-			if (dev->scsi_dev_data->device_id == multipath_dev->scsi_dev_data->device_id)
+			if (multipath_dev->scsi_dev_data &&
+			    id == multipath_dev->scsi_dev_data->device_id)
 				return multipath_dev;
+
 			}
 	}
 
