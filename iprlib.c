@@ -6042,6 +6042,8 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 	struct ipr_mode_pages mode_pages;
 	struct ipr_cache_cap_vpd cc_vpd;
 
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
 	ioa->af_block_size = IPR_DEFAULT_AF_BLOCK_SIZE;
 	ioa->tcq_mode = ioa_get_tcq_mode(ioa);
 
@@ -6093,17 +6095,14 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 				ioa->hop_count = IPR_3BIT_HOP;
 		}
 
+		rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
+		if (rc)
+			break;
+		page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages)
+						     + mode_pages.hdr.block_desc_len +
+						     sizeof(mode_pages.hdr));
+		ioa->rebuild_rate = page24->rebuild_rate;
 		if (ioa_cap.dual_ioa_raid || ioa_cap.dual_ioa_asymmetric_access) {
-			memset(&mode_pages, 0, sizeof(mode_pages));
-			rc = ipr_mode_sense(&ioa->ioa, 0x24, &mode_pages);
-			if (rc)
-				break;
-
-			page24 = (struct ipr_mode_page24 *) (((u8 *)&mode_pages) +
-							     mode_pages.hdr.block_desc_len +
-							     sizeof(mode_pages.hdr));
-
-			ioa->rebuild_rate = page24->rebuild_rate;
 			if (ioa_cap.disable_array_rebuild_verify) {
 				ioa->configure_rebuild_verify = 1;
 				ioa->disable_rebuild_verify =
