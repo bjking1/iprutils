@@ -775,7 +775,9 @@ Example:
 .B set-array-rebuild-rate [IOA] [Rebuild Rate | default]
 Used to set the rebuilt rate ratio of the IOA. [Rebuild Rate] must be in
 range 0..100. If 'default' is used, the IOA will reset to the
-implementation default rate.
+implementation default rate.  The value actually configured may not be
+the exact rate configured by the user, but an approximation to the
+closest rate supported by the IOA.
 .br
 Example:
 .br
