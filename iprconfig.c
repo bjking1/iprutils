@@ -12146,7 +12146,7 @@ int ibm_storage_log_tail(i_container *i_con)
 
 	snprintf(logfile, sizeof(logfile), "%s/messages", log_root_dir);
 	logsource_fp = fopen(logfile, "r");
-	if (logsource_fp < 0) {
+	if (!logsource_fp) {
 		syslog(LOG_ERR, "Could not open %s: %m\n", logfile);
 		free(tmp_log);
 		close(log_fd);
@@ -12737,7 +12737,7 @@ int ibm_boot_log(i_container *i_con)
 
 	snprintf(logfile, sizeof(logfile), "%s/boot.msg", log_root_dir);
 	logsource_fp = fopen(logfile, "r");
-	if (logsource_fp < 0) {
+	if (!logsource_fp) {
 		syslog(LOG_ERR, "Could not open %s: %m\n", line);
 		free(tmp_log);
 		close(log_fd);
