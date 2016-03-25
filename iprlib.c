@@ -6497,7 +6497,7 @@ void check_current_config(bool allow_rebuild_refresh)
 							IPR_DEV_CACHE_WRITE_THROUGH;
 				}
 
-				if (ioa->support_4k && scsi_dev_data->type == TYPE_DISK) {
+				if (scsi_dev_data->type == TYPE_DISK) {
 					if (ipr_get_logical_block_size(&ioa->dev[device_count]) == IPR_JBOD_4K_BLOCK_SIZE)
 						ioa->dev[device_count].block_dev_class |= IPR_BLK_DEV_CLASS_4K;
 				}

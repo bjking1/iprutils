@@ -13769,7 +13769,7 @@ static int format_devices(char **args, int num_args, int fmt_flag)
 			continue;
 		}
 		if (!dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K) {
-			fprintf(stderr, "Invalid device specified: %s. 4K disks not supprted on this adapter", args[i]);
+			fprintf(stderr, "Invalid device specified: %s. 4K disks not supported on this adapter", args[i]);
 			continue;
 		}
 
@@ -13850,7 +13850,7 @@ static int format_for_raid(char **args, int num_args)
 		}
 
 		if (!dev->ioa->support_4k && dev->block_dev_class & IPR_BLK_DEV_CLASS_4K) {
-			fprintf(stderr, "Invalid device specified: %s. 4K disks not supprted on this adapter", args[i]);
+			fprintf(stderr, "Invalid device specified: %s. 4K disks not supported on this adapter\n", args[i]);
 			return -EINVAL;
 		}
 
