@@ -11,7 +11,7 @@ Vendor: IBM
 URL: http://sourceforge.net/projects/iprdd/
 Source0: iprutils-%{version}.%{release_prefix}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
-BuildRequires: ncurses-devel
+BuildRequires: ncurses-devel zlib-devel
 
 # Predicate whether we want to build -static package.
 %bcond_with static
@@ -77,9 +77,9 @@ supported by the ipr SCSI storage device driver.
 Summary: Static version of iprutils.
 Group: System Environment/Base
 %if 0%{?suse_version:1}
-BuildRequires: glibc-static
+BuildRequires: glibc-static zlib-static
 %else
-BuildRequires: glibc-static ncurses-static
+BuildRequires: glibc-static ncurses-static zlib-static
 %endif
 
 %description static

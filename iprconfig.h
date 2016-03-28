@@ -1716,6 +1716,7 @@ const char *screen_status[] = {
 	/* 91 */ __("Create disk array failed - can not mix 5XX and 4K disks."),
 	/* 92 */ __("Create disk array failed - can not build with read intensive disks only."),
 	/* 93 */ __("All devices up to date"),
+	/* 94 */ __("Temporary log file creation failed: %s"),
 
       /* NOTE:  127 maximum limit */
 };
@@ -1816,6 +1817,7 @@ enum {
 	RC_91_Mixed_Logical_Blk_Size,
 	RC_92_UNSUPT_REQ_BLK_DEV_CLASS,
 	RC_93_All_Up_To_Date,
+	RC_94_Tmp_Log_Fail,
 
 	/* NOTE:  127 maximum limit */
 };
