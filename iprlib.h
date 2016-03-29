@@ -1748,6 +1748,8 @@ struct ipr_mode_page24 {
 	u8 rebuild_without_verify:1;
 #endif
 
+#define MIN_ARRAY_REBUILD_RATE		0x02
+
 #define DISABLE_DUAL_IOA_AF		0x00
 #define ENABLE_DUAL_IOA_AF		0x02
 #define ENABLE_DUAL_IOA_ACTIVE_ACTIVE	0x03

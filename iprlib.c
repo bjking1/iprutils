@@ -5613,7 +5613,8 @@ int ipr_set_array_rebuild_rate(struct ipr_ioa *ioa, u8 rebuild_rate)
 	if (rc)
 		return rc;
 
-	if (rebuild_rate != page24->rebuild_rate)
+	if (rebuild_rate != page24->rebuild_rate &&
+	    (rebuild_rate || page24->rebuild_rate != MIN_ARRAY_REBUILD_RATE))
 		return -EINVAL;
 
 	return 0;

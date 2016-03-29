@@ -18194,10 +18194,11 @@ static int set_array_rebuild_rate(char**args, int num_args)
 		char *endptr = NULL;
 		rebuild_rate = strtol(args[1], &endptr, 10);
 		if (endptr == args[1]
-		    || rebuild_rate < 0 || rebuild_rate > 100) {
+		    || rebuild_rate < 10 || rebuild_rate > 100) {
 			scsi_err(dev,
 				 "'%s' is not a valid rebuild rate value.\n"
-				 "Supported values are in the range 0-100.\n"
+				 "Supported values are in the range 10-100.\n"
+				 "Use 'default' to reset the configuration.\n"
 				 "Higher values may affect performance but "
 				 "decrease the total rebuild time.\n", args[1]);
 			return -EINVAL;
