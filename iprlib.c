@@ -4655,8 +4655,8 @@ int ipr_resume_device_bus(struct ipr_dev *dev,
  * Returns:
  *   0 if success / non-zero on failure
  **/
-static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int length,
-			      struct sense_data_t *sense_data)
+static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff,
+			      int offset, int length, struct sense_data_t *sense_data)
 {
 	u32 direction = length ? SG_DXFER_TO_DEV : SG_DXFER_NONE;
 	u8 cdb[IPR_CCB_CDB_LEN];
@@ -4670,6 +4670,9 @@ static int __ipr_write_buffer(struct ipr_dev *dev, u8 mode, void *buff, int leng
 
 	cdb[0] = WRITE_BUFFER;
 	cdb[1] = mode;
+	cdb[3] = (offset & 0xff0000) >> 16;
+	cdb[4] = (offset & 0x00ff00) >> 8;
+	cdb[5] = (offset & 0x0000ff);
 	cdb[6] = (length & 0xff0000) >> 16;
 	cdb[7] = (length & 0x00ff00) >> 8;
 	cdb[8] = length & 0x0000ff;
@@ -4721,6 +4724,9 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	int sas_ses = 0;
 	int sas_ses_retries = 5;
 	int mode5 = 1;
+	u32 write_len = 0;
+	u32 offset;
+	u32 write_buffer_chunk_sz = length;
 
 	ENTER;
 	if ((rc = ipr_get_dev_attr(dev, &attr))) {
@@ -4745,9 +4751,14 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 	}
 
 	if (sas_ses) {
-		if (!mode5) {
+		for (offset = 0; offset < length && !mode5; offset += write_len) {
+			write_len = write_buffer_chunk_sz;
+			if (offset + write_len > length)
+				write_len = length - offset;
+
 			for (i = 0; i < (sas_ses_retries + 1); i++) {
-				rc = __ipr_write_buffer(dev, 0x0e, buff, length, &sense_data);
+				rc = __ipr_write_buffer(dev, 0x0e, buff + offset, offset,
+							write_len, &sense_data);
 				if (!rc) {
 					break;
 				} else if (rc && sense_data.sense_key == UNIT_ATTENTION &&
@@ -4755,7 +4766,13 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 					   sense_data.add_sense_code_qual == 0x00) {
 					continue;
 				} else if (rc && sense_data.sense_key == ILLEGAL_REQUEST) {
-					mode5 = 1;
+					if (write_buffer_chunk_sz == 4096) {
+						mode5 = 1;
+					} else {
+						/* Attempt 4k write */
+						write_buffer_chunk_sz = 4096;
+						write_len = 0;
+					}
 					break;
 				} else if (rc) {
 					goto out;
@@ -4773,9 +4790,9 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 
 		for (i = 0; i < (sas_ses_retries + 1); i++) {
 			if (mode5)
-				rc = __ipr_write_buffer(dev, 5, buff, length, &sense_data);
+				rc = __ipr_write_buffer(dev, 5, buff, 0, length, &sense_data);
 			else
-				rc = __ipr_write_buffer(dev, 0x0f, NULL, 0, &sense_data);
+				rc = __ipr_write_buffer(dev, 0x0f, NULL, 0, 0, &sense_data);
 
 			if (rc && sense_data.sense_key == UNIT_ATTENTION &&
 				   sense_data.add_sense_code == 0x29 &&
@@ -4791,7 +4808,7 @@ int ipr_write_buffer(struct ipr_dev *dev, void *buff, int length)
 			goto out_resume;
 		}
 	} else {
-		if ((rc = __ipr_write_buffer(dev, 5, buff, length, &sense_data)))
+		if ((rc = __ipr_write_buffer(dev, 5, buff, 0, length, &sense_data)))
 			goto out;
 	}
 
@@ -5671,7 +5688,7 @@ int ipr_set_ses_mode(struct ipr_dev *dev, int mode) {
 	struct sense_data_t sense_data;
 	u8 buff = (u8)mode;
 
-	rc = __ipr_write_buffer(dev, 0x1f, &buff, sizeof(buff), &sense_data);
+	rc = __ipr_write_buffer(dev, 0x1f, &buff, 0, sizeof(buff), &sense_data);
 	return rc;
 }
 
