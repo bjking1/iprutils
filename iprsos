@@ -28,7 +28,7 @@ function _lsscsi_H() {
 }
 
 function _check_daemons() {
-	if [ -f "/usr/bin/systemctl" ]; then
+	if which systemctl >/dev/null 2>&1; then
 		echo
 		echo === IPR daemons: Running 'systemctl status ipr{init,dump,update}.service' ===
 		systemctl status iprdump.service
