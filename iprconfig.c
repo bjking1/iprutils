@@ -12337,7 +12337,7 @@ int ibm_storage_log(i_container *i_con)
 
 			write(log_fd, line, strlen(line));
 		}
-		gzclose_r(logsource_fp);
+		gzclose(logsource_fp);
 		dirent++;
 	}
 
@@ -12414,7 +12414,7 @@ int kernel_log(i_container *i_con)
 
 		while (gzgets(logsource_fp, line, sizeof(line)))
 			write(log_fd, line, strlen(line));
-		gzclose_r(logsource_fp);
+		gzclose(logsource_fp);
 		dirent++;
 	}
 
@@ -12496,7 +12496,7 @@ int iprconfig_log(i_container *i_con)
 				continue;
 			write(log_fd, line, strlen(line));
 		}
-		gzclose_r(logsource_fp);
+		gzclose(logsource_fp);
 		dirent++;
 	}
 
