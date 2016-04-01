@@ -92,7 +92,7 @@ case "$1" in
 	restart)
 		restart
 	;;
-	reload)
+	reload|force-reload)
 		reload
 	;;
 	status)
