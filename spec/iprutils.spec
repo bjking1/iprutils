@@ -42,10 +42,9 @@ BuildRequires: systemd
 %endif
 
 %if 0%{?rhel} <= 6
-Requires(post): chkconfig
-Requires(preun): chkconfig
-Requires(preun): initscripts
-Requires(postun): initscripts
+Requires(post): /lib/lsb/init-functions, chkconfig, initscripts
+Requires(preun): /lib/lsb/init-functions, chkconfig, initscripts
+Requires(postun): /lib/lsb/init-functions, chkconfig, initscripts
 %endif
 
 # Rhel uses sosreport plugin.
