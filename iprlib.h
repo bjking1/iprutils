@@ -51,6 +51,7 @@
 #include <time.h>
 #include <limits.h>
 #include <zlib.h>
+#include <sys/param.h>
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -1542,6 +1543,7 @@ struct ipr_ioa {
 #define IPR_SIS32		0x00
 #define IPR_SIS64		0x01
 	u8 support_4k:1;
+	int can_queue;
 	enum ipr_tcq_mode tcq_mode;
 	u16 pci_vendor;
 	u16 pci_device;
@@ -2911,6 +2913,8 @@ int ipr_improper_device_type(struct ipr_dev *);
 int ipr_get_fw_version(struct ipr_dev *, u8 release_level[4]);
 int ipr_get_live_dump(struct ipr_ioa *);
 int ipr_jbod_sysfs_bind(struct ipr_dev *, u8);
+int ipr_max_queue_depth(struct ipr_ioa *ioa, int num_devs, int num_ssd_devs);
+void ipr_count_devices_in_vset(struct ipr_dev *, int *num_devs, int *ssd_num_devs);
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {

@@ -3641,7 +3641,7 @@ int configure_raid_parameters(i_container *i_con)
 	int *userptr = NULL;
 	int *retptr;
 	int max_x,max_y,start_y,start_x;
-	int qdepth, new_qdepth;
+	int qdepth, new_qdepth, max_qdepth;
 	int cache_prot;
 
 	getmaxyx(stdscr,max_y,max_x);
@@ -3664,6 +3664,7 @@ int configure_raid_parameters(i_container *i_con)
 		}
 	}
 
+	max_qdepth = ipr_max_queue_depth(ioa, selected_count, ssd_num);
 	if (ioa->sis64)
 		qdepth = selected_count * 16;
 	else
@@ -3782,7 +3783,7 @@ int configure_raid_parameters(i_container *i_con)
 	mvaddstr(6, 1, _("c=Change Setting"));
 	mvaddstr(8, 0,  "Protection Level . . . . . . . . . . . . :");
 	mvaddstr(9, 0,  "Stripe Size  . . . . . . . . . . . . . . :");
-	mvprintw(10, 0, "Queue Depth (default = %3d). . . . . . . :", qdepth);
+	mvprintw(10, 0, "Queue Depth (default = %3d)(max = %3d) . :", qdepth, max_qdepth);
 	if (ioa->vset_write_cache)
 		mvprintw(11, 0, "Array Write Cache Policy . . . . . . . . :");
 	mvaddstr(max_y - 4, 0, _("Press Enter to Continue"));
@@ -3924,10 +3925,8 @@ int configure_raid_parameters(i_container *i_con)
 				if (rc == CANCEL_FLAG)
 					continue;
 
-				if (new_qdepth > 128)
-					qdepth = 128;
-				else
-					qdepth = new_qdepth;
+				qdepth = (new_qdepth < max_qdepth)? new_qdepth:max_qdepth;
+
 				continue;
 			} else if (cur_field_index == 4 && ioa->vset_write_cache) {
 				userptr = realloc(userptr,
@@ -10868,8 +10867,6 @@ static int disk_config_menu(struct disk_config_attr *disk_config_attr,
 
 	if (disk_config_attr->option == 1) { /* queue depth*/
 		rc = display_input(start_row, &disk_config_attr->queue_depth);
-		if (disk_config_attr->queue_depth > 128)
-			disk_config_attr->queue_depth = 128;
 	} else if (disk_config_attr->option == 3) {  /* tag command queue.*/
 		num_menu_items = 2;
 		menu_item = malloc(sizeof(ITEM **) * (num_menu_items + 1));
@@ -10998,7 +10995,7 @@ int change_disk_config(i_container * i_con)
 	struct ipr_dev *dev;
 	char qdepth_str[4];
 	char format_timeout_str[8];
-	char buffer[128];
+	char buffer[200];
 	i_container *temp_i_con;
 	int found = 0;
 	char *input;
@@ -11012,6 +11009,7 @@ int change_disk_config(i_container * i_con)
 	int tcq_warning = 0;
 	int tcq_blocked = 0;
 	int tcq_enabled = 0;
+	int num_devs, ssd_num_devs, max_qdepth;
 
 	rc = RC_SUCCESS;
 
@@ -11073,10 +11071,18 @@ int change_disk_config(i_container * i_con)
 		tcq_warning = tcq_blocked = 0;
 
 	if (!tcq_blocked || ipr_is_gscsi(dev)) {
-		body = add_line_to_body(body,_("Queue Depth"), "%3");
+		ipr_count_devices_in_vset(dev, &num_devs, &ssd_num_devs);
+		max_qdepth = ipr_max_queue_depth(dev->ioa, num_devs, ssd_num_devs);
+		sprintf(buffer, "Queue Depth (max = %03d)", max_qdepth);
+		body = add_line_to_body(body, buffer, "%3");
+
 		disk_config_attr[0].option = 1;
+
+		if (disk_attr.queue_depth > max_qdepth)
+			disk_attr.queue_depth = max_qdepth;
+
 		disk_config_attr[0].queue_depth = disk_attr.queue_depth;
-		sprintf(qdepth_str,"%d",disk_config_attr[0].queue_depth);
+		sprintf(qdepth_str, "%d", disk_config_attr[0].queue_depth);
 		i_con = add_i_con(i_con, qdepth_str, &disk_config_attr[0]);
 	}
 
@@ -11140,7 +11146,10 @@ int change_disk_config(i_container * i_con)
 
 				if (config_attr->option == 1) {
 					sprintf(temp_i_con->field_data,"%d", config_attr->queue_depth);
-					disk_attr.queue_depth = config_attr->queue_depth;
+					if (config_attr->queue_depth > max_qdepth)
+						disk_attr.queue_depth = max_qdepth;
+					else
+						disk_attr.queue_depth = config_attr->queue_depth;
 				}
 				else if (config_attr->option == 2) {
 					sprintf(temp_i_con->field_data,"%d hr", config_attr->format_timeout);
@@ -14003,12 +14012,12 @@ static int format_for_raid(char **args, int num_args)
  **/
 static int raid_create(char **args, int num_args)
 {
-	int i, num_devs = 0, rc, prot_level;
+	int i, num_devs = 0, ssd_num_devs = 0, rc, prot_level;
 	int non_4k_count = 0, is_4k_count = 0;
 	int next_raid_level, next_stripe_size, next_qdepth, next_label;
 	char *raid_level = IPR_DEFAULT_RAID_LVL;
 	char label[8];
-	int stripe_size, qdepth, zeroed_devs, skip_format;
+	int stripe_size, qdepth, zeroed_devs, skip_format, max_qdepth;
 	int next_vcache, vcache = -1;
 	struct ipr_dev *dev;
 	struct sysfs_dev *sdev;
@@ -14072,6 +14081,8 @@ static int raid_create(char **args, int num_args)
 
 			strcpy(label, args[i]);
 		} else if ((dev = find_dev(args[i]))) {
+			if (dev->block_dev_class & IPR_SSD)
+				ssd_num_devs++;
 			num_devs++;
 			if (zeroed_devs)
 				ipr_add_zeroed_dev(dev);
@@ -14139,6 +14150,9 @@ IOA write cache.  Use --force to force creation.\n");
 	if (!stripe_size)
 		stripe_size = ntohs(cap->recommended_stripe_size);
 
+	max_qdepth = ipr_max_queue_depth(dev->ioa, num_devs, ssd_num_devs);
+	if (qdepth > max_qdepth)
+		qdepth = max_qdepth;
 	if (!qdepth) {
 		if (ioa->sis64)
 			qdepth = num_devs * 16;
@@ -15376,6 +15390,7 @@ static int set_qdepth(char **args, int num_args)
 	int rc;
 	struct ipr_disk_attr attr;
 	struct ipr_dev *dev = find_dev(args[0]);
+	int num_devs, ssd_num_devs, max_qdepth;
 
 	if (!dev) {
 		fprintf(stderr, "Cannot find %s\n", args[0]);
@@ -15392,10 +15407,14 @@ static int set_qdepth(char **args, int num_args)
 	if (rc)
 		return rc;
 
+	ipr_count_devices_in_vset(dev, &num_devs, &ssd_num_devs);
+	max_qdepth = ipr_max_queue_depth(dev->ioa, num_devs, ssd_num_devs);
+
 	attr.queue_depth = strtoul(args[1], NULL, 10);
 
-	if (attr.queue_depth > 255) {
-		fprintf(stderr, "Invalid queue depth %s\n", args[1]);
+	if (attr.queue_depth > max_qdepth) {
+		fprintf(stderr, "Invalid queue depth, max queue depth is %d\n",
+			max_qdepth);
 		return -EINVAL;
 	}
 

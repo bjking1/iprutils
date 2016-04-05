@@ -2101,6 +2101,7 @@ static int __tool_init(int save_state)
 	DIR *dirfd, *host_dirfd;
 	struct dirent *dent, *host_dent;
 	ssize_t len;
+	char queue_str[256];
 
 	save_old_config();
 
@@ -2158,6 +2159,11 @@ static int __tool_init(int save_state)
 				sscanf(fw_str, "%d", &fw_type);
 			if (ipr_debug)
 				syslog(LOG_INFO, "tool_init: fw_type attr = %d.\n", fw_type);
+
+			len = sysfs_read_attr(scsipath, "can_queue", queue_str, 256);
+			if (len < 0)
+				ioa_dbg(ipr_ioa, "Failed to read can_queue attribute");
+			sscanf(queue_str, "%d", &ipr_ioa->can_queue);
 			break;
 		}
 		closedir(host_dirfd);
@@ -6957,6 +6963,8 @@ static void ipr_save_dev_attr(struct ipr_dev *dev, char *field,
 			     char *value, int update)
 {
 	char category[100];
+	struct ipr_dev *alt_dev = dev->alt_path;
+
 	if (dev->scsi_dev_data->device_id)
 		sprintf(category,"[%s %lx]", IPR_CATEGORY_DEVICE,
 			dev->scsi_dev_data->device_id);
@@ -6966,6 +6974,8 @@ static void ipr_save_dev_attr(struct ipr_dev *dev, char *field,
 			dev->scsi_dev_data->lun);
 
 	ipr_save_attr(dev->ioa, category, field, value, update);
+	if (alt_dev)
+		ipr_save_attr(alt_dev->ioa, category, field, value, update);
 }
 
 /**
@@ -7517,6 +7527,11 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 				return -EIO;
 		} else {
 			if (ipr_write_dev_attr(dev, "queue_depth", temp))
+				return -EIO;
+
+			if (dev->alt_path && ipr_write_dev_attr(dev->alt_path,
+								"queue_depth",
+								temp))
 				return -EIO;
 		}
 		if (save)
@@ -9357,6 +9372,44 @@ static int setup_page0x0a(struct ipr_dev *dev)
 	return rc;
 }
 
+void ipr_count_devices_in_vset(struct ipr_dev *dev, int *num_devs,
+			       int *ssd_num_devs)
+{
+	struct ipr_dev *vset, *temp;
+	int devs_cnt = 0, ssd_devs_cnt = 0;
+
+	if (ipr_is_volume_set(dev)) {
+		for_each_dev_in_vset(dev, temp) {
+			devs_cnt++;
+			if (temp->block_dev_class & IPR_SSD)
+				ssd_devs_cnt++;
+			fprintf(stdout, "%s\n", temp->gen_name);
+		}
+	} else {
+		devs_cnt++;
+		if (dev->block_dev_class & IPR_SSD)
+			ssd_devs_cnt++;
+	}
+
+	*num_devs = devs_cnt;
+	*ssd_num_devs = ssd_devs_cnt;
+
+}
+
+int ipr_max_queue_depth(struct ipr_ioa *ioa, int num_devs, int num_ssd_devs)
+{
+	int max_qdepth;
+
+	if (num_ssd_devs == num_devs)
+		max_qdepth = MIN(num_devs * 64, ioa->can_queue);
+	else if (num_ssd_devs)
+		max_qdepth = MIN(num_devs * 32, ioa->can_queue);
+	else
+		max_qdepth = MIN(num_devs * 16, ioa->can_queue);
+
+	return MAX(max_qdepth, 128);
+}
+
 /**
  * init_vset_dev - 
  * @dev:		ipr dev struct
@@ -9374,7 +9427,7 @@ static void init_vset_dev(struct ipr_dev *dev)
 	struct ipr_query_res_state res_state;
 	char q_depth[100];
 	char cur_depth[100], saved_depth[100];
-	int depth, rc;
+	int depth, rc, num_devs, ssd_num_devs;
 	char saved_cache[100];
 
 	memset(&res_state, 0, sizeof(res_state));
@@ -9383,9 +9436,10 @@ static void init_vset_dev(struct ipr_dev *dev)
 		return;
 
 	if (!ipr_query_resource_state(dev, &res_state)) {
-		depth = res_state.vset.num_devices_in_vset * 4;
+		ipr_count_devices_in_vset(dev, &num_devs, &ssd_num_devs);
+		depth = ipr_max_queue_depth(dev->ioa, num_devs, ssd_num_devs);
+
 		snprintf(q_depth, sizeof(q_depth), "%d", depth);
-		q_depth[sizeof(q_depth)-1] = '\0';
 		if (ipr_read_dev_attr(dev, "queue_depth", cur_depth, 100))
 			return;
 		rc = ipr_get_saved_dev_attr(dev, IPR_QUEUE_DEPTH, saved_depth);
