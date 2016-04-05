@@ -9607,6 +9607,15 @@ static void init_ioa_dev(struct ipr_dev *dev)
 		return;
 }
 
+static void init_ses_dev(struct ipr_dev *dev)
+{
+	time_t t = time(NULL);
+	if (t != ((time_t) -1)) {
+		t *= 1000;
+		ipr_ses_set_time(dev, t);
+	}
+}
+
 /**
  * ipr_init_dev - 
  * @dev:		ipr dev struct
@@ -9632,6 +9641,9 @@ int ipr_init_dev(struct ipr_dev *dev)
 	case IPR_TYPE_ADAPTER:
 		if (&dev->ioa->ioa == dev)
 			init_ioa_dev(dev);
+		break;
+	case TYPE_ENCLOSURE:
+		init_ses_dev(dev);
 		break;
 	default:
 		break;
@@ -10147,4 +10159,34 @@ int ipr_jbod_sysfs_bind(struct ipr_dev *dev, u8 op)
 
 	close(fd);
 	return 0;
+}
+
+int ipr_ses_get_time(struct ipr_dev *dev, u64* timestamp, int *origin)
+{
+	struct ipr_ses_diag_page12 get_time;
+	int err;
+
+	err = ipr_receive_diagnostics(dev, 0x12, &get_time, sizeof(get_time));
+	if (err)
+		return -EIO;
+
+	*origin = !!get_time.timestamp_origin;
+	*timestamp = be64toh(*((u64*) get_time.timestamp)) >> 16;
+	return 0;
+}
+
+int ipr_ses_set_time(struct ipr_dev *dev, u64 timestamp)
+{
+	struct ipr_ses_diag_ctrl_page13 set_time;
+
+	memset(&set_time, '\0', sizeof(set_time));
+
+	set_time.page_code = 0x13;
+	set_time.page_length[1] = 8;
+
+	timestamp = htobe64(timestamp << 16);
+	memcpy(set_time.timestamp, (char*) &
+	       timestamp, 6);
+
+	return ipr_send_diagnostics(dev, &set_time, sizeof(set_time));
 }

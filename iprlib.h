@@ -2650,6 +2650,25 @@ struct ipr_ses_inquiry_pageC3 {
 	u8 reserved2;
 };
 
+/* Page 12h - Get Time */
+struct ipr_ses_diag_page12 {
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length[2];
+	u8 timestamp_origin;
+	u8 reserved2;
+	u8 timestamp[6];
+};
+
+/* Page 13h - Set Time */
+struct ipr_ses_diag_ctrl_page13 {
+	u8 page_code;
+	u8 reserved1;
+	u8 page_length[2];
+	u8 timestamp[6];
+	u8 reserved[2];
+};
+
 struct ipr_sas_inquiry_pageC4 {
 	u8 peri_qual_dev_type;
 	u8 page_code;
