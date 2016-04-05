@@ -19131,7 +19131,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 	/* Max bytes. */
 	aux = ntohl(*((u32 *) pageC7_inq.total_bytes_warranty)) >> 8;
 	snprintf(buffer, BUFSIZ, "%ld GB", aux * 1024L);
-	body = add_line_to_body(body, _("Number of Bytes reported by Warranty"),
+	body = add_line_to_body(body, _("Number of written bytes supported"),
 				buffer);
 
 	/* Life remaining */
