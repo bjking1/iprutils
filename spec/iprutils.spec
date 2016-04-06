@@ -3,7 +3,7 @@ Name: iprutils
 Version: 2.4.11
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
-%define release_prefix 0.rc1
+%define release_prefix 1
 Release: %{release_prefix}.1
 License: CPL
 Group: System Environment/Base
@@ -322,6 +322,12 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Wed Apr 06 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.11
+- Miscellaneous fixes, code cleanups, build infrastructure cleanup
+- Support for new disk enclosures
+- Add maximum queue depth in GUI when creating an array
+- Remove system calls from log viewing commands
+- Show RAID initialization state during T10-DIF initialization
 * Tue Jan 19 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.10
 - Released iprutils 2.4.10
 * Wed Jan 13 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com>
