@@ -13063,8 +13063,8 @@ static const char *link_rate[] = {
 	"1.5Gbps",
 	"3.0Gbps",
 	"6.0Gbps",
-	"Enabled",
-	"Enabled",
+	"12.0Gbps",
+	"22.5Gbps",
 	"Enabled",
 	"Enabled",
 	"Enabled"
