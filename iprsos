@@ -67,6 +67,26 @@ function _var_log_messages() {
 	echo
 	echo "=== Contents of '/var/log/messages' ==="
 	cat /var/log/messages
+
+	if [ -f /var/log/dmesg ]; then
+		echo "=== Contents of '/var/log/dmesg' ==="
+		cat /var/log/dmesg
+	fi
+
+	if [ -f /var/log/boot.msg ]; then
+		echo "=== Contents of '/var/log/boot.msg' ==="
+		cat /var/log/boot.msg
+	fi
+
+	if [ -f /var/log/kern.log ]; then
+		echo "=== Contents of '/var/log/kern.log' ==="
+		cat /var/log/kern.log
+	fi
+
+	if [ -f /var/log/syslog ]; then
+		echo "=== Contents of '/var/log/syslog' ==="
+		cat /var/log/syslog
+	fi
 }
 
 function _run_sos() {
