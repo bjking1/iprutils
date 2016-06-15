@@ -2706,6 +2706,19 @@ static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
 	return rc;
 }
 
+static void ipr_mpath_flush()
+{
+	int pid, status;
+
+	/* flush unused multipath device maps */
+	pid = fork();
+	if (pid == 0) {
+		execlp("multipath", "-F", NULL);
+		_exit(errno);
+	} else
+		waitpid(pid, &status, 0);
+}
+
 /**
  * ipr_stop_array_protection - Stop array protection for an array
  * @ioa:		ipr ioa struct
@@ -2715,6 +2728,7 @@ static int ipr_stop_array(struct ipr_ioa *ioa, char *cmd, int hot_spare)
  **/
 int ipr_stop_array_protection(struct ipr_ioa *ioa)
 {
+	ipr_mpath_flush();
 	return ipr_stop_array(ioa, "Stop Array Protection", 0);
 }
 
@@ -3748,18 +3762,8 @@ int ipr_format_unit(struct ipr_dev *dev)
 	int length = IPR_DEFECT_LIST_HDR_LEN;
 	char *name = dev->gen_name;
 
-	if (strlen(dev->dev_name) && dev->scsi_dev_data->device_id) {
-		int pid, status;
-
-		/* flush unused multipath device maps */
-		pid = fork();
-		if (pid == 0) {
-			execlp("multipath", "-F", NULL);
-			_exit(errno);
-		} else {
-			waitpid(pid, &status, 0);
-		}
-	}
+	if (strlen(dev->dev_name) && dev->scsi_dev_data->device_id)
+		ipr_mpath_flush();
 
 	if (strlen(name) == 0)
 		return -ENOENT;
