@@ -5882,7 +5882,7 @@ static void get_sd_names(int num_devs)
 		while((dent = readdir(dirfd)) != NULL) {
 			if (dent->d_name[0] == '.')
 				continue;
-			if (strncmp(dent->d_name, "sd", 2))
+			if (strncmp(dent->d_name, "sd", 2) && strncmp(dent->d_name, "sr", 2))
 				continue;
 			sprintf(scsi_dev_table[i].dev_name, "/dev/%s",
 				dent->d_name);
