@@ -1481,6 +1481,10 @@ struct ipr_dev {
 	u32 is_suspend_cand:1;
 	u32 is_resume_cand:1;
 	u8 write_cache_policy:1;
+	u8 supports_4k:1;
+	u8 supports_5xx:1;
+	u8 read_c7:1;
+	u32 format_timeout;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];
 	struct ipr_res_addr res_addr[IPR_DEV_MAX_PATHS];
@@ -2692,9 +2696,17 @@ struct ipr_sas_inquiry_pageC7 {
 	u8 reserved1;
 	u8 page_length;
 	u8 ascii_len;
-	u8 reserved2[109];
+	u8 reserved2[38];
+	u8 format_timeout_hi; /* in minutes */
+	u8 format_timeout_lo;
+	u8 reserved3[63];
+	u8 support_4k_modes;
+#define ONLY_5XX_SUPPORTED		0
+#define BOTH_5XXe_OR_4K_SUPPORTED	1
+#define ONLY_4K_SUPPORTED		2
+	u8 reserved4[5];
 	u8 total_bytes_warranty[IPR_SAS_INQ_BYTES_WARRANTY_LEN];
-	u8 reserved3[43];
+	u8 reserved5[43];
 };
 
 static inline int ipr_elem_offset(struct ipr_ses_config_pg *ses_cfg, u8 type)

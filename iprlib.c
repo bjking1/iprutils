@@ -6423,6 +6423,74 @@ int ipr_get_logical_block_size(struct ipr_dev *dev)
 }
 
 /**
+ * init_inquiry_c7 - Page 0xC7 Inquiry to disks
+ * @dev:		ipr dev struct
+ *
+ * Setup IBM vendor unique settings
+ *
+ * Returns:
+ *   0 if success / other on failure
+ **/
+static int init_inquiry_c7(struct ipr_dev *dev)
+{
+	struct ipr_sas_inquiry_pageC7 inq;
+	int rc;
+
+	if (dev->read_c7)
+		return 0;
+
+	if (!dev->scsi_dev_data || strncmp(dev->scsi_dev_data->vendor_id, "IBM", 3)) {
+		if (ipr_is_gscsi(dev)) {
+			if (ipr_get_logical_block_size(dev) == IPR_JBOD_4K_BLOCK_SIZE) {
+				dev->block_dev_class |= IPR_BLK_DEV_CLASS_4K;
+				dev->supports_4k = 1;
+			} else {
+				dev->block_dev_class &= ~IPR_BLK_DEV_CLASS_4K;
+				dev->supports_5xx = 1;
+			}
+		}
+
+		dev->format_timeout = IPR_FORMAT_UNIT_TIMEOUT;
+		scsi_dbg(dev, "Skipping IBM vendor settings for non IBM device.\n");
+		return -EINVAL;
+	}
+
+	memset(&inq, 0, sizeof(inq));
+
+	rc = ipr_inquiry(dev, 0xC7, &inq, sizeof(inq));
+
+	if (rc) {
+		scsi_dbg(dev, "Inquiry 0xC7 failed. rc=%d\n", rc);
+		return rc;
+	}
+
+	switch (inq.support_4k_modes) {
+	case ONLY_5XX_SUPPORTED:
+		dev->supports_5xx = 1;
+		dev->supports_4k = 0;
+		dev->block_dev_class &= ~IPR_BLK_DEV_CLASS_4K;
+		scsi_dbg(dev, "Only 5xx supported.\n");
+		break;
+	case ONLY_4K_SUPPORTED:
+		dev->supports_4k = 1;
+		dev->block_dev_class |= IPR_BLK_DEV_CLASS_4K;
+		scsi_dbg(dev, "Only 4k supported.\n");
+		break;
+	case BOTH_5XXe_OR_4K_SUPPORTED:
+	default:
+		dev->supports_5xx = 1;
+		dev->supports_4k = 1;
+		dev->block_dev_class |= IPR_BLK_DEV_CLASS_4K;
+		scsi_dbg(dev, "Both 4k and 5xx supported.\n");
+		break;
+	};
+
+	dev->read_c7 = 1;
+	dev->format_timeout = ((inq.format_timeout_hi << 8) | inq.format_timeout_lo) * 60;
+	return 0;
+}
+
+/**
  * check_current_config - populates the ioa configuration data
  * @allow_rebuild_refresh:	allow_rebuild_refresh flag
  *
@@ -6524,10 +6592,6 @@ void check_current_config(bool allow_rebuild_refresh)
 							IPR_DEV_CACHE_WRITE_THROUGH;
 				}
 
-				if (scsi_dev_data->type == TYPE_DISK) {
-					if (ipr_get_logical_block_size(&ioa->dev[device_count]) == IPR_JBOD_4K_BLOCK_SIZE)
-						ioa->dev[device_count].block_dev_class |= IPR_BLK_DEV_CLASS_4K;
-				}
 				/* find array config data matching resource entry */
 				k = 0;
 				for_each_qac_entry(common_record, qac_data) {
@@ -6627,7 +6691,10 @@ void check_current_config(bool allow_rebuild_refresh)
 			for_each_ra(ra, dev)
 				memcpy(ra, &res_addr, sizeof(*ra));
 
-			if (!dev || !dev->qac_entry)
+			if (ipr_is_gscsi(dev) || ipr_is_af_dasd_device(dev))
+				init_inquiry_c7(dev);
+
+			if (!dev->qac_entry)
 				continue;
 
 			if (dev->qac_entry->record_id == IPR_RECORD_ID_DEVICE_RECORD) {
@@ -7207,7 +7274,9 @@ static int get_format_timeout(struct ipr_dev *dev)
 	int rc, i, records, timeout;
 	char temp[100];
 
-	if (ipr_is_af_dasd_device(dev)) {
+	rc = init_inquiry_c7(dev);
+
+	if (rc && ipr_is_af_dasd_device(dev)) {
 		rc = ipr_query_dasd_timeouts(dev, &tos);
 
 		if (!rc) {
@@ -7227,7 +7296,7 @@ static int get_format_timeout(struct ipr_dev *dev)
 		}
 	}
 
-	timeout = IPR_FORMAT_UNIT_TIMEOUT;
+	timeout = dev->format_timeout;
 	rc = ipr_get_saved_dev_attr(dev, IPR_FORMAT_TIMEOUT, temp);
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &timeout);
