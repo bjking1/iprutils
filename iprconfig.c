@@ -19457,6 +19457,21 @@ int main(int argc, char *argv[])
 	while (head_zdev) {
 		struct screen_output *s_out;
 		i_container *i_con;
+		struct ipr_ioa *ioa;
+		struct ipr_dev *dev;
+		int num_zeroed = 0;
+
+		for_each_ioa(ioa) {
+			for_each_af_dasd(ioa, dev) {
+				if (ipr_device_is_zeroed(dev) &&
+				    !ipr_known_zeroed_is_saved(dev)) {
+					num_zeroed++;
+				}
+			}
+		}
+
+		if (!num_zeroed)
+			break;
 
  		n_exit_confirm.body = body_init(n_exit_confirm.header, NULL);
 

@@ -2946,6 +2946,7 @@ int ipr_get_live_dump(struct ipr_ioa *);
 int ipr_jbod_sysfs_bind(struct ipr_dev *, u8);
 int ipr_max_queue_depth(struct ipr_ioa *ioa, int num_devs, int num_ssd_devs);
 void ipr_count_devices_in_vset(struct ipr_dev *, int *num_devs, int *ssd_num_devs);
+int ipr_known_zeroed_is_saved(struct ipr_dev *);
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {

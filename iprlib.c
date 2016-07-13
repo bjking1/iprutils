@@ -7423,6 +7423,26 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	return 0;
 }
 
+int ipr_known_zeroed_is_saved(struct ipr_dev *dev)
+{
+	int len;
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
+
+	memset(&mode_pages, 0, sizeof(mode_pages));
+
+	if (!ipr_mode_sense(dev, 0x20, &mode_pages)) {
+		page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
+						     mode_pages.hdr.block_desc_len +
+						     sizeof(mode_pages.hdr));
+
+		if (page->format_completed)
+			return 1;
+	}
+
+	return 0;
+}
+
 int ipr_set_format_completed_bit(struct ipr_dev *dev)
 {
 	int len;
