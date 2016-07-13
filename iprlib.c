@@ -7216,12 +7216,12 @@ static int get_format_timeout(struct ipr_dev *dev)
 			for (i = 0; i < records; i++) {
 				if (tos.record[i].op_code != FORMAT_UNIT)
 					continue;
-				if (IPR_TIMEOUT_RADIX_IS_MINUTE(tos.record[i].timeout))
-					return ((tos.record[i].timeout & IPR_TIMEOUT_MASK) * 60);
-				if (IPR_TIMEOUT_RADIX_IS_SECONDS(tos.record[i].timeout))
-					return tos.record[i].timeout & IPR_TIMEOUT_MASK;
+				if (IPR_TIMEOUT_RADIX_IS_MINUTE(ntohs(tos.record[i].timeout)))
+					return ((ntohs(tos.record[i].timeout) & IPR_TIMEOUT_MASK) * 60);
+				if (IPR_TIMEOUT_RADIX_IS_SECONDS(ntohs(tos.record[i].timeout)))
+					return ntohs(tos.record[i].timeout) & IPR_TIMEOUT_MASK;
 				scsi_dbg(dev, "Unknown timeout radix: %X\n",
-					 (tos.record[i].timeout & IPR_TIMEOUT_RADIX_MASK));
+					 (ntohs(tos.record[i].timeout) & IPR_TIMEOUT_RADIX_MASK));
 				break;
 			}
 		}
@@ -7285,10 +7285,10 @@ static int ipr_set_dasd_timeouts(struct ipr_dev *dev, int format_timeout)
 		timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].op_code = FORMAT_UNIT;
 		if (format_timeout >= IPR_TIMEOUT_MASK) {
 			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
-				(format_timeout / 60) | IPR_TIMEOUT_MINUTE_RADIX;
+				htons((format_timeout / 60) | IPR_TIMEOUT_MINUTE_RADIX);
 		} else {
 			timeouts.record[ARRAY_SIZE(ipr_dasd_timeouts)].timeout =
-				format_timeout;
+				htons(format_timeout);
 		}
 	}
 
