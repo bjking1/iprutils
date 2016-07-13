@@ -13998,6 +13998,7 @@ static int format_for_raid(char **args, int num_args)
 	}
 
 	rc = send_dev_inits(NULL);
+	set_devs_format_completed();
 	free_devs_to_init();
 	return IPR_XLATE_DEV_FMT_RC(rc);
 }
