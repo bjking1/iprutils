@@ -3736,6 +3736,9 @@ static struct ipr_dev *find_multipath_jbod(struct ipr_dev *dev)
 			continue;
 
 		for_each_dev(ioa, multipath_dev) {
+			if (multipath_dev == dev)
+				continue;
+
 			if (multipath_dev->scsi_dev_data &&
 			    id == multipath_dev->scsi_dev_data->device_id)
 				return multipath_dev;
