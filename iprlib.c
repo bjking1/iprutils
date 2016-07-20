@@ -3749,6 +3749,50 @@ static struct ipr_dev *find_multipath_jbod(struct ipr_dev *dev)
 	return NULL;
 }
 
+int ipr_device_lock(struct ipr_dev *dev)
+{
+	int fd, rc;
+	char *name = dev->gen_name;
+
+	if (strlen(name) == 0)
+		return -ENOENT;
+
+	if (dev->locked) {
+		scsi_err(dev, "Device already locked\n");
+		return -EINVAL;
+	}
+
+	fd = open(name, O_RDWR);
+	if (fd <= 1) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not open %s. %m\n", name);
+		return errno;
+	}
+
+	rc = flock(fd, LOCK_EX);
+
+	if (rc) {
+		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
+			syslog(LOG_ERR, "Could not lock %s. %m\n", name);
+		close(fd);
+		return errno;
+	}
+
+	/* Do not close the file descriptor here as we want to hold onto the lock */
+	dev->locked = 1;
+	dev->lock_fd = fd;
+	return rc;
+}
+
+void ipr_device_unlock(struct ipr_dev *dev)
+{
+	if (dev->locked) {
+		close(dev->lock_fd);
+		dev->locked = 0;
+		dev->lock_fd = 0;
+	}
+}
+
 /**
  * ipr_format_unit - 
  * @dev:		ipr dev struct
@@ -9837,11 +9881,12 @@ static int fixup_improper_devs(struct ipr_ioa *ioa)
 
 	for_each_dev(ioa, dev) {
 		dev->local_flag = 0;
-		if (ipr_improper_device_type(dev)) {
+		if (ipr_improper_device_type(dev) && !ipr_device_lock(dev)) {
 			improper++;
 			dev->local_flag = 1;
 			scsi_dbg(dev, "Deleting improper device\n");
 			ipr_write_dev_attr(dev, "delete", "1");
+			ipr_device_unlock(dev);
 		}
 	}
 

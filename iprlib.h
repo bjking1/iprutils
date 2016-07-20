@@ -1484,6 +1484,8 @@ struct ipr_dev {
 	u8 supports_4k:1;
 	u8 supports_5xx:1;
 	u8 read_c7:1;
+	u8 locked:1;
+	int lock_fd;
 	u32 format_timeout;
 	struct scsi_dev_data *scsi_dev_data;
 	struct ipr_dev *ses[IPR_DEV_MAX_PATHS];

@@ -1649,6 +1649,9 @@ static void verify_device(struct ipr_dev *dev)
 		return;
 	}
 
+	if (ipr_device_lock(dev))
+		return;
+
 	if (ipr_is_af(dev)) {
 		if ((rc = ipr_query_command_status(dev, &cmd_status)))
 			return;
@@ -1675,6 +1678,8 @@ static void verify_device(struct ipr_dev *dev)
 			}
 		}
 	}
+
+	ipr_device_unlock(dev);
 }
 
 /**
@@ -8818,6 +8823,8 @@ static int dev_init_complete(u8 num_devs)
 					evaluate_device(dev->dev, ioa, dev->new_block_size);
 				}
 
+				ipr_device_unlock(dev->dev);
+
 				if (ipr_is_af_blk_size(ioa, dev->new_block_size) || ipr_is_af_dasd_device(dev->dev))
 					ipr_add_zeroed_dev(dev->dev);
 			}
@@ -8944,7 +8951,7 @@ int send_dev_inits(i_container *i_con)
 			}
 
 			/* Issue the format. Failure will be detected by query command status */
-			rc = ipr_format_unit(cur_dev_init->dev);  /* FIXME  Mandatory lock? */
+			rc = ipr_format_unit(cur_dev_init->dev);
 		} else if (cur_dev_init->do_init &&
 			   cur_dev_init->dev_type == IPR_JBOD_DASD_DEVICE) {
 			num_devs++;
@@ -9011,8 +9018,13 @@ int send_dev_inits(i_container *i_con)
 				syslog(LOG_ERR, "Could not unbind %s: %m\n",
 				       cur_dev_init->dev->dev_name);
 
-			/* Issue format */
-			status = ipr_format_unit(cur_dev_init->dev);  /* FIXME  Mandatory lock? */   
+			status = 0;
+
+			if (ipr_is_af_blk_size(ioa, cur_dev_init->new_block_size))
+				status = ipr_device_lock(cur_dev_init->dev);
+
+			if (!status)
+				status = ipr_format_unit(cur_dev_init->dev);
 
 			if (status) {
 				/* Send a device reset to cleanup any old state */
@@ -9023,6 +9035,7 @@ int send_dev_inits(i_container *i_con)
 					       "Could not bind %s: %m\n",
 					       cur_dev_init->dev->dev_name);
 
+				ipr_device_unlock(cur_dev_init->dev);
 				cur_dev_init->do_init = 0;
 				num_devs--;
 				failure++;
