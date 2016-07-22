@@ -4,7 +4,7 @@ Version: 2.4.12
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
 %define release_prefix 0
-Release: %{release_prefix}.rc1
+Release: %{release_prefix}.rc2
 License: CPL
 Group: System Environment/Base
 Vendor: IBM
