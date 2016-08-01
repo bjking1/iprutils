@@ -2606,7 +2606,9 @@ struct ipr_drive_elem_status {
 	u8 reserved5:1;
 	u8 fault_requested:1;
 	u8 fault_sensed:1;
-	u8 reserved6:4;
+	u8 reserved6:1;
+	u8 enable_byp:2;
+	u8 reserved7:1;
 	u8 disable_resets:1;
 #elif defined (__LITTLE_ENDIAN_BITFIELD)
 	u8 status:4;
@@ -2626,7 +2628,9 @@ struct ipr_drive_elem_status {
 	u8 reserved3:4;
 
 	u8 disable_resets:1;
-	u8 reserved6:4;
+	u8 reserved7:1;
+	u8 enable_byp:2;
+	u8 reserved6:1;
 	u8 fault_sensed:1;
 	u8 fault_requested:1;
 	u8 reserved5:1;

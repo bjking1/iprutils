@@ -7521,6 +7521,7 @@ int process_conc_maint(i_container *i_con, int action)
 		elem_status->select = 1;
 		elem_status->insert = 1;
 		elem_status->identify = 1;
+		elem_status->enable_byp = 0;
 	}
 
 	overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
@@ -15055,6 +15056,7 @@ static int __add_device(struct ipr_dev *dev, int on)
 	elem_status->remove = 0;
 	elem_status->insert = on;
 	elem_status->identify = on;
+	elem_status->enable_byp = 0;
 
 	overall = ipr_get_overall_elem(&ses_data, &ses_cfg); 
 	overall->select = 1;
