@@ -3,8 +3,8 @@ Name: iprutils
 Version: 2.4.12
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
-%define release_prefix 0
-Release: %{release_prefix}.rc2
+%define release_prefix 1
+Release: %{release_prefix}
 License: CPL
 Group: System Environment/Base
 Vendor: IBM
@@ -322,6 +322,18 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Thu Aug 04 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.12
+- Display higher link rates in path details
+- Flush unused multipaths prior to array delete
+- Collect additional logs with iprsos
+- Display sr device name
+- Fix format timeout issue on little endian systems
+- Format timeout and format block size fixes
+- Remove unnecessary iprconfig prompt on exit
+- Save known zeroed state for command line format
+- Fix find_multipath_jbod to never return itself
+- Ensure device known zeroed state gets saved after format
+- Fix for hotplug disk with Slider drawers
 * Wed Apr 06 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.11
 - Miscellaneous fixes, code cleanups, build infrastructure cleanup
 - Support for new disk enclosures
