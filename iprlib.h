@@ -297,7 +297,7 @@ extern struct sysfs_dev *tail_zdev;
 extern enum system_p_mode power_cur_mode;
 
 struct sysfs_dev {
-	char sysfs_device_name[PATH_MAX];
+	u64 device_id;
 	struct sysfs_dev *next, *prev;
 };
 
@@ -2953,6 +2953,8 @@ int ipr_jbod_sysfs_bind(struct ipr_dev *, u8);
 int ipr_max_queue_depth(struct ipr_ioa *ioa, int num_devs, int num_ssd_devs);
 void ipr_count_devices_in_vset(struct ipr_dev *, int *num_devs, int *ssd_num_devs);
 int ipr_known_zeroed_is_saved(struct ipr_dev *);
+int get_sg_name(struct scsi_dev_data *);
+int ipr_sg_inquiry(struct scsi_dev_data *, u8, void *, u8);
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {

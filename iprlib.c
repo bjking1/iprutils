@@ -569,8 +569,7 @@ struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev *hea
 		return NULL;
 
 	for (sdev = head; sdev; sdev = sdev->next) {
-		if (!strcmp(sdev->sysfs_device_name,
-			    dev->scsi_dev_data->sysfs_device_name))
+		if (sdev->device_id == dev->scsi_dev_data->device_id)
 			break;
 	}
 
@@ -593,8 +592,7 @@ struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *sdev)
 		for_each_dev(ioa, dev) {
 			if (!dev->scsi_dev_data)
 				continue;
-			if (!strcmp(sdev->sysfs_device_name,
-				    dev->scsi_dev_data->sysfs_device_name))
+			if (sdev->device_id == dev->scsi_dev_data->device_id)
 				return dev;
 		}
 	}
@@ -647,8 +645,7 @@ void ipr_add_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
 
 	if (!sdev) {
 		sdev = calloc(1, sizeof(struct sysfs_dev));
-		strcpy(sdev->sysfs_device_name,
-		       dev->scsi_dev_data->sysfs_device_name);
+		sdev->device_id = dev->scsi_dev_data->device_id;
 
 		if (!(*head)) {
 			*tail = *head = sdev;
@@ -3758,7 +3755,7 @@ int ipr_device_lock(struct ipr_dev *dev)
 		return -ENOENT;
 
 	if (dev->locked) {
-		scsi_err(dev, "Device already locked\n");
+		scsi_dbg(dev, "Device already locked\n");
 		return -EINVAL;
 	}
 
@@ -3769,7 +3766,7 @@ int ipr_device_lock(struct ipr_dev *dev)
 		return errno;
 	}
 
-	rc = flock(fd, LOCK_EX);
+	rc = flock(fd, LOCK_EX | LOCK_NB);
 
 	if (rc) {
 		if (!strcmp(tool_name, "iprconfig") || ipr_debug)
@@ -5873,6 +5870,32 @@ static int wait_for_dev(char *name)
 	return -ETIMEDOUT;
 }
 
+int get_sg_name(struct scsi_dev_data *scsi_dev)
+{
+	int i, rc = -ENXIO;
+	DIR *dirfd;
+	struct dirent *dent;
+	char devpath[PATH_MAX];
+
+	sprintf(devpath, "/sys/class/scsi_device/%s/device/scsi_generic",
+		scsi_dev->sysfs_device_name);
+	dirfd = opendir(devpath);
+	if (!dirfd)
+		return -ENXIO;
+	while((dent = readdir(dirfd)) != NULL) {
+		if (dent->d_name[0] == '.')
+			continue;
+		if (strncmp(dent->d_name, "sg", 2))
+			continue;
+		sprintf(scsi_dev->gen_name, "/dev/%s",
+			dent->d_name);
+		rc = 0;
+		break;
+	}
+	closedir(dirfd);
+	return rc;
+}
+
 /**
  * get_sg_names - waits for sg devices to become available
  * @num_devs:		number of devices
@@ -5883,27 +5906,8 @@ static int wait_for_dev(char *name)
 static void get_sg_names(int num_devs)
 {
 	int i;
-	DIR *dirfd;
-	struct dirent *dent;
-	char devpath[PATH_MAX];
-
-	for (i = 0; i < num_devs; i++) {
-		sprintf(devpath, "/sys/class/scsi_device/%s/device/scsi_generic",
-			scsi_dev_table[i].sysfs_device_name);
-		dirfd = opendir(devpath);
-		if (!dirfd)
-			continue;
-		while((dent = readdir(dirfd)) != NULL) {
-			if (dent->d_name[0] == '.')
-				continue;
-			if (strncmp(dent->d_name, "sg", 2))
-				continue;
-			sprintf(scsi_dev_table[i].gen_name, "/dev/%s",
-				dent->d_name);
-			break;
-		}
-		closedir(dirfd);
-	}
+	for (i = 0; i < num_devs; i++)
+		get_sg_name(&scsi_dev_table[i]);
 }
 
 /**
@@ -7492,14 +7496,24 @@ int ipr_known_zeroed_is_saved(struct ipr_dev *dev)
 
 int ipr_set_format_completed_bit(struct ipr_dev *dev)
 {
-	int len;
+	int len, retries = 5;
 	struct ipr_mode_pages mode_pages;
 	struct ipr_ioa_mode_page *page;
 
+	scsi_dbg(dev, "Setting device formatted bit. Device ID=%lx\n", dev->scsi_dev_data->device_id);
+
 	memset(&mode_pages, 0, sizeof(mode_pages));
 
-	if (ipr_mode_sense(dev, 0x20, &mode_pages))
+	do {
+		if (!ipr_mode_sense(dev, 0x20, &mode_pages))
+			break;
+		sleep(1);
+	} while (retries--);
+
+	if (!retries) {
+		scsi_info(dev, "Page 20 mode sense failed. Device ID=%lx\n", dev->scsi_dev_data->device_id);
 		return -EIO;
+	}
 
 	page = (struct ipr_ioa_mode_page *) (((u8 *)&mode_pages) +
 						     mode_pages.hdr.block_desc_len +
@@ -7513,8 +7527,16 @@ int ipr_set_format_completed_bit(struct ipr_dev *dev)
 	mode_pages.hdr.device_spec_parms = 0;
 	page->hdr.parms_saveable = 0;
 
-	if (ipr_mode_select(dev, &mode_pages, len))
+	do {
+		if (!ipr_mode_select(dev, &mode_pages, len))
+			break;
+		sleep(1);
+	} while (retries--);
+
+	if (!retries) {
+		scsi_info(dev, "Page 20 mode select failed. Device ID=%lx\n", dev->scsi_dev_data->device_id);
 		return -EIO;
+	}
 
 	return 0;
 }

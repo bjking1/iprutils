@@ -37,6 +37,7 @@ char *tool_name = "iprconfig";
 struct devs_to_init_t {
 	struct ipr_dev *dev;
 	struct ipr_ioa *ioa;
+	u64 device_id;
 	int new_block_size;
 	int cmplt;
 	int do_init;
@@ -220,6 +221,63 @@ static int can_format_for_raid(struct ipr_dev *dev)
 	if (!is_format_allowed(dev))
 		return 0;
 	return 1;
+}
+
+static int wait_for_formatted_af_dasd(int timeout_in_secs)
+{
+	struct devs_to_init_t *dev = dev_init_head;
+	struct scsi_dev_data *scsi_devs;
+	struct scsi_dev_data *scsi_dev_data;
+	int num_devs, j, af_found, jbod2af_formats, num_secs;
+	u64 device_id;
+
+	for (num_secs = 0; num_secs < timeout_in_secs; timeout_in_secs++) {
+		af_found = 0;
+		jbod2af_formats = 0;
+		scsi_devs = NULL;
+
+		num_devs = get_scsi_dev_data(&scsi_devs);
+
+		for_each_dev_to_init(dev) {
+			if (!dev->dev || !dev->ioa)
+				continue;
+			if (!dev->dev->scsi_dev_data)
+				continue;
+			if (dev->dev_type != IPR_JBOD_DASD_DEVICE)
+				continue;
+			if (!ipr_is_af_blk_size(dev->ioa, dev->new_block_size))
+				continue;
+			if (!dev->do_init)
+				continue;
+
+			jbod2af_formats++;
+			device_id = dev->dev->scsi_dev_data->device_id;
+
+			for (j = 0, scsi_dev_data = scsi_devs;
+			     j < num_devs; j++, scsi_dev_data++) {
+				if (scsi_dev_data->host != dev->ioa->host_num)
+					continue;
+				if (get_sg_name(scsi_dev_data))
+					continue;
+				if (scsi_dev_data->type != IPR_TYPE_AF_DISK)
+					continue;
+				if (dev->device_id != scsi_dev_data->device_id)
+					continue;
+
+				scsi_dbg(dev->dev, "Format complete. AF DASD found. New Device ID=%lx, Old Device ID=%lx\n",
+					  scsi_dev_data->device_id, dev->device_id);
+				af_found++;
+				break;
+			}
+		}
+
+		free(scsi_devs);
+		if (af_found == jbod2af_formats)
+			break;
+		sleep(1);
+	}
+
+	return ((af_found == jbod2af_formats) ? 0 : -ETIMEDOUT);
 }
 
 /**
@@ -6556,6 +6614,10 @@ static void add_format_device(struct ipr_dev *dev, int blk_size)
 		dev_init_tail->dev_type = IPR_JBOD_DASD_DEVICE;
 	dev_init_tail->new_block_size = blk_size;
 	dev_init_tail->dev = dev;
+	dev_init_tail->device_id = dev->scsi_dev_data->device_id;
+
+	scsi_dbg(dev, "Formatting device to %d bytes/block. Device ID=%lx\n",
+		 blk_size, dev_init_tail->device_id);
 }
 
 /**
@@ -8840,8 +8902,9 @@ static int dev_init_complete(u8 num_devs)
 				return 51 | EXIT_FLAG;
 			}
 
-                        format_done = 1;
-                        check_current_config(false);
+			format_done = 1;
+			wait_for_formatted_af_dasd(30);
+			check_current_config(false);
 
 			if (!pid)
 				exit(0);
@@ -14012,7 +14075,6 @@ static int format_for_raid(char **args, int num_args)
 	}
 
 	rc = send_dev_inits(NULL);
-	set_devs_format_completed();
 	free_devs_to_init();
 	return IPR_XLATE_DEV_FMT_RC(rc);
 }
@@ -14197,8 +14259,8 @@ IOA write cache.  Use --force to force creation.\n");
 	for (sdev = head_sdev; sdev; sdev = sdev->next) {
 		dev = ipr_sysfs_dev_to_dev(sdev);
 		if (!dev) {
-			syslog(LOG_ERR, _("Cannot find device: %s\n"),
-			       sdev->sysfs_device_name);
+			syslog(LOG_ERR, _("Cannot find device: %lx\n"),
+			       sdev->device_id);
 			return -EIO;
 		}
 
