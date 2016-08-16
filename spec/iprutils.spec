@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.12
+Version: 2.4.13
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
 %define release_prefix 1
@@ -322,6 +322,8 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Tue Aug 16 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.13
+- Additional fixes for tracking known zeroed state
 * Thu Aug 04 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.12
 - Display higher link rates in path details
 - Flush unused multipaths prior to array delete
