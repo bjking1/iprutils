@@ -8025,6 +8025,9 @@ static struct ipr_dev *get_dev_for_slot_64bit(struct ipr_dev *ses, int slot, cha
 		if (ses_path_len != res_path_len)
 			continue;
 
+		if (ipr_is_volume_set(dev) || ipr_is_array(dev))
+			continue;
+
 		for_each_rp(rp, dev) {
 			if ( !memcmp(&rp->res_path_bytes, &ses->res_path[0], ses_path_len/3) && slot == dev_slot ) {
 
