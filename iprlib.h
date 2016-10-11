@@ -2955,6 +2955,10 @@ void ipr_count_devices_in_vset(struct ipr_dev *, int *num_devs, int *ssd_num_dev
 int ipr_known_zeroed_is_saved(struct ipr_dev *);
 int get_sg_name(struct scsi_dev_data *);
 int ipr_sg_inquiry(struct scsi_dev_data *, u8, void *, u8);
+int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref);
+
+int ipr_device_lock(struct ipr_dev *dev);
+void ipr_device_unlock(struct ipr_dev *dev);
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {
