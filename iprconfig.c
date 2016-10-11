@@ -16908,7 +16908,8 @@ static int query_raid_levels_raid_migrate(char **args, int num_args)
 	}
 
 	if (!dev->array_rcd->migrate_cand) {
-		scsi_err(dev, "%s is not a candidate for array migration.\n");
+		scsi_err(dev, "%s is not a candidate for array migration.\n",
+			 args[0]);
 		return -EINVAL;
 	}
 
