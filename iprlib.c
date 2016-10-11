@@ -9292,6 +9292,37 @@ static int mode_select(struct ipr_dev *dev, void *buff, int length)
 	return rc;
 }
 
+
+int ipr_ses_get_time(struct ipr_dev *dev, u64* timestamp, int *origin)
+{
+	struct ipr_ses_diag_page12 get_time;
+	int err;
+
+	err = ipr_receive_diagnostics(dev, 0x12, &get_time, sizeof(get_time));
+	if (err)
+		return -EIO;
+
+	*origin = !!get_time.timestamp_origin;
+	*timestamp = be64toh(*((u64*) get_time.timestamp)) >> 16;
+	return 0;
+}
+
+int ipr_ses_set_time(struct ipr_dev *dev, u64 timestamp)
+{
+	struct ipr_ses_diag_ctrl_page13 set_time;
+
+	memset(&set_time, '\0', sizeof(set_time));
+
+	set_time.page_code = 0x13;
+	set_time.page_length[1] = 8;
+
+	timestamp = htobe64(timestamp << 16);
+	memcpy(set_time.timestamp, (char*) &
+	       timestamp, 6);
+
+	return ipr_send_diagnostics(dev, &set_time, sizeof(set_time));
+}
+
 /**
  * setup_page0x00 - 
  * @dev:		ipr dev struct
@@ -10324,32 +10355,3 @@ int ipr_jbod_sysfs_bind(struct ipr_dev *dev, u8 op)
 	return 0;
 }
 
-int ipr_ses_get_time(struct ipr_dev *dev, u64* timestamp, int *origin)
-{
-	struct ipr_ses_diag_page12 get_time;
-	int err;
-
-	err = ipr_receive_diagnostics(dev, 0x12, &get_time, sizeof(get_time));
-	if (err)
-		return -EIO;
-
-	*origin = !!get_time.timestamp_origin;
-	*timestamp = be64toh(*((u64*) get_time.timestamp)) >> 16;
-	return 0;
-}
-
-int ipr_ses_set_time(struct ipr_dev *dev, u64 timestamp)
-{
-	struct ipr_ses_diag_ctrl_page13 set_time;
-
-	memset(&set_time, '\0', sizeof(set_time));
-
-	set_time.page_code = 0x13;
-	set_time.page_length[1] = 8;
-
-	timestamp = htobe64(timestamp << 16);
-	memcpy(set_time.timestamp, (char*) &
-	       timestamp, 6);
-
-	return ipr_send_diagnostics(dev, &set_time, sizeof(set_time));
-}
