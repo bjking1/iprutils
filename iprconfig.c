@@ -15733,7 +15733,7 @@ static int update_all_ucodes(char **args, int num_args)
 
 	for_each_ioa(ioa) {
 		if (!ioa->ioa.scsi_dev_data)
-			return;
+			continue;
 		for_each_dev(ioa, dev) {
 			if (ipr_is_volume_set(dev))
 				continue;
