@@ -7759,6 +7759,14 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	if (ipr_get_ioa_attr(ioa, &old_attr))
 		return -EIO;
 
+	if (ioa->has_vset_write_cache && attr->vset_write_cache &&
+	    power_cur_mode != POWER_BAREMETAL) {
+		/* vset cache should not be disabled adapter-wide
+		 for any reason.  So we don't save the parameter here. */
+		ipr_change_cache_parameters(ioa,
+					    IPR_IOA_SET_VSET_CACHE_ENABLED);
+	}
+
 	/* FIXME - preferred_primary and active_active may change at the same
 	 * time.  This code may need to change.
  	 */
@@ -7829,14 +7837,6 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 			ipr_save_ioa_attr(ioa, IPR_ARRAY_DISABLE_REBUILD_VERIFY,
 					  temp, 1);
 		}
-	}
-
-	if (ioa->has_vset_write_cache && attr->vset_write_cache &&
-	    power_cur_mode != POWER_BAREMETAL) {
-		/* vset cache should not be disabled adapter-wide
-		   for any reason.  So we don't save the parameter here. */
-		ipr_change_cache_parameters(ioa,
-					    IPR_IOA_SET_VSET_CACHE_ENABLED);
 	}
 
 	get_dual_ioa_state(ioa);	/* for preferred_primary */
@@ -9635,28 +9635,6 @@ static void init_vset_dev(struct ipr_dev *dev)
 	if (polling_mode && !dev->should_init)
 		return;
 
-	if (!ipr_query_resource_state(dev, &res_state)) {
-		ipr_count_devices_in_vset(dev, &num_devs, &ssd_num_devs);
-		depth = ipr_max_queue_depth(dev->ioa, num_devs, ssd_num_devs);
-
-		snprintf(q_depth, sizeof(q_depth), "%d", depth);
-		if (ipr_read_dev_attr(dev, "queue_depth", cur_depth, 100))
-			return;
-		rc = ipr_get_saved_dev_attr(dev, IPR_QUEUE_DEPTH, saved_depth);
-		if (rc == RC_SUCCESS) {
-			if (!strcmp(saved_depth, q_depth))
-				return;
-			depth = strtoul(saved_depth, NULL, 10);
-			if (depth && depth <= 255)
-				strcpy(q_depth, saved_depth);
-		}
-
-		if (!strcmp(cur_depth, q_depth))
-			return;
-		if (ipr_write_dev_attr(dev, "queue_depth", q_depth))
-			return;
-	}
-
 	if (dev->ioa->has_vset_write_cache) {
 		int pol;
 		rc = ipr_get_saved_dev_attr(dev, IPR_WRITE_CACHE_POLICY,
@@ -9666,7 +9644,26 @@ static void init_vset_dev(struct ipr_dev *dev)
 			IPR_DEV_CACHE_WRITE_BACK : IPR_DEV_CACHE_WRITE_THROUGH;
 
 		ipr_set_dev_wcache_policy(dev, pol);
+	}
 
+	if (!ipr_query_resource_state(dev, &res_state)) {
+		ipr_count_devices_in_vset(dev, &num_devs, &ssd_num_devs);
+		depth = ipr_max_queue_depth(dev->ioa, num_devs, ssd_num_devs);
+
+		snprintf(q_depth, sizeof(q_depth), "%d", depth);
+		if (ipr_read_dev_attr(dev, "queue_depth", cur_depth, 100))
+			return;
+		rc = ipr_get_saved_dev_attr(dev, IPR_QUEUE_DEPTH, saved_depth);
+		if (rc == RC_SUCCESS) {
+			depth = strtoul(saved_depth, NULL, 10);
+			if (depth && depth <= 255)
+				strcpy(q_depth, saved_depth);
+		}
+
+		if (!strcmp(cur_depth, q_depth))
+			return;
+		if (ipr_write_dev_attr(dev, "queue_depth", q_depth))
+			return;
 	}
 }
 
