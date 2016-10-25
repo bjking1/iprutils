@@ -9584,7 +9584,6 @@ void ipr_count_devices_in_vset(struct ipr_dev *dev, int *num_devs,
 			devs_cnt++;
 			if (temp->block_dev_class & IPR_SSD)
 				ssd_devs_cnt++;
-			fprintf(stdout, "%s\n", temp->gen_name);
 		}
 	} else {
 		devs_cnt++;
