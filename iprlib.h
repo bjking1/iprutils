@@ -2960,6 +2960,7 @@ int get_scsi_dev_data(struct scsi_dev_data **scsi_dev_ref);
 
 int ipr_device_lock(struct ipr_dev *dev);
 void ipr_device_unlock(struct ipr_dev *dev);
+int check_sg_module();
 
 static inline u32 ipr_get_dev_res_handle(struct ipr_ioa *ioa, struct ipr_dev_record *dev_rcd)
 {

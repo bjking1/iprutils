@@ -27,7 +27,7 @@
 
 char *tool_name = "iprinit";
 
-static void init_all()
+static int init_all()
 {
 	struct ipr_ioa *ioa;
 	int rc = tool_init(1);
@@ -39,8 +39,12 @@ static void init_all()
 			syslog(LOG_ERR, "Error initializing adapters. Perhaps run with sudo?\n");
 	}
 	check_current_config(false);
-	for_each_ioa(ioa)
+	for_each_ioa(ioa) {
+		if (!strlen(ioa->ioa.gen_name))
+			rc |= -EAGAIN;
 		ipr_init_ioa(ioa);
+	}
+	return rc;
 }
 
 static void kevent_handler(char *buf)
@@ -65,7 +69,7 @@ static void poll_ioas()
 
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, rc, delay_secs, wait;
 
 	ipr_sg_required = 1;
 
@@ -81,12 +85,40 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	init_all();
+	rc = check_sg_module();
 
 	if (daemonize) {
 		ipr_daemonize();
-		return handle_events(poll_ioas, 60, kevent_handler);
-	}
 
-	return 0;
+		if (!rc)
+			rc = init_all();
+
+		if (rc) {
+			syslog(LOG_INFO, "Waiting for ipr adapters and sg module to come ready.\n");
+
+			delay_secs = 2;
+			sleep(delay_secs);
+
+			for (wait = 0; rc && wait < 300; wait += delay_secs) {
+				rc = check_sg_module();
+				sleep(delay_secs);
+				if (!rc)
+					rc = init_all();
+			}
+
+			if (rc)
+				syslog(LOG_ERR, "Timeout reached. Ensure the sg module is loaded, then "
+				       "run iprinit manually to ensure all "
+				       "ipr RAID adapters are running optimally\n");
+		}
+		return handle_events(poll_ioas, 60, kevent_handler);
+	} else if (!rc)
+		rc = init_all();
+
+	if (rc)
+		syslog(LOG_ERR, "iprinit failed. Ensure the sg module is loaded, then "
+		       "run iprinit again to ensure all "
+		       "ipr RAID adapters are running optimally\n");
+
+	return rc;
 }

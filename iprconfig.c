@@ -19421,25 +19421,6 @@ static int non_intenactive_cmd(char *cmd, char **args, int num_args)
 	return -EINVAL;
 }
 
-int check_sg_module()
-{
-	DIR *sg_dirfd;
-	char devpath[PATH_MAX];
-
-	sprintf(devpath, "%s", "/sys/module/sg");
-
-	sg_dirfd = opendir(devpath);
-
-	if (!sg_dirfd) {
-		syslog_dbg("Failed to open sg parameter.\n");
-		return -1;
-	}
-
-	closedir(sg_dirfd);
-
-	return 0;
-}
-
 void list_options()
 {
 	int i;

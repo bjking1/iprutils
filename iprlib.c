@@ -6572,8 +6572,8 @@ void check_current_config(bool allow_rebuild_refresh)
 	int *qac_entry_ref;
 	struct ipr_dev_identify_vpd di_vpd;
 	char *pchr;
-        struct ipr_mode_pages mode_pages;
-        struct ipr_ioa_mode_page *page;
+	struct ipr_mode_pages mode_pages;
+	struct ipr_ioa_mode_page *page;
 
 	if (ipr_qac_data == NULL) {
 		ipr_qac_data =
@@ -10362,3 +10362,21 @@ int ipr_jbod_sysfs_bind(struct ipr_dev *dev, u8 op)
 	return 0;
 }
 
+int check_sg_module()
+{
+	DIR *sg_dirfd;
+	char devpath[PATH_MAX];
+
+	sprintf(devpath, "%s", "/sys/module/sg");
+
+	sg_dirfd = opendir(devpath);
+
+	if (!sg_dirfd) {
+		syslog_dbg("Failed to open sg parameter.\n");
+		return -1;
+	}
+
+	closedir(sg_dirfd);
+
+	return 0;
+}
