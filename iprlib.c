@@ -569,8 +569,11 @@ struct sysfs_dev * ipr_find_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev *hea
 		return NULL;
 
 	for (sdev = head; sdev; sdev = sdev->next) {
-		if (sdev->device_id == dev->scsi_dev_data->device_id)
+		if (sdev->device_id != dev->scsi_dev_data->device_id)
+			continue;
+		if (!memcmp(sdev->ioa_pci_addr, dev->ioa->pci_address, sizeof(sdev->ioa_pci_addr)))
 			break;
+
 	}
 
 	return sdev;
@@ -589,6 +592,9 @@ struct ipr_dev *ipr_sysfs_dev_to_dev(struct sysfs_dev *sdev)
 	struct ipr_ioa *ioa;
 
 	for_each_ioa(ioa) {
+		if (memcmp(sdev->ioa_pci_addr, ioa->pci_address, sizeof(sdev->ioa_pci_addr)))
+			continue;
+
 		for_each_dev(ioa, dev) {
 			if (!dev->scsi_dev_data)
 				continue;
@@ -646,6 +652,7 @@ void ipr_add_sysfs_dev(struct ipr_dev *dev, struct sysfs_dev **head,
 	if (!sdev) {
 		sdev = calloc(1, sizeof(struct sysfs_dev));
 		sdev->device_id = dev->scsi_dev_data->device_id;
+		memcpy(sdev->ioa_pci_addr, dev->ioa->pci_address, sizeof(sdev->ioa_pci_addr));
 
 		if (!(*head)) {
 			*tail = *head = sdev;

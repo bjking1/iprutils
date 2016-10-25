@@ -298,6 +298,7 @@ extern enum system_p_mode power_cur_mode;
 
 struct sysfs_dev {
 	u64 device_id;
+	char ioa_pci_addr[16];
 	struct sysfs_dev *next, *prev;
 };
 
