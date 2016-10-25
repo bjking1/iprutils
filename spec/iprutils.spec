@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.13
+Version: 2.4.14
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
 %define release_prefix 1
@@ -322,6 +322,21 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Tue Oct 25 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.14
+- Released iprutils 2.4.14
+* Wed Oct 19 2016 Brian King <brking@linux.vnet.ibm.com>
+- Remove sleeps from iprconfig initialization
+- Filter out JBOD HDDs from the device statistics menu
+* Wed Oct 05 2016 Brian King <brking@linux.vnet.ibm.com>
+- Allow VSET write cache in bare metal mode
+* Tue Oct 04 2016 Brian King <brking@linux.vnet.ibm.com>
+- Fix raid-create on dual adapter setups
+- Wait for sg module
+- Disable rebuild verify by default for single adapter configurations
+- Remove stale debug printf
+- Vset cache enable fixes
+- Backwards compatibility for endian swapped device_id
+- Fix iprconfig dump option to log full IOA details
 * Tue Aug 16 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.13
 - Additional fixes for tracking known zeroed state
 * Thu Aug 04 2016 Brian King <brking@linux.vnet.ibm.com> 2.4.12
