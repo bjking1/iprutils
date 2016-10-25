@@ -203,6 +203,7 @@ typedef uint64_t u64;
 #define IPR_XLATE_DEV_FMT_RC(rc)	((((rc) & 127) == 51) ? -EIO : 0)
 #define IPR_TYPE_AF_DISK                     0xC
 #define IPR_TYPE_ADAPTER                     0x1f
+#define IPR_TYPE_ARRAY				   0x1f
 #define IPR_TYPE_EMPTY_SLOT                  0xff
 
 #define IPR_ACTIVE_OPTIMIZED                 0x0
@@ -3000,6 +3001,15 @@ static inline int ipr_is_array_record(int record_id)
 {
 	if ((record_id == IPR_RECORD_ID_ARRAY_RECORD) ||
 	    (record_id == IPR_RECORD_ID_ARRAY_RECORD_3))
+		return 1;
+	else
+		return 0;
+}
+
+static inline int ipr_is_ioa(struct ipr_dev *device)
+{
+	if (device->ioa && device->ioa->ioa.scsi_dev_data &&
+	    device->scsi_dev_data == device->ioa->ioa.scsi_dev_data)
 		return 1;
 	else
 		return 0;

@@ -6627,9 +6627,12 @@ void check_current_config(bool allow_rebuild_refresh)
 			if (scsi_dev_data->host != ioa->host_num)
 				continue;
 
+			if (ioa->ioa.scsi_dev_data == scsi_dev_data)
+				continue;
+
 			if (scsi_dev_data->type == TYPE_DISK ||
 			    scsi_dev_data->type == IPR_TYPE_AF_DISK ||
-			    scsi_dev_data->type == IPR_TYPE_ADAPTER ||
+			    scsi_dev_data->type == IPR_TYPE_ARRAY ||
 			    scsi_dev_data->type == TYPE_ENCLOSURE ||
 			    scsi_dev_data->type == TYPE_ROM ||
 			    scsi_dev_data->type == TYPE_TAPE ||
@@ -6703,9 +6706,6 @@ void check_current_config(bool allow_rebuild_refresh)
 					__ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
 				device_count++;
-			} else if (scsi_dev_data->type == IPR_TYPE_ADAPTER) {
-				ioa->ioa.ioa = ioa;
-				ioa->ioa.scsi_dev_data = scsi_dev_data;
 			}
 		}
 
@@ -8586,7 +8586,7 @@ u32 get_fw_version(struct ipr_dev *dev)
 		return 0;
 	}
 
-	if (&dev->ioa->ioa == dev)
+	if (ipr_is_ioa(dev))
 		return get_ioa_fw_version(dev->ioa);
 
 	return get_dev_fw_version(dev);
@@ -8939,7 +8939,7 @@ struct ipr_fw_images *get_latest_fw_image(struct ipr_dev *dev)
 	if (!dev)
 		return NULL;
 
-	if (dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+	if (ipr_is_ioa(dev))
 		get_ioa_firmware_image_list(dev->ioa, &fw);
 	else if (ipr_is_ses(dev))
 		get_ses_firmware_image_list(dev, &fw);
@@ -8969,7 +8969,7 @@ int get_latest_fw_image_version(struct ipr_dev *dev)
 	if (!dev)
 		return -ENODEV;
 
-	if (dev->scsi_dev_data->type == IPR_TYPE_ADAPTER)
+	if (ipr_is_ioa(dev))
 		get_ioa_firmware_image_list(dev->ioa, &fw);
 	else if (ipr_is_ses(dev))
 		get_ses_firmware_image_list(dev, &fw);
@@ -9845,7 +9845,7 @@ int ipr_init_dev(struct ipr_dev *dev)
 		init_af_dev(dev);
 		break;
 	case IPR_TYPE_ADAPTER:
-		if (&dev->ioa->ioa == dev)
+		if (ipr_is_ioa(dev))
 			init_ioa_dev(dev);
 		break;
 	case TYPE_ENCLOSURE:
@@ -9877,7 +9877,7 @@ int ipr_init_new_dev(struct ipr_dev *dev)
 		wait_for_dev(dev->dev_name);
 		break;
 	case IPR_TYPE_ADAPTER:
-		if (&dev->ioa->ioa != dev)
+		if (!ipr_is_ioa(dev))
 			break;
 	case IPR_TYPE_AF_DISK:
 		wait_for_dev(dev->gen_name);
