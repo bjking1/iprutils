@@ -7214,6 +7214,15 @@ static int ipr_get_saved_dev_attr(struct ipr_dev *dev,
 			dev->scsi_dev_data->device_id);
 
 		rc = ipr_get_saved_attr(dev->ioa, category, field, value);
+
+		if (rc) {
+			/* Older kernels reported a byte swapped device_id, which has since
+			 been changed. Check both for compatibility reasons */
+			sprintf(category,"[%s %lx]", IPR_CATEGORY_DEVICE,
+				htobe64(dev->scsi_dev_data->device_id));
+
+			rc = ipr_get_saved_attr(dev->ioa, category, field, value);
+		}
 	}
 
 	if (rc) {
