@@ -6188,13 +6188,14 @@ static void get_ioa_cap(struct ipr_ioa *ioa)
 						     + mode_pages.hdr.block_desc_len +
 						     sizeof(mode_pages.hdr));
 		ioa->rebuild_rate = page24->rebuild_rate;
-		if (ioa_cap.dual_ioa_raid || ioa_cap.dual_ioa_asymmetric_access) {
-			if (ioa_cap.disable_array_rebuild_verify) {
-				ioa->configure_rebuild_verify = 1;
-				ioa->disable_rebuild_verify =
-					page24->rebuild_without_verify;
-			}
 
+		if (ioa_cap.disable_array_rebuild_verify) {
+			ioa->configure_rebuild_verify = 1;
+			ioa->disable_rebuild_verify =
+				page24->rebuild_without_verify;
+		}
+
+		if (ioa_cap.dual_ioa_raid || ioa_cap.dual_ioa_asymmetric_access) {
 			if (ioa_cap.dual_ioa_raid && page24->dual_adapter_af == ENABLE_DUAL_IOA_AF)
 				ioa->dual_raid_support = 1;
 
