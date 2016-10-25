@@ -19455,6 +19455,7 @@ int main(int argc, char *argv[])
 	char parm_editor[200], parm_dir[200], cmd[200];
 	int non_intenactive = 0;
 
+	tool_init_retry = 0;
 	strcpy(parm_dir, DEFAULT_LOG_DIR);
 	strcpy(parm_editor, DEFAULT_EDITOR);
 

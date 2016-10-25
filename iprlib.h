@@ -296,6 +296,7 @@ extern char *tool_name;
 extern struct sysfs_dev *head_zdev;
 extern struct sysfs_dev *tail_zdev;
 extern enum system_p_mode power_cur_mode;
+extern int tool_init_retry;
 
 struct sysfs_dev {
 	u64 device_id;

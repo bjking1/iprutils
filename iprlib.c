@@ -35,6 +35,7 @@ int ipr_fast = 0;
 int format_done = 0;
 static int ipr_mode5_write_buffer = 0;
 static int first_time_check_zeroed_dev = 0;
+int tool_init_retry = 1;
 
 struct sysfs_dev *head_zdev = NULL;
 struct sysfs_dev *tail_zdev = NULL;
@@ -2220,7 +2221,7 @@ int tool_init(int save_state)
 
 	for (i = 0; i < 4 && rc_err == -EAGAIN; i++) {
 		rc_err = __tool_init(save_state);
-		if (rc_err == -EAGAIN)
+		if (rc_err == -EAGAIN && tool_init_retry)
 			sleep(2);
 	}
 	if (rc_err) {
