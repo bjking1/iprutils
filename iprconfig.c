@@ -2886,6 +2886,8 @@ int statistics_menu(i_container *i_con)
 	char *buffer[2];
 	int toggle = 1;
 	struct ipr_dev *vset;
+	struct ipr_sas_std_inq_data std_inq;
+
 	processing();
 
 	rc = RC_SUCCESS;
@@ -2898,7 +2900,18 @@ int statistics_menu(i_container *i_con)
 		if (!ioa->ioa.scsi_dev_data)
 			continue;
 
-		num_lines += print_standalone_disks(ioa, &i_con, buffer, 2);
+		__for_each_standalone_disk(ioa, dev) {
+			if (ipr_is_gscsi(dev)) {
+				rc = ipr_inquiry(dev, IPR_STD_INQUIRY, &std_inq, sizeof(std_inq));
+				if (rc || !std_inq.is_ssd)
+					continue;
+			}
+
+			print_dev(k, dev, buffer, "%1", 2+k);
+			i_con = add_i_con(i_con, "\0", dev);
+			num_lines++;
+		}
+
 		num_lines += print_hotspare_disks(ioa, &i_con, buffer, 2);
 
 		for_each_vset(ioa, vset) {
