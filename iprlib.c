@@ -7768,8 +7768,7 @@ int ipr_set_ioa_attr(struct ipr_ioa *ioa, struct ipr_ioa_attr *attr, int save)
 	if (ipr_get_ioa_attr(ioa, &old_attr))
 		return -EIO;
 
-	if (ioa->has_vset_write_cache && attr->vset_write_cache &&
-	    power_cur_mode != POWER_BAREMETAL) {
+	if (ioa->has_vset_write_cache && attr->vset_write_cache) {
 		/* vset cache should not be disabled adapter-wide
 		 for any reason.  So we don't save the parameter here. */
 		ipr_change_cache_parameters(ioa,
