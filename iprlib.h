@@ -2646,6 +2646,7 @@ struct ipr_encl_status_ctl_pg {
 	u16 byte_count;
 	u8 reserved1[4];
 	struct ipr_drive_elem_status elem_status[IPR_NUM_DRIVE_ELEM_STATUS_ENTRIES];
+	u8 reserved2[468];	/*rest of page 2*/
 };
 
 struct ipr_ses_config_pg {
