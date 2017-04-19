@@ -12908,6 +12908,7 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 	int percent_cmplt = 0;
 	int format_in_progress = 0;
 	int resync_in_progress = 0;
+	int migrate_in_progress = 0;
 	int initialization_in_progress = 0;
 	struct ipr_res_redundancy_info info;
 
@@ -12936,6 +12937,8 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 						resync_in_progress = 1;
 					if (status_record->command_code == IPR_START_ARRAY_PROTECTION)
 						initialization_in_progress = 1;
+					if (status_record->command_code == IPR_MIGRATE_ARRAY_PROTECTION)
+						migrate_in_progress = 1;
 					percent_cmplt = status_record->percent_complete;
 				}
 			}
@@ -13063,6 +13066,11 @@ static void get_status(struct ipr_dev *dev, char *buf, int percent, int path_sta
 					sprintf(buf, "Initializing");
 				else
 					sprintf(buf, "%d%% Initializing", percent_cmplt);
+			} else if (migrate_in_progress) {
+				if ((!percent || (percent_cmplt == 0)))
+					sprintf(buf, "Migrating");
+				else
+					sprintf(buf, "%d%% Migrated", percent_cmplt);
 			} else if (res_state.prot_suspended)
 				sprintf(buf, "Degraded");
 			else if (res_state.degraded_oper || res_state.service_req)
