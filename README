@@ -15,10 +15,13 @@ http://publib16.boulder.ibm.com/pseries/en_US/infocenter/base/HW_scsi_adapters.h
 # INSTALL
 Make sure your system has the following packages installed:
 
-     - pciutils-devel
-     - ncurses,
-     - ncurses-devel
+     - pciutils-devel (libpci-dev in Ubuntu)
+     - ncurses-devel (libncurses-dev in Ubuntu)
      - sysfsutils
+     - automake
+     - autoconf
+     - ncurses
+     - libtool
 
 Enter the root directory and type the following commands:
 
@@ -97,7 +100,7 @@ maintanence actions to be performed against those resources when necessary.
 18. Analyze Log. This allows you to view the error messages logged by the ipr device driver.
 
 Changes Log:
-1. Concurrent maintience commands line changes from PCI location to physical location(3/12/2012).
+1. Concurrent maintenance commands line changes from PCI location to physical location(3/12/2012).
    #iprconfig -c identify-slot "U5886.001.P915059-P1-D1 1"
    #iprconfig -c remove-slot "U5886.001.P915059-P1-D1 1"
    #iprconfig -c add-slot "U5886.001.P915059-P1-D1 1"
