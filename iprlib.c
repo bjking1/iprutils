@@ -3486,7 +3486,7 @@ static int ipr_start_stop(struct ipr_dev *dev, u8 start, char *cmd)
 	cdb[4] = start;
 
 	rc = sg_ioctl(fd, cdb, NULL,
-		      0, SG_DXFER_FROM_DEV,
+		      0, SG_DXFER_NONE,
 		      &sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	if (rc != 0)
@@ -3675,7 +3675,7 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 {
 	int fd, rc;
 	u8 cdb[IPR_CCB_CDB_LEN];
-	int length = 0, allow_restart = 0;
+	int allow_restart = 0;
 	char *name = dev->gen_name;
 
 	if (strlen(name) == 0)
@@ -3693,7 +3693,7 @@ int __ipr_test_unit_ready(struct ipr_dev *dev,
 	cdb[0] = TEST_UNIT_READY;
 
 	rc = sg_ioctl(fd, cdb, NULL,
-		      length, SG_DXFER_FROM_DEV,
+		      0, SG_DXFER_NONE,
 		      sense_data, IPR_INTERNAL_DEV_TIMEOUT);
 
 	close(fd);
