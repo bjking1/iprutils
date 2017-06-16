@@ -1483,7 +1483,6 @@ struct ipr_dev {
 	u8 active_suspend;
 	u32 is_suspend_cand:1;
 	u32 is_resume_cand:1;
-	u8 write_cache_policy:1;
 	u8 supports_4k:1;
 	u8 supports_5xx:1;
 	u8 read_c7:1;

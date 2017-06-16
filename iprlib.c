@@ -3593,6 +3593,7 @@ static int ipr_set_dev_wcache_policy (const struct ipr_dev *dev, int policy)
 	char *cache_type;
 	char current_type[100];
 
+	memset(current_type, 0, sizeof(current_type));
 	sprintf(path, "/sys/class/scsi_disk/%s",
 		dev->scsi_dev_data->sysfs_device_name);
 
@@ -6646,15 +6647,6 @@ void check_current_config(bool allow_rebuild_refresh)
 				strcpy(ioa->dev[device_count].gen_name,
 				       scsi_dev_data->gen_name);
 
-				if (scsi_dev_data->type == TYPE_DISK) {
-					if (ipr_dev_wcache_policy(&(ioa->dev[device_count])) == IPR_DEV_CACHE_WRITE_BACK)
-						ioa->dev[device_count].write_cache_policy =
-							IPR_DEV_CACHE_WRITE_BACK;
-					else
-						ioa->dev[device_count].write_cache_policy =
-							IPR_DEV_CACHE_WRITE_THROUGH;
-				}
-
 				/* find array config data matching resource entry */
 				k = 0;
 				for_each_qac_entry(common_record, qac_data) {
@@ -7487,7 +7479,13 @@ int ipr_get_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 		attr->tcq_enabled = is_tagged(dev);
 
 	attr->format_timeout = get_format_timeout(dev);
-	attr->write_cache_policy = dev->write_cache_policy;
+
+	if (ipr_is_gscsi(dev) || ipr_is_volume_set(dev)) {
+		if (ipr_dev_wcache_policy(dev) == IPR_DEV_CACHE_WRITE_BACK)
+			attr->write_cache_policy = IPR_DEV_CACHE_WRITE_BACK;
+		else
+			attr->write_cache_policy = IPR_DEV_CACHE_WRITE_THROUGH;
+	}
 
 	return 0;
 }
@@ -7655,6 +7653,8 @@ int ipr_modify_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr)
 	rc = ipr_get_saved_dev_attr(dev, IPR_WRITE_CACHE_POLICY, temp);
 	if (rc == RC_SUCCESS)
 		sscanf(temp, "%d", &attr->write_cache_policy);
+	else
+		attr->write_cache_policy = IPR_DEV_CACHE_WRITE_BACK;
 
 	return 0;
 }
@@ -7738,12 +7738,14 @@ int ipr_set_dev_attr(struct ipr_dev *dev, struct ipr_disk_attr *attr, int save)
 		}
 	}
 
-	if (attr->write_cache_policy != old_attr.write_cache_policy
-	    || !attr->write_cache_policy) {
-		ipr_set_dev_wcache_policy(dev, attr->write_cache_policy);
-		if (save) {
-			sprintf(temp, "%d", attr->write_cache_policy);
-			ipr_save_dev_attr(dev, IPR_WRITE_CACHE_POLICY, temp, 1);
+	if (ipr_is_gscsi(dev) || ipr_is_volume_set(dev)) {
+		if (attr->write_cache_policy != old_attr.write_cache_policy
+		    || !attr->write_cache_policy) {
+			ipr_set_dev_wcache_policy(dev, attr->write_cache_policy);
+			if (save) {
+				sprintf(temp, "%d", attr->write_cache_policy);
+				ipr_save_dev_attr(dev, IPR_WRITE_CACHE_POLICY, temp, 1);
+			}
 		}
 	}
 
