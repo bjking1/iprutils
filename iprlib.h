@@ -1594,6 +1594,10 @@ struct ipr_ioa {
 
 #define for_each_dev(i, d) for (d = (i)->dev; (d - (i)->dev) < (i)->num_devices; d++)
 
+#define for_ioa_and_each_dev(i, d) for (d = &((i)->ioa); \
+                                       (d == &((i)->ioa)) || ((d - (i)->dev) < (i)->num_devices); \
+                                       d = (d == &((i)->ioa)) ? (i)->dev : d + 1)
+
 #define for_each_hotplug_dev(i, d) \
       for_each_dev(i, d) \
            if (ipr_is_af_dasd_device(d) || ipr_is_gscsi(d))

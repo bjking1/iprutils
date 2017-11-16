@@ -11842,7 +11842,7 @@ int download_all_ucode(i_container *i_con)
 		if (!ioa->ioa.scsi_dev_data || ioa->ioa_dead)
 			continue;
 
-		for_each_dev (ioa, dev) {
+		for_ioa_and_each_dev (ioa, dev) {
 			if (ipr_is_volume_set(dev))
 				continue;
 
@@ -15754,7 +15754,7 @@ static int update_all_ucodes(char **args, int num_args)
 	for_each_ioa(ioa) {
 		if (!ioa->ioa.scsi_dev_data)
 			continue;
-		for_each_dev(ioa, dev) {
+		for_ioa_and_each_dev(ioa, dev) {
 			if (ipr_is_volume_set(dev))
 				continue;
 
