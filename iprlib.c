@@ -8369,8 +8369,11 @@ static int fw_compare(const void *parm1,
 	struct ipr_fw_images *first = (struct ipr_fw_images *)parm1;
 	struct ipr_fw_images *second = (struct ipr_fw_images *)parm2;
 
-	return memcmp(&second->version, &first->version,
-		      sizeof(second->version));
+	if (first->version < second->version)
+		return 1;
+	if (second->version > first->version)
+		return -1;
+	return 0;
 }
 
 /**
