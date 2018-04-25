@@ -19408,11 +19408,15 @@ static const struct {
 static int non_intenactive_cmd(char *cmd, char **args, int num_args)
 {
 	int rc, i;
+	int show_details = 0;
 
 	exit_func = cmdline_exit_func;
 	closelog();
 	openlog("iprconfig", LOG_PERROR | LOG_PID | LOG_CONS, LOG_USER);
-	check_current_config(false);
+	if (!strcmp("show-details", cmd))
+		show_details = 1;
+
+	__check_current_config(false, show_details);
 
 	for (i = 0; i < ARRAY_SIZE(command); i++) {
 		if (strcmp(cmd, command[i].cmd) != 0)

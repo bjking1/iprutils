@@ -2815,6 +2815,7 @@ int ipr_change_multi_adapter_assignment(struct ipr_ioa *, int, int);
 int set_ha_mode(struct ipr_ioa *, int);
 int set_preferred_primary(struct ipr_ioa *, int);
 void check_current_config(bool);
+void __check_current_config(bool, bool);
 int num_device_opens(int, int, int, int);
 int open_and_lock(char *);
 int tool_init(int);

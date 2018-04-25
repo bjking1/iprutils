@@ -6552,13 +6552,14 @@ static int init_inquiry_c7(struct ipr_dev *dev)
 }
 
 /**
- * check_current_config - populates the ioa configuration data
+ * __check_current_config - populates the ioa configuration data
  * @allow_rebuild_refresh:	allow_rebuild_refresh flag
+ * @device_details_only:	Skip commands not needed for show-details
  *
  * Returns:
  *   nothing
  **/
-void check_current_config(bool allow_rebuild_refresh)
+void __check_current_config(bool allow_rebuild_refresh, bool device_details_only)
 {
 	struct scsi_dev_data *scsi_dev_data;
 	int num_sg_devices, rc, device_count, j, k;
@@ -6695,7 +6696,7 @@ void check_current_config(bool allow_rebuild_refresh)
 
 				/* Send Test Unit Ready to start device if its a volume set */
 				/* xxx TODO try to remove this */
-				if (!ipr_fast && ipr_is_volume_set(&ioa->dev[device_count]))
+				if (!ipr_fast && ipr_is_volume_set(&ioa->dev[device_count]) && !device_details_only)
 					__ipr_test_unit_ready(&ioa->dev[device_count], &sense_data);
 
 				device_count++;
@@ -6743,7 +6744,7 @@ void check_current_config(bool allow_rebuild_refresh)
 			for_each_ra(ra, dev)
 				memcpy(ra, &res_addr, sizeof(*ra));
 
-			if (ipr_is_gscsi(dev) || ipr_is_af_dasd_device(dev))
+			if (ipr_is_gscsi(dev) || ipr_is_af_dasd_device(dev) && !device_details_only)
 				init_inquiry_c7(dev);
 
 			if (!dev->qac_entry)
@@ -6840,6 +6841,11 @@ void check_current_config(bool allow_rebuild_refresh)
                 }
                 first_time_check_zeroed_dev = 1;
         }
+}
+
+void check_current_config(bool allow_rebuild_refresh)
+{
+	__check_current_config(allow_rebuild_refresh, 0);
 }
 
 /**
