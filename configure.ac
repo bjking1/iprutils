@@ -10,7 +10,7 @@
 AC_PREREQ([2.63])
 # For RC releases, version should be set to 2.4.10.0.rc1, 2.4.10.0.rc2, etc.
 # For GA releases, version should be set to 2.4.10.1, 2.4.10.2, etc.
-AC_INIT([iprutils], [2.4.15.1], [iprdd-devel@lists.sourceforge.net])
+AC_INIT([iprutils], [2.4.16.1], [iprdd-devel@lists.sourceforge.net])
 
 AM_INIT_AUTOMAKE([1.9 foreign])
 AC_CONFIG_MACRO_DIR([build-aux])

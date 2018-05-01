@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.15
+Version: 2.4.16
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
 %define release_prefix 1
@@ -322,6 +322,11 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Tue May 1 2018 Brian King <brking@linux.ibm.com> 2.4.16
+- Speedup for show-details 
+- Improve error messages when creating the arrays with RI and non-RI disks
+- Fix download microcode to all devices
+- Fix microcode image sorting on little endian systems
 * Mon Jun 19 2017 Brian King <brking@linux.vnet.ibm.com> 2.4.15
 - Released iprutils 2.4.15
 - Enable write cache policy for JBODs
