@@ -17780,66 +17780,64 @@ static int get_drive_phy_loc(struct ipr_ioa *ioa)
 	char phy_loc[PHYSICAL_LOCATION_LENGTH + 1];
 	int times, index;
 
-	for_each_ioa(ioa)  {
-		is_spi = ioa_is_spi(ioa);
+	is_spi = ioa_is_spi(ioa);
 
-		for_each_hotplug_dev(ioa, dev) {
+	for_each_hotplug_dev(ioa, dev) {
+		if (ioa->sis64)
+			get_res_path(dev);
+		else
+			get_res_addrs(dev);
+	}
+
+	for_each_ses(ioa, ses) {
+		times = 5;
+		if (strlen(ses->physical_location) == 0)
+			get_ses_phy_loc(ses);
+		while (times--) {
+			if (!ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
+				break;
+		}
+		if (times < 0 ) continue;
+
+		if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
+			continue;
+
+		if (ipr_receive_diagnostics(ses, 7, &drive_data, sizeof(drive_data)))
+			continue;
+
+		overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
+		ses_bus = ses->scsi_dev_data->channel;
+		scsi_id_found = 0;
+
+		if (!is_spi && (overall->device_environment == 0))
+			is_vses = 1;
+		else
+			is_vses = 0;
+
+		scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
+
+		for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
+			index = index_in_page2(&ses_data, elem_status->slot_id);
+			if (index != -1)
+				get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, index, phy_loc, 0);
+
+			if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
+				continue;
+			if (elem_status->status == IPR_DRIVE_ELEM_STATUS_NO_ACCESS)
+				continue;
+			if (is_spi && (scsi_id_found & (1 << elem_status->slot_id)))
+				continue;
+			scsi_id_found |= (1 << elem_status->slot_id);
+
 			if (ioa->sis64)
-				get_res_path(dev);
+				dev = get_dev_for_slot_64bit(ses, elem_status->slot_id, phy_loc);
 			else
-				get_res_addrs(dev);
-		}
-
-		for_each_ses(ioa, ses) {
-			times = 5;
-			if (strlen(ses->physical_location) == 0)
-				get_ses_phy_loc(ses);
-			while (times--) {
-				if (!ipr_receive_diagnostics(ses, 2, &ses_data, sizeof(ses_data)))
-					break;
-			}
-			if (times < 0 ) continue;
-
-			if (ipr_receive_diagnostics(ses, 1, &ses_cfg, sizeof(ses_cfg)))
+				dev = get_dev_for_slot(ses, elem_status->slot_id, is_vses, phy_loc);
+			if (!dev)
 				continue;
 
-			if (ipr_receive_diagnostics(ses, 7, &drive_data, sizeof(drive_data)))
-				continue;
-
-			overall = ipr_get_overall_elem(&ses_data, &ses_cfg);
-			ses_bus = ses->scsi_dev_data->channel;
-			scsi_id_found = 0;
-
-			if (!is_spi && (overall->device_environment == 0))
-				is_vses = 1;
-			else
-				is_vses = 0;
-
-			scsi_dbg(ses, "%s\n", is_vses ? "Found VSES" : "Found real SES");
-
-			for_each_elem_status(elem_status, &ses_data, &ses_cfg) {
-				index = index_in_page2(&ses_data, elem_status->slot_id);
-				if (index != -1)
-					get_drive_phy_loc_with_ses_phy_loc(ses, &drive_data, index, phy_loc, 0);
-
-				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_UNSUPP)
-					continue;
-				if (elem_status->status == IPR_DRIVE_ELEM_STATUS_NO_ACCESS)
-					continue;
-				if (is_spi && (scsi_id_found & (1 << elem_status->slot_id)))
-					continue;
-				scsi_id_found |= (1 << elem_status->slot_id);
-
-				if (ioa->sis64)
-					dev = get_dev_for_slot_64bit(ses, elem_status->slot_id, phy_loc);
-				else
-					dev = get_dev_for_slot(ses, elem_status->slot_id, is_vses, phy_loc);
-				if (!dev)
-					continue;
-
-			}
-
 		}
+
 	}
 	return 0;
 }
