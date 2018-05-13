@@ -6,4 +6,4 @@ Type=forking
 ExecStart=@sbindir@/iprinit --daemon
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=iprutils.target

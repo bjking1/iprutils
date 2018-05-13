@@ -1,0 +1,7 @@
+[Unit]
+Description=IBM Power Raid utilities
+Requires=iprupdate.service iprinit.service iprdump.service basic.target
+Before=default.target
+
+[Install]
+WantedBy=default.target
