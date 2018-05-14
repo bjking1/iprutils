@@ -7,5 +7,6 @@
 # Common Public License v1.0 which accompanies this distribution.
 #
 #
-:
-EXTRA_DIST = rules.d/
+
+udevrulesdir = @udevrulesdir@
+udevrules_DATA = 90-iprutils.rules
