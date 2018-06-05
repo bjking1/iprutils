@@ -75,6 +75,7 @@ AM_CONDITIONAL([IPRDUMPFMT], [test "x${iprdumpfmt}" = xtrue])
 
 # --with-systemd
 systemdunitdir='${exec_prefix}/lib/systemd/system/'
+udevrulesdir='${exec_prefix}/lib/udev/rules.d/'
 AC_ARG_WITH([systemd],
 	    [--without-systemd Disable systemd service files.],
 [case $withval in
@@ -91,6 +92,7 @@ AC_ARG_WITH([systemd],
  esac], [systemd=true])
 AM_CONDITIONAL([SYSTEMD], [test "x${systemd}" = xtrue])
 AC_SUBST(systemdunitdir, ${systemdunitdir})
+AC_SUBST(udevrulesdir, ${udevrulesdir})
 
 # --with-initd
 initddir="${prefix}/etc/init.d/"
@@ -159,5 +161,5 @@ AC_CHECK_FUNCS([getcwd isascii memset mkdir munmap pow setenv setlocale \
 	       socket strcasecmp strchr strncasecmp strrchr strstr \
 	       strtol strtoul strtoull])
 
-AC_CONFIG_FILES([Makefile systemd/Makefile init.d/Makefile spec/Makefile])
+AC_CONFIG_FILES([Makefile systemd/Makefile init.d/Makefile spec/Makefile udev/Makefile])
 AC_OUTPUT

@@ -33,9 +33,7 @@ static int init_all()
 	int rc = tool_init(1);
 
 	if (rc && rc != -ENXIO) {
-		if (daemonize)
-			syslog(LOG_ERR, "Run iprinit manually to ensure all ipr RAID adapters are running optimally.\n");
-		else
+		if (!daemonize)
 			syslog(LOG_ERR, "Error initializing adapters. Perhaps run with sudo?\n");
 	}
 	check_current_config(false);
@@ -94,8 +92,6 @@ int main(int argc, char *argv[])
 			rc = init_all();
 
 		if (rc) {
-			syslog(LOG_INFO, "Waiting for ipr adapters and sg module to come ready.\n");
-
 			delay_secs = 2;
 			sleep(delay_secs);
 

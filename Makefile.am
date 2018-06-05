@@ -47,6 +47,7 @@ SUBDIRS = . init.d spec
 
 if SYSTEMD
 SUBDIRS += systemd
+SUBDIRS += udev
 endif
 
 if SOSREPORT

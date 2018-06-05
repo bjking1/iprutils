@@ -7,4 +7,4 @@ Type=forking
 ExecStart=@sbindir@/iprdump --daemon
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=iprutils.target

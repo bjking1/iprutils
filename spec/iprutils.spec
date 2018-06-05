@@ -137,15 +137,6 @@ Static version of some tools of iprutils.
 %endif #SUSE
 
 %if 0%{?rhel}
-
-%if 0%{?rhel} >= 7
-# FIXME: We should be able to use systemd_post macro here, but ipr is
-# not in the preset list for RHEL.
-/usr/bin/systemctl enable iprinit.service 2>&1 1>/dev/null
-/usr/bin/systemctl enable iprupdate.service 2>&1 1>/dev/null
-/usr/bin/systemctl enable iprdump.service 2>&1 1>/dev/null
-%endif
-
 %if 0%{!?_unitdir:1} && 0%{?rhel}
 /sbin/chkconfig --add iprinit
 /sbin/chkconfig --add iprupdate
@@ -153,19 +144,11 @@ Static version of some tools of iprutils.
 %endif
 %endif #RHEL
 
-%if "%{?dist}" == "pkvm3_1"
-# FIXME: We should be able to use systemd_post macro here, but ipr is
-# not in the preset list for pkvm.
-/usr/bin/systemctl enable iprinit.service 2>&1 1>/dev/null
-/usr/bin/systemctl enable iprupdate.service 2>&1 1>/dev/null
-/usr/bin/systemctl enable iprdump.service 2>&1 1>/dev/null
-%endif
-
 # Start daemons.
 %if 0%{?_unitdir:1}%{!?_unitdir:0}
-/usr/bin/systemctl start iprinit.service || :
-/usr/bin/systemctl start iprupdate.service  || :
-/usr/bin/systemctl start iprdump.service || :
+if [ -d /sys/module/ipr ] ; then
+/usr/bin/systemctl start iprutils.target || :
+fi
 %else
 service iprinit start  || :
 service iprupdate start  || :
@@ -307,6 +290,8 @@ fi
 %{_unitdir}/iprinit.service
 %{_unitdir}/iprupdate.service
 %{_unitdir}/iprdump.service
+%{_unitdir}/iprutils.target
+%{_usr}/lib/udev/rules.d/90-iprutils.rules
 %else
 %{_initrddir}/iprinit
 %{_initrddir}/iprupdate

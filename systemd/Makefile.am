@@ -17,6 +17,7 @@ nodist_systemdunit_DATA = iprdump.service \
 	iprinit.service iprupdate.service
 EXTRA_DIST = iprdump.service.in \
 	iprinit.service.in iprupdate.service.in
+dist_systemdunit_DATA = iprutils.target
 
 clean-local:
 	-rm iprdump.service iprinit.service iprupdate.service
