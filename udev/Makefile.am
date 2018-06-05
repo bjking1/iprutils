@@ -9,4 +9,4 @@
 #
 
 udevrulesdir = @udevrulesdir@
-udevrules_DATA = 90-iprutils.rules
+dist_udevrules_DATA = 90-iprutils.rules

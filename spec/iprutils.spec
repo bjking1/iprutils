@@ -307,6 +307,8 @@ fi
 %{_unitdir}/iprinit.service
 %{_unitdir}/iprupdate.service
 %{_unitdir}/iprdump.service
+%{_unitdir}/iprutils.target
+%{_usr}/lib/udev/rules.d/90-iprutils.rules
 %else
 %{_initrddir}/iprinit
 %{_initrddir}/iprupdate
