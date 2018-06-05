@@ -20,11 +20,6 @@ AC_PROG_CC
 AC_PROG_INSTALL
 LT_INIT
 
-ncurses_include=$(ncurses5-config --cflags)
-if test -n ${ncurses_include}; then
-  CFLAGS="${CFLAGS} ${ncurses_include}"
-fi
-
 AC_ARG_ENABLE([build_static],
               [--enable-build-static Generate statically linked binaries],
 [case "${enableval}" in
@@ -138,6 +133,19 @@ AC_CHECK_LIB([z], [zlibVersion], [], [AC_ERROR("zlib not found.")])
 IPRCONFIG_LIBS="$LIBS"
 AC_SUBST([IPRCONFIG_LIBS])
 LIBS="$save_LIBS"
+
+ncurses_config=$(which ncurses5-config 2> /dev/null)
+if ! test -n ${ncurses_config}; then
+  ncurses_config=$(which ncurses6-config 2> /dev/null)
+fi
+
+if test -n ${ncurses_config}; then
+  ncurses_include=$(${ncurses_config} --cflags)
+
+  if test -n "${ncurses_include}"; then
+    CFLAGS="${CFLAGS} ${ncurses_include}"
+  fi
+fi
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h locale.h netinet/in.h nl_types.h \
