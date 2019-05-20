@@ -232,7 +232,7 @@ static int wait_for_formatted_af_dasd(int timeout_in_secs)
 	int num_devs, j, af_found, jbod2af_formats, num_secs;
 	u64 device_id;
 
-	for (num_secs = 0; num_secs < timeout_in_secs; timeout_in_secs++) {
+	for (num_secs = 0; num_secs < timeout_in_secs; num_secs++) {
 		af_found = 0;
 		jbod2af_formats = 0;
 		scsi_devs = NULL;
