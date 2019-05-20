@@ -10345,7 +10345,8 @@ int ipr_jbod_sysfs_bind(struct ipr_dev *dev, u8 op)
 	char *sysfs_device_name;
 
 	sysfs_device_name = dev->scsi_dev_data->sysfs_device_name;
-	size = strnlen(sysfs_device_name, sizeof(sysfs_device_name));
+	size = strnlen(sysfs_device_name,
+		       sizeof(dev->scsi_dev_data->sysfs_device_name));
 
 	if (op == IPR_JBOD_SYSFS_BIND) {
 		fd = open("/sys/bus/scsi/drivers/sd/bind", O_WRONLY);
@@ -10367,7 +10368,8 @@ int ipr_jbod_sysfs_bind(struct ipr_dev *dev, u8 op)
 	mp_dev = find_multipath_jbod(dev);
 	if (mp_dev) {
 		sysfs_device_name = mp_dev->scsi_dev_data->sysfs_device_name;
-		size = strnlen(sysfs_device_name, sizeof(sysfs_device_name));
+		size = strnlen(sysfs_device_name,
+			       sizeof(mp_dev->scsi_dev_data->sysfs_device_name));
 		rc = write(fd, sysfs_device_name, size);
 		if (rc < 0) {
 			close(fd);
