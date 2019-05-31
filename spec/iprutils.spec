@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.17
+Version: 2.4.18
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
 %define release_prefix 1
@@ -307,6 +307,9 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Fri May 31 2019 Brian King <brking@linux.ibm.com> 2.4.18
+- Fix format for RAID hang
+- Fix driver unbind on format
 * Fri Oct 26 2018 Brian King <brking@linux.ibm.com> 2.4.17
 - Additional speedup for show-details
 - Utilize udev rules for systemd daemon activation
