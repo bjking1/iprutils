@@ -1727,6 +1727,17 @@ struct sense_data_t {
 	u8 add_sense_bytes[0];
 };
 
+/* Structure for Descriptive Format Sense Data */
+struct df_sense_data_t {
+	u8 error_code;
+	u8 sense_key;
+	u8 add_sense_code;
+	u8 add_sense_code_qual;
+	u8 rfield;
+	u8 rsrvd[2];
+	u8 add_sense_len;
+};
+
 struct ipr_ioa_mode_page {
 	struct ipr_mode_page_hdr hdr;
 	u8 reserved;
