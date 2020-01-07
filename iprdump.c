@@ -103,6 +103,8 @@ static int read_dump(struct ipr_ioa *ioa)
 
 	sprintf(path, "/sys/class/scsi_host/%s/%s", ioa->host_name, "dump");
 	file = fopen(path, "r");
+	if (file == NULL)
+		return -1;
 	count = fread(&dump, 1 , sizeof(dump), file);
 	fclose(file);
 
