@@ -2980,6 +2980,8 @@ int hot_spare_screen(i_container *i_con)
 **/
 int raid_screen(i_container *i_con)
 {
+	free_raid_cmds();
+
 	return display_features_menu(i_con, &n_raid_screen);
 }
 
