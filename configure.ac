@@ -140,7 +140,7 @@ if ! test -n ${ncurses_config}; then
 fi
 
 if test -n ${ncurses_config}; then
-  ncurses_include=$(${ncurses_config} --cflags)
+  ncurses_include="$(${ncurses_config} --cflags)"
 
   if test -n "${ncurses_include}"; then
     CFLAGS="${CFLAGS} ${ncurses_include}"
