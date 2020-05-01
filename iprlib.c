@@ -5249,7 +5249,7 @@ int format_req(struct ipr_dev *dev)
 	if (rc < 0)
 		return 0;
 
-	if (ipr_is_gscsi(dev) && (rc != 512 || rc != 4096))
+	if (ipr_is_gscsi(dev) && (rc != 512 && rc != 4096))
 		return 1;
 
 	return 0;
