@@ -1,6 +1,6 @@
 Summary: Utilities for the IBM Power Linux RAID adapters
 Name: iprutils
-Version: 2.4.18
+Version: 2.4.19
 # For RC releases, release_prefix should be set to 0.rc1, 0.rc2, etc.
 # For GA releases, release_prefix should be set to 1, 2, 3, etc.
 %define release_prefix 1
@@ -307,6 +307,11 @@ fi
 %endif #WITH_STATIC
 
 %changelog
+* Fri May 8 2020 Brian King <brking@linux.ibm.com> 2.4.19
+- Build issue: Fix quoting of ncurses flags
+- Fix potential crash in RAID creation menus
+- Fix iprdump sigserv on non-existing dump file
+- Add support for descriptor format sense data
 * Fri May 31 2019 Brian King <brking@linux.ibm.com> 2.4.18
 - Fix format for RAID hang
 - Fix driver unbind on format
