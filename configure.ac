@@ -14,6 +14,7 @@ AC_INIT([iprutils], [2.4.19.1], [iprdd-devel@lists.sourceforge.net])
 
 AM_INIT_AUTOMAKE([1.9 foreign])
 AC_CONFIG_MACRO_DIR([build-aux])
+AC_USE_SYSTEM_EXTENSIONS
 
 # Checks for programs.
 AC_PROG_CC
