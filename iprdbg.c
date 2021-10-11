@@ -226,16 +226,18 @@ static void ipr_fgets(char *buf, int size, FILE *stream)
 {
 	int i, ch = 0;
 
-	for (i = 0; ch != EOF && i < (size - 1); i++) {
+	for (i = 0; i < (size - 1); i++) {
 		ch = fgetc(stream);
-		if (ch == '\n')
+		if (ch == '\n' || ch == EOF)
 			break;
 
 		buf[i] = ch;
 	}
 
 	buf[i] = '\0';
-	strcat(buf, "\n");
+	if(ch != EOF || i > 0) {
+		strcat(buf, "\n");
+	}
 }
 
 static void dump_data(unsigned int adx, unsigned int *buf, int len)
@@ -827,6 +829,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		printf("IPRDB(%X)> ", ioa->ccin);
 		ipr_fgets(cmd_line, 999, stdin);
+		if(!*cmd_line) break;
 		__logtofile("%s\n", SEPARATOR);
 		logtofile("%s", cmd_line);
 		exec_shell_cmd(ioa, cmd_line);
