@@ -19201,7 +19201,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 	if (rc)
 		return NULL;
 
-	smart_attr = ipr_sas_log_get_param(&page34_log, 0xE7, NULL);
+	smart_attr = ipr_sas_log_get_param(&page34_log, 0xB1, NULL);
 	if (smart_attr && smart_attr->norm_worst_val > 0)
 		life_remain = smart_attr->norm_worst_val;
 
@@ -19215,7 +19215,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 
 	bytes_counter = ipr_sas_log_get_param(&page02_log, 0x05, NULL);
 	if (bytes_counter)
-		total_gb_writ = be64toh(*(u64 *) &bytes_counter->counter) >> 14;
+		total_gb_writ = ntohl(*(u64 *) &bytes_counter->counter) >> 8;
 
 	rc = ipr_log_sense(dev, 0x2F, &page2F_log, sizeof(page2F_log));
 	if (rc)
@@ -19254,7 +19254,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 	body = add_line_to_body(body, _("Firmware Version"), buffer);
 
 	/* Bytes written */
-	snprintf(buffer, BUFSIZ, "%ld GB", total_gb_writ);
+	snprintf(buffer, BUFSIZ, "%ld GB", total_gb_writ * 1024L);
 	body = add_line_to_body(body, _("Total Bytes Written"), buffer);
 
 	/* Max bytes. */
