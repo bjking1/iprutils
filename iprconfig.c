@@ -19152,7 +19152,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 	struct ipr_sas_log_write_err_cnt_attr *bytes_counter;
 
 	char buffer[BUFSIZ];
-	int rc, len, nentries = 0;
+	int rc, len;
 	u64 aux;
 	u64 total_gb_writ = 0;
 	u32 uptime = 0;
@@ -19201,7 +19201,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 	if (rc)
 		return NULL;
 
-	smart_attr = ipr_sas_log_get_param(&page34_log, 0xE7, NULL);
+	smart_attr = ipr_sas_log_get_param(&page34_log, 0xB1, NULL);
 	if (smart_attr && smart_attr->norm_worst_val > 0)
 		life_remain = smart_attr->norm_worst_val;
 
@@ -19215,17 +19215,14 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 
 	bytes_counter = ipr_sas_log_get_param(&page02_log, 0x05, NULL);
 	if (bytes_counter)
-		total_gb_writ = be64toh(*(u64 *) &bytes_counter->counter) >> 14;
+		total_gb_writ = be64toh(*((u64 *) &bytes_counter->counter))/1024/1024/1024;
 
 	rc = ipr_log_sense(dev, 0x2F, &page2F_log, sizeof(page2F_log));
 	if (rc)
 		return NULL;
-
-	inf_except_attr = ipr_sas_log_get_param(&page2F_log, 0x0, &nentries);
+	inf_except_attr = ipr_sas_log_get_param(&page2F_log, 0x0, NULL);
 	if (inf_except_attr)
 		pfa_trip = inf_except_attr->inf_except_add_sense_code;
-	if (nentries > 1)
-		pfa_trip = 1;
 
 	body = add_line_to_body(body, "", NULL);
 	/* FRU Number */
@@ -19254,7 +19251,7 @@ static char *print_ssd_report(struct ipr_dev *dev, char *body)
 	body = add_line_to_body(body, _("Firmware Version"), buffer);
 
 	/* Bytes written */
-	snprintf(buffer, BUFSIZ, "%ld GB", total_gb_writ);
+	snprintf(buffer, BUFSIZ, "%llu GB", total_gb_writ);
 	body = add_line_to_body(body, _("Total Bytes Written"), buffer);
 
 	/* Max bytes. */
